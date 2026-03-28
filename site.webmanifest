@@ -1,0 +1,16 @@
+{
+  "name": "Hashinmy",
+  "short_name": "Hashinmy",
+  "description": "Software a la medida, inteligencia artificial aplicada, nube, páginas web y chatbots empresariales.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07111e",
+  "theme_color": "#07111e",
+  "icons": [
+    {
+      "src": "./logo_Hashinmy.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

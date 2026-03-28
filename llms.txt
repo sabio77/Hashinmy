@@ -1,0 +1,32 @@
+# Hashinmy
+
+Hashinmy es una empresa de software a la medida enfocada en programas para PC, software web, almacenamiento en la nube, inteligencia artificial aplicada, cotizadores técnicos, páginas web y chatbots empresariales.
+
+## Propuesta principal
+Hashinmy ayuda a empresas que necesitan ordenar procesos, acelerar cotizaciones, proteger información y crecer con una operación más clara mediante soluciones de software diseñadas alrededor de su lógica real de negocio.
+
+## Servicios principales
+- Desarrollo de software a la medida
+- Programas para PC instalables
+- Sistemas web y paneles administrativos
+- Respaldo y sincronización en la nube
+- Inteligencia artificial aplicada al negocio
+- Software de cotizaciones técnicas y aprovechamiento de material
+- Landing pages y páginas web corporativas
+- Chatbots empresariales
+
+## Diferenciales
+- Enfoque técnico y comercial
+- Arquitectura preparada para crecer
+- Integración entre escritorio, web, nube e IA
+- Especialización útil para cotización técnica y operación empresarial
+- Trabajo por fases con claridad funcional
+
+## Sectores donde puede aportar mucho valor
+- Carpinterías y mobiliario
+- Metalmecánica y fabricación
+- Empresas comerciales
+- Negocios de servicios
+
+## URL principal
+- https://www.hashinmy.com/
