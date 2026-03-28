@@ -1,16 +1,23 @@
 {
-  "name": "Hashinmy",
+  "name": "Hashinmy | Software a la medida",
   "short_name": "Hashinmy",
-  "description": "Software a la medida, inteligencia artificial aplicada, nube, páginas web y chatbots empresariales.",
-  "start_url": "/",
+  "description": "Software a la medida para empresas: programas para PC, software web, nube, IA aplicada y chatbots empresariales.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#07111e",
   "theme_color": "#07111e",
+  "lang": "es-CO",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "technology"],
   "icons": [
     {
-      "src": "./logo_Hashinmy.png",
+      "src": "https://www.hashinmy.com/logo_Hashinmy.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
