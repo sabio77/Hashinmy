@@ -127,6 +127,93 @@
     status.className = `form-status${type ? ` is-${type}` : ''}`;
   };
 
+  const escapeHTML = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const getFirstName = (fullName) => {
+    const cleanName = String(fullName || '').trim();
+    if (!cleanName) return 'Hola';
+    const [firstName] = cleanName.split(/\s+/);
+    return firstName || cleanName;
+  };
+
+  let toastHideTimeout = null;
+
+  const hideFloatingMessage = () => {
+    const toast = document.getElementById('contactFloatingToast');
+    if (!toast) return;
+    toast.classList.remove('is-visible');
+    if (toastHideTimeout) {
+      clearTimeout(toastHideTimeout);
+      toastHideTimeout = null;
+    }
+  };
+
+  const createFloatingMessage = () => {
+    let toast = document.getElementById('contactFloatingToast');
+    if (toast) return toast;
+
+    toast = document.createElement('div');
+    toast.id = 'contactFloatingToast';
+    toast.className = 'contact-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.innerHTML = `
+      <div class="contact-toast__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M9.55 16.6 5.4 12.45l1.4-1.4 2.75 2.75 7-7 1.4 1.4-8.4 8.4Z"></path>
+        </svg>
+      </div>
+      <div class="contact-toast__content">
+        <strong class="contact-toast__title"></strong>
+        <p class="contact-toast__text"></p>
+      </div>
+      <button class="contact-toast__close" type="button" aria-label="Cerrar mensaje">×</button>
+      <div class="contact-toast__progress"></div>
+    `;
+
+    document.body.appendChild(toast);
+
+    const closeButton = toast.querySelector('.contact-toast__close');
+    if (closeButton) {
+      closeButton.addEventListener('click', () => hideFloatingMessage());
+    }
+
+    return toast;
+  };
+
+  const showFloatingMessage = (payload) => {
+    const toast = createFloatingMessage();
+    const title = toast.querySelector('.contact-toast__title');
+    const text = toast.querySelector('.contact-toast__text');
+    const firstName = getFirstName(payload.nombre);
+    const empresaTexto = payload.empresa ? ` de ${payload.empresa}` : '';
+    const servicioTexto = payload.servicio ? ` para ${payload.servicio.toLowerCase()}` : '';
+    const contactoTexto = payload.telefono || payload.email;
+
+    if (title) {
+      title.textContent = `${firstName}, recibimos tu solicitud`;
+    }
+
+    if (text) {
+      text.innerHTML = `${escapeHTML(firstName)}, gracias por escribirnos${empresaTexto ? escapeHTML(empresaTexto) : ''}. Ya registramos tu solicitud${servicioTexto ? escapeHTML(servicioTexto) : ''} y pronto un asesor te contactará${contactoTexto ? ` al ${escapeHTML(contactoTexto)}` : ''}.`;
+    }
+
+    toast.classList.remove('is-visible');
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
+
+    if (toastHideTimeout) clearTimeout(toastHideTimeout);
+    toastHideTimeout = setTimeout(() => {
+      toast.classList.remove('is-visible');
+      toastHideTimeout = null;
+    }, 8500);
+  };
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity()) return;
@@ -146,26 +233,28 @@
       return;
     }
 
-    const outbound = {...payload};
+    const outbound = { ...payload };
 
     try {
       if (submitButton) submitButton.disabled = true;
+      hideFloatingMessage();
       setStatus('Enviando solicitud...', '');
 
-	const response = await fetch("https://mapsx.app/enviar-formX", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-mapsx-token": window.location.hostname
-            },
-            body: JSON.stringify(outbound)
-          });
+      const response = await fetch('https://mapsx.app/enviar-formX', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-mapsx-token': window.location.hostname
+        },
+        body: JSON.stringify(outbound)
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      setStatus('Solicitud enviada correctamente. Te contactaremos pronto.', 'success');
+      setStatus(`Solicitud enviada correctamente, ${payload.nombre}. Te contactaremos pronto.`, 'success');
+      showFloatingMessage(payload);
       form.reset();
     } catch (error) {
       console.error('No se pudo enviar la solicitud:', error);

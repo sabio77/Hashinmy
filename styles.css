@@ -276,3 +276,122 @@ textarea{min-height:130px;resize:vertical}
   .hero-grid.hero-grid-diagonal .service-hero-copy,
   .hero-grid.hero-grid-diagonal .service-hero-visual{margin:0}
 }
+
+
+.contact-toast{
+  position:fixed;
+  right:22px;
+  bottom:22px;
+  z-index:45;
+  width:min(calc(100vw - 28px), 430px);
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:14px;
+  align-items:start;
+  padding:18px 18px 20px;
+  border-radius:24px;
+  border:1px solid rgba(6,118,71,.18);
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(240,255,247,.96));
+  box-shadow:0 30px 70px rgba(6,118,71,.18);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  color:var(--text);
+  opacity:0;
+  transform:translate3d(0,24px,0) scale(.98);
+  pointer-events:none;
+  transition:opacity .32s ease, transform .32s ease;
+  overflow:hidden;
+}
+.contact-toast.is-visible{
+  opacity:1;
+  transform:translate3d(0,0,0) scale(1);
+  pointer-events:auto;
+}
+.contact-toast__icon{
+  width:54px;
+  height:54px;
+  border-radius:18px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(135deg,#14b86d,#32d583);
+  color:#fff;
+  box-shadow:0 14px 30px rgba(20,184,109,.28);
+  flex:0 0 auto;
+}
+.contact-toast__icon svg{
+  width:28px;
+  height:28px;
+  display:block;
+  fill:currentColor;
+}
+.contact-toast__content{
+  min-width:0;
+}
+.contact-toast__title{
+  display:block;
+  margin:1px 0 6px;
+  font-size:17px;
+  line-height:1.25;
+  color:#067647;
+}
+.contact-toast__text{
+  margin:0;
+  color:var(--text-soft);
+  font-size:14px;
+  line-height:1.7;
+}
+.contact-toast__close{
+  width:34px;
+  height:34px;
+  border:none;
+  border-radius:12px;
+  background:rgba(6,118,71,.08);
+  color:#067647;
+  font:inherit;
+  font-size:24px;
+  line-height:1;
+  cursor:pointer;
+  transition:background .2s ease, transform .2s ease;
+}
+.contact-toast__close:hover{
+  background:rgba(6,118,71,.14);
+  transform:scale(1.04);
+}
+.contact-toast__progress{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:4px;
+  background:linear-gradient(90deg,#12b76a,#6ce9a6);
+  transform-origin:left center;
+  transform:scaleX(0);
+}
+.contact-toast.is-visible .contact-toast__progress{
+  animation:contactToastProgress 8.5s linear forwards;
+}
+
+@keyframes contactToastProgress{
+  from{transform:scaleX(1)}
+  to{transform:scaleX(0)}
+}
+
+@media (max-width:760px){
+  .contact-toast{
+    right:14px;
+    left:14px;
+    bottom:14px;
+    width:auto;
+    grid-template-columns:auto 1fr auto;
+    padding:16px 16px 18px;
+    border-radius:22px;
+  }
+  .contact-toast__icon{
+    width:48px;
+    height:48px;
+    border-radius:16px;
+  }
+  .contact-toast__title{
+    font-size:16px;
+  }
+}
