@@ -3,6 +3,66 @@
   <url>
     <loc>https://www.hashinmy.com/</loc>
     <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/desarrollo-software-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/software-a-la-medida-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/desarrollo-software-medellin.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/software-para-carpinterias.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/cotizador-tecnico-aprovechamiento-material.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/paginas-web-seo-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/chatbots-empresariales-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/desarrollo-aplicaciones-web-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/desarrollo-aplicaciones-moviles-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/desarrollo-api-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/software-seguro-empresas-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.71</priority>
+  </url>
+  <url>
+    <loc>https://www.hashinmy.com/transformacion-digital-empresas-colombia.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.71</priority>
   </url>
 </urlset>

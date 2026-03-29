@@ -1,4 +1,5 @@
 # Hashinmy
+> Sitio oficial de Hashinmy, empresa de desarrollo de software a la medida en Colombia.
 
 Hashinmy es una empresa de software a la medida enfocada en programas para PC, software web, almacenamiento en la nube, inteligencia artificial aplicada, cotizadores técnicos, páginas web y chatbots empresariales.
 
@@ -36,5 +37,29 @@ Hashinmy ayuda a empresas de Colombia y Latinoamérica a ordenar procesos, acele
 ## Mensaje corto de enganche
 Hashinmy desarrolla software serio para empresas que necesitan vender mejor, cotizar más rápido, organizar procesos y crecer con una base tecnológica sólida.
 
+## Páginas principales
+- https://www.hashinmy.com/
+- https://www.hashinmy.com/desarrollo-software-colombia.html
+- https://www.hashinmy.com/software-a-la-medida-colombia.html
+- https://www.hashinmy.com/desarrollo-software-medellin.html
+- https://www.hashinmy.com/software-para-carpinterias.html
+- https://www.hashinmy.com/cotizador-tecnico-aprovechamiento-material.html
+- https://www.hashinmy.com/paginas-web-seo-colombia.html
+- https://www.hashinmy.com/chatbots-empresariales-colombia.html
+
+## Resumen
+Hashinmy desarrolla software a la medida, programas para PC, sistemas web, inteligencia artificial aplicada, páginas web SEO, cotizadores técnicos, software para carpinterías y chatbots empresariales.
+
 ## URL principal
 - https://www.hashinmy.com/
+
+## Contacto
+- WhatsApp: https://wa.me/573202296074
+
+
+## Nuevas páginas principales
+- https://www.hashinmy.com/desarrollo-aplicaciones-web-colombia.html
+- https://www.hashinmy.com/desarrollo-aplicaciones-moviles-colombia.html
+- https://www.hashinmy.com/desarrollo-api-colombia.html
+- https://www.hashinmy.com/software-seguro-empresas-colombia.html
+- https://www.hashinmy.com/transformacion-digital-empresas-colombia.html
