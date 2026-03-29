@@ -195,12 +195,15 @@
     const servicioTexto = payload.servicio ? ` para ${payload.servicio.toLowerCase()}` : '';
     const contactoTexto = payload.telefono || payload.email;
 
+    const primerNombre = payload.nombre.trim().split(/\s+/)[0];
+    const nombreFormateado = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
+
     if (title) {
-      title.textContent = `${firstName}, recibimos tu solicitud`;
+      title.textContent = `${nombreFormateado}, recibimos tu solicitud`;
     }
 
     if (text) {
-      text.innerHTML = `${escapeHTML(firstName)}, gracias por escribirnos${empresaTexto ? escapeHTML(empresaTexto) : ''}. Ya registramos tu solicitud${servicioTexto ? escapeHTML(servicioTexto) : ''} y pronto un asesor te contactará${contactoTexto ? ` al ${escapeHTML(contactoTexto)}` : ''}.`;
+      text.innerHTML = `${escapeHTML(nombreFormateado)}, gracias por escribirnos${empresaTexto ? escapeHTML(empresaTexto) : ''}. Ya registramos tu solicitud${servicioTexto ? escapeHTML(servicioTexto) : ''} y pronto un asesor te contactará${contactoTexto ? ` al ${escapeHTML(contactoTexto)}` : ''}.`;
     }
 
     toast.classList.remove('is-visible');
@@ -252,9 +255,6 @@
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-
-      const primerNombre = payload.nombre.trim().split(/\s+/)[0];
-      const nombreFormateado = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
       
       setStatus(`Solicitud enviada correctamente. ${nombreFormateado}, Te contactaremos pronto.`, 'success');
 
