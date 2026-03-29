@@ -156,11 +156,12 @@
       if (submitButton) submitButton.disabled = true;
       setStatus('Enviando solicitud...', '');
 
+	const dominio = window.location.hostname;
 	const response = await fetch("https://mapsx.app/enviar-form", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-mapsx-token": "${dominio}"
+              "x-mapsx-token": `"${dominio}"`
             },
             body: JSON.stringify(outbound)
           });
