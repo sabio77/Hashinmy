@@ -139,7 +139,6 @@
       telefono: String(formData.get('telefono') || '').trim(),
       servicio: String(formData.get('servicio') || '').trim(),
       mensaje: String(formData.get('mensaje') || '').trim(),
-      origen: 'hashinmy_web'
     };
 
     if (!payload.empresa || !payload.nombre || !payload.email || !payload.telefono || !payload.servicio || !payload.mensaje) {
@@ -147,10 +146,7 @@
       return;
     }
 
-    const outbound = {
-      ...payload,
-      text: `Nueva solicitud desde Hashinmy\nEmpresa: ${payload.empresa}\nNombre: ${payload.nombre}\nEmail: ${payload.email}\nTeléfono: ${payload.telefono}\nServicio: ${payload.servicio}\nMensaje: ${payload.mensaje}`
-    };
+    const outbound = {...payload};
 
     try {
       if (submitButton) submitButton.disabled = true;
