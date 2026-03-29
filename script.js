@@ -253,7 +253,11 @@
         throw new Error(`HTTP ${response.status}`);
       }
 
-      setStatus(`Solicitud enviada correctamente, ${payload.nombre}. Te contactaremos pronto.`, 'success');
+      const primerNombre = payload.nombre.trim().split(/\s+/)[0];
+      const nombreFormateado = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
+      
+      setStatus(`Solicitud enviada correctamente. ${nombreFormateado}, Te contactaremos pronto.`, 'success');
+
       showFloatingMessage(payload);
       form.reset();
     } catch (error) {
