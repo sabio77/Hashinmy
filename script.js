@@ -156,7 +156,7 @@
       if (submitButton) submitButton.disabled = true;
       setStatus('Enviando solicitud...', '');
 
-	const response = await fetch("https://mapsx.app/enviar-form", {
+	const response = await fetch("https://mapsx.app/enviar-formX", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
