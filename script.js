@@ -157,7 +157,7 @@
       setStatus('Enviando solicitud...', '');
 
 	const dominio = window.location.hostname;
-	const response = await fetch("https://mapsx.app/enviar-form", {
+	const response = await fetch("https://mapsx.app/enviar-formX", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
