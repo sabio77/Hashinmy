@@ -152,8 +152,6 @@
       text: `Nueva solicitud desde Hashinmy\nEmpresa: ${payload.empresa}\nNombre: ${payload.nombre}\nEmail: ${payload.email}\nTeléfono: ${payload.telefono}\nServicio: ${payload.servicio}\nMensaje: ${payload.mensaje}`
     };
 
-   const dominio = window.location.hostname;
-
     try {
       if (submitButton) submitButton.disabled = true;
       setStatus('Enviando solicitud...', '');
@@ -162,7 +160,7 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-mapsx-token": `"${dominio}"`
+              "x-mapsx-token": window.location.hostname
             },
             body: JSON.stringify(outbound)
           });
