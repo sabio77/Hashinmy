@@ -45,6 +45,7 @@
   </script>
   <link rel="icon" type="image/png" href="./assets/hashinmy-logo-emblem.png" />
   <link rel="apple-touch-icon" href="./assets/hashinmy-logo-emblem.png" />
+  <link rel="preload" as="image" href="./assets/hashinmy-logo-emblem.png" fetchpriority="high" />
   <meta name="description" content="" data-i18n-content="meta.description" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Hashinmy" data-i18n-content="meta.applicationName" />
@@ -289,7 +290,18 @@
   <link rel="stylesheet" href="./css/hashinmy-immersive.css" />
 </head>
 <body>
-  <main class="hm-experience" id="hmExperience" aria-live="polite">
+  <section class="hm-page-loader" id="hmPageLoader" role="status" aria-live="polite" aria-label="Hashinmy cargando">
+    <div class="hm-page-loader__surface">
+      <span class="hm-page-loader__mark" aria-hidden="true">
+        <img class="hm-page-loader__logo" src="./assets/hashinmy-logo-emblem.png" alt="" decoding="async" loading="eager" fetchpriority="high" onload="this.parentElement.classList.add('has-logo-image')" onerror="this.hidden=true;this.parentElement.classList.add('is-logo-fallback')" />
+        <span>H</span>
+      </span>
+      <strong class="hm-page-loader__brand">Hashinmy</strong>
+      <span class="hm-page-loader__message">cargando...</span>
+    </div>
+  </section>
+
+  <main class="hm-experience" id="hmExperience" aria-live="polite" aria-busy="true">
     <a class="hm-skip" href="#hmQuestion" data-i18n-text="ui.skip"></a>
 
     <section class="hm-stage" data-i18n-aria="ui.stageLabel" aria-label="" aria-busy="false">

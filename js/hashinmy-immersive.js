@@ -57,6 +57,8 @@
   const RESPONSIVE_FIT_CHECK_DELAYS_MS = [0, 140, 420, 920];
   const CRAMPED_VIEWPORT_HEIGHT_PX = 640;
   const CRAMPED_VIEWPORT_WIDTH_PX = 430;
+  const INITIAL_LOADER_CONFIRM_DELAY_MS = 100;
+  const INITIAL_LOADER_EXIT_DURATION_MS = 460;
 
   let paisORIGEN = '';
   // No eliminar: paisORIGEN inicia en blanco y será alimentada por una futura API de memoriaBACKEND
@@ -4757,6 +4759,7 @@
   }
 
   function bindElements() {
+    elements.pageLoader = $('#hmPageLoader');
     elements.experience = $('#hmExperience');
     elements.stage = $('.hm-stage');
     elements.languageWrap = $('#hmLanguageSelectorWrap');
@@ -5175,6 +5178,26 @@
     });
   }
 
+  function finishInitialPageLoader(reason = 'ready') {
+    const pageLoader = elements.pageLoader || $('#hmPageLoader');
+    if (!pageLoader || pageLoader.dataset.state === 'done' || pageLoader.dataset.state === 'closing') return;
+
+    pageLoader.dataset.state = 'closing';
+    pageLoader.dataset.readyReason = reason;
+    document.documentElement.dataset.appReady = 'true';
+    if (elements.experience) elements.experience.setAttribute('aria-busy', 'false');
+
+    window.setTimeout(() => {
+      pageLoader.hidden = true;
+      pageLoader.dataset.state = 'done';
+      document.body?.classList.add('hm-page-ready');
+    }, INITIAL_LOADER_EXIT_DURATION_MS);
+  }
+
+  function scheduleInitialPageLoaderRelease(reason = 'ready') {
+    window.setTimeout(() => finishInitialPageLoader(reason), INITIAL_LOADER_CONFIRM_DELAY_MS);
+  }
+
   async function init() {
     bindElements();
     renderProofLogos();
@@ -5238,11 +5261,19 @@
     window.addEventListener('popstate', () => {
       applySeoRouteFromLocation({ replaceHistory: false });
     });
+    scheduleInitialPageLoaderRelease('init-complete');
+  }
+
+  function runInit() {
+    init().catch((error) => {
+      console.error('Hashinmy: la experiencia principal no pudo completar la inicialización.', error);
+      scheduleInitialPageLoaderRelease('init-error');
+    });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
+    document.addEventListener('DOMContentLoaded', runInit, { once: true });
   } else {
-    init();
+    runInit();
   }
 })();
