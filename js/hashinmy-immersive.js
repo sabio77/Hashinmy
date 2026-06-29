@@ -116,6 +116,14 @@
     'ui.submitRoute',
     'scenes.intro.insight',
     'scenes.serviceFamily.insight',
+    'scenes.buildType.insight',
+    'scenes.automationType.insight',
+    'scenes.modernization.insight',
+    'scenes.operation.insight',
+    'scenes.value.insight',
+    'scenes.risk.insight',
+    'scenes.finance.insight',
+    'scenes.timeline.insight',
     'scenes.summary.insight'
   ];
   const REQUIRED_TEXT_SCENES = ['intro', 'serviceFamily', 'buildType', 'automationType', 'modernization', 'operation', 'value', 'risk', 'finance', 'timeline', 'summary'];
@@ -664,8 +672,9 @@
   const baseScenes = {
     intro: {
       options: [
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'sin_financiacion' }] },
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }], priority: 'high' }
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }], priority: 'high' },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'sin_financiacion' }] }
       ]
     },
     serviceFamily: {
@@ -1497,7 +1506,7 @@
     } catch {}
     return normalized
       .replace(/<[^>]*>/g, ' ')
-      .replace(/[^a-z0-9áéíóúñü¿?¡!]+/giu, ' ')
+      .replace(/[^\p{L}\p{N}¿?¡!]+/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -1950,6 +1959,172 @@
     };
   }
 
+  const BRAND_HOME_SCHEMA_SERVICE_MAP = [
+    ['software-a-medida', 'service-custom-software'],
+    ['ia-para-empresas', 'service-ai-automation'],
+    ['automatizacion-procesos', 'service-business-automation'],
+    ['financiacion-proyecto', 'service-financed-development'],
+    ['diagnostico-tecnico', 'service-business-diagnosis'],
+    ['chatbots-empresariales', 'service-web-seo-chatbots'],
+    ['cotizador-tecnico-aprovechamiento', 'service-technical-quoter']
+  ];
+
+  function getSeoItemById(id = '', bundle = getSeoBundle()) {
+    const targetId = String(id || '').trim();
+    if (!targetId) return null;
+    return (Array.isArray(bundle?.items) ? bundle.items : []).find((item) => item?.id === targetId) || null;
+  }
+
+  function uniqueStructuredTextList(values = [], limit = 24) {
+    const seen = new Set();
+    return (Array.isArray(values) ? values : [])
+      .flatMap((value) => Array.isArray(value) ? value : [value])
+      .map((value) => compactSeoVisibleText(value, 140))
+      .filter((value) => {
+        const key = normalizeSeoVisibleSignature(value);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, Math.max(1, Number(limit) || 24));
+  }
+
+  function getBrandStructuredDescription(bundle = getSeoBundle()) {
+    return compactSeoVisibleText(
+      t('meta.description', '') || t('meta.ogDescription', '') || bundle?.hubLead || bundle?.hubMetaDescription || 'Hashinmy',
+      520
+    );
+  }
+
+  function getBrandStructuredSlogan(bundle = getSeoBundle()) {
+    return compactSeoVisibleText(
+      t('meta.ogTitle', '') || t('meta.title', '') || bundle?.hubTitle || getBrandStructuredDescription(bundle),
+      180
+    );
+  }
+
+  function getBrandKnowsAboutTerms(bundle = getSeoBundle()) {
+    const textBundle = currentText();
+    const services = Array.isArray(textBundle?.services) ? textBundle.services : [];
+    const mappedItems = BRAND_HOME_SCHEMA_SERVICE_MAP.map(([itemId]) => getSeoItemById(itemId, bundle)).filter(Boolean);
+    const keywords = String(t('meta.keywords', '') || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    return uniqueStructuredTextList([
+      bundle?.hubTitle,
+      bundle?.hubLead,
+      t('valueLabels.financiamiento_100', ''),
+      t('valueLabels.modernizacion_operativa', ''),
+      t('valueLabels.automatizacion_ia', ''),
+      t('valueLabels.software_online', ''),
+      ...services.map((service) => service?.label),
+      ...mappedItems.flatMap((item) => [
+        item?.title,
+        item?.eyebrow,
+        item?.summary,
+        ...(Array.isArray(item?.keywords) ? item.keywords : []),
+        ...(Array.isArray(item?.terms) ? item.terms.map((entry) => entry?.term) : [])
+      ]),
+      ...keywords
+    ], 26);
+  }
+
+  function buildBrandOrganizationStructuredData(bundle = getSeoBundle()) {
+    return {
+      '@type': 'Organization',
+      '@id': 'https://hashinmy.com/#organization',
+      name: 'Hashinmy',
+      url: 'https://hashinmy.com/',
+      logo: 'https://hashinmy.com/assets/hashinmy-logo-emblem.png',
+      description: getBrandStructuredDescription(bundle),
+      slogan: getBrandStructuredSlogan(bundle),
+      areaServed: 'Global',
+      knowsAbout: getBrandKnowsAboutTerms(bundle),
+      sameAs: []
+    };
+  }
+
+  function buildBrandOfferCatalogStructuredData(bundle = getSeoBundle()) {
+    const textBundle = currentText();
+    const fallbackServices = Array.isArray(textBundle?.services) ? textBundle.services : [];
+    return {
+      '@type': 'OfferCatalog',
+      '@id': 'https://hashinmy.com/#offer-catalog',
+      name: bundle?.hubTitle || t('meta.ogTitle', 'Hashinmy'),
+      description: bundle?.hubLead || getBrandStructuredDescription(bundle),
+      itemListElement: BRAND_HOME_SCHEMA_SERVICE_MAP.map(([itemId, schemaId], index) => {
+        const item = getSeoItemById(itemId, bundle);
+        const fallback = fallbackServices[index] || {};
+        const name = item?.title || fallback.label || `Hashinmy ${index + 1}`;
+        const description = item?.metaDescription || item?.summary || item?.simple || fallback.tech || name;
+        return {
+          '@type': 'Offer',
+          position: index + 1,
+          itemOffered: {
+            '@type': 'Service',
+            '@id': `https://hashinmy.com/#${schemaId}`,
+            name,
+            serviceType: item?.eyebrow || item?.category || fallback.tech || name,
+            description,
+            provider: { '@id': 'https://hashinmy.com/#organization' },
+            areaServed: 'Global'
+          }
+        };
+      })
+    };
+  }
+
+  function buildHomeSeoItemListStructuredData(pageUrl, bundle = getSeoBundle()) {
+    const items = getSeoItems().map((item, index) => {
+      const itemUrl = buildSeoPublicUrl(item.url);
+      return {
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.title,
+        url: itemUrl,
+        item: {
+          '@type': getSeoPrimaryEntityType(item),
+          '@id': getSeoPrimaryEntityId(item, itemUrl),
+          name: item.title,
+          description: item.summary,
+          url: itemUrl
+        }
+      };
+    });
+
+    return {
+      '@type': 'ItemList',
+      '@id': `${pageUrl}#itemlist`,
+      name: bundle?.hubTitle || 'Hashinmy',
+      description: bundle?.hubLead || getBrandStructuredDescription(bundle),
+      itemListElement: items
+    };
+  }
+
+  function buildHomeFaqStructuredData(pageUrl) {
+    const faqs = [
+      [t('ui.proofFaqWhyQuestion', ''), t('ui.proofFaqWhyAnswer', '')],
+      [t('ui.proofFaqWhoQuestion', ''), t('ui.proofFaqWhoAnswer', '')],
+      [t('ui.proofFaqStartQuestion', ''), t('ui.proofFaqStartAnswer', '')]
+    ].filter(([question, answer]) => String(question || '').trim() && String(answer || '').trim());
+
+    if (!faqs.length) return null;
+    return {
+      '@type': 'FAQPage',
+      '@id': `${pageUrl}#faq`,
+      mainEntity: faqs.map(([question, answer]) => ({
+        '@type': 'Question',
+        name: question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: answer
+        }
+      }))
+    };
+  }
+
   function syncSeoStructuredData() {
     const node = document.getElementById('hmStructuredData');
     if (!node) return;
@@ -1961,34 +2136,10 @@
     const pageDescription = activeItem?.metaDescription || bundle?.hubMetaDescription || t('meta.description', '');
     const definedTerms = activeItem ? getSeoDefinedTerms(activeItem, pageUrl) : [];
     const primaryEntityId = activeItem ? getSeoPrimaryEntityId(activeItem, pageUrl) : `${pageUrl}#itemlist`;
-    const itemList = state.seoHubOpen && !activeItem
-      ? getSeoItems().map((item, index) => {
-        const itemUrl = buildSeoPublicUrl(item.url);
-        return {
-          '@type': 'ListItem',
-          position: index + 1,
-          name: item.title,
-          url: itemUrl,
-          item: {
-            '@type': getSeoPrimaryEntityType(item),
-            '@id': getSeoPrimaryEntityId(item, itemUrl),
-            name: item.title,
-            description: item.summary,
-            url: itemUrl
-          }
-        };
-      })
-      : [];
     const faqs = getSeoItemFaqs(activeItem, SEO_FINAL_VISIBLE_LIMITS.faqs);
 
     const graph = [
-      {
-        '@type': 'Organization',
-        '@id': 'https://hashinmy.com/#organization',
-        name: 'Hashinmy',
-        url: 'https://hashinmy.com/',
-        logo: 'https://hashinmy.com/assets/hashinmy-logo-emblem.png'
-      },
+      buildBrandOrganizationStructuredData(bundle),
       {
         '@type': 'WebSite',
         '@id': 'https://hashinmy.com/#website',
@@ -2034,13 +2185,12 @@
           }))
         });
       }
-    } else if (itemList.length) {
-      graph.push({
-        '@type': 'ItemList',
-        '@id': `${pageUrl}#itemlist`,
-        name: bundle?.hubTitle || 'Hashinmy products',
-        itemListElement: itemList
-      });
+    } else {
+      const homeItemList = buildHomeSeoItemListStructuredData(pageUrl, bundle);
+      if (homeItemList.itemListElement.length) graph.push(homeItemList);
+      graph.push(buildBrandOfferCatalogStructuredData(bundle));
+      const homeFaq = buildHomeFaqStructuredData(pageUrl);
+      if (homeFaq) graph.push(homeFaq);
     }
 
     try {

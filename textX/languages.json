@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "defaultLanguage": "es",
-  "generatedAt": "2026-06-26T14:30:17.466Z",
+  "generatedAt": "2026-06-29T21:46:36.336Z",
   "source": "detected-from-textX-and-textX-seo",
   "languages": [
     {
@@ -23,6 +23,13 @@
       "name": "German",
       "nativeName": "Deutsch",
       "htmlLang": "de",
+      "dir": "ltr"
+    },
+    {
+      "code": "el",
+      "name": "Greek",
+      "nativeName": "Ελληνικά",
+      "htmlLang": "el",
       "dir": "ltr"
     }
   ]

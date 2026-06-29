@@ -30,6 +30,17 @@ const SEO_FINAL_VISIBLE_LIMITS = {
 };
 
 
+const STATIC_BRAND_HOME_SCHEMA_SERVICE_MAP = [
+  ['software-a-medida', 'service-custom-software'],
+  ['ia-para-empresas', 'service-ai-automation'],
+  ['automatizacion-procesos', 'service-business-automation'],
+  ['financiacion-proyecto', 'service-financed-development'],
+  ['diagnostico-tecnico', 'service-business-diagnosis'],
+  ['chatbots-empresariales', 'service-web-seo-chatbots'],
+  ['cotizador-tecnico-aprovechamiento', 'service-technical-quoter']
+];
+
+
 const DENSE_SCRIPT_LANGUAGE_CODES = new Set(['zh', 'ja', 'ko', 'th', 'my']);
 const INDIC_SCRIPT_LANGUAGE_CODES = new Set(['hi', 'bn', 'mr', 'te', 'ta', 'gu', 'pa', 'kn', 'ml', 'or', 'as', 'ne', 'si']);
 const RTL_SCRIPT_LANGUAGE_CODES = new Set(['ar', 'ur', 'fa', 'he']);
@@ -722,22 +733,91 @@ function findSeoItemById(seoBundle = {}, id = '') {
   return (Array.isArray(seoBundle?.items) ? seoBundle.items : []).find((item) => item?.id === id) || null;
 }
 
-function buildStaticEntryOfferCatalogJsonLd(seoBundle = {}, bundle = {}) {
-  const serviceMap = [
-    ['software-a-medida', 'service-custom-software'],
-    ['ia-para-empresas', 'service-ai-automation'],
-    ['chatbots-empresariales', 'service-web-seo-chatbots'],
-    ['cotizador-tecnico-aprovechamiento', 'service-technical-quoter'],
-    ['software-cad-dxf-automatizacion', 'service-cad-dxf-automation']
-  ];
+function compactStaticStructuredText(value = '', maxLength = 320) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  const max = Math.max(40, Number(maxLength) || 320);
+  if (clean.length <= max) return clean;
+  const firstSentence = clean.split(/(?<=[.!?¿?])\s+/u).find((sentence) => sentence.length <= max && sentence.length >= 42) || clean;
+  const trimmed = firstSentence.slice(0, max).replace(/\s+\S*$/u, '').trim();
+  return trimmed || firstSentence.slice(0, max).trim();
+}
+
+function normalizeStaticStructuredSignature(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9α-ωа-я一-龥가-힣ぁ-んァ-ン]+/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function uniqueStaticStructuredList(values = [], limit = 24) {
+  const seen = new Set();
+  return (Array.isArray(values) ? values : [])
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => compactStaticStructuredText(value, 150))
+    .filter((value) => {
+      const key = normalizeStaticStructuredSignature(value);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, Math.max(1, Number(limit) || 24));
+}
+
+function getStaticBrandStructuredDescription(seoBundle = {}, bundle = {}) {
+  const meta = bundle?.meta || {};
+  return compactStaticStructuredText(
+    meta.description || meta.ogDescription || seoBundle?.hubLead || seoBundle?.hubMetaDescription || 'Hashinmy',
+    520
+  );
+}
+
+function getStaticBrandStructuredSlogan(seoBundle = {}, bundle = {}) {
+  const meta = bundle?.meta || {};
+  return compactStaticStructuredText(
+    meta.ogTitle || meta.title || seoBundle?.hubTitle || getStaticBrandStructuredDescription(seoBundle, bundle),
+    180
+  );
+}
+
+function buildStaticBrandKnowsAbout(seoBundle = {}, bundle = {}) {
+  const services = Array.isArray(bundle?.services) ? bundle.services : [];
+  const mappedItems = STATIC_BRAND_HOME_SCHEMA_SERVICE_MAP.map(([itemId]) => findSeoItemById(seoBundle, itemId)).filter(Boolean);
+  const keywords = Array.isArray(bundle?.meta?.keywords)
+    ? bundle.meta.keywords
+    : String(bundle?.meta?.keywords || '').split(',').map((entry) => entry.trim()).filter(Boolean);
+
+  return uniqueStaticStructuredList([
+    seoBundle?.hubTitle,
+    seoBundle?.hubLead,
+    valueAtPath(bundle, 'valueLabels.financiamiento_100'),
+    valueAtPath(bundle, 'valueLabels.modernizacion_operativa'),
+    valueAtPath(bundle, 'valueLabels.automatizacion_ia'),
+    valueAtPath(bundle, 'valueLabels.software_online'),
+    ...services.map((service) => service?.label),
+    ...mappedItems.flatMap((item) => [
+      item?.title,
+      item?.eyebrow,
+      item?.summary,
+      ...(Array.isArray(item?.keywords) ? item.keywords : []),
+      ...(Array.isArray(item?.terms) ? item.terms.map((entry) => entry?.term) : [])
+    ]),
+    ...keywords
+  ], 26);
+}
+
+function buildStaticBrandOfferCatalogJsonLd(seoBundle = {}, bundle = {}) {
   const fallbackServices = Array.isArray(bundle?.services) ? bundle.services : [];
-  const offers = serviceMap.map(([itemId, schemaId], index) => {
+  const offers = STATIC_BRAND_HOME_SCHEMA_SERVICE_MAP.map(([itemId, schemaId], index) => {
     const item = findSeoItemById(seoBundle, itemId);
     const fallback = fallbackServices[index] || {};
     const name = item?.title || fallback.label || `Hashinmy ${index + 1}`;
     const description = item?.metaDescription || item?.summary || item?.simple || fallback.tech || name;
     return {
       '@type': 'Offer',
+      position: index + 1,
       itemOffered: {
         '@type': 'Service',
         '@id': `${PUBLIC_SITE_URL}#${schemaId}`,
@@ -754,9 +834,15 @@ function buildStaticEntryOfferCatalogJsonLd(seoBundle = {}, bundle = {}) {
     '@type': 'OfferCatalog',
     '@id': `${PUBLIC_SITE_URL}#offer-catalog`,
     name: seoBundle?.hubTitle || seoBundle?.entryLabel || bundle?.meta?.applicationName || 'Hashinmy',
+    description: seoBundle?.hubLead || getStaticBrandStructuredDescription(seoBundle, bundle),
     itemListElement: offers
   };
 }
+
+function buildStaticEntryOfferCatalogJsonLd(seoBundle = {}, bundle = {}) {
+  return buildStaticBrandOfferCatalogJsonLd(seoBundle, bundle);
+}
+
 
 function buildStaticEntryJsonLd({ pageUrl, bundle = {}, languages = [], activeCode = 'es', proofLogos = [], seoContent = null, noindex = false }) {
   const meta = bundle?.meta || {};
@@ -774,8 +860,11 @@ function buildStaticEntryJsonLd({ pageUrl, bundle = {}, languages = [], activeCo
       name: 'Hashinmy',
       url: PUBLIC_SITE_URL,
       logo: `${PUBLIC_SITE_URL}assets/hashinmy-logo-emblem.png`,
-      slogan: meta.ogDescription || meta.description || undefined,
-      areaServed: 'Global'
+      description: getStaticBrandStructuredDescription(seoBundle, bundle),
+      slogan: getStaticBrandStructuredSlogan(seoBundle, bundle),
+      areaServed: 'Global',
+      knowsAbout: buildStaticBrandKnowsAbout(seoBundle, bundle),
+      sameAs: []
     },
     {
       '@type': 'WebSite',
@@ -1255,7 +1344,7 @@ function normalizeSeoVisibleSignature(value = '') {
   } catch {}
   return normalized
     .replace(/<[^>]*>/g, ' ')
-    .replace(/[^a-z0-9áéíóúñü¿?¡!]+/giu, ' ')
+    .replace(/[^\p{L}\p{N}¿?¡!]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

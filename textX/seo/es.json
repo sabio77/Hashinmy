@@ -4,79 +4,47 @@
   "dir": "ltr",
   "hubUrl": "/es/productos/",
   "entryLabel": "Productos",
-  "hubTitle": "Productos y soluciones Hashinmy",
-  "hubLead": "Explora productos, industrias, formas de pago, proceso de trabajo, glosario y casos de uso de Hashinmy.",
+  "hubTitle": "Ingeniería digital, software, IA y automatización financiados al 100% por Hashinmy",
+  "hubLead": "Explora cómo Hashinmy actúa como socio tecnológico: analiza procesos empresariales, detecta pérdidas de tiempo, dinero o información y transforma esa operación en software inteligente, automatización e inteligencia artificial a la medida, con financiación del 100% del desarrollo para modernizar sin descapitalizarse.",
   "allLabel": "Todo",
   "closeLabel": "Cerrar",
   "backLabel": "Volver a productos",
   "openDetailLabel": "Ver solución",
   "cardsLabel": "Contenido técnico y descriptivo de Hashinmy",
   "detailLabel": "Ficha completa de Hashinmy",
-  "hubMetaTitle": "Productos Hashinmy | Software, IA, CAD DXF, industrias, pagos y glosario",
-  "hubMetaDescription": "Productos, industrias, formas de pago, proceso, glosario y casos de uso de Hashinmy para software a medida, CAD con exportación DXF, inteligencia artificial, automatización, apps, ecommerce y sistemas empresariales.",
+  "hubMetaTitle": "Hashinmy | Ingeniería digital financiada al 100%",
+  "hubMetaDescription": "Hashinmy: ingeniería digital, software a medida, IA y automatización con financiación del 100% para ordenar procesos, proteger flujo de caja y crecer sin descapitalizarse.",
   "hubMetaKeywords": [
     "Hashinmy",
     "hashinmy.com",
-    "software a medida financiable",
-    "desarrollo de software a medida",
-    "inteligencia artificial para empresas",
-    "automatización de procesos empresariales",
-    "aplicaciones web PWA",
-    "apps móviles empresariales",
-    "sistemas para PC",
-    "dashboards BI",
-    "software para ecommerce",
-    "software para restaurantes",
-    "software para clínicas",
-    "software para logística",
-    "software para inmobiliarias",
-    "software para educación",
-    "formas de pago para software",
-    "financiación de software",
-    "mantenimiento mensual de software",
-    "integraciones API",
-    "migración de datos",
-    "seguridad digital",
-    "nube cloud",
-    "glosario tecnológico para empresas",
-    "cotizador técnico y aprovechamiento",
-    "software para carpinterías",
-    "páginas web SEO en Colombia",
-    "chatbots empresariales en Colombia",
-    "nube y respaldo de datos",
-    "desarrollo de software en Medellín",
-    "software empresarial en Colombia",
-    "programas para PC con nube",
-    "cotización por áreas",
-    "Hashinmy Medellín",
-    "desarrollo de API",
-    "software seguro para empresas",
-    "transformación digital",
-    "API empresarial",
-    "software para metalmecánica",
-    "software para fabricación",
-    "software para empresas comerciales",
-    "CRM y seguimiento comercial",
+    "software a medida financiado al 100%",
+    "tecnología empresarial financiada",
+    "ingeniería digital para empresas",
+    "inteligencia artificial aplicada",
+    "automatización empresarial",
+    "software para ordenar procesos",
+    "transformación digital sin descapitalizarse",
+    "desarrollo de software con cuotas manejables",
+    "sistemas inteligentes para empresas",
+    "chatbots empresariales",
+    "APIs empresariales",
+    "plataformas digitales a medida",
+    "CRM a medida",
     "ERP ligero personalizado",
-    "portal web para clientes",
-    "inventario y producción",
-    "software para negocios de servicios",
-    "hashinmy Medellín Colombia",
-    "programas para PC instalables",
-    "cotizadores técnicos para carpinterías",
-    "web Google-ready AI-ready",
-    "software CAD a medida",
-    "desarrollo software CAD",
-    "exportación DXF",
-    "automatización diseño CAD",
-    "software para construcción",
-    "software para procesos industriales"
+    "automatización de cotizaciones",
+    "automatización de ventas",
+    "control operativo",
+    "productividad empresarial",
+    "flujo de caja protegido",
+    "modernización empresarial",
+    "software empresarial en Colombia",
+    "Hashinmy Medellín Colombia"
   ],
   "categories": [
     {
       "id": "productos",
       "label": "Productos",
-      "description": "Soluciones que se pueden contratar, financiar, cotizar o construir por etapas."
+      "description": "Soluciones de software, IA y automatización que pueden financiarse, cotizarse o construirse por etapas."
     },
     {
       "id": "industrias",
@@ -91,7 +59,7 @@
     {
       "id": "formas-de-pago",
       "label": "Formas de pago",
-      "description": "Opciones comerciales para iniciar sin fricción y crecer con control."
+      "description": "Formas de iniciar tecnología empresarial sin descapitalizar la operación."
     },
     {
       "id": "proceso-confianza",
@@ -111,8 +79,8 @@
       "url": "/es/productos/software-a-medida/",
       "title": "Software a medida",
       "eyebrow": "Producto",
-      "summary": "Creamos sistemas adaptados a tu operación (software personalizado), no plantillas genéricas que obligan a cambiar tu forma de trabajar.",
-      "simple": "Sirve para ordenar procesos, conectar equipos, reducir errores y convertir tareas repetidas en flujos claros.",
+      "summary": "Transformamos procesos empresariales reales en software inteligente a medida, financiable al 100%, diseñado para ordenar operación, ventas, datos, permisos y crecimiento sin obligar a la empresa a adaptarse a una plantilla genérica ni a una inversión inicial que descapitalice el negocio.",
+      "simple": "Hashinmy convierte trabajo manual, hojas de cálculo, WhatsApp y datos dispersos en sistemas propios que ayudan a controlar la empresa y escalar con más claridad.",
       "technical": "Arquitectura web, base de datos, backend, frontend, API, roles, auditoría y panel administrativo.",
       "who": "Empresas que ya usan hojas de cálculo, WhatsApp o herramientas sueltas y necesitan un sistema propio.",
       "includes": [
@@ -147,7 +115,7 @@
         }
       ],
       "metaTitle": "Software a medida para empresas | Hashinmy",
-      "metaDescription": "Hashinmy crea software a medida para ordenar procesos, conectar equipos, automatizar operaciones y construir sistemas escalables con backend, frontend, APIs y panel administrativo.",
+      "metaDescription": "Transformamos procesos empresariales reales en software inteligente a medida, financiable al 100%, diseñado para ordenar operación, ventas, datos, permisos y crecimiento sin obligar a la empresa a adaptarse a una plantilla genérica ni a una inversión inicial que descapitalice el negocio.",
       "keywords": [
         "software a medida",
         "software personalizado",
@@ -187,7 +155,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software a medida ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve para ordenar procesos, conectar equipos, reducir errores y convertir tareas repetidas en flujos claros. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Software a medida ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve para ordenar procesos, conectar equipos, reducir errores y convertir tareas repetidas en flujos claros. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -225,7 +193,7 @@
       "url": "/es/productos/ia-para-empresas/",
       "title": "IA para empresas",
       "eyebrow": "Producto",
-      "summary": "Diseñamos asistentes inteligentes (inteligencia artificial) que ayudan a responder, clasificar, resumir y proponer acciones sin perder control humano.",
+      "summary": "Diseñamos asistentes inteligentes (inteligencia artificial) que ayudan a responder, clasificar, resumir y proponer acciones sin perder control humano. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "La IA puede leer información, ordenar solicitudes, sugerir respuestas y acelerar decisiones cuando está conectada a reglas claras.",
       "technical": "Modelos de lenguaje (LLM), clasificación, resumen, extracción de datos, prompts controlados, RAG y trazabilidad.",
       "who": "Equipos con soporte, ventas, operaciones o administración que reciben mucha información y necesitan responder mejor.",
@@ -261,7 +229,7 @@
         }
       ],
       "metaTitle": "IA para empresas y asistentes inteligentes | Hashinmy",
-      "metaDescription": "Soluciones de inteligencia artificial para empresas: asistentes, clasificación, resúmenes, extracción de datos, RAG y flujos con control humano.",
+      "metaDescription": "IA para empresas con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "IA para empresas",
         "inteligencia artificial empresarial",
@@ -301,7 +269,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "IA para empresas ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. La IA puede leer información, ordenar solicitudes, sugerir respuestas y acelerar decisiones cuando está conectada a reglas claras. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "IA para empresas ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. La IA puede leer información, ordenar solicitudes, sugerir respuestas y acelerar decisiones cuando está conectada a reglas claras. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -335,7 +303,7 @@
       "url": "/es/productos/automatizacion-procesos/",
       "title": "Automatización de procesos",
       "eyebrow": "Producto",
-      "summary": "Convertimos tareas repetitivas en flujos automáticos (automatización) para ahorrar tiempo, evitar olvidos y mejorar la consistencia.",
+      "summary": "Convertimos tareas repetitivas en flujos automáticos (automatización) para ahorrar tiempo, evitar olvidos y mejorar la consistencia. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Si una persona copia datos, envía mensajes, revisa estados o mueve información todos los días, probablemente se puede automatizar.",
       "technical": "Automatización por API, RPA, webhooks, colas, validaciones, integraciones y monitoreo de errores.",
       "who": "Negocios con tareas manuales frecuentes, archivos dispersos o procesos que dependen de que alguien recuerde cada paso.",
@@ -363,7 +331,7 @@
         }
       ],
       "metaTitle": "Automatización de procesos empresariales | Hashinmy",
-      "metaDescription": "Automatiza tareas repetitivas con Hashinmy: APIs, RPA, webhooks, alertas, validaciones y flujos para ahorrar tiempo y reducir errores.",
+      "metaDescription": "Automatización de procesos con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "automatización de procesos",
         "RPA",
@@ -403,7 +371,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Automatización de procesos ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Si una persona copia datos, envía mensajes, revisa estados o mueve información todos los días, probablemente se puede automatizar. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Automatización de procesos ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Si una persona copia datos, envía mensajes, revisa estados o mueve información todos los días, probablemente se puede automatizar. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -437,7 +405,7 @@
       "url": "/es/productos/aplicaciones-web-pwa/",
       "title": "Aplicaciones web y PWA",
       "eyebrow": "Producto",
-      "summary": "Construimos aplicaciones que funcionan desde el navegador (web app) y pueden instalarse como app ligera (PWA) en celular o computador.",
+      "summary": "Construimos aplicaciones que funcionan desde el navegador (web app) y pueden instalarse como app ligera (PWA) en celular o computador. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ideal cuando quieres llegar a usuarios sin obligarlos a descargar una app pesada desde una tienda.",
       "technical": "HTML, CSS, JavaScript, service worker, manifest, responsive design, cache seguro y conexión con backend.",
       "who": "Empresas que necesitan vender, reservar, gestionar clientes, registrar datos o atender usuarios desde cualquier dispositivo.",
@@ -462,7 +430,7 @@
         }
       ],
       "metaTitle": "Aplicaciones web y PWA para empresas | Hashinmy",
-      "metaDescription": "Desarrollo de aplicaciones web y PWA instalables, rápidas y responsive para gestionar clientes, ventas, reservas, datos y operaciones.",
+      "metaDescription": "Aplicaciones web y PWA con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "aplicaciones web",
         "PWA",
@@ -491,7 +459,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Aplicaciones web y PWA ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ideal cuando quieres llegar a usuarios sin obligarlos a descargar una app pesada desde una tienda. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Aplicaciones web y PWA ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ideal cuando quieres llegar a usuarios sin obligarlos a descargar una app pesada desde una tienda. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -513,7 +481,7 @@
       "url": "/es/productos/apps-moviles/",
       "title": "Apps móviles",
       "eyebrow": "Producto",
-      "summary": "Diseñamos aplicaciones móviles para Android, iOS o híbridas, enfocadas en experiencia clara, seguridad y operación real.",
+      "summary": "Diseñamos aplicaciones móviles para Android, iOS o híbridas, enfocadas en experiencia clara, seguridad y operación real. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Una app móvil sirve cuando el usuario necesita acceder rápido, recibir notificaciones o usar funciones del dispositivo.",
       "technical": "Arquitectura móvil, autenticación, notificaciones push, consumo de API, almacenamiento local y pruebas en dispositivos.",
       "who": "Negocios que atienden clientes, conductores, técnicos, vendedores, estudiantes o equipos en campo.",
@@ -538,7 +506,7 @@
         }
       ],
       "metaTitle": "Desarrollo de apps móviles | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla apps móviles para Android, iOS o híbridas con backend, APIs, notificaciones, autenticación y experiencia enfocada en usuarios reales.",
+      "metaDescription": "Apps móviles con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "apps móviles",
         "desarrollo Android",
@@ -567,7 +535,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Apps móviles ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Una app móvil sirve cuando el usuario necesita acceder rápido, recibir notificaciones o usar funciones del dispositivo. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Apps móviles ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Una app móvil sirve cuando el usuario necesita acceder rápido, recibir notificaciones o usar funciones del dispositivo. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -589,7 +557,7 @@
       "url": "/es/productos/sistemas-pc/",
       "title": "Sistemas para PC",
       "eyebrow": "Producto",
-      "summary": "Creamos sistemas de escritorio (software para PC) cuando la operación necesita trabajar localmente, con archivos, impresoras o equipos internos.",
+      "summary": "Creamos sistemas de escritorio (software para PC) cuando la operación necesita trabajar localmente, con archivos, impresoras o equipos internos. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Es útil para negocios que dependen de computador, caja, inventario, oficina, producción o procesos internos sin depender siempre del navegador.",
       "technical": "Electron, escritorio local, IPC seguro, almacenamiento, sincronización, instalador y actualizaciones controladas.",
       "who": "Empresas con puntos físicos, operación administrativa, flujos internos o requisitos de funcionamiento local.",
@@ -625,7 +593,7 @@
         }
       ],
       "metaTitle": "Sistemas para PC y escritorio | Hashinmy",
-      "metaDescription": "Desarrollo de sistemas para PC, escritorio y operación local con Electron, almacenamiento, instalador, sincronización y seguridad para empresas.",
+      "metaDescription": "Sistemas para PC con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software para PC",
         "sistema de escritorio",
@@ -665,7 +633,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Sistemas para PC ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Es útil para negocios que dependen de computador, caja, inventario, oficina, producción o procesos internos sin depender siempre del navegador. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Sistemas para PC ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Es útil para negocios que dependen de computador, caja, inventario, oficina, producción o procesos internos sin depender siempre del navegador. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -703,7 +671,7 @@
       "url": "/es/productos/software-cad-dxf-automatizacion/",
       "title": "Software CAD con exportación DXF",
       "eyebrow": "Producto",
-      "summary": "Desarrollamos software CAD a medida para diseño técnico, planos, piezas, módulos constructivos y procesos industriales con exportaciones DXF compatibles con otros programas.",
+      "summary": "Desarrollamos software CAD a medida para diseño técnico, planos, piezas, módulos constructivos y procesos industriales con exportaciones DXF compatibles con otros programas. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Sirve para convertir reglas de diseño, medidas, materiales y validaciones técnicas en una herramienta propia que genera planos y archivos listos para continuar en otros softwares CAD.",
       "technical": "Motor de geometría 2D/3D según alcance, generación paramétrica, automatización de diseño CAD, exportación DXF, validaciones de medidas, integración con cotización, producción e inventario.",
       "who": "Empresas de construcción, metalmecánica, fabricación, carpintería, mobiliario, arquitectura, ingeniería o procesos industriales que necesitan automatizar diseño técnico y reducir reprocesos.",
@@ -734,7 +702,7 @@
         }
       ],
       "metaTitle": "Software CAD con exportación DXF | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software CAD a medida con automatización de diseño, generación paramétrica y exportación DXF para construcción, fabricación y procesos industriales.",
+      "metaDescription": "Software CAD con exportación DXF con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software CAD a medida",
         "desarrollo software CAD",
@@ -766,7 +734,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software CAD con exportación DXF ayuda cuando una empresa depende de dibujos repetitivos, plantillas manuales, cálculos separados o archivos que no conectan diseño con producción. La solución permite convertir medidas, reglas, materiales y restricciones en una herramienta propia que genera planos, piezas o módulos técnicos con mayor consistencia."
+          "body": "Software CAD con exportación DXF ayuda cuando una empresa depende de dibujos repetitivos, plantillas manuales, cálculos separados o archivos que no conectan diseño con producción. La solución permite convertir medidas, reglas, materiales y restricciones en una herramienta propia que genera planos, piezas o módulos técnicos con mayor consistencia.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Automatización de diseño CAD",
@@ -796,7 +764,7 @@
       "url": "/es/productos/dashboards-bi/",
       "title": "Dashboards y reportes BI",
       "eyebrow": "Producto",
-      "summary": "Unificamos datos en paneles claros (BI o inteligencia de negocio) para ver ventas, operación, riesgos y resultados sin buscar en muchos archivos.",
+      "summary": "Unificamos datos en paneles claros (BI o inteligencia de negocio) para ver ventas, operación, riesgos y resultados sin buscar en muchos archivos. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a tomar decisiones con números visibles, filtros y alertas en lugar de revisar hojas sueltas manualmente.",
       "technical": "ETL, indicadores KPI, visualización, filtros, permisos, exportación y conexión con bases de datos o APIs.",
       "who": "Empresas que necesitan medir ventas, inventario, tickets, tiempos, clientes, productividad o finanzas.",
@@ -824,7 +792,7 @@
         }
       ],
       "metaTitle": "Dashboards BI y reportes empresariales | Hashinmy",
-      "metaDescription": "Dashboards BI, reportes, indicadores KPI, filtros y alertas para convertir datos empresariales en decisiones claras.",
+      "metaDescription": "Dashboards y reportes BI con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "dashboards BI",
         "reportes empresariales",
@@ -864,7 +832,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Dashboards y reportes BI ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a tomar decisiones con números visibles, filtros y alertas en lugar de revisar hojas sueltas manualmente. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo."
+          "body": "Dashboards y reportes BI ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a tomar decisiones con números visibles, filtros y alertas en lugar de revisar hojas sueltas manualmente. También sirve para comparar si conviene una web, una app, un sistema interno o una automatización antes de invertir en desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -898,7 +866,7 @@
       "url": "/es/formas-de-pago/pago-por-etapas/",
       "title": "Pago por etapas",
       "eyebrow": "Forma de pago",
-      "summary": "Dividimos el proyecto en entregas controladas para pagar por avances reales y reducir riesgo comercial.",
+      "summary": "Dividimos el proyecto en entregas controladas para pagar por avances reales y reducir riesgo comercial. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Primero se define una parte importante, se entrega, se valida y luego se continúa con la siguiente etapa.",
       "technical": "Hitos, alcance cerrado, entregables, validación funcional, control de cambios y roadmap incremental.",
       "who": "Clientes que quieren avanzar con orden, medir resultados y evitar pagar todo antes de ver valor.",
@@ -923,7 +891,7 @@
         }
       ],
       "metaTitle": "Pago por etapas para software | Hashinmy",
-      "metaDescription": "Hashinmy permite organizar proyectos de software por etapas, con hitos, entregables, validación funcional y roadmap incremental.",
+      "metaDescription": "Pago por etapas con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "pago por etapas software",
         "proyecto por fases",
@@ -951,7 +919,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Pago por etapas ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Primero se define una parte importante, se entrega, se valida y luego se continúa con la siguiente etapa. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes."
+          "body": "Pago por etapas ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Primero se define una parte importante, se entrega, se valida y luego se continúa con la siguiente etapa. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -970,75 +938,76 @@
     {
       "id": "financiacion-proyecto",
       "category": "formas-de-pago",
-      "url": "/es/formas-de-pago/financiacion-proyecto/",
-      "title": "Financiación del proyecto",
-      "eyebrow": "Forma de pago",
-      "summary": "Estructuramos una ruta de financiación para que una empresa pueda iniciar sin frenar toda su caja de una sola vez.",
-      "simple": "La idea es convertir una solución grande en un plan más manejable, con prioridad en lo que genera valor primero.",
-      "technical": "Priorización MVP, calendario de pagos, entregas progresivas, control de riesgo y alcance financiable.",
-      "who": "Empresas que necesitan software, IA o automatización, pero quieren distribuir la inversión en el tiempo.",
+      "url": "/es/formas-de-pago/financiacion-100-desarrollo/",
+      "title": "Financiación 100% del desarrollo",
+      "eyebrow": "Capital protegido",
+      "summary": "Hashinmy financia el 100% del desarrollo para que una empresa pueda implementar software, IA o automatización sin hacer una gran inversión inicial, con cuotas manejables mientras la solución empieza a ahorrar tiempo, reducir errores y generar valor operativo.",
+      "simple": "La empresa puede modernizarse, proteger su flujo de caja y pagar en cuotas manejables mientras la solución empieza a generar valor operativo.",
+      "technical": "Diagnóstico de prioridad, alcance financiable, módulos por valor, calendario de cuotas, entregas verificables, trazabilidad comercial y control de riesgo por etapa.",
+      "who": "Empresas que necesitan software especializado, automatización o inteligencia artificial aplicada, pero no quieren descapitalizarse para iniciar la transformación.",
       "includes": [
-        "Diagnóstico de prioridad",
-        "Plan de inversión por fase",
-        "Entrega temprana de valor",
-        "Ajuste según resultados"
+        "Diagnóstico operativo y financiero",
+        "Financiación del 100% del desarrollo",
+        "Priorización del primer módulo de valor",
+        "Cuotas manejables según alcance"
       ],
       "terms": [
         {
-          "term": "MVP",
-          "meaning": "primera versión útil del sistema"
+          "term": "Alcance financiable",
+          "meaning": "parte del proyecto que puede construirse y pagarse con control por etapas"
         },
         {
-          "term": "Alcance financiable",
-          "meaning": "parte del proyecto que se puede dividir comercialmente"
+          "term": "Capital protegido",
+          "meaning": "capacidad de modernizar sin usar todo el flujo de caja al inicio"
         },
         {
           "term": "Valor temprano",
-          "meaning": "beneficio visible antes de construir todo"
+          "meaning": "beneficio operativo visible antes de construir toda la plataforma"
         }
       ],
-      "metaTitle": "Financiación para proyectos de software | Hashinmy",
-      "metaDescription": "Opciones de financiación para iniciar software a medida, IA o automatización con MVP, pagos progresivos y entregas por prioridad.",
+      "metaTitle": "Financiación 100% para software a medida | Hashinmy",
+      "metaDescription": "Hashinmy financia el 100% del desarrollo para que una empresa pueda implementar software, IA o automatización sin hacer una gran inversión inicial, con cuotas manejables mientras la solución empieza a ahorrar tiempo, reducir errores y generar valor operativo.",
       "keywords": [
-        "financiación software",
-        "financiar proyecto tecnológico",
-        "MVP financiado",
+        "financiación 100% software",
+        "software sin gran pago inicial",
+        "desarrollo de software financiado",
+        "tecnología empresarial financiada",
         "Hashinmy"
       ],
       "faqs": [
         {
-          "question": "¿Qué es Financiación del proyecto en Hashinmy?",
-          "answer": "Estructuramos una ruta de financiación para que una empresa pueda iniciar sin frenar toda su caja de una sola vez. La idea es convertir una solución grande en un plan más manejable, con prioridad en lo que genera valor primero."
+          "question": "¿Qué significa financiación 100% del desarrollo en Hashinmy?",
+          "answer": "Significa que Hashinmy estructura el desarrollo de la solución para que la empresa pueda iniciar sin pagar una gran suma de entrada, con cuotas manejables y alcance priorizado por valor operativo."
         },
         {
-          "question": "¿Para quién sirve Financiación del proyecto?",
-          "answer": "Empresas que necesitan software, IA o automatización, pero quieren distribuir la inversión en el tiempo. Hashinmy lo explica con lenguaje sencillo sin perder la base técnica que necesita un equipo con experiencia."
+          "question": "¿Para quién sirve esta financiación?",
+          "answer": "Sirve para empresas que ya saben que necesitan software, automatización o inteligencia artificial, pero quieren proteger el flujo de caja mientras modernizan la operación."
         },
         {
-          "question": "¿Qué incluye Financiación del proyecto?",
-          "answer": "Puede incluir Diagnóstico de prioridad, Plan de inversión por fase, Entrega temprana de valor, Ajuste según resultados. El alcance se ordena por prioridad para iniciar con una fase útil y crecer con control."
+          "question": "¿Qué incluye la ruta financiada?",
+          "answer": "Puede incluir diagnóstico operativo y financiero, definición del primer módulo de valor, alcance financiable, calendario de cuotas, entregas verificables y revisión de riesgos por etapa."
         },
         {
-          "question": "¿Cuál es la base técnica de Financiación del proyecto?",
-          "answer": "Priorización MVP, calendario de pagos, entregas progresivas, control de riesgo y alcance financiable. Hashinmy mantiene la explicación clara para quien decide y precisa para quien implementa."
+          "question": "¿La financiación cambia la calidad técnica?",
+          "answer": "No. La financiación cambia la forma de acceso al desarrollo, pero la solución mantiene arquitectura, seguridad, pruebas, trazabilidad y posibilidad de crecimiento por etapas."
         }
       ],
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Financiación del proyecto ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. La idea es convertir una solución grande en un plan más manejable, con prioridad en lo que genera valor primero. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes."
+          "body": "La financiación 100% del desarrollo resuelve el freno financiero que impide a muchas empresas modernizarse. Permite iniciar software a medida, automatización o inteligencia artificial sin sacrificar de golpe el capital operativo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
-          "body": "En palabras simples, financiación del proyecto significa tener una solución que acompaña la forma real de trabajar del negocio. Empresas que necesitan software, IA o automatización, pero quieren distribuir la inversión en el tiempo. La explicación mantiene términos técnicos entre paréntesis o definidos para que decisión y equipo técnico hablen el mismo idioma."
+          "body": "En palabras simples, la empresa puede implementar la tecnología que necesita y pagarla en cuotas manejables mientras el sistema empieza a ordenar procesos, ahorrar tiempo o apoyar ventas."
         },
         {
           "heading": "Cómo lo construye Hashinmy",
-          "body": "La base técnica se define por etapas: Priorización MVP, calendario de pagos, entregas progresivas, control de riesgo y alcance financiable. Según el alcance puede incluir Diagnóstico de prioridad, Plan de inversión por fase, Entrega temprana de valor, Ajuste según resultados. Cada entrega debe quedar clara, medible y preparada para crecer sin rehacer el sistema desde cero."
+          "body": "Hashinmy analiza la operación, prioriza el módulo de mayor valor, define el alcance financiable y organiza una ruta de entregas verificables con control técnico, comercial y financiero."
         },
         {
           "heading": "Palabras que ayudan a buscarlo",
-          "body": "Términos relacionados: MVP: primera versión útil del sistema, Alcance financiable: parte del proyecto que se puede dividir comercialmente, Valor temprano: beneficio visible antes de construir todo. Estos conceptos se explican con lenguaje sencillo para que Google, buscadores e inteligencias artificiales entiendan el servicio y también lo entienda una persona que apenas está evaluando la compra."
+          "body": "Conceptos relacionados: financiación de software, capital protegido, cuotas manejables, alcance financiable, transformación digital sin descapitalizarse y software a medida con valor temprano."
         }
       ]
     },
@@ -1048,7 +1017,7 @@
       "url": "/es/formas-de-pago/transferencia-y-tarjeta/",
       "title": "Transferencia y tarjeta",
       "eyebrow": "Forma de pago",
-      "summary": "Podemos organizar pagos por transferencia, tarjeta u otros medios disponibles según país, monto y acuerdo comercial.",
+      "summary": "Podemos organizar pagos por transferencia, tarjeta u otros medios disponibles según país, monto y acuerdo comercial. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "El objetivo es que la forma de pago sea clara, verificable y fácil de asociar a cada entrega del proyecto.",
       "technical": "Registro de pagos, comprobantes, facturación, pasarelas, conciliación y trazabilidad administrativa.",
       "who": "Clientes que necesitan claridad contable, comprobantes y orden financiero para contratar tecnología.",
@@ -1073,7 +1042,7 @@
         }
       ],
       "metaTitle": "Pagos por transferencia o tarjeta | Hashinmy",
-      "metaDescription": "Formas de pago para proyectos Hashinmy: transferencia, tarjeta, comprobantes, facturación, pasarelas y seguimiento por etapa.",
+      "metaDescription": "Transferencia y tarjeta con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "pagar software",
         "transferencia",
@@ -1102,7 +1071,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Transferencia y tarjeta ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El objetivo es que la forma de pago sea clara, verificable y fácil de asociar a cada entrega del proyecto. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes."
+          "body": "Transferencia y tarjeta ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El objetivo es que la forma de pago sea clara, verificable y fácil de asociar a cada entrega del proyecto. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1124,7 +1093,7 @@
       "url": "/es/formas-de-pago/mantenimiento-mensual/",
       "title": "Mantenimiento mensual",
       "eyebrow": "Forma de pago",
-      "summary": "Después de construir, podemos acompañar el sistema con mejoras, soporte y monitoreo mensual.",
+      "summary": "Después de construir, podemos acompañar el sistema con mejoras, soporte y monitoreo mensual. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un sistema vivo necesita ajustes, correcciones, seguridad y pequeñas mejoras cuando la empresa cambia.",
       "technical": "Soporte evolutivo, monitoreo, backups, parches, ajustes UX, mejoras menores y revisión de rendimiento.",
       "who": "Empresas que quieren continuidad técnica sin contratar un equipo interno completo.",
@@ -1149,7 +1118,7 @@
         }
       ],
       "metaTitle": "Mantenimiento mensual de software | Hashinmy",
-      "metaDescription": "Mantenimiento mensual para software, apps y automatizaciones: soporte, backups, parches, monitoreo, mejoras y estabilidad.",
+      "metaDescription": "Mantenimiento mensual con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "mantenimiento de software",
         "soporte mensual",
@@ -1178,7 +1147,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Mantenimiento mensual ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema vivo necesita ajustes, correcciones, seguridad y pequeñas mejoras cuando la empresa cambia. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes."
+          "body": "Mantenimiento mensual ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema vivo necesita ajustes, correcciones, seguridad y pequeñas mejoras cuando la empresa cambia. Aclara cómo iniciar el proyecto con control financiero, pagos por avance y acuerdos transparentes.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1200,7 +1169,7 @@
       "url": "/es/glosario/inteligencia-artificial/",
       "title": "Inteligencia artificial (IA)",
       "eyebrow": "Glosario",
-      "summary": "La inteligencia artificial es software que puede analizar información, reconocer patrones y generar respuestas o recomendaciones.",
+      "summary": "La inteligencia artificial es software que puede analizar información, reconocer patrones y generar respuestas o recomendaciones. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "No reemplaza todo el negocio: funciona mejor cuando tiene datos claros, reglas y supervisión humana.",
       "technical": "Machine learning, modelos de lenguaje, clasificación, inferencia, embeddings y evaluación de calidad.",
       "who": "Personas que escuchan IA, pero quieren entender cuándo sirve realmente y cuándo solo aumenta ruido.",
@@ -1225,7 +1194,7 @@
         }
       ],
       "metaTitle": "Qué es inteligencia artificial IA | Glosario Hashinmy",
-      "metaDescription": "Explicación sencilla de inteligencia artificial, modelos de lenguaje, clasificación, inferencia y usos empresariales con control humano.",
+      "metaDescription": "Inteligencia artificial (IA) con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "qué es IA",
         "inteligencia artificial",
@@ -1253,7 +1222,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Inteligencia artificial (IA) ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. No reemplaza todo el negocio: funciona mejor cuando tiene datos claros, reglas y supervisión humana. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores."
+          "body": "Inteligencia artificial (IA) ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. No reemplaza todo el negocio: funciona mejor cuando tiene datos claros, reglas y supervisión humana. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1275,7 +1244,7 @@
       "url": "/es/glosario/api/",
       "title": "API",
       "eyebrow": "Glosario",
-      "summary": "Una API es una conexión controlada que permite que dos sistemas intercambien información sin copiar todo manualmente.",
+      "summary": "Una API es una conexión controlada que permite que dos sistemas intercambien información sin copiar todo manualmente. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Por ejemplo, una tienda puede enviar una venta al inventario y luego al sistema de facturación automáticamente.",
       "technical": "REST, endpoints, autenticación, tokens, JSON, rate limit, webhooks y documentación técnica.",
       "who": "Negocios que necesitan conectar pagos, inventario, CRM, WhatsApp, facturación o paneles de datos.",
@@ -1300,7 +1269,7 @@
         }
       ],
       "metaTitle": "Qué es una API | Glosario Hashinmy",
-      "metaDescription": "Qué es una API explicado fácil: endpoints, tokens, JSON, webhooks, integraciones y ejemplos para conectar sistemas empresariales.",
+      "metaDescription": "API con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "qué es API",
         "integraciones API",
@@ -1329,7 +1298,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "API ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Por ejemplo, una tienda puede enviar una venta al inventario y luego al sistema de facturación automáticamente. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores."
+          "body": "API ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Por ejemplo, una tienda puede enviar una venta al inventario y luego al sistema de facturación automáticamente. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1351,7 +1320,7 @@
       "url": "/es/glosario/nube-cloud/",
       "title": "Nube (cloud)",
       "eyebrow": "Glosario",
-      "summary": "La nube permite alojar sistemas, datos y servicios en servidores accesibles por internet con seguridad y escalabilidad.",
+      "summary": "La nube permite alojar sistemas, datos y servicios en servidores accesibles por internet con seguridad y escalabilidad. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Evita depender de un solo computador y permite que varias personas trabajen desde diferentes lugares.",
       "technical": "Hosting, base de datos administrada, CDN, backups, escalado, despliegue continuo y monitoreo.",
       "who": "Empresas que quieren acceso remoto, continuidad, crecimiento y menos dependencia de equipos locales.",
@@ -1376,7 +1345,7 @@
         }
       ],
       "metaTitle": "Qué es la nube cloud | Glosario Hashinmy",
-      "metaDescription": "La nube o cloud explicada fácil: hosting, bases de datos, CDN, backups, escalado, monitoreo y beneficios para empresas.",
+      "metaDescription": "Nube (cloud) con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "qué es la nube",
         "cloud",
@@ -1405,7 +1374,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Nube (cloud) ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Evita depender de un solo computador y permite que varias personas trabajen desde diferentes lugares. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores."
+          "body": "Nube (cloud) ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Evita depender de un solo computador y permite que varias personas trabajen desde diferentes lugares. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1427,7 +1396,7 @@
       "url": "/es/glosario/ux-ui/",
       "title": "UX/UI",
       "eyebrow": "Glosario",
-      "summary": "UX/UI es la forma de diseñar pantallas para que las personas entiendan, confíen y completen acciones sin confundirse.",
+      "summary": "UX/UI es la forma de diseñar pantallas para que las personas entiendan, confíen y completen acciones sin confundirse. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "No es solo que una app se vea bonita; también debe ser fácil, rápida y clara para el usuario final.",
       "technical": "Experiencia de usuario, interfaz visual, jerarquía, accesibilidad, prototipos, pruebas y diseño responsive.",
       "who": "Empresas que necesitan que clientes, empleados o administradores usen un sistema sin capacitación pesada.",
@@ -1452,7 +1421,7 @@
         }
       ],
       "metaTitle": "Qué es UX UI | Glosario Hashinmy",
-      "metaDescription": "UX/UI explicado fácil: experiencia de usuario, interfaz visual, accesibilidad, prototipos, pruebas y diseño responsive.",
+      "metaDescription": "UX/UI con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "qué es UX UI",
         "diseño de interfaz",
@@ -1480,7 +1449,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "UX/UI ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. No es solo que una app se vea bonita; también debe ser fácil, rápida y clara para el usuario final. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores."
+          "body": "UX/UI ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. No es solo que una app se vea bonita; también debe ser fácil, rápida y clara para el usuario final. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1502,7 +1471,7 @@
       "url": "/es/glosario/seguridad-digital/",
       "title": "Seguridad digital",
       "eyebrow": "Glosario",
-      "summary": "La seguridad digital protege usuarios, datos y operaciones mediante reglas, controles, permisos y registros de actividad.",
+      "summary": "La seguridad digital protege usuarios, datos y operaciones mediante reglas, controles, permisos y registros de actividad. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un sistema debe saber quién entra, qué puede hacer y dejar evidencia cuando algo importante cambia.",
       "technical": "Autenticación, autorización, cifrado, rate limit, auditoría, validación de datos y protección de sesión.",
       "who": "Empresas que manejan datos de clientes, pagos, documentos, operaciones internas o información sensible.",
@@ -1527,7 +1496,7 @@
         }
       ],
       "metaTitle": "Seguridad digital para software | Glosario Hashinmy",
-      "metaDescription": "Seguridad digital explicada fácil: autenticación, permisos, cifrado, auditoría, validación de datos y protección de sesión.",
+      "metaDescription": "Seguridad digital con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "seguridad digital",
         "autenticación",
@@ -1556,7 +1525,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Seguridad digital ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema debe saber quién entra, qué puede hacer y dejar evidencia cuando algo importante cambia. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores."
+          "body": "Seguridad digital ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema debe saber quién entra, qué puede hacer y dejar evidencia cuando algo importante cambia. Ayuda a personas no técnicas a entender conceptos clave sin perder el nombre técnico que usan buscadores, equipos y proveedores.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1578,7 +1547,7 @@
       "url": "/es/casos-de-uso/ecommerce-automatizado/",
       "title": "Ecommerce automatizado",
       "eyebrow": "Caso de uso",
-      "summary": "Un ecommerce puede conectar catálogo, pagos, inventario, notificaciones y reportes para vender con menos trabajo manual.",
+      "summary": "Un ecommerce puede conectar catálogo, pagos, inventario, notificaciones y reportes para vender con menos trabajo manual. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a evitar ventas duplicadas, respuestas lentas y desorden cuando llegan pedidos por varios canales.",
       "technical": "Carrito, pasarela de pagos, inventario, órdenes, webhooks, panel de administración y analítica.",
       "who": "Tiendas, marcas, emprendedores y empresas que venden productos o servicios en línea.",
@@ -1603,7 +1572,7 @@
         }
       ],
       "metaTitle": "Ecommerce automatizado para empresas | Hashinmy",
-      "metaDescription": "Caso de uso: ecommerce automatizado con catálogo, pagos, inventario, órdenes, notificaciones, panel administrativo y reportes.",
+      "metaDescription": "Ecommerce automatizado con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "ecommerce automatizado",
         "tienda online",
@@ -1632,7 +1601,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Ecommerce automatizado ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a evitar ventas duplicadas, respuestas lentas y desorden cuando llegan pedidos por varios canales. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización."
+          "body": "Ecommerce automatizado ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a evitar ventas duplicadas, respuestas lentas y desorden cuando llegan pedidos por varios canales. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1654,7 +1623,7 @@
       "url": "/es/casos-de-uso/soporte-con-ia/",
       "title": "Soporte con IA",
       "eyebrow": "Caso de uso",
-      "summary": "La IA puede ayudar a clasificar tickets, resumir conversaciones y sugerir respuestas para atender más rápido.",
+      "summary": "La IA puede ayudar a clasificar tickets, resumir conversaciones y sugerir respuestas para atender más rápido. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "El equipo humano conserva el control, pero recibe ayuda para entender prioridad, historial y próxima acción.",
       "technical": "Clasificación automática, resumen, base de conocimiento, RAG, prioridad, etiquetas y auditoría de atención.",
       "who": "Empresas con soporte por email, WhatsApp, formularios, chat o sistemas de tickets.",
@@ -1679,7 +1648,7 @@
         }
       ],
       "metaTitle": "Soporte con IA para empresas | Hashinmy",
-      "metaDescription": "Automatiza soporte con IA: clasificación de tickets, resúmenes, respuestas sugeridas, RAG, base de conocimiento y auditoría humana.",
+      "metaDescription": "Soporte con IA con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "soporte con IA",
         "tickets con IA",
@@ -1707,7 +1676,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Soporte con IA ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El equipo humano conserva el control, pero recibe ayuda para entender prioridad, historial y próxima acción. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización."
+          "body": "Soporte con IA ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El equipo humano conserva el control, pero recibe ayuda para entender prioridad, historial y próxima acción. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1729,7 +1698,7 @@
       "url": "/es/casos-de-uso/operacion-interna/",
       "title": "Operación interna ordenada",
       "eyebrow": "Caso de uso",
-      "summary": "Un sistema interno puede reunir tareas, responsables, documentos, aprobaciones y reportes en un solo lugar.",
+      "summary": "Un sistema interno puede reunir tareas, responsables, documentos, aprobaciones y reportes en un solo lugar. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Sirve cuando el equipo depende de mensajes sueltos, archivos repetidos o procesos que nadie puede medir bien.",
       "technical": "Workflow, roles, estados, auditoría, documentos, notificaciones, permisos y dashboards.",
       "who": "Empresas con administración, producción, logística, ventas internas o áreas que necesitan coordinación.",
@@ -1754,7 +1723,7 @@
         }
       ],
       "metaTitle": "Sistema para operación interna | Hashinmy",
-      "metaDescription": "Caso de uso: operación interna con workflow, roles, estados, auditoría, documentos, notificaciones, permisos y dashboards.",
+      "metaDescription": "Operación interna ordenada con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "sistema interno",
         "operación interna",
@@ -1783,7 +1752,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Operación interna ordenada ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve cuando el equipo depende de mensajes sueltos, archivos repetidos o procesos que nadie puede medir bien. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización."
+          "body": "Operación interna ordenada ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve cuando el equipo depende de mensajes sueltos, archivos repetidos o procesos que nadie puede medir bien. Funciona como ejemplo práctico para entender el alcance, los beneficios y los límites antes de pedir una cotización.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1805,7 +1774,7 @@
       "url": "/es/productos/software-para-ecommerce/",
       "title": "Software para ecommerce",
       "eyebrow": "Industria",
-      "summary": "Creamos tiendas y paneles para vender en línea con inventario, pagos, pedidos y atención conectados en un solo sistema.",
+      "summary": "Creamos tiendas y paneles para vender en línea con inventario, pagos, pedidos y atención conectados en un solo sistema. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un ecommerce bien hecho no es solo una página bonita: debe vender, cobrar, actualizar inventario y avisar al equipo sin trabajo manual innecesario.",
       "technical": "Catálogo, carrito, pasarela de pago, webhooks, inventario, estados de pedido, CRM ligero y analítica de conversión.",
       "who": "Tiendas, marcas, emprendimientos y empresas que venden productos físicos o digitales y quieren operar con orden.",
@@ -1830,7 +1799,7 @@
         }
       ],
       "metaTitle": "Software para ecommerce y tiendas online | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla ecommerce, tiendas online y paneles de venta con pagos, inventario, pedidos, notificaciones, CRM y analítica para vender con orden.",
+      "metaDescription": "Software para ecommerce con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software ecommerce",
         "tienda online",
@@ -1859,7 +1828,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para ecommerce ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un ecommerce bien hecho no es solo una página bonita: debe vender, cobrar, actualizar inventario y avisar al equipo sin trabajo manual innecesario. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para ecommerce ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un ecommerce bien hecho no es solo una página bonita: debe vender, cobrar, actualizar inventario y avisar al equipo sin trabajo manual innecesario. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1881,7 +1850,7 @@
       "url": "/es/productos/software-para-restaurantes/",
       "title": "Software para restaurantes",
       "eyebrow": "Industria",
-      "summary": "Diseñamos sistemas para pedidos, reservas, mesas, domicilios, inventario y reportes sin complicar al equipo de atención.",
+      "summary": "Diseñamos sistemas para pedidos, reservas, mesas, domicilios, inventario y reportes sin complicar al equipo de atención. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "El objetivo es que cocina, caja y administración vean la misma información y reduzcan errores en pedidos, pagos o inventario.",
       "technical": "POS, gestión de mesas, comandas, inventario, roles de usuario, reportes, integraciones de domicilio y sincronización local/nube.",
       "who": "Restaurantes, cafeterías, bares, cocinas ocultas y negocios de comida que necesitan operación rápida y controlada.",
@@ -1906,7 +1875,7 @@
         }
       ],
       "metaTitle": "Software para restaurantes, POS y pedidos | Hashinmy",
-      "metaDescription": "Sistemas para restaurantes con POS, pedidos, mesas, inventario, domicilios, reportes y sincronización para mejorar caja, cocina y administración.",
+      "metaDescription": "Software para restaurantes con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software para restaurantes",
         "POS restaurante",
@@ -1935,7 +1904,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para restaurantes ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El objetivo es que cocina, caja y administración vean la misma información y reduzcan errores en pedidos, pagos o inventario. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para restaurantes ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. El objetivo es que cocina, caja y administración vean la misma información y reduzcan errores en pedidos, pagos o inventario. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -1957,7 +1926,7 @@
       "url": "/es/productos/software-para-clinicas/",
       "title": "Software para clínicas y salud",
       "eyebrow": "Industria",
-      "summary": "Construimos herramientas para citas, pacientes, historias, recordatorios y administración con enfoque en privacidad y trazabilidad.",
+      "summary": "Construimos herramientas para citas, pacientes, historias, recordatorios y administración con enfoque en privacidad y trazabilidad. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Sirve para ordenar la atención, evitar pérdida de datos y dar seguimiento a pacientes sin depender de agendas dispersas.",
       "technical": "Agenda, perfiles de paciente, permisos, auditoría, recordatorios, formularios, almacenamiento seguro y panel administrativo.",
       "who": "Clínicas, consultorios, centros estéticos, terapeutas y servicios de salud que necesitan información clara y protegida.",
@@ -1982,7 +1951,7 @@
         }
       ],
       "metaTitle": "Software para clínicas, citas y pacientes | Hashinmy",
-      "metaDescription": "Desarrollo de software para clínicas, consultorios y salud con citas, pacientes, permisos, auditoría, recordatorios y administración segura.",
+      "metaDescription": "Software para clínicas y salud con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software para clínicas",
         "sistema de citas",
@@ -2011,7 +1980,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para clínicas y salud ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve para ordenar la atención, evitar pérdida de datos y dar seguimiento a pacientes sin depender de agendas dispersas. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para clínicas y salud ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Sirve para ordenar la atención, evitar pérdida de datos y dar seguimiento a pacientes sin depender de agendas dispersas. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2033,7 +2002,7 @@
       "url": "/es/productos/software-para-logistica/",
       "title": "Software para logística",
       "eyebrow": "Industria",
-      "summary": "Creamos sistemas para rutas, entregas, conductores, paquetes, estados y evidencias para saber qué pasa en cada operación.",
+      "summary": "Creamos sistemas para rutas, entregas, conductores, paquetes, estados y evidencias para saber qué pasa en cada operación. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a coordinar entregas, reducir llamadas innecesarias y tener pruebas cuando un pedido cambia de estado.",
       "technical": "Tracking, geolocalización, estados de entrega, evidencia multimedia, asignación de rutas, notificaciones y panel de control.",
       "who": "Empresas de entrega, transporte, mensajería, bodegas, distribución y operación en campo.",
@@ -2058,7 +2027,7 @@
         }
       ],
       "metaTitle": "Software para logística, rutas y entregas | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software logístico para rutas, tracking, entregas, conductores, evidencias, alertas, geolocalización y panel de control.",
+      "metaDescription": "Software para logística con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software logística",
         "tracking entregas",
@@ -2087,7 +2056,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para logística ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a coordinar entregas, reducir llamadas innecesarias y tener pruebas cuando un pedido cambia de estado. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para logística ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Ayuda a coordinar entregas, reducir llamadas innecesarias y tener pruebas cuando un pedido cambia de estado. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2109,7 +2078,7 @@
       "url": "/es/productos/software-para-inmobiliarias/",
       "title": "Software para inmobiliarias",
       "eyebrow": "Industria",
-      "summary": "Organizamos propiedades, clientes, visitas, documentos y seguimiento comercial para que cada oportunidad tenga contexto.",
+      "summary": "Organizamos propiedades, clientes, visitas, documentos y seguimiento comercial para que cada oportunidad tenga contexto. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Permite saber qué inmueble está disponible, quién lo consultó, qué falta por enviar y qué asesor debe continuar el proceso.",
       "technical": "CRM inmobiliario, catálogo, filtros, formularios, agenda de visitas, documentos, automatización de seguimiento y reportes.",
       "who": "Inmobiliarias, brokers, constructoras, asesores y equipos comerciales que gestionan propiedades o proyectos.",
@@ -2134,7 +2103,7 @@
         }
       ],
       "metaTitle": "Software para inmobiliarias y CRM inmobiliario | Hashinmy",
-      "metaDescription": "Sistemas para inmobiliarias con catálogo de propiedades, CRM, agenda de visitas, documentos, seguimiento comercial y reportes por asesor.",
+      "metaDescription": "Software para inmobiliarias con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software inmobiliario",
         "CRM inmobiliario",
@@ -2163,7 +2132,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para inmobiliarias ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Permite saber qué inmueble está disponible, quién lo consultó, qué falta por enviar y qué asesor debe continuar el proceso. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para inmobiliarias ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Permite saber qué inmueble está disponible, quién lo consultó, qué falta por enviar y qué asesor debe continuar el proceso. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2185,7 +2154,7 @@
       "url": "/es/productos/software-para-educacion/",
       "title": "Software para educación",
       "eyebrow": "Industria",
-      "summary": "Desarrollamos plataformas para cursos, estudiantes, pagos, clases, contenido y seguimiento académico de forma simple.",
+      "summary": "Desarrollamos plataformas para cursos, estudiantes, pagos, clases, contenido y seguimiento académico de forma simple. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Una institución o creador puede organizar inscripciones, materiales y avances sin depender de mensajes sueltos o archivos dispersos.",
       "technical": "LMS, usuarios por rol, contenido, evaluaciones, pagos, progreso, certificados, notificaciones y panel administrativo.",
       "who": "Academias, colegios, profesores, creadores de cursos, centros de formación y programas internos de empresa.",
@@ -2210,7 +2179,7 @@
         }
       ],
       "metaTitle": "Software educativo, LMS y cursos online | Hashinmy",
-      "metaDescription": "Hashinmy crea software educativo, LMS y plataformas de cursos con estudiantes, pagos, contenido, progreso, certificados y panel administrativo.",
+      "metaDescription": "Software para educación con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software educativo",
         "LMS",
@@ -2239,7 +2208,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software para educación ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Una institución o creador puede organizar inscripciones, materiales y avances sin depender de mensajes sueltos o archivos dispersos. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria."
+          "body": "Software para educación ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Una institución o creador puede organizar inscripciones, materiales y avances sin depender de mensajes sueltos o archivos dispersos. El contenido aterriza el servicio en una industria concreta para que una empresa pueda reconocer problemas reales de su operación diaria.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2261,7 +2230,7 @@
       "url": "/es/productos/diagnostico-tecnico/",
       "title": "Diagnóstico técnico",
       "eyebrow": "Proceso",
-      "summary": "Antes de construir, revisamos objetivos, usuarios, datos, riesgos y prioridad para proponer una ruta clara y realista.",
+      "summary": "Antes de construir, analizamos la operación, detectamos dónde se pierde tiempo, dinero o información, priorizamos el módulo de mayor impacto y proponemos una ruta técnica, comercial y financiera clara.",
       "simple": "Es la etapa donde se entiende qué problema se debe resolver primero y qué no conviene construir todavía.",
       "technical": "Levantamiento de requisitos, mapa de procesos, arquitectura inicial, estimación por fases, riesgos y criterios de aceptación.",
       "who": "Personas o empresas con una idea, proceso desordenado o sistema existente que necesitan decidir el mejor camino.",
@@ -2286,7 +2255,7 @@
         }
       ],
       "metaTitle": "Diagnóstico técnico para software | Hashinmy",
-      "metaDescription": "Diagnóstico técnico para proyectos de software: requisitos, procesos, arquitectura inicial, fases, riesgos y ruta de primera versión con Hashinmy.",
+      "metaDescription": "Antes de construir, analizamos la operación, detectamos dónde se pierde tiempo, dinero o información, priorizamos el módulo de mayor impacto y proponemos una ruta técnica, comercial y financiera clara.",
       "keywords": [
         "diagnóstico técnico software",
         "requisitos software",
@@ -2315,7 +2284,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Diagnóstico técnico ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Es la etapa donde se entiende qué problema se debe resolver primero y qué no conviene construir todavía. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto."
+          "body": "Diagnóstico técnico ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Es la etapa donde se entiende qué problema se debe resolver primero y qué no conviene construir todavía. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2337,7 +2306,7 @@
       "url": "/es/productos/prototipo-mvp/",
       "title": "Prototipo y MVP",
       "eyebrow": "Proceso",
-      "summary": "Creamos una primera versión útil (MVP) para validar rápido sin gastar en funciones que todavía no se necesitan.",
+      "summary": "Creamos una primera versión útil (MVP) para validar rápido sin gastar en funciones que todavía no se necesitan. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un MVP permite probar la idea con usuarios reales, aprender y mejorar antes de construir todo el producto completo.",
       "technical": "Flujos principales, diseño navegable, backend mínimo, medición, feedback, iteración y backlog priorizado.",
       "who": "Emprendimientos, empresas nuevas, productos digitales y equipos que quieren validar demanda antes de escalar.",
@@ -2362,7 +2331,7 @@
         }
       ],
       "metaTitle": "Prototipo y MVP de software | Hashinmy",
-      "metaDescription": "Diseño y desarrollo de prototipos y MVP para validar productos digitales con flujos principales, backend mínimo, medición e iteración.",
+      "metaDescription": "Prototipo y MVP con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "MVP software",
         "prototipo digital",
@@ -2391,7 +2360,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Prototipo y MVP ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un MVP permite probar la idea con usuarios reales, aprender y mejorar antes de construir todo el producto completo. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto."
+          "body": "Prototipo y MVP ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un MVP permite probar la idea con usuarios reales, aprender y mejorar antes de construir todo el producto completo. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2413,7 +2382,7 @@
       "url": "/es/productos/seguridad-y-privacidad/",
       "title": "Seguridad y privacidad",
       "eyebrow": "Confianza",
-      "summary": "Diseñamos sistemas con permisos, validaciones y protección de datos desde el inicio, no como arreglo de último minuto.",
+      "summary": "Diseñamos sistemas con permisos, validaciones y protección de datos desde el inicio, no como arreglo de último minuto. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "La seguridad evita accesos indebidos, errores costosos y pérdida de confianza cuando el sistema maneja información importante.",
       "technical": "Autenticación, autorización, cifrado, validación de entradas, auditoría, rate limit, backups y manejo responsable de datos.",
       "who": "Empresas que manejan clientes, pagos, documentos, datos internos, información sensible o usuarios con diferentes permisos.",
@@ -2438,7 +2407,7 @@
         }
       ],
       "metaTitle": "Seguridad y privacidad en software | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software con autenticación, permisos, cifrado, validaciones, auditoría, rate limit y buenas prácticas de privacidad.",
+      "metaDescription": "Seguridad y privacidad con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "seguridad software",
         "privacidad datos",
@@ -2467,7 +2436,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Seguridad y privacidad ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. La seguridad evita accesos indebidos, errores costosos y pérdida de confianza cuando el sistema maneja información importante. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto."
+          "body": "Seguridad y privacidad ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. La seguridad evita accesos indebidos, errores costosos y pérdida de confianza cuando el sistema maneja información importante. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2489,7 +2458,7 @@
       "url": "/es/productos/integraciones-y-migraciones/",
       "title": "Integraciones y migraciones",
       "eyebrow": "Proceso",
-      "summary": "Conectamos sistemas existentes y movemos datos con cuidado para que la operación no empiece desde cero.",
+      "summary": "Conectamos sistemas existentes y movemos datos con cuidado para que la operación no empiece desde cero. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Si ya usas hojas, plataformas, CRM o bases de datos, se puede crear un puente o migrar información importante con control.",
       "technical": "APIs, ETL, limpieza de datos, mapeo de campos, webhooks, importaciones, pruebas de integridad y plan de reversa.",
       "who": "Empresas que tienen información repartida en herramientas diferentes o quieren modernizar sin perder historial.",
@@ -2514,7 +2483,7 @@
         }
       ],
       "metaTitle": "Integraciones y migraciones de datos | Hashinmy",
-      "metaDescription": "Integraciones y migraciones con APIs, ETL, limpieza de datos, webhooks, importaciones, pruebas de integridad y modernización segura.",
+      "metaDescription": "Integraciones y migraciones con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "integraciones API",
         "migración de datos",
@@ -2543,7 +2512,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Integraciones y migraciones ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Si ya usas hojas, plataformas, CRM o bases de datos, se puede crear un puente o migrar información importante con control. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto."
+          "body": "Integraciones y migraciones ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Si ya usas hojas, plataformas, CRM o bases de datos, se puede crear un puente o migrar información importante con control. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2565,7 +2534,7 @@
       "url": "/es/productos/soporte-y-evolucion/",
       "title": "Soporte y evolución",
       "eyebrow": "Confianza",
-      "summary": "Después de publicar, acompañamos mejoras, mantenimiento, medición y ajustes para que el producto siga funcionando y creciendo.",
+      "summary": "Después de publicar, acompañamos mejoras, mantenimiento, medición y ajustes para que el producto siga funcionando y creciendo. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un sistema real cambia con el negocio: aparecen usuarios, reglas nuevas, errores y oportunidades que necesitan atención ordenada.",
       "technical": "Mantenimiento, monitoreo, backlog, versionado, corrección de bugs, mejoras iterativas, documentación y despliegues controlados.",
       "who": "Negocios que no quieren quedarse con un sistema abandonado después de la primera entrega.",
@@ -2590,7 +2559,7 @@
         }
       ],
       "metaTitle": "Soporte, mantenimiento y evolución de software | Hashinmy",
-      "metaDescription": "Soporte y evolución de software con mantenimiento, monitoreo, corrección de bugs, mejoras, documentación, versionado y despliegues controlados.",
+      "metaDescription": "Soporte y evolución con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "soporte software",
         "mantenimiento software",
@@ -2619,7 +2588,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Soporte y evolución ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema real cambia con el negocio: aparecen usuarios, reglas nuevas, errores y oportunidades que necesitan atención ordenada. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto."
+          "body": "Soporte y evolución ayuda cuando una empresa necesita pasar de trabajo manual, herramientas separadas o decisiones lentas a un flujo más claro. Un sistema real cambia con el negocio: aparecen usuarios, reglas nuevas, errores y oportunidades que necesitan atención ordenada. Explica cómo Hashinmy reduce riesgo técnico, protege datos y mantiene trazabilidad durante el proyecto.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2641,7 +2610,7 @@
       "url": "/es/productos/cotizador-tecnico-aprovechamiento/",
       "title": "Cotizador técnico y aprovechamiento",
       "eyebrow": "Producto",
-      "summary": "Creamos cotizadores técnicos para calcular áreas, materiales, combinaciones, desperdicio y precios con mayor precisión, especialmente cuando la venta depende de medidas reales.",
+      "summary": "Creamos cotizadores técnicos para calcular áreas, materiales, combinaciones, desperdicio y precios con mayor precisión, especialmente cuando la venta depende de medidas reales. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un cotizador técnico ayuda a que el equipo comercial no calcule todo a mano: ingresa medidas, materiales y condiciones, y el sistema entrega una propuesta más ordenada.",
       "technical": "Reglas de cálculo, motor de precios, fórmulas por área, optimización de material, base de datos, reportes, permisos y trazabilidad de cambios.",
       "who": "Carpinterías, fabricación, mobiliario, metalmecánica y empresas que venden productos donde cada medida o material cambia el costo final.",
@@ -2682,7 +2651,7 @@
         }
       ],
       "metaTitle": "Cotizador técnico y aprovechamiento de material | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla cotizadores técnicos para carpinterías y fabricación: cálculo por áreas, aprovechamiento de material, precios, reportes y trazabilidad.",
+      "metaDescription": "Cotizador técnico y aprovechamiento con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "cotizador técnico",
         "aprovechamiento de material",
@@ -2721,7 +2690,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Cuando una cotización depende de medidas, áreas, materiales o fórmulas, el error manual puede afectar margen, tiempos y confianza del cliente. Un cotizador técnico convierte esa lógica en un sistema que guía al usuario, aplica reglas y mantiene historial para revisar cada propuesta."
+          "body": "Cuando una cotización depende de medidas, áreas, materiales o fórmulas, el error manual puede afectar margen, tiempos y confianza del cliente. Un cotizador técnico convierte esa lógica en un sistema que guía al usuario, aplica reglas y mantiene historial para revisar cada propuesta.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2759,7 +2728,7 @@
       "url": "/es/productos/paginas-web-seo/",
       "title": "Páginas web SEO",
       "eyebrow": "Producto",
-      "summary": "Diseñamos páginas web corporativas y landing pages con estructura semántica, metadatos, contenido claro, velocidad, responsive y preparación para buscadores e inteligencia artificial.",
+      "summary": "Diseñamos páginas web corporativas y landing pages con estructura semántica, metadatos, contenido claro, velocidad, responsive y preparación para buscadores e inteligencia artificial. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Una página web SEO no solo se ve bien: también explica qué ofrece la empresa para que clientes, Google y asistentes de IA puedan entenderla y recomendarla mejor.",
       "technical": "HTML semántico, metatags, canonical, sitemap, robots.txt, JSON-LD, rendimiento, mobile first, accesibilidad y arquitectura de contenido por intención de búsqueda.",
       "who": "Empresas que necesitan presencia digital seria, captación de clientes, confianza visual y una base técnica preparada para crecer con contenidos y campañas.",
@@ -2800,7 +2769,7 @@
         }
       ],
       "metaTitle": "Páginas web SEO y landing pages | Hashinmy",
-      "metaDescription": "Hashinmy crea páginas web SEO con estructura semántica, datos estructurados, sitemap, robots, velocidad, mobile first y contenido claro para buscadores e IA.",
+      "metaDescription": "Páginas web SEO con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "páginas web SEO",
         "landing pages Colombia",
@@ -2840,7 +2809,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Muchas webs se ven bonitas pero no explican bien qué vende la empresa ni ayudan al rastreador a entender la oferta. Una página web SEO combina diseño, estructura, contenido y señales técnicas para mejorar descubrimiento, confianza y conversión."
+          "body": "Muchas webs se ven bonitas pero no explican bien qué vende la empresa ni ayudan al rastreador a entender la oferta. Una página web SEO combina diseño, estructura, contenido y señales técnicas para mejorar descubrimiento, confianza y conversión.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2878,7 +2847,7 @@
       "url": "/es/productos/chatbots-empresariales/",
       "title": "Chatbots empresariales",
       "eyebrow": "Producto",
-      "summary": "Implementamos chatbots conectados a ventas, soporte, seguimiento, precalificación y atención automática para responder mejor sin perder el control del negocio.",
+      "summary": "Implementamos chatbots conectados a ventas, soporte, seguimiento, precalificación y atención automática para responder mejor sin perder el control del negocio. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Un chatbot puede recibir preguntas, orientar al cliente, filtrar solicitudes y entregar información útil antes de que intervenga una persona del equipo.",
       "technical": "Flujos conversacionales, integración con CRM o backend, base de conocimiento, webhooks, reglas de seguridad, registro de conversaciones y escalamiento humano.",
       "who": "Equipos comerciales, soporte, servicios y empresas que reciben consultas repetidas y necesitan atención más rápida con información ordenada.",
@@ -2919,7 +2888,7 @@
         }
       ],
       "metaTitle": "Chatbots empresariales para ventas y soporte | Hashinmy",
-      "metaDescription": "Hashinmy implementa chatbots empresariales conectados a ventas, soporte, CRM, backend, atención automática, precalificación y escalamiento humano.",
+      "metaDescription": "Chatbots empresariales con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "chatbots empresariales",
         "automatización conversacional",
@@ -2959,7 +2928,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Cuando muchas consultas llegan por canales diferentes, el equipo pierde tiempo repitiendo respuestas y copiando información. Un chatbot empresarial centraliza la primera atención, ordena solicitudes y conserva contexto para que la persona correcta intervenga mejor."
+          "body": "Cuando muchas consultas llegan por canales diferentes, el equipo pierde tiempo repitiendo respuestas y copiando información. Un chatbot empresarial centraliza la primera atención, ordena solicitudes y conserva contexto para que la persona correcta intervenga mejor.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -2997,7 +2966,7 @@
       "url": "/es/productos/nube-respaldo-datos/",
       "title": "Nube y respaldo de datos",
       "eyebrow": "Producto",
-      "summary": "Diseñamos almacenamiento en la nube, sincronización y respaldos para proteger información crítica de clientes, cotizaciones, pedidos, materiales, diseños y documentos.",
+      "summary": "Diseñamos almacenamiento en la nube, sincronización y respaldos para proteger información crítica de clientes, cotizaciones, pedidos, materiales, diseños y documentos. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "La nube permite que la información importante no dependa de un solo computador y pueda recuperarse o consultarse con permisos cuando el negocio lo necesita.",
       "technical": "Arquitectura cloud, backups, sincronización, control de acceso, cifrado, base de datos, recuperación, auditoría y continuidad operativa.",
       "who": "Empresas que manejan información sensible o crítica y necesitan continuidad, acceso remoto, recuperación y menor riesgo de pérdida de datos.",
@@ -3030,7 +2999,7 @@
         }
       ],
       "metaTitle": "Nube, respaldo y datos seguros | Hashinmy",
-      "metaDescription": "Soluciones de nube y respaldo de datos para empresas: sincronización, backups, permisos, recuperación, trazabilidad y continuidad operativa con Hashinmy.",
+      "metaDescription": "Nube y respaldo de datos con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "nube empresarial",
         "respaldo de datos",
@@ -3070,7 +3039,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Perder información de clientes, cotizaciones o documentos puede frenar ventas y operación. La nube y el respaldo reducen el riesgo de depender de archivos sueltos, computadores únicos o copias manuales difíciles de controlar."
+          "body": "Perder información de clientes, cotizaciones o documentos puede frenar ventas y operación. La nube y el respaldo reducen el riesgo de depender de archivos sueltos, computadores únicos o copias manuales difíciles de controlar.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3104,7 +3073,7 @@
       "url": "/es/industrias/software-para-carpinterias/",
       "title": "Software para carpinterías",
       "eyebrow": "Industria",
-      "summary": "Construimos software para carpinterías y mobiliario con cotización por áreas, materiales, despiece, aprovechamiento, retales, producción y seguimiento comercial.",
+      "summary": "Construimos software para carpinterías y mobiliario con cotización por áreas, materiales, despiece, aprovechamiento, retales, producción y seguimiento comercial. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a una carpintería a ordenar ventas, medidas, materiales, cotizaciones, producción y seguimiento para que cada proyecto tenga menos improvisación.",
       "technical": "Módulos de cotización, inventario, producción, CRM, usuarios, permisos, fórmulas, reportes, archivos de diseño y trazabilidad por orden.",
       "who": "Carpinterías, talleres de mobiliario, fabricantes de cocinas, closets, muebles especiales y negocios que venden proyectos con medidas variables.",
@@ -3134,7 +3103,7 @@
         }
       ],
       "metaTitle": "Software para carpinterías y mobiliario | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software para carpinterías: cotización por áreas, materiales, despiece, aprovechamiento, retales, producción, CRM y reportes.",
+      "metaDescription": "Software para carpinterías con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software para carpinterías",
         "cotizador para carpintería",
@@ -3163,7 +3132,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "En carpintería cada medida, material y acabado puede cambiar costos, tiempos y producción. Un software propio permite pasar de cálculos dispersos a una operación más ordenada, con menos errores y más control sobre cotizaciones y entregas."
+          "body": "En carpintería cada medida, material y acabado puede cambiar costos, tiempos y producción. Un software propio permite pasar de cálculos dispersos a una operación más ordenada, con menos errores y más control sobre cotizaciones y entregas.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3185,7 +3154,7 @@
       "url": "/es/productos/desarrollo-software-colombia-medellin/",
       "title": "Desarrollo en Colombia y Medellín",
       "eyebrow": "Confianza",
-      "summary": "Hashinmy trabaja desde Medellín, Colombia, con enfoque en software empresarial, programas para PC, web, nube, IA, automatización, páginas y chatbots conectados a necesidades reales.",
+      "summary": "Hashinmy trabaja desde Medellín, Colombia, con enfoque en software empresarial, programas para PC, web, nube, IA, automatización, páginas y chatbots conectados a necesidades reales. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Para una empresa local o regional, trabajar con un equipo que entiende operación, ventas y tecnología permite hablar de problemas reales antes de construir pantallas.",
       "technical": "Diagnóstico funcional, arquitectura por fases, desarrollo web y escritorio, cloud, IA aplicada, seguridad, APIs, pruebas, despliegue y evolución del producto.",
       "who": "Empresas de Colombia, Medellín o mercados hispanos que necesitan una solución seria, personalizada y preparada para crecer sin perder control técnico.",
@@ -3218,7 +3187,7 @@
         }
       ],
       "metaTitle": "Desarrollo de software en Colombia y Medellín | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software empresarial en Colombia y Medellín: PC, web, nube, IA, automatización, páginas, chatbots y arquitectura por fases.",
+      "metaDescription": "Desarrollo en Colombia y Medellín con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "desarrollo de software en Colombia",
         "software en Medellín",
@@ -3257,7 +3226,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Una empresa puede saber que necesita tecnología, pero no siempre sabe si requiere una web, un sistema interno, una app, un chatbot o automatización. Hashinmy ayuda a ordenar esa decisión desde el proceso real antes de iniciar desarrollo."
+          "body": "Una empresa puede saber que necesita tecnología, pero no siempre sabe si requiere una web, un sistema interno, una app, un chatbot o automatización. Hashinmy ayuda a ordenar esa decisión desde el proceso real antes de iniciar desarrollo.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3291,7 +3260,7 @@
       "url": "/es/productos/desarrollo-api/",
       "title": "Desarrollo de API empresarial",
       "eyebrow": "Integración",
-      "summary": "Conectamos sistemas, formularios, CRM, paneles, apps y servicios externos mediante API (puente técnico seguro) para que la información no quede aislada.",
+      "summary": "Conectamos sistemas, formularios, CRM, paneles, apps y servicios externos mediante API (puente técnico seguro) para que la información no quede aislada. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Una API permite que dos herramientas hablen entre sí sin copiar datos manualmente ni depender de archivos sueltos.",
       "technical": "Diseño REST o HTTP, autenticación, validación de datos, documentación, logs, control de errores, webhooks e integración con backend.",
       "who": "Empresas que ya tienen varias herramientas separadas y necesitan unir ventas, operación, soporte, pagos o reportes en un flujo estable.",
@@ -3323,7 +3292,7 @@
         }
       ],
       "metaTitle": "Desarrollo de API empresarial en Colombia | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla APIs para conectar software, CRM, formularios, apps, paneles y servicios externos con seguridad, documentación y trazabilidad empresarial.",
+      "metaDescription": "Desarrollo de API empresarial con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "desarrollo de API",
         "API empresarial",
@@ -3363,7 +3332,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "El desarrollo de API empresarial resuelve el problema de sistemas que no se comunican. Cuando ventas usa una herramienta, soporte otra y administración otra, la información se duplica o se pierde. Una API ordena el intercambio de datos y permite que el software crezca con conexiones más estables."
+          "body": "El desarrollo de API empresarial resuelve el problema de sistemas que no se comunican. Cuando ventas usa una herramienta, soporte otra y administración otra, la información se duplica o se pierde. Una API ordena el intercambio de datos y permite que el software crezca con conexiones más estables.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3397,7 +3366,7 @@
       "url": "/es/productos/software-seguro-para-empresas/",
       "title": "Software seguro para empresas",
       "eyebrow": "Seguridad",
-      "summary": "Diseñamos software con permisos, validaciones, trazabilidad y continuidad para proteger datos, reducir errores y controlar acciones importantes.",
+      "summary": "Diseñamos software con permisos, validaciones, trazabilidad y continuidad para proteger datos, reducir errores y controlar acciones importantes. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a que cada usuario vea solo lo necesario, que los cambios importantes queden registrados y que la información crítica tenga más control.",
       "technical": "Roles, permisos, validación de entradas, auditoría, cifrado cuando aplica, respaldos, sesiones, logs y buenas prácticas de despliegue.",
       "who": "Empresas que manejan clientes, cotizaciones, documentos, producción, pagos o información sensible y necesitan operar con más confianza.",
@@ -3429,7 +3398,7 @@
         }
       ],
       "metaTitle": "Software seguro para empresas | Hashinmy",
-      "metaDescription": "Hashinmy desarrolla software seguro para empresas con roles, permisos, validaciones, auditoría, respaldos y trazabilidad para proteger operaciones críticas.",
+      "metaDescription": "Software seguro para empresas con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software seguro para empresas",
         "seguridad digital empresarial",
@@ -3468,7 +3437,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Software seguro para empresas reduce el riesgo de accesos incorrectos, cambios sin historial, datos mal ingresados o información crítica sin respaldo. Ayuda a que el negocio trabaje con más control cuando varias personas participan en ventas, operación, administración o soporte."
+          "body": "Software seguro para empresas reduce el riesgo de accesos incorrectos, cambios sin historial, datos mal ingresados o información crítica sin respaldo. Ayuda a que el negocio trabaje con más control cuando varias personas participan en ventas, operación, administración o soporte.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3502,7 +3471,7 @@
       "url": "/es/productos/transformacion-digital/",
       "title": "Transformación digital para empresas",
       "eyebrow": "Evolución",
-      "summary": "Convertimos procesos manuales en flujos digitales más claros, medibles y escalables con software, automatización, nube e inteligencia artificial aplicada.",
+      "summary": "Convertimos procesos manuales en flujos digitales más claros, medibles y escalables con software, automatización, nube e inteligencia artificial aplicada. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Sirve para dejar de depender de papeles, archivos desordenados o mensajes sueltos y pasar a una operación más organizada.",
       "technical": "Diagnóstico, arquitectura funcional, módulos por fases, datos en nube, automatización, integraciones, dashboards e IA aplicada cuando aporta valor.",
       "who": "Empresas que quieren modernizar su operación sin improvisar, empezando por fases útiles y creciendo con una ruta técnica clara.",
@@ -3534,7 +3503,7 @@
         }
       ],
       "metaTitle": "Transformación digital para empresas | Hashinmy",
-      "metaDescription": "Hashinmy ayuda a empresas a digitalizar procesos, automatizar tareas, ordenar datos, crear dashboards e integrar IA con una ruta técnica por fases.",
+      "metaDescription": "Transformación digital para empresas con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "transformación digital",
         "digitalización empresarial",
@@ -3574,7 +3543,7 @@
       "sections": [
         {
           "heading": "Qué problema resuelve",
-          "body": "Transformación digital resuelve el desorden que aparece cuando una empresa crece con papeles, hojas de cálculo, chats y herramientas aisladas. La meta es convertir tareas críticas en flujos digitales más claros, medibles y preparados para crecer."
+          "body": "Transformación digital resuelve el desorden que aparece cuando una empresa crece con papeles, hojas de cálculo, chats y herramientas aisladas. La meta es convertir tareas críticas en flujos digitales más claros, medibles y preparados para crecer.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo entiende una persona no técnica",
@@ -3608,7 +3577,7 @@
       "url": "/es/productos/software-metalmecanica-fabricacion/",
       "title": "Software para metalmecánica y fabricación",
       "eyebrow": "Industria",
-      "summary": "Hashinmy puede ordenar procesos de metalmecánica y fabricación donde materiales, etapas, costos, producción y trazabilidad cambian el resultado de cada trabajo.",
+      "summary": "Hashinmy puede ordenar procesos de metalmecánica y fabricación donde materiales, etapas, costos, producción y trazabilidad cambian el resultado de cada trabajo. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Sirve para que el equipo deje de perseguir datos en hojas sueltas y pueda ver cotización, materiales, órdenes, avance y entregas en un mismo sistema.",
       "technical": "Modelo de órdenes de producción, inventario, roles, estados de trabajo, reportes, historial de cambios, APIs e integración opcional con nube o escritorio.",
       "who": "Talleres, fabricantes, empresas industriales y negocios técnicos que cotizan por materiales, procesos, tiempos, piezas o requisitos propios de cada cliente.",
@@ -3638,7 +3607,7 @@
         }
       ],
       "metaTitle": "Software para metalmecánica y fabricación | Hashinmy",
-      "metaDescription": "Software para metalmecánica y fabricación con cotización, materiales, órdenes, inventario, producción, trazabilidad y reportes conectados al proceso real.",
+      "metaDescription": "Software para metalmecánica y fabricación con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software metalmecánica",
         "software fabricación",
@@ -3649,7 +3618,7 @@
       "sections": [
         {
           "heading": "Proceso técnico con más control",
-          "body": "En fabricación y metalmecánica cada trabajo puede depender de materiales, medidas, procesos, tiempos, costos y aprobaciones. Un sistema a medida ayuda a convertir esa lógica en una operación más clara, con estados visibles y menos información perdida entre mensajes, archivos o llamadas."
+          "body": "En fabricación y metalmecánica cada trabajo puede depender de materiales, medidas, procesos, tiempos, costos y aprobaciones. Un sistema a medida ayuda a convertir esa lógica en una operación más clara, con estados visibles y menos información perdida entre mensajes, archivos o llamadas.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Lenguaje claro para el equipo",
@@ -3689,7 +3658,7 @@
       "url": "/es/productos/software-empresas-comerciales/",
       "title": "Software para empresas comerciales",
       "eyebrow": "Industria",
-      "summary": "Creamos sistemas para empresas comerciales que necesitan ordenar clientes, ventas, seguimiento, cotizaciones, inventario, reportes y automatización comercial.",
+      "summary": "Creamos sistemas para empresas comerciales que necesitan ordenar clientes, ventas, seguimiento, cotizaciones, inventario, reportes y automatización comercial. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a que ventas y administración trabajen con una sola versión de la información, sin depender de mensajes dispersos o archivos diferentes para cada cliente.",
       "technical": "CRM, panel administrativo, base de datos, flujos de seguimiento, permisos, reportes, notificaciones, automatización y conexión opcional con chatbot o página web.",
       "who": "Empresas que venden productos o servicios, reciben solicitudes, hacen seguimiento comercial y necesitan medir mejor oportunidades, respuestas, pedidos y resultados.",
@@ -3719,7 +3688,7 @@
         }
       ],
       "metaTitle": "Software para empresas comerciales | Hashinmy",
-      "metaDescription": "Software comercial con CRM, seguimiento de clientes, cotizaciones, pedidos, inventario, reportes, chatbot y automatización conectada al negocio.",
+      "metaDescription": "Software para empresas comerciales con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software comercial",
         "CRM a medida",
@@ -3730,7 +3699,7 @@
       "sections": [
         {
           "heading": "Ventas con menos dispersión",
-          "body": "Una empresa comercial puede perder oportunidades cuando cada vendedor maneja datos en su propio archivo, chat o libreta. Un sistema centralizado permite saber quién atendió, qué se cotizó, qué falta responder y qué oportunidad necesita seguimiento."
+          "body": "Una empresa comercial puede perder oportunidades cuando cada vendedor maneja datos en su propio archivo, chat o libreta. Un sistema centralizado permite saber quién atendió, qué se cotizó, qué falta responder y qué oportunidad necesita seguimiento.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Información entendible para todos",
@@ -3770,7 +3739,7 @@
       "url": "/es/productos/software-negocios-servicios/",
       "title": "Software para negocios de servicios",
       "eyebrow": "Industria",
-      "summary": "Diseñamos software para negocios de servicios que necesitan agendamiento, atención, historial, seguimiento, pagos, soporte, automatización y portales para clientes.",
+      "summary": "Diseñamos software para negocios de servicios que necesitan agendamiento, atención, historial, seguimiento, pagos, soporte, automatización y portales para clientes. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Permite saber qué pidió cada cliente, en qué estado está el servicio, quién lo atiende y qué falta por hacer, sin depender de memoria o mensajes sueltos.",
       "technical": "Agenda, CRM, estados de servicio, panel de usuarios, historial, notificaciones, permisos, formularios, portal web, chatbot e integraciones por API cuando aplica.",
       "who": "Empresas de servicios profesionales, técnicos, mantenimiento, atención recurrente o soporte que necesitan ordenar solicitudes y mejorar respuesta al cliente.",
@@ -3800,7 +3769,7 @@
         }
       ],
       "metaTitle": "Software para negocios de servicios | Hashinmy",
-      "metaDescription": "Software para negocios de servicios con agenda, solicitudes, historial, portal de clientes, chatbot, seguimiento, reportes y automatización operativa.",
+      "metaDescription": "Software para negocios de servicios con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software para servicios",
         "sistema de agendamiento",
@@ -3811,7 +3780,7 @@
       "sections": [
         {
           "heading": "Atención más organizada",
-          "body": "En un negocio de servicios es fácil perder contexto cuando las solicitudes llegan por llamadas, WhatsApp, correos o formularios diferentes. Un sistema propio registra cada caso, su estado, responsable, cliente y próxima acción."
+          "body": "En un negocio de servicios es fácil perder contexto cuando las solicitudes llegan por llamadas, WhatsApp, correos o formularios diferentes. Un sistema propio registra cada caso, su estado, responsable, cliente y próxima acción.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Experiencia simple para usuario y cliente",
@@ -3851,7 +3820,7 @@
       "url": "/es/productos/crm-seguimiento-comercial/",
       "title": "CRM y seguimiento comercial",
       "eyebrow": "Caso de uso",
-      "summary": "Un CRM a medida permite centralizar clientes, conversaciones, cotizaciones, tareas, oportunidades y reportes para que el seguimiento comercial no dependa de memoria.",
+      "summary": "Un CRM a medida permite centralizar clientes, conversaciones, cotizaciones, tareas, oportunidades y reportes para que el seguimiento comercial no dependa de memoria. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Es una agenda inteligente de clientes y oportunidades: muestra quién preguntó, qué necesita, qué se respondió, cuánto vale y qué paso sigue.",
       "technical": "Base de datos de clientes, pipeline comercial, permisos, historial, automatizaciones, paneles, reportes, formularios y conexión opcional con chatbot, web o correo.",
       "who": "Equipos comerciales, empresas con cotizaciones frecuentes, negocios que pierden oportunidades por falta de seguimiento o áreas que necesitan medir ventas y respuesta.",
@@ -3881,7 +3850,7 @@
         }
       ],
       "metaTitle": "CRM y seguimiento comercial a medida | Hashinmy",
-      "metaDescription": "CRM a medida para clientes, oportunidades, cotizaciones, tareas, historial, seguimiento, automatización comercial y reportes de ventas.",
+      "metaDescription": "CRM y seguimiento comercial con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "CRM a medida",
         "seguimiento comercial",
@@ -3892,7 +3861,7 @@
       "sections": [
         {
           "heading": "Problema que resuelve",
-          "body": "Muchas ventas se pierden porque no hay un lugar claro donde ver clientes, propuestas, responsables y próximos pasos. Un CRM a medida organiza esa información para reducir olvidos, repetir menos trabajo y responder con más criterio."
+          "body": "Muchas ventas se pierden porque no hay un lugar claro donde ver clientes, propuestas, responsables y próximos pasos. Un CRM a medida organiza esa información para reducir olvidos, repetir menos trabajo y responder con más criterio.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Cómo lo vive una persona no técnica",
@@ -3932,7 +3901,7 @@
       "url": "/es/productos/erp-ligero-personalizado/",
       "title": "ERP ligero personalizado",
       "eyebrow": "Caso de uso",
-      "summary": "Un ERP ligero personalizado une módulos clave como clientes, ventas, inventario, órdenes, documentos, reportes y permisos sin imponer una plataforma pesada.",
+      "summary": "Un ERP ligero personalizado une módulos clave como clientes, ventas, inventario, órdenes, documentos, reportes y permisos sin imponer una plataforma pesada. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Es un sistema central para manejar varias áreas del negocio poco a poco, empezando por lo más importante y creciendo por módulos.",
       "technical": "Arquitectura modular, base de datos relacional o documental, roles, auditoría, API interna, panel administrativo, reportes y posibles integraciones con nube o escritorio.",
       "who": "Empresas que necesitan más orden que una hoja de cálculo, pero todavía no requieren o no quieren adoptar un ERP genérico grande y difícil de adaptar.",
@@ -3962,7 +3931,7 @@
         }
       ],
       "metaTitle": "ERP ligero personalizado para empresas | Hashinmy",
-      "metaDescription": "ERP ligero a medida para conectar clientes, ventas, inventario, órdenes, documentos, reportes, permisos e integraciones por fases.",
+      "metaDescription": "ERP ligero personalizado con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "ERP ligero",
         "ERP personalizado",
@@ -3973,7 +3942,7 @@
       "sections": [
         {
           "heading": "Una base central sin exceso",
-          "body": "No todas las empresas necesitan un ERP gigante. A veces el mayor valor está en construir una base ligera que conecte las áreas más críticas: clientes, ventas, inventario, órdenes, documentos y reportes."
+          "body": "No todas las empresas necesitan un ERP gigante. A veces el mayor valor está en construir una base ligera que conecte las áreas más críticas: clientes, ventas, inventario, órdenes, documentos y reportes.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Construcción entendible",
@@ -4013,7 +3982,7 @@
       "url": "/es/productos/portal-clientes-web/",
       "title": "Portal web para clientes",
       "eyebrow": "Caso de uso",
-      "summary": "Un portal web para clientes permite consultar avances, enviar información, revisar documentos, crear solicitudes o acceder a servicios sin depender de atención manual permanente.",
+      "summary": "Un portal web para clientes permite consultar avances, enviar información, revisar documentos, crear solicitudes o acceder a servicios sin depender de atención manual permanente. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Es una zona privada o pública donde el cliente puede hacer seguimiento y entregar datos de forma ordenada, mientras la empresa mantiene control del proceso.",
       "technical": "Frontend web responsive, autenticación, roles, formularios, backend, base de datos, historial, notificaciones, archivos, APIs y seguridad según el tipo de información.",
       "who": "Empresas que atienden clientes recurrentes, manejan proyectos, servicios, documentos, solicitudes, soporte o procesos donde el cliente necesita visibilidad y orden.",
@@ -4043,7 +4012,7 @@
         }
       ],
       "metaTitle": "Portal web para clientes | Hashinmy",
-      "metaDescription": "Portal web para clientes con acceso, formularios, estados, documentos, solicitudes, trazabilidad, notificaciones e integración con sistemas internos.",
+      "metaDescription": "Portal web para clientes con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "portal de clientes",
         "portal web empresarial",
@@ -4054,7 +4023,7 @@
       "sections": [
         {
           "heading": "Más autoservicio con control",
-          "body": "Cuando los clientes preguntan siempre por estados, documentos o avances, el equipo pierde tiempo respondiendo manualmente. Un portal web organiza la información disponible y permite que cada cliente consulte o envíe datos con permisos definidos."
+          "body": "Cuando los clientes preguntan siempre por estados, documentos o avances, el equipo pierde tiempo respondiendo manualmente. Un portal web organiza la información disponible y permite que cada cliente consulte o envíe datos con permisos definidos.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Experiencia clara",
@@ -4094,7 +4063,7 @@
       "url": "/es/productos/inventario-produccion-reportes/",
       "title": "Inventario, producción y reportes",
       "eyebrow": "Caso de uso",
-      "summary": "Hashinmy puede conectar inventario, producción y reportes para saber qué hay disponible, qué se está ejecutando, qué falta y cómo se comporta la operación.",
+      "summary": "Hashinmy puede conectar inventario, producción y reportes para saber qué hay disponible, qué se está ejecutando, qué falta y cómo se comporta la operación. Hashinmy no lo trata como un servicio aislado: lo conecta con diagnóstico operativo, software a medida, IA cuando aporta valor y financiación del 100% para avanzar sin descapitalizarse.",
       "simple": "Ayuda a ver materiales, movimientos, órdenes, responsables y resultados sin tener que cruzar muchos archivos o preguntar a varias personas.",
       "technical": "Control de stock, movimientos, órdenes, estados, roles, auditoría, indicadores, dashboards, APIs, sincronización y reglas de negocio configuradas según el proceso.",
       "who": "Empresas con materiales, productos, pedidos, producción o entregas que necesitan reducir errores, mejorar visibilidad y tomar decisiones con datos más claros.",
@@ -4124,7 +4093,7 @@
         }
       ],
       "metaTitle": "Inventario, producción y reportes | Hashinmy",
-      "metaDescription": "Sistema para inventario, producción y reportes con movimientos, órdenes, estados, trazabilidad, dashboards e indicadores para operación empresarial.",
+      "metaDescription": "Inventario, producción y reportes con Hashinmy: ingeniería digital, software a medida, automatización e IA con posible financiación del 100% para ordenar procesos sin descapitalizarse.",
       "keywords": [
         "software de inventario",
         "control de producción",
@@ -4135,7 +4104,7 @@
       "sections": [
         {
           "heading": "Visibilidad operativa",
-          "body": "Cuando inventario y producción están separados, los equipos pueden tomar decisiones con datos incompletos. Un sistema conectado ayuda a ver existencias, movimientos, órdenes, responsables, estados y reportes desde una misma base."
+          "body": "Cuando inventario y producción están separados, los equipos pueden tomar decisiones con datos incompletos. Un sistema conectado ayuda a ver existencias, movimientos, órdenes, responsables, estados y reportes desde una misma base.\n\nEl diferencial de Hashinmy es que la decisión tecnológica no queda limitada por el pago inicial: podemos financiar el 100% del desarrollo y ordenar el alcance en cuotas manejables, mientras la solución empieza a ahorrar tiempo, reducir errores, centralizar información y producir valor medible dentro de la operación."
         },
         {
           "heading": "Uso diario sin complejidad",
@@ -4172,7 +4141,7 @@
   ],
   "schemaVersion": 1,
   "siteUrl": "https://hashinmy.com/",
-  "updatedAt": "2026-06-25",
+  "updatedAt": "2026-06-29",
   "uiLabels": {
     "productsLabel": "Productos",
     "allLabel": "Todo",

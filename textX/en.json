@@ -5,21 +5,21 @@
   "htmlLang": "en",
   "dir": "ltr",
   "meta": {
-    "title": "Hashinmy | Global custom software with AI, cloud and security",
-    "description": "Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
-    "ogTitle": "Hashinmy | Custom software, AI, CAD DXF, cloud, PC, SEO and chatbots",
-    "ogDescription": "A technology company rooted in Medellín, Colombia, with global reach for secure, traceable and scalable business software, including CAD with DXF export.",
+    "title": "Hashinmy | 100% financed custom software, AI and automation",
+    "description": "Hashinmy turns business processes into custom intelligent software, automation and applied AI, financing 100% of development so companies can modernize operations, protect cash flow and grow without draining capital.",
+    "ogTitle": "Hashinmy | 100% financed business technology built to measure",
+    "ogDescription": "A digital engineering firm and technology partner that analyzes your operation, finds where time, money or information is lost, builds the exact solution and finances 100% of development with manageable installments while the software creates value.",
     "appleTitle": "Hashinmy",
     "applicationName": "Hashinmy",
     "author": "Hashinmy",
-    "keywords": "Hashinmy, hashinmy.com, financeable custom software, custom software development, artificial intelligence for companies, business process automation, web apps PWA, business mobile apps, PC software systems, BI dashboards, ecommerce software, restaurant software, clinic software, logistics software, real estate software, education software, software payment options, software project financing, monthly software maintenance, API integrations, data migration, digital security, cloud software, technology glossary for companies, technical quoting and material optimization, carpentry software, SEO websites in Colombia, business chatbots in Colombia, cloud and data backup, software development in Medellín, business software in Colombia, PC software with cloud, area quoting, Hashinmy Medellín, API development, secure business software, digital transformation, business API, metalworking software, manufacturing software, software for commercial companies, CRM and sales follow-up, lightweight custom ERP, customer web portal, inventory and production, software for service businesses, Hashinmy Medellin Colombia, installable PC programs"
+    "keywords": "Hashinmy, hashinmy.com, 100% financed custom software, financed business technology, digital engineering for companies, applied artificial intelligence, business automation, digital transformation without draining cash flow, software development with financing, intelligent business systems, software to organize operations, sales automation, quoting automation, inventory software, custom CRM, lightweight custom ERP, business APIs, business chatbots, websites as sales channels, custom digital platforms, manageable software installments, business modernization, productivity, operational control, business reporting, protected cash flow, software development in Medellin, business software in Colombia, Hashinmy Medellin Colombia"
   },
   "ui": {
     "skip": "Skip to the current question",
     "stageLabel": "Interactive Hashinmy experience",
     "topbarLabel": "Main controls",
     "brandAria": "Return to the Hashinmy start",
-    "brandSmall": "Custom software + AI",
+    "brandSmall": "100% financed software + AI",
     "progressLabel": "Route progress",
     "languageLabel": "Language",
     "languageAria": "Change initial language",
@@ -33,9 +33,9 @@
     "back": "Back",
     "restart": "Restart",
     "contactLabel": "Contact details",
-    "contactPlaceholder": "Email address",
+    "contactPlaceholder": "Business email",
     "commentLabel": "Describe your project",
-    "commentPlaceholder": "Tell us which process you want to improve, which drawing, part or system you need, and any technical detail that helps us prepare a clear route.",
+    "commentPlaceholder": "Tell us which process you want to organize, automate or turn into software: sales, quotes, inventory, production, support, data, service, website, API, chatbot or platform. Include what makes you lose time, money or information so we can prepare a clear technical and financial route.",
     "submitRoute": "Send to Hashinmy",
     "copySummaryAction": "Copy summary",
     "formNote": "Your answers stay saved only in this browser until you decide to send them.",
@@ -43,13 +43,13 @@
     "copySuccess": "Summary copied. You can paste it into WhatsApp, email or CRM.",
     "copyFailure": "Automatic copy failed. Email sending will still prepare the summary.",
     "mailOpening": "We could not confirm through memoriaBACKEND on this attempt. We will open your email app with the prepared route as a fallback.",
-    "waitSummary": "Preparing summary",
+    "waitSummary": "Preparing technology route",
     "preparingOptions": "Preparing options",
     "optionFallback": "Choose an option",
     "pathLabel": "Your Decisions:",
     "pathEmpty": "Every tap builds your brief",
     "interactionFallback": "Interaction",
-    "summaryTitle": "Hashinmy interactive request",
+    "summaryTitle": "Technology route prepared by Hashinmy",
     "projectChosen": "Selected project",
     "expectedUse": "Expected use",
     "wantedValue": "Wanted value",
@@ -66,36 +66,36 @@
     "directRouteRequested": "Direct route requested.",
     "directQuoteSubject": "Hashinmy quote request",
     "financedSubject": "Hashinmy financed software request",
-    "directQuoteAudit": "The route jumps to diagnosis to quote your system with a clear scope.",
-    "financeAudit": "The route jumps to diagnosis with financing as the main priority.",
-    "directQuoteTech": "system quote + scope review",
-    "financeTech": "diagnosis + USD installments + scope review",
+    "directQuoteAudit": "The route jumps to diagnosis to quote the system with clear scope, operational value and implementation path.",
+    "financeAudit": "The route jumps to diagnosis with 100% development financing as the main priority.",
+    "directQuoteTech": "system diagnosis + technical and commercial scope",
+    "financeTech": "diagnosis + 100% financing + manageable installments",
     "topActionsLabel": "Products · Language",
     "proofEntryAria": "Our Experience · Hashinmy",
     "proofOpenButton": "Our Experience",
-    "proofTitle": "Our Experience",
-    "proofLead": "Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
+    "proofTitle": "Financed digital engineering",
+    "proofLead": "Hashinmy is not a website agency or a generic software vendor. It is a digital engineering firm and technology partner that turns business processes into custom intelligent software, automation and applied AI, financing 100% of development so companies can modernize without draining operations capital.",
     "proofCloseAria": "Close · Our Experience",
     "proofContentAria": "Our Experience · Frequently asked questions",
     "proofSummaryAria": "Trust and control",
-    "proofSummaryTitle": "Trust and control · Hashinmy",
+    "proofSummaryTitle": "100% financed custom technology to organize operations, protect capital and grow with control",
     "proofTrustLabel": "Trust and control:",
-    "proofTrustText": "Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation. Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
+    "proofTrustText": "business strategy, custom software, applied AI, automation, APIs, websites as sales channels, chatbots, operational diagnosis, 100% financing, manageable installments, security, permissions, traceability, useful data and operational continuity.",
     "proofMethodLabel": "Process and trust:",
-    "proofMethodText": "How we work, protect data, integrate systems and keep the product alive.",
+    "proofMethodText": "we analyze the real operation, detect where time, money or information is lost, prioritize the most profitable problem, design the exact solution, finance 100% of development and support implementation, testing, adoption and evolution.",
     "proofUseCasesLabel": "Use cases:",
-    "proofUseCasesText": "Clear examples to identify what a company needs.",
+    "proofUseCasesText": "sales, quotations, inventory, production, support, CRM, portals, ecommerce, automated service, reports, API integrations, cost control and internal processes that today depend on spreadsheets, WhatsApp or human memory.",
     "proofBrandsTitle": "Brands, projects and companies related to our work",
     "proofBrandsAria": "Brands, projects and companies related to our work",
     "proofLogoPlaceholder": "Our Experience Hashinmy",
     "proofLogoAltTemplate": "{name} logo",
     "proofFaqAria": "Frequently asked questions · Our Experience",
     "proofFaqWhyQuestion": "Why choose Hashinmy?",
-    "proofFaqWhyAnswer": "A technology company rooted in Medellín, Colombia, with global reach for secure, traceable and scalable business software, including CAD with DXF export.",
+    "proofFaqWhyAnswer": "Because Hashinmy does not sell isolated code, disconnected websites or generic technology: it turns concrete operational problems into clear, secure, measurable and financially viable systems.",
     "proofFaqWhoQuestion": "Who it helps?",
-    "proofFaqWhoAnswer": "Solutions explained by business type: commerce, health, logistics, education and services. Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation.",
+    "proofFaqWhoAnswer": "For small, medium or large companies that need to organize processes, automate work, integrate AI, sell better or create their own software without suddenly compromising cash flow.",
     "proofFaqStartQuestion": "How do I start?",
-    "proofFaqStartAnswer": "Your route is ready. Before sending it, you can add any detail that matters; the Hashinmy team will review the project direction, financing option and next steps with clear commercial and technical context. The route jumps to diagnosis to quote your system with a clear scope.",
+    "proofFaqStartAnswer": "Request a diagnosis to review your operation, find where time, money or information is lost, prioritize the highest-impact module and prepare a clear technical, commercial and financial route.",
     "proofBrandsStructuredDescription": "Brands, projects and companies related to our work"
   },
   "services": [
@@ -341,53 +341,59 @@
   "scenes": {
     "intro": {
       "eyebrow": "English",
-      "title": "Welcome to HASHINMY",
-      "copy": "We build custom software for companies that operate, sell and grow in local and international markets. We integrate AI, automation, PC programs, CAD software with DXF export, web applications, cloud, SEO, chatbots, technical quoting tools, security and operational continuity.\nMedellín and Colombia are our origin; our commercial and technical reach is global.\nWe drive companies’ technological development with 100% financed solutions, helping them reach their full potential, improve productivity and scale more efficiently.",
-      "optionQuestion": "Which option would you like?",
+      "title": "100% financed custom technology to grow without draining cash flow",
+      "copy": "Hashinmy is a digital engineering firm that turns business processes into custom intelligent software, automation and applied artificial intelligence. We analyze your operation, detect where time, money or information is lost, build the exact solution and finance 100% of development so your company can modernize without a large upfront investment.\nWe are not a website agency or a generic software vendor: we are a technology partner that combines business strategy, software engineering, artificial intelligence and accessible financing.\nYour company already has knowledge, experience and vision. We build and finance the technology so that knowledge can work better, organize sales, quotes, inventory, support, data, internal processes and digital channels, protecting cash flow while it starts creating real value.",
+      "optionQuestion": "What is the most comfortable first step for your company?",
       "progress": "Start",
       "core": "HASHINMY",
-      "insight": "The initial diagnosis helps turn a real need into a clear, finance-ready technical route prepared to grow.",
+      "insight": "The first step can now be operational diagnosis, financing or a direct quote, so Hashinmy starts from the real business problem instead of forcing a payment decision before understanding the operation.",
       "options": [
         {
-          "label": "No financing",
-          "hint": "I want to receive a quote with no financing",
-          "tech": "No financing",
-          "insight": "I want to receive a direct quote without a financing plan."
+          "label": "Operational diagnosis",
+          "hint": "I want Hashinmy to find where time, money or information is being lost",
+          "tech": "operation analysis + technical route + financial viability",
+          "insight": "I want to start by understanding my operation, finding the process that slows the business down the most and receiving a clear route before deciding whether to finance, quote directly or build in phases."
         },
         {
           "label": "100% financing",
-          "hint": "I want to move forward with clear USD installments",
-          "tech": "USD installments",
-          "insight": "I want to move forward with 100% financing as the main modality."
+          "hint": "I want to modernize without a large upfront payment",
+          "tech": "100% financing",
+          "insight": "I want to move forward with development financed 100% and pay through manageable installments while the system starts creating value."
+        },
+        {
+          "label": "Direct quote",
+          "hint": "I want to know scope and price without financing",
+          "tech": "direct quote",
+          "insight": "I want to receive a direct proposal with clear scope, price and timing so I can decide without a financing plan."
         }
       ]
     },
     "serviceFamily": {
       "eyebrow": "First door",
-      "title": "What do you want to achieve first?",
-      "optionQuestion": "What do you want to solve first?",
-      "copy": "Choose the starting point and we will prepare a clear route to turn your need into a real proposal. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "title": "Which process needs to stop improvising?",
+      "optionQuestion": "Where does the operation hurt most today?",
+      "copy": "Choose the point where your company loses the most time, control or sales. We do not start by selling an isolated service; we start by understanding the operation to define a route that connects business strategy, software engineering, artificial intelligence and a viable way to pay for implementation.",
       "progress": "Route",
       "core": "Service",
-      "insight": "I choose the path that best fits my current priority.",
+      "insight": "I choose the need that most affects productivity, commercial flow or operational control so the first technology solution responds to a real business pain.",
       "options": [
         {
-          "label": "Build software",
-          "hint": "A platform, app or system (digital product)",
+          "label": "Create proprietary software",
+          "hint": "A platform, app or system for your operation",
           "tech": "product engineering",
-          "insight": "I want to build a custom digital product."
+          "insight": "I want to build a custom system that turns my company knowledge into a proprietary, scalable and measurable tool."
         },
         {
-          "label": "Automate or use AI",
-          "hint": "Less manual work (RPA, API or AI)",
+          "label": "Automate with AI",
+          "hint": "Less repetitive work and more operational speed",
           "tech": "automation + AI",
-          "insight": "I want the system to work for my team, not the other way around."
+          "insight": "I want to reduce manual work, errors and slow responses with automation, intelligent assistants and integrations connected to the real business."
         },
         {
           "label": "Modernize operations",
-          "hint": "Replace Excel or old systems (modernization)",
+          "hint": "Organize Excel, WhatsApp or old systems",
           "tech": "legacy modernization",
-          "insight": "I want to turn scattered processes into a connected operation."
+          "insight": "I want to replace scattered processes with a connected operation, reliable data, clear permissions and traceability."
         }
       ]
     },
@@ -395,7 +401,7 @@
       "eyebrow": "Digital product",
       "title": "Where should your software open?",
       "optionQuestion": "Where do you want to use it?",
-      "copy": "This decision defines the foundation: browser, phone or PC. Hashinmy can combine modules later if the project needs it.",
+      "copy": "The technical base must follow the real way the business works. It may be browser, mobile, PC or a staged combination, always with architecture ready to grow without rebuilding the system from zero.",
       "progress": "Product",
       "core": "Build",
       "options": [
@@ -417,13 +423,14 @@
           "tech": "desktop/local",
           "insight": "I need local control, strong performance and stable internal operation."
         }
-      ]
+      ],
+      "insight": "The platform should open where your team already works, so technology organizes the operation without forcing the business into an uncomfortable tool."
     },
     "automationType": {
       "eyebrow": "Intelligent engine",
       "title": "Which part should the system do for you?",
       "optionQuestion": "What do you want to automate first?",
-      "copy": "Automation is not adding AI because it is trendy: it removes friction, errors and repeated tasks where it really hurts.",
+      "copy": "Artificial intelligence and automation only make sense when they solve concrete friction: repeated tasks, slow service, scattered data, decisions without information or processes that depend too much on human memory.",
       "progress": "Automation",
       "core": "AI + RPA",
       "options": [
@@ -445,13 +452,14 @@
           "tech": "BI/dashboard",
           "insight": "I need to see my operation in numbers to decide better."
         }
-      ]
+      ],
+      "insight": "The right automation starts with the work that repeats most, gets delayed most or creates the most human error in daily operations."
     },
     "modernization": {
       "eyebrow": "Current operation",
       "title": "What do you want to leave behind?",
       "optionQuestion": "What do you want to replace first?",
-      "copy": "Modernization turns isolated tools into a safer, measurable system prepared to grow. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "copy": "Modernization is not changing tools for fashion; it is turning spreadsheets, loose messages and old systems into a clearer, safer and measurable operation ready to grow with fewer errors.",
       "progress": "Modernize",
       "core": "360",
       "options": [
@@ -473,13 +481,14 @@
           "tech": "UX/UI + product",
           "insight": "I want a platform that communicates trust, clarity and readiness to sell more."
         }
-      ]
+      ],
+      "insight": "Leaving spreadsheets, loose messages and old systems behind helps recover traceability, speed and control without changing the essence of the business."
     },
     "operation": {
       "eyebrow": "Architecture without complexity",
       "title": "How should it be used in real life?",
       "optionQuestion": "Where do you need it to work best?",
-      "copy": "Your answer tells us whether backend, synchronization, mobile app or local software makes more sense.",
+      "copy": "Software must work where work happens: office, field, sales, production, support or management. This answer defines synchronization, permissions, backend, mobile experience or local control according to the real operation.",
       "progress": "Use",
       "core": "Architecture",
       "options": [
@@ -501,13 +510,14 @@
           "tech": "desktop/local",
           "insight": "I need it to work strongly on desktop and synchronize later if needed."
         }
-      ]
+      ],
+      "insight": "The architecture is decided from real use so the system works in the office, field, sales, production or support without unnecessary friction."
     },
     "value": {
       "eyebrow": "Visible value",
       "title": "What should improve first?",
       "optionQuestion": "What result do you want to notice first?",
-      "copy": "A good platform is not only attractive: it organizes, automates and shows useful data for decisions.",
+      "copy": "A good platform should feel useful early: organize cases, automate tasks, show actionable data and help sell better. Value is designed so the system starts justifying its investment inside the operation.",
       "progress": "Value",
       "core": "Engine",
       "options": [
@@ -529,13 +539,14 @@
           "tech": "BI + AI",
           "insight": "I want to turn scattered information into visible decisions."
         }
-      ]
+      ],
+      "insight": "The first visible value must justify the investment: more order, less wasted time, better data, more productivity or more sales opportunities."
     },
     "risk": {
       "eyebrow": "Trust and control",
       "title": "What should feel most protected?",
       "optionQuestion": "What do you want to protect better?",
-      "copy": "Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation.",
+      "copy": "Trust is designed from the first module with roles, permissions, audit trails, validations and limits for artificial intelligence. This helps the company gain speed without losing control over data, decisions and critical processes.",
       "progress": "Security",
       "core": "Trust",
       "options": [
@@ -557,41 +568,43 @@
           "tech": "AI governance",
           "insight": "I want AI and automation with limits, traceability and human review when needed."
         }
-      ]
+      ],
+      "insight": "Growth needs control; that is why permissions, audit trails, validations and AI limits are designed before automating critical processes."
     },
     "finance": {
-      "eyebrow": "Protected cash flow",
-      "title": "How do you want to move forward without stopping operations?",
-      "optionQuestion": "How do you want to organize payment?",
-      "copy": "Development can be organized in USD installments according to scope and approval. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
-      "progress": "Financing",
-      "core": "USD",
+      "eyebrow": "Protected capital",
+      "title": "How do you want to modernize without draining cash flow?",
+      "optionQuestion": "Which mode makes it viable to move forward now?",
+      "copy": "With Hashinmy, the company does not have to choose between protecting cash flow and modernizing. First we make technology transformation possible: we finance 100% of development, define manageable installments according to scope and priority, and let the software start creating value while it is paid in a viable way.\nFinancing does not replace engineering: it makes it accessible for real companies that need to organize processes, automate work, integrate AI and grow without draining capital.",
+      "progress": "100% financing",
+      "core": "100%",
       "options": [
         {
           "label": "Finance 100%",
-          "hint": "Avoid pulling all capital at once (USD installments)",
-          "tech": "USD installments",
-          "insight": "I want a financeable, clear and monthly proposal."
+          "hint": "Develop with no large initial payment",
+          "tech": "100% financing",
+          "insight": "I want to protect operating capital and pay development through manageable installments while the software starts saving time or generating sales."
         },
         {
-          "label": "Quote by phases",
-          "hint": "Start with the essentials (modular roadmap)",
+          "label": "Build by phases",
+          "hint": "Start with the module that creates the most value",
           "tech": "modular roadmap",
-          "insight": "I want to launch by modules, validate first and grow with control."
+          "insight": "I want to prioritize a useful first version, validate results and expand the system with technical and financial control."
         },
         {
-          "label": "Talk to someone",
-          "hint": "I want human guidance (commercial review)",
-          "tech": "human review",
-          "insight": "I want Hashinmy to contact me with a clear route and enough context."
+          "label": "Talk to an advisor",
+          "hint": "I need technical and financial guidance",
+          "tech": "human diagnosis",
+          "insight": "I want Hashinmy to review my case and propose a viable route according to operation, priority, scope and payment mode."
         }
-      ]
+      ],
+      "insight": "Financing turns modernization into a viable decision: move now, protect operating capital and pay while technology starts saving time, organizing processes or generating sales."
     },
     "timeline": {
       "eyebrow": "Execution pace",
       "title": "How soon should it start breathing?",
       "optionQuestion": "Which pace fits you best?",
-      "copy": "This separates a useful first version from a large platform built by stages. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "copy": "Pace defines how to turn a large need into useful deliveries. We can start with an MVP, a short phase or an enterprise architecture, making sure every step has operational and financial value.",
       "progress": "Pace",
       "core": "Roadmap",
       "options": [
@@ -613,15 +626,16 @@
           "tech": "enterprise roadmap",
           "insight": "I want security, scaling, auditing and planned evolution."
         }
-      ]
+      ],
+      "insight": "The right pace turns a large need into useful, measurable and financeable deliveries without losing the complete system vision."
     },
     "summary": {
       "eyebrow": "Route understood",
-      "title": "We now understand what you need.",
-      "copy": "Your route is ready. Before sending it, you can add any detail that matters; the Hashinmy team will review the project direction, financing option and next steps with clear commercial and technical context.",
+      "title": "Your technology route is ready.",
+      "copy": "We now have an initial reading of the need, the payment mode and the operational priority. Add any missing context so Hashinmy can analyze your operation, detect where time, money or information is lost, propose a custom solution and define a viable technical, commercial and financial route.\nThe next conversation should not be only about technology: it should connect the business problem, internal knowledge, system scope, operational priority, expected value and the payment method that protects cash flow while the software starts creating results.",
       "progress": "Request",
       "core": "Brief",
-      "insight": "My route is ready to be sent with contact and optional comment.",
+      "insight": "The route is ready for Hashinmy to connect need, business knowledge, technical scope, operational priority, expected value and payment model into a viable proposal.",
       "options": []
     }
   },
@@ -657,23 +671,23 @@
     "roles_permisos": "Users and permissions",
     "datos_sensibles": "Sensitive data",
     "ia_controlada": "AI or critical processes",
-    "financiamiento_100": "100% financing",
-    "sin_financiacion": "Direct quote",
-    "fases": "Quote by phases",
-    "contacto_directo": "Direct contact",
+    "financiamiento_100": "100% development financing",
+    "sin_financiacion": "Direct quote without financing",
+    "fases": "Phased construction",
+    "contacto_directo": "Advisor diagnosis",
     "mvp_rapido": "Fast MVP",
     "1_3_meses": "1 to 3 months",
     "enterprise": "Enterprise stages"
   },
   "recommendation": {
     "defaults": {
-      "service": "Custom software project",
-      "operation": "Architecture to be defined",
-      "value": "Objective to be defined",
-      "risk": "Security to be defined",
-      "financing": "Mode to be defined",
+      "service": "Custom business system",
+      "operation": "Architecture based on real operation",
+      "value": "Operational value to prioritize",
+      "risk": "Controls to be defined",
+      "financing": "Financial mode to be defined",
       "timeline": "Pace to be defined",
-      "technical": "modular architecture to be defined"
+      "technical": "modular architecture focused on productivity"
     },
     "technicalParts": {
       "software_online": "web platform",
@@ -710,14 +724,14 @@
       "roles_permisos": "role matrix",
       "datos_sensibles": "sensitive data protection",
       "ia_controlada": "limits and human review",
-      "financiamiento_100": "clear financing conditions",
-      "sin_financiacion": "clear scope and price"
+      "financiamiento_100": "clear 100% financing conditions",
+      "sin_financiacion": "clear scope, price and timeline"
     },
     "nextSteps": {
-      "noService": "Commercial contact with preliminary brief",
-      "mvp": "Executive diagnosis + MVP scope",
-      "enterprise": "Enterprise architecture by stages",
-      "default": "Commercial and technical architecture"
+      "noService": "Commercial diagnosis with initial operational context",
+      "mvp": "Executive diagnosis + first value module",
+      "enterprise": "Financeable enterprise architecture by stages",
+      "default": "Technical, commercial and financial route"
     }
   },
   "schemaVersion": 1
