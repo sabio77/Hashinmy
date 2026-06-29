@@ -162,6 +162,15 @@ button { cursor: pointer; }
   line-height: 1;
   letter-spacing: -.055em;
 }
+.hm-page-loader__tagline {
+  max-width: 19rem;
+  color: rgba(7,19,31,.82);
+  font-size: clamp(.88rem, 2.6vw, 1.02rem);
+  line-height: 1.22;
+  font-weight: 850;
+  letter-spacing: .01em;
+  text-wrap: balance;
+}
 .hm-page-loader__message {
   position: relative;
   display: inline-flex;
@@ -1454,6 +1463,7 @@ body[data-scene="risk"] .hm-ambient__grid { opacity: .46; }
   box-shadow: 0 34px 90px rgba(0,0,0,.34);
 }
 :root[data-theme="dark"] .hm-page-loader__brand { color: rgba(244,251,255,.96); }
+:root[data-theme="dark"] .hm-page-loader__tagline { color: rgba(244,251,255,.84); }
 :root[data-theme="dark"] .hm-page-loader__message { color: rgba(244,251,255,.68); }
 :root[data-theme="dark"] .hm-page-loader::before { border-color: rgba(126,231,255,.16); }
 
