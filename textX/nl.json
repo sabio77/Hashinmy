@@ -1,0 +1,724 @@
+{
+  "iso": "nl",
+  "name": "Dutch",
+  "nativeName": "Nederlands",
+  "htmlLang": "nl",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | maatwerksoftware route",
+    "description": "Hashinmy ervaring: maatwerksoftware. AI + automatisering. mobiele app + PC-software. 100% financiering / directe offerte.",
+    "ogTitle": "Hashinmy | maatwerksoftware",
+    "ogDescription": "route Kies. software projectsamenvatting. financiering / Offerte aanvragen.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Nederlands, Dutch, Dienst, route, Gebruik, Waarde, financiering, beveiliging, web · software, mobiele app, PC-software, automatisering, AI · integratie, modernisering, projectsamenvatting · route, maatwerksoftware · Product, automatisering · AI, modernisering · processen, automatisering · processen, web · route, mobiele app · Gebruik, PC · controles, workflow · processen, automatisering · snel, data · rapporten, AI · menselijke controle, UX/UI · vertrouwen, data · AI, gebruikers · rechten, data · beveiliging, 100% financiering, directe offerte, directe offerte · fasen, contact · menselijke controle, snel · MVP, 1-3 · fasen, enterprise · roadmap, Hashinmy, hashinmy.com, maatwerksoftware · Product · 100% financiering, web · software · PWA, ecommerce · maatwerksoftware · Product, maatwerksoftware · Product · CAD/DXF, directe offerte · 100% financiering, API, UX/UI, ecommerce · automatisering · processen, AI · integratie · enterprise · roadmap, Sectoren · maatwerksoftware · Product, Nu financieren, API · web · route, directe offerte · maatwerksoftware · Product, web · software · SEO, chatbots · AI · integratie, Colombia · Medellín · maatwerksoftware · Product, API · enterprise · roadmap, data · beveiliging · maatwerksoftware · Product, enterprise · roadmap · maatwerksoftware · Product, CRM · enterprise · roadmap, ERP · maatwerksoftware · Product, web · software · UX/UI · vertrouwen, web · software · portal"
+  },
+  "ui": {
+    "skip": "Kies · route",
+    "stageLabel": "Hashinmy · ervaring · route",
+    "topbarLabel": "controles · Hashinmy",
+    "brandAria": "Opnieuw starten · Hashinmy",
+    "brandSmall": "maatwerksoftware · AI",
+    "progressLabel": "route · Tempo",
+    "languageLabel": "Taal",
+    "languageAria": "Kies · Taal",
+    "contentLabel": "ervaring · projectsamenvatting",
+    "pathLabelAria": "route · samenvatting",
+    "decisionZoneLabel": "Kies · Dienst",
+    "summaryLabelAria": "samenvatting · projectsamenvatting",
+    "footerLabel": "controles · route",
+    "primaryFinance": "Nu financieren",
+    "primaryQuote": "Offerte aanvragen",
+    "back": "Terug",
+    "restart": "Opnieuw starten",
+    "contactLabel": "contact · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · contact",
+    "commentLabel": "Beschrijf uw project",
+    "commentPlaceholder": "Vertel welk proces u wilt verbeteren, welke tekening, welk onderdeel of systeem u nodig hebt en welke technische details helpen om een duidelijke route voor te bereiden.",
+    "submitRoute": "Route naar Hashinmy sturen",
+    "copySummaryAction": "Samenvatting kopiëren",
+    "formNote": "Uw antwoorden blijven alleen in deze browser opgeslagen totdat u besluit ze te verzenden.",
+    "contactRequired": "Voeg e-mail, WhatsApp of bedrijfsnaam toe zodat Hashinmy contact met u kan opnemen met de voorbereide route.",
+    "copySuccess": "Samenvatting gekopieerd. U kunt deze plakken in WhatsApp, e-mail of CRM.",
+    "copyFailure": "De samenvatting kon niet worden gekopieerd; stuur de route naar Hashinmy via het formulier.",
+    "mailOpening": "De e-mail met de voorbereide route wordt geopend; controleer deze voordat u hem naar Hashinmy stuurt.",
+    "waitSummary": "samenvatting · projectsamenvatting",
+    "preparingOptions": "Opties worden voorbereid",
+    "optionFallback": "Kies · route",
+    "pathLabel": "route · samenvatting",
+    "pathEmpty": "Kies · route · projectsamenvatting",
+    "interactionFallback": "ervaring",
+    "summaryTitle": "Interactieve aanvraag voor Hashinmy",
+    "projectChosen": "Product · Kies",
+    "expectedUse": "Gebruik",
+    "wantedValue": "Waarde",
+    "prioritySecurity": "beveiliging",
+    "paymentMode": "financiering",
+    "financing": "financiering",
+    "pace": "Tempo",
+    "technicalBase": "Aanbevolen technische basis",
+    "suggestedControls": "controles",
+    "nextStep": "roadmap · fasen",
+    "contact": "contact",
+    "additionalComment": "Optionele opmerking",
+    "registeredInteractions": "route · samenvatting",
+    "directRouteRequested": "directe offerte. route.",
+    "directQuoteSubject": "Hashinmy · directe offerte",
+    "financedSubject": "Hashinmy · maatwerksoftware · financiering",
+    "directQuoteAudit": "directe offerte. projectsamenvatting. route.",
+    "financeAudit": "100% financiering. projectsamenvatting. route.",
+    "directQuoteTech": "directe offerte · projectsamenvatting",
+    "financeTech": "USD · fasen · projectsamenvatting",
+    "topActionsLabel": "Producten · Taal",
+    "proofEntryAria": "Onze ervaring · Hashinmy",
+    "proofOpenButton": "Onze ervaring",
+    "proofTitle": "Onze ervaring",
+    "proofLead": "Hashinmy ervaring: maatwerksoftware. AI + automatisering. mobiele app + PC-software. 100% financiering / directe offerte.",
+    "proofCloseAria": "Sluiten · Onze ervaring",
+    "proofContentAria": "Onze ervaring · Veelgestelde vragen",
+    "proofSummaryAria": "vertrouwen · controles",
+    "proofSummaryTitle": "vertrouwen · controles · Hashinmy",
+    "proofTrustLabel": "vertrouwen · controles:",
+    "proofTrustText": "In dit scherm ligt de praktische focus op beveiliging, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien. Hashinmy ervaring: maatwerksoftware. AI + automatisering. mobiele app + PC-software. 100% financiering / directe offerte.",
+    "proofMethodLabel": "Methodiek:",
+    "proofMethodText": "Diagnose, ontwerp, ontwikkeling, testen, oplevering en support. Medellín en Colombia zijn onze oorsprong; het bereik is wereldwijd.",
+    "proofUseCasesLabel": "Gebruiksscenario’s:",
+    "proofUseCasesText": "Timmerbedrijven, verkoop, voorraad, technische offertes, support, CRM, UX/UI · vertrouwens, e-commerce en operationele automatisering.",
+    "proofBrandsTitle": "Merken, projecten en bedrijven die verband houden met ons werk",
+    "proofBrandsAria": "Merken, projecten en bedrijven die verband houden met ons werk",
+    "proofLogoPlaceholder": "Onze ervaring Hashinmy",
+    "proofLogoAltTemplate": "Logo van {name}",
+    "proofFaqAria": "Veelgestelde vragen · Onze ervaring",
+    "proofFaqWhyQuestion": "Waarom kiezen voor Hashinmy?",
+    "proofFaqWhyAnswer": "route Kies. software projectsamenvatting. financiering / Offerte aanvragen.",
+    "proofFaqWhoQuestion": "Voor wie?",
+    "proofFaqWhoAnswer": "route Kies. software projectsamenvatting. financiering / Offerte aanvragen. In dit scherm ligt de praktische focus op beveiliging, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+    "proofFaqStartQuestion": "Hoe begin ik?",
+    "proofFaqStartAnswer": "Uw route is klaar. Voordat u verzendt, kunt u elk belangrijk detail toevoegen; het Hashinmy-team beoordeelt de projectrichting, financieringsoptie en volgende stappen met duidelijke zakelijke en technische context. directe offerte. projectsamenvatting. route.",
+    "proofBrandsStructuredDescription": "Merken, projecten en bedrijven die verband houden met ons werk"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · software",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobiele app",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC-software",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatisering",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · integratie",
+      "tech": "AI · workflow",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernisering",
+      "tech": "software · controles",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "beschermd kapitaal"
+    },
+    "serviceFamily": {
+      "symbol": "route",
+      "label": "Dienst · Kies"
+    },
+    "buildType": {
+      "symbol": "Bouw",
+      "label": "Product"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatisering"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernisering"
+    },
+    "operation": {
+      "symbol": "Gebruik",
+      "label": "Gebruik"
+    },
+    "value": {
+      "symbol": "Waarde",
+      "label": "Waarde · controles"
+    },
+    "risk": {
+      "symbol": "vertrouwen",
+      "label": "beveiliging · controles"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% financiering"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "roadmap"
+    },
+    "summary": {
+      "symbol": "samenvatting",
+      "label": "projectsamenvatting"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "op maat"
+      ],
+      [
+        "AI",
+        "automatisering"
+      ],
+      [
+        "PC",
+        "mobiel"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "route"
+      ],
+      [
+        "6",
+        "Dienst"
+      ],
+      [
+        "1",
+        "projectsamenvatting"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "processen"
+      ],
+      [
+        "AI",
+        "menselijke controle"
+      ],
+      [
+        "BI",
+        "rapporten"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernisering"
+      ],
+      [
+        "API",
+        "integratie"
+      ],
+      [
+        "UX",
+        "vertrouwen"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Gebruik"
+      ],
+      [
+        "Local",
+        "controles"
+      ]
+    ],
+    "value": [
+      [
+        "workflow",
+        "processen"
+      ],
+      [
+        "Auto",
+        "snel"
+      ],
+      [
+        "Data",
+        "controles"
+      ]
+    ],
+    "risk": [
+      [
+        "gebruikers",
+        "rechten"
+      ],
+      [
+        "Data",
+        "beveiliging"
+      ],
+      [
+        "AI",
+        "menselijke controle"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "financiering"
+      ],
+      [
+        "USD",
+        "fasen"
+      ],
+      [
+        "Pause",
+        "controles"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "snel"
+      ],
+      [
+        "fasen",
+        "roadmap"
+      ],
+      [
+        "QA",
+        "controles"
+      ]
+    ],
+    "summary": [
+      [
+        "route",
+        "samenvatting"
+      ],
+      [
+        "Email",
+        "projectsamenvatting"
+      ],
+      [
+        "menselijke controle",
+        "contact"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Nederlands",
+      "title": "Welkom bij HASHINMY",
+      "copy": "Wij bouwen maatwerksoftware voor bedrijven die actief zijn, verkopen en groeien in lokale en internationale markten. We integreren AI, automatisering, pc-programma’s, CAD-software met DXF-export, webapplicaties, cloud, SEO, chatbots, technische offertemakers, beveiliging en operationele continuïteit.\nMedellín en Colombia zijn onze oorsprong; ons commerciële en technische bereik is wereldwijd.\nWe stimuleren de technologische ontwikkeling van bedrijven met 100% gefinancierde oplossingen, zodat ze hun maximale potentieel bereiken, productiviteit verbeteren en efficiënter opschalen.",
+      "optionQuestion": "Welke optie wil je?",
+      "progress": "Start",
+      "core": "HASHINMY",
+      "insight": "De eerste diagnose helpt een echte behoefte om te zetten in een duidelijke, financierbare technische route die klaar is om te groeien.",
+      "options": [
+        {
+          "label": "Zonder financiering",
+          "hint": "Ik wil een offerte zonder financiering ontvangen",
+          "tech": "Zonder financiering",
+          "insight": "Ik wil een directe offerte ontvangen zonder financieringsplan."
+        },
+        {
+          "label": "100% financiering",
+          "hint": "Ik wil doorgaan met duidelijke termijnen in USD",
+          "tech": "USD-termijnen",
+          "insight": "Ik wil doorgaan met 100% financiering als hoofdmodel."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "route",
+      "title": "Kies · Dienst · Waarde",
+      "optionQuestion": "Kies · Dienst",
+      "copy": "In dit scherm ligt de praktische focus op Kies, Dienst, Waarde, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "route",
+      "core": "Dienst",
+      "insight": "route. Waarde.",
+      "options": [
+        {
+          "label": "maatwerksoftware · Product",
+          "hint": "web · mobiele app · PC-software",
+          "tech": "software · Product",
+          "insight": "Gekozen richting: maatwerksoftware, Product — web, mobiele app, PC-software."
+        },
+        {
+          "label": "automatisering · AI",
+          "hint": "RPA · API · AI",
+          "tech": "automatisering · AI",
+          "insight": "Gekozen richting: automatisering, AI — RPA, API, AI."
+        },
+        {
+          "label": "modernisering · processen",
+          "hint": "Excel · integratie · workflow",
+          "tech": "modernisering · workflow",
+          "insight": "Gekozen richting: modernisering, processen — Excel, integratie, workflow."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Product",
+      "title": "maatwerksoftware · Gebruik",
+      "optionQuestion": "Kies · web · mobiele app · PC-software",
+      "copy": "In dit scherm ligt de praktische focus op maatwerksoftware, Gebruik, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "Product",
+      "core": "Bouw",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · data",
+          "tech": "web · backend",
+          "insight": "Gekozen richting: web — web, backend, data."
+        },
+        {
+          "label": "mobiele app",
+          "hint": "PWA/App · Gebruik",
+          "tech": "mobile/PWA",
+          "insight": "Gekozen richting: mobiele app — PWA/App, Gebruik."
+        },
+        {
+          "label": "PC-software",
+          "hint": "desktop/local · controles",
+          "tech": "desktop/local",
+          "insight": "Gekozen richting: PC-software — desktop/local, controles."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "AI · automatisering",
+      "title": "automatisering · processen",
+      "optionQuestion": "Kies · automatisering",
+      "copy": "In dit scherm ligt de praktische focus op automatisering, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "automatisering",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "processen · automatisering",
+          "hint": "RPA · API · snel",
+          "tech": "RPA/API",
+          "insight": "Gekozen richting: processen, automatisering — RPA, API, snel."
+        },
+        {
+          "label": "AI · menselijke controle",
+          "hint": "AI · samenvatting · controles",
+          "tech": "AI · menselijke controle",
+          "insight": "Gekozen richting: AI, menselijke controle — AI, samenvatting, controles."
+        },
+        {
+          "label": "data · rapporten",
+          "hint": "BI · rapporten",
+          "tech": "BI/dashboard",
+          "insight": "Gekozen richting: data, rapporten — BI, rapporten."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernisering",
+      "title": "modernisering · processen",
+      "optionQuestion": "Kies · modernisering",
+      "copy": "In dit scherm ligt de praktische focus op modernisering, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "modernisering",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · workflow",
+          "hint": "processen · rechten",
+          "tech": "workflow · rechten",
+          "insight": "Gekozen richting: Excel, workflow — processen, rechten."
+        },
+        {
+          "label": "integratie · data",
+          "hint": "API · controles",
+          "tech": "API · integratie",
+          "insight": "Gekozen richting: integratie, data — API, controles."
+        },
+        {
+          "label": "UX/UI · vertrouwen",
+          "hint": "ervaring · Waarde",
+          "tech": "UX/UI + product",
+          "insight": "Gekozen richting: UX/UI, vertrouwen — ervaring, Waarde."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Gebruik · processen",
+      "optionQuestion": "Kies · Gebruik",
+      "copy": "In dit scherm ligt de praktische focus op Gebruik, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "Gebruik",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · route",
+          "hint": "cloud · backend · data",
+          "tech": "cloud backend",
+          "insight": "Gekozen richting: web, route — cloud, backend, data."
+        },
+        {
+          "label": "mobiele app · Gebruik",
+          "hint": "mobiele app · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Gekozen richting: mobiele app, Gebruik — mobiele app, tablet, sync."
+        },
+        {
+          "label": "PC · controles",
+          "hint": "desktop/local · beveiliging",
+          "tech": "desktop/local",
+          "insight": "Gekozen richting: PC, controles — desktop/local, beveiliging."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Waarde",
+      "title": "Waarde · Kies",
+      "optionQuestion": "Kies · Waarde",
+      "copy": "In dit scherm ligt de praktische focus op Waarde, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "Waarde",
+      "core": "Waarde",
+      "options": [
+        {
+          "label": "processen · workflow",
+          "hint": "rechten · controles",
+          "tech": "workflow + RBAC",
+          "insight": "Gekozen richting: processen, workflow — rechten, controles."
+        },
+        {
+          "label": "automatisering · snel",
+          "hint": "RPA/API · processen",
+          "tech": "RPA/API",
+          "insight": "Gekozen richting: automatisering, snel — RPA/API, processen."
+        },
+        {
+          "label": "data · AI",
+          "hint": "rapporten · AI",
+          "tech": "BI + AI",
+          "insight": "Gekozen richting: data, AI — rapporten, AI."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "vertrouwen · controles",
+      "title": "beveiliging · Kies",
+      "optionQuestion": "Kies · beveiliging",
+      "copy": "In dit scherm ligt de praktische focus op beveiliging, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "beveiliging",
+      "core": "vertrouwen",
+      "options": [
+        {
+          "label": "gebruikers · rechten",
+          "hint": "RBAC · controles",
+          "tech": "RBAC + audit",
+          "insight": "Gekozen richting: gebruikers, rechten — RBAC, controles."
+        },
+        {
+          "label": "data · beveiliging",
+          "hint": "data · controles",
+          "tech": "veiligheid vanaf het ontwerp",
+          "insight": "Gekozen richting: data, beveiliging — data, controles."
+        },
+        {
+          "label": "AI · menselijke controle",
+          "hint": "automatisering · controles",
+          "tech": "AI governance",
+          "insight": "Gekozen richting: AI, menselijke controle — automatisering, controles."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "beschermd kapitaal · financiering",
+      "title": "financiering · roadmap",
+      "optionQuestion": "Kies · financiering",
+      "copy": "In dit scherm ligt de praktische focus op financiering, roadmap, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "financiering",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% financiering",
+          "hint": "USD · fasen · beschermd kapitaal",
+          "tech": "USD · financiering",
+          "insight": "Gekozen richting: 100% financiering — USD, fasen, beschermd kapitaal."
+        },
+        {
+          "label": "directe offerte · fasen",
+          "hint": "roadmap · fasen",
+          "tech": "roadmap",
+          "insight": "Gekozen richting: directe offerte, fasen — roadmap, fasen."
+        },
+        {
+          "label": "contact · menselijke controle",
+          "hint": "projectsamenvatting · contact",
+          "tech": "menselijke controle",
+          "insight": "Gekozen richting: contact, menselijke controle — projectsamenvatting, contact."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Tempo",
+      "title": "roadmap · Tempo",
+      "optionQuestion": "Kies · Tempo",
+      "copy": "In dit scherm ligt de praktische focus op roadmap, Tempo, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "progress": "Tempo",
+      "core": "roadmap",
+      "options": [
+        {
+          "label": "snel · MVP",
+          "hint": "Product · snel",
+          "tech": "MVP",
+          "insight": "Gekozen richting: snel, MVP — Product, snel."
+        },
+        {
+          "label": "1-3 · fasen",
+          "hint": "roadmap · controles",
+          "tech": "fasen",
+          "insight": "Gekozen richting: 1-3, fasen — roadmap, controles."
+        },
+        {
+          "label": "enterprise · roadmap",
+          "hint": "beveiliging · enterprise",
+          "tech": "enterprise-roadmap",
+          "insight": "Gekozen richting: enterprise, roadmap — beveiliging, enterprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "route · samenvatting",
+      "title": "projectsamenvatting · samenvatting",
+      "copy": "Uw route is klaar. Voordat u verzendt, kunt u elk belangrijk detail toevoegen; het Hashinmy-team beoordeelt de projectrichting, financieringsoptie en volgende stappen met duidelijke zakelijke en technische context.",
+      "progress": "projectsamenvatting",
+      "core": "projectsamenvatting",
+      "insight": "route. projectsamenvatting. contact.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "route",
+    "service": "Dienst",
+    "operation": "Gebruik",
+    "value": "Waarde",
+    "risk": "beveiliging",
+    "financing": "financiering",
+    "timeline": "Tempo"
+  },
+  "valueLabels": {
+    "diagnostico": "projectsamenvatting · route",
+    "producto_digital": "maatwerksoftware · Product",
+    "automatizacion_ia": "automatisering · AI",
+    "modernizacion_operativa": "modernisering · processen",
+    "software_online": "web · software",
+    "app_movil": "mobiele app",
+    "software_pc": "PC-software",
+    "automatizacion": "automatisering · processen",
+    "ia": "AI · integratie",
+    "modernizacion": "modernisering",
+    "web_global": "web · route",
+    "mobile_first": "mobiele app · Gebruik",
+    "pc_local": "PC · controles",
+    "workflow": "workflow · processen",
+    "automation": "automatisering · snel",
+    "analytics": "data · rapporten",
+    "ai": "AI · menselijke controle",
+    "experience": "UX/UI · vertrouwen",
+    "analytics_ai": "data · AI",
+    "roles_permisos": "gebruikers · rechten",
+    "datos_sensibles": "data · beveiliging",
+    "ia_controlada": "AI · menselijke controle",
+    "financiamiento_100": "100% financiering",
+    "sin_financiacion": "directe offerte",
+    "fases": "directe offerte · fasen",
+    "contacto_directo": "contact · menselijke controle",
+    "mvp_rapido": "snel · MVP",
+    "1_3_meses": "1-3 · fasen",
+    "enterprise": "enterprise · roadmap"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "maatwerksoftware · Product",
+      "operation": "architecture · projectsamenvatting",
+      "value": "Waarde · projectsamenvatting",
+      "risk": "beveiliging · projectsamenvatting",
+      "financing": "financiering · projectsamenvatting",
+      "timeline": "Tempo · projectsamenvatting",
+      "technical": "software · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · software",
+      "automatizacion": "RPA/API-automatisering",
+      "ia": "AI · menselijke controle",
+      "modernizacion": "modernisering",
+      "web_global": "serverlaag + database",
+      "mobile_first": "mobiele app · sync",
+      "pc_local": "local · controles",
+      "workflow": "rechten · workflow",
+      "automation": "automatisering · integratie",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "data · beveiliging",
+      "ia_controlada": "AI governance · menselijke controle"
+    },
+    "controlBase": [
+      "data",
+      "controles"
+    ],
+    "controlParts": {
+      "web_global": "rechten",
+      "software_online": "rechten",
+      "ia": "menselijke controle",
+      "analytics_ai": "menselijke controle",
+      "ai": "menselijke controle",
+      "automatizacion": "automatisering · rapporten",
+      "automation": "automatisering · rapporten",
+      "roles_permisos": "rechten · controles",
+      "datos_sensibles": "data · beveiliging",
+      "ia_controlada": "menselijke controle · controles",
+      "financiamiento_100": "100% financiering",
+      "sin_financiacion": "directe offerte"
+    },
+    "nextSteps": {
+      "noService": "contact · projectsamenvatting",
+      "mvp": "MVP · projectsamenvatting",
+      "enterprise": "enterprise · roadmap",
+      "default": "software · roadmap"
+    }
+  },
+  "schemaVersion": 1
+}

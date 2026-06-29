@@ -1,0 +1,724 @@
+{
+  "iso": "am",
+  "name": "Amharic",
+  "nativeName": "አማርኛ",
+  "htmlLang": "am",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | ብጁ ሶፍትዌር መንገድ",
+    "description": "Hashinmy ተሞክሮ: ብጁ ሶፍትዌር. ሰው ሰራሽ ብልህነት + አውቶሜሽን. የሞባይል መተግበሪያ + PC ሶፍትዌር. 100% ፋይናንስ / ቀጥታ ዋጋ.",
+    "ogTitle": "Hashinmy | ብጁ ሶፍትዌር",
+    "ogDescription": "መንገድ ይምረጡ. ሶፍትዌር የፕሮጀክት ማጠቃለያ. ፋይናንስ / አሁን ዋጋ ይጠይቁ.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "አማርኛ, Amharic, አገልግሎት, መንገድ, አጠቃቀም, ዋጋ, ፋይናንስ, ደህንነት, ድር · ሶፍትዌር, የሞባይል መተግበሪያ, PC ሶፍትዌር, አውቶሜሽን, ሰው ሰራሽ ብልህነት · ውህደት, ዘመናዊነት, የፕሮጀክት ማጠቃለያ · መንገድ, ብጁ ሶፍትዌር · ምርት, አውቶሜሽን · ሰው ሰራሽ ብልህነት, ዘመናዊነት · ሂደቶች, አውቶሜሽን · ሂደቶች, ድር · መንገድ, የሞባይል መተግበሪያ · አጠቃቀም, PC · ቁጥጥሮች, የስራ ፍሰት · ሂደቶች, አውቶሜሽን · ፈጣን, ውሂብ · ሪፖርቶች, ሰው ሰራሽ ብልህነት · የሰው ግምገማ, UX/UI · እምነት, ውሂብ · ሰው ሰራሽ ብልህነት, ተጠቃሚዎች · ፈቃዶች, ውሂብ · ደህንነት, 100% ፋይናንስ, ቀጥታ ዋጋ, ቀጥታ ዋጋ · ደረጃዎች, እውቂያ · የሰው ግምገማ, ፈጣን · MVP, 1-3 · ደረጃዎች, ኢንተርፕራይዝ · የመንገድ ካርታ, Hashinmy, hashinmy.com, ብጁ ሶፍትዌር · ምርት · 100% ፋይናንስ, ድር · ሶፍትዌር · PWA, ecommerce · ብጁ ሶፍትዌር · ምርት, ብጁ ሶፍትዌር · ምርት · CAD/DXF, ቀጥታ ዋጋ · 100% ፋይናንስ, API, UX/UI, ecommerce · አውቶሜሽን · ሂደቶች, ሰው ሰራሽ ብልህነት · ውህደት · ኢንተርፕራይዝ · የመንገድ ካርታ, ኢንዱስትሪዎች · ብጁ ሶፍትዌር · ምርት, አሁን ፋይናንስ ያድርጉ, API · ድር · መንገድ, ቀጥታ ዋጋ · ብጁ ሶፍትዌር · ምርት, ድር · ሶፍትዌር · SEO, chatbots · ሰው ሰራሽ ብልህነት · ውህደት, Colombia · Medellín · ብጁ ሶፍትዌር · ምርት, API · ኢንተርፕራይዝ · የመንገድ ካርታ, ውሂብ · ደህንነት · ብጁ ሶፍትዌር · ምርት, ኢንተርፕራይዝ · የመንገድ ካርታ · ብጁ ሶፍትዌር · ምርት, CRM · ኢንተርፕራይዝ · የመንገድ ካርታ, ERP · ብጁ ሶፍትዌር · ምርት, ድር · ሶፍትዌር · UX/UI · እምነት, ድር · ሶፍትዌር · portal"
+  },
+  "ui": {
+    "skip": "ይምረጡ · መንገድ",
+    "stageLabel": "Hashinmy · ተሞክሮ · መንገድ",
+    "topbarLabel": "ቁጥጥሮች · Hashinmy",
+    "brandAria": "እንደገና ጀምር · Hashinmy",
+    "brandSmall": "ብጁ ሶፍትዌር · ሰው ሰራሽ ብልህነት",
+    "progressLabel": "መንገድ · ፍጥነት",
+    "languageLabel": "ቋንቋ",
+    "languageAria": "ይምረጡ · ቋንቋ",
+    "contentLabel": "ተሞክሮ · የፕሮጀክት ማጠቃለያ",
+    "pathLabelAria": "መንገድ · ማጠቃለያ",
+    "decisionZoneLabel": "ይምረጡ · አገልግሎት",
+    "summaryLabelAria": "ማጠቃለያ · የፕሮጀክት ማጠቃለያ",
+    "footerLabel": "ቁጥጥሮች · መንገድ",
+    "primaryFinance": "አሁን ፋይናንስ ያድርጉ",
+    "primaryQuote": "አሁን ዋጋ ይጠይቁ",
+    "back": "ተመለስ",
+    "restart": "እንደገና ጀምር",
+    "contactLabel": "እውቂያ · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · እውቂያ",
+    "commentLabel": "ፕሮጀክትዎን ይግለጹ",
+    "commentPlaceholder": "የትኛውን ሂደት ማሻሻል እንደሚፈልጉ፣ የትኛው ንድፍ፣ ክፍል ወይም ስርዓት እንደሚያስፈልግዎ እና ግልጽ መንገድ ለማዘጋጀት የሚረዳ ማንኛውንም ቴክኒክ ዝርዝር ይንገሩን።",
+    "submitRoute": "መንገዱን ወደ Hashinmy ይላኩ",
+    "copySummaryAction": "ማጠቃለያውን ቅዳ",
+    "formNote": "መልሶችዎ ለመላክ እስኪወስኑ ድረስ በዚህ አሳሽ ውስጥ ብቻ በደህና ይቀመጣሉ፣ እርስዎ ካልላኩ አይላኩም።",
+    "contactRequired": "Hashinmy የተዘጋጀውን መንገድ ይዞ እንዲገናኝዎት ኢሜይል፣ WhatsApp ወይም የኩባንያ ስም ያክሉ።",
+    "copySuccess": "ማጠቃለያው ተቀድቷል። በWhatsApp፣ በEmail ወይም በCRM ውስጥ መለጠፍ ይችላሉ።",
+    "copyFailure": "ማጠቃለያውን መቅዳት አልተቻለም፤ መንገዱን በቅጹ በኩል ወደ Hashinmy ይላኩ።",
+    "mailOpening": "የተዘጋጀው መንገድ በመልዕክት ውስጥ እየተከፈተ ነው፤ ወደ Hashinmy ከመላክዎ በፊት ይገምግሙት።",
+    "waitSummary": "ማጠቃለያ · የፕሮጀክት ማጠቃለያ",
+    "preparingOptions": "አማራጮች በመዘጋጀት ላይ ናቸው",
+    "optionFallback": "ይምረጡ · መንገድ",
+    "pathLabel": "መንገድ · ማጠቃለያ",
+    "pathEmpty": "ይምረጡ · መንገድ · የፕሮጀክት ማጠቃለያ",
+    "interactionFallback": "ተሞክሮ",
+    "summaryTitle": "Hashinmy በይነተገናኝ ጥያቄ",
+    "projectChosen": "ምርት · ይምረጡ",
+    "expectedUse": "አጠቃቀም",
+    "wantedValue": "ዋጋ",
+    "prioritySecurity": "ደህንነት",
+    "paymentMode": "ፋይናንስ",
+    "financing": "ፋይናንስ",
+    "pace": "ፍጥነት",
+    "technicalBase": "የተመከረ ቴክኒካዊ መሠረት",
+    "suggestedControls": "ቁጥጥሮች",
+    "nextStep": "የመንገድ ካርታ · ደረጃዎች",
+    "contact": "እውቂያ",
+    "additionalComment": "አማራጭ አስተያየት",
+    "registeredInteractions": "መንገድ · ማጠቃለያ",
+    "directRouteRequested": "ቀጥታ ዋጋ. መንገድ.",
+    "directQuoteSubject": "Hashinmy · ቀጥታ ዋጋ",
+    "financedSubject": "Hashinmy · ብጁ ሶፍትዌር · ፋይናንስ",
+    "directQuoteAudit": "ቀጥታ ዋጋ. የፕሮጀክት ማጠቃለያ. መንገድ.",
+    "financeAudit": "100% ፋይናንስ. የፕሮጀክት ማጠቃለያ. መንገድ.",
+    "directQuoteTech": "ቀጥታ ዋጋ · የፕሮጀክት ማጠቃለያ",
+    "financeTech": "USD · ደረጃዎች · የፕሮጀክት ማጠቃለያ",
+    "topActionsLabel": "ምርቶች · ቋንቋ",
+    "proofEntryAria": "የእኛ ተሞክሮ · Hashinmy",
+    "proofOpenButton": "የእኛ ተሞክሮ",
+    "proofTitle": "የእኛ ተሞክሮ",
+    "proofLead": "Hashinmy ተሞክሮ: ብጁ ሶፍትዌር. ሰው ሰራሽ ብልህነት + አውቶሜሽን. የሞባይል መተግበሪያ + PC ሶፍትዌር. 100% ፋይናንስ / ቀጥታ ዋጋ.",
+    "proofCloseAria": "ዝጋ · የእኛ ተሞክሮ",
+    "proofContentAria": "የእኛ ተሞክሮ · ተደጋጋሚ ጥያቄዎች",
+    "proofSummaryAria": "እምነት · ቁጥጥሮች",
+    "proofSummaryTitle": "እምነት · ቁጥጥሮች · Hashinmy",
+    "proofTrustLabel": "እምነት · ቁጥጥሮች:",
+    "proofTrustText": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ደህንነት, ይምረጡ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ። Hashinmy ተሞክሮ: ብጁ ሶፍትዌር. ሰው ሰራሽ ብልህነት + አውቶሜሽን. የሞባይል መተግበሪያ + PC ሶፍትዌር. 100% ፋይናንስ / ቀጥታ ዋጋ.",
+    "proofMethodLabel": "የሥራ ዘዴ:",
+    "proofMethodText": "ምርመራ፣ ንድፍ፣ ልማት፣ ሙከራ፣ ማስረከብ እና ድጋፍ። Medellín እና ኮሎምቢያ መነሻችን ናቸው፤ የሥራ ክልላችን ዓለም አቀፍ ነው።",
+    "proofUseCasesLabel": "የአጠቃቀም ሁኔታዎች:",
+    "proofUseCasesText": "የእንጨት ሥራ ንግዶች፣ ሽያጭ፣ ኢንቬንቶሪ፣ ቴክኒካዊ የዋጋ ጥያቄዎች፣ ድጋፍ፣ CRM፣ ፖርታሎች፣ ኢ-ኮሜርስ እና የኦፕሬሽን አውቶሜሽን።",
+    "proofBrandsTitle": "ከስራችን ጋር የተያያዙ ብራንዶች፣ ፕሮጀክቶች እና ኩባንያዎች",
+    "proofBrandsAria": "ከስራችን ጋር የተያያዙ ብራንዶች፣ ፕሮጀክቶች እና ኩባንያዎች",
+    "proofLogoPlaceholder": "የእኛ ተሞክሮ Hashinmy",
+    "proofLogoAltTemplate": "የ{name} ሎጎ",
+    "proofFaqAria": "ተደጋጋሚ ጥያቄዎች · የእኛ ተሞክሮ",
+    "proofFaqWhyQuestion": "ለምን Hashinmy መምረጥ አለብን?",
+    "proofFaqWhyAnswer": "መንገድ ይምረጡ. ሶፍትዌር የፕሮጀክት ማጠቃለያ. ፋይናንስ / አሁን ዋጋ ይጠይቁ.",
+    "proofFaqWhoQuestion": "ለማን?",
+    "proofFaqWhoAnswer": "መንገድ ይምረጡ. ሶፍትዌር የፕሮጀክት ማጠቃለያ. ፋይናንስ / አሁን ዋጋ ይጠይቁ. በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ደህንነት, ይምረጡ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+    "proofFaqStartQuestion": "እንዴት እጀምራለሁ?",
+    "proofFaqStartAnswer": "መንገድዎ ተዘጋጅቷል። ከመላክዎ በፊት ማንኛውንም አስፈላጊ ዝርዝር ማከል ይችላሉ፤ የ Hashinmy ቡድን የፕሮጀክቱን አቅጣጫ፣ የፋይናንስ አማራጭ እና ቀጣይ እርምጃዎችን በግልጽ የንግድ እና ቴክኒክ አውድ ይገመግማል። ቀጥታ ዋጋ. የፕሮጀክት ማጠቃለያ. መንገድ.",
+    "proofBrandsStructuredDescription": "ከስራችን ጋር የተያያዙ ብራንዶች፣ ፕሮጀክቶች እና ኩባንያዎች"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "ድር · ሶፍትዌር",
+      "tech": "ድር · backend",
+      "short": "ድር"
+    },
+    {
+      "value": "app_movil",
+      "label": "የሞባይል መተግበሪያ",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC ሶፍትዌር",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "አውቶሜሽን",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "ሰው ሰራሽ ብልህነት · ውህደት",
+      "tech": "ሰው ሰራሽ ብልህነት · የስራ ፍሰት",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "ዘመናዊነት",
+      "tech": "ሶፍትዌር · ቁጥጥሮች",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "የተጠበቀ ካፒታል"
+    },
+    "serviceFamily": {
+      "symbol": "መንገድ",
+      "label": "አገልግሎት · ይምረጡ"
+    },
+    "buildType": {
+      "symbol": "መገንባት",
+      "label": "ምርት"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "አውቶሜሽን"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "ዘመናዊነት"
+    },
+    "operation": {
+      "symbol": "አጠቃቀም",
+      "label": "አጠቃቀም"
+    },
+    "value": {
+      "symbol": "ዋጋ",
+      "label": "ዋጋ · ቁጥጥሮች"
+    },
+    "risk": {
+      "symbol": "እምነት",
+      "label": "ደህንነት · ቁጥጥሮች"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% ፋይናንስ"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "የመንገድ ካርታ"
+    },
+    "summary": {
+      "symbol": "ማጠቃለያ",
+      "label": "የፕሮጀክት ማጠቃለያ"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "ብጁ"
+      ],
+      [
+        "AI",
+        "አውቶሜሽን"
+      ],
+      [
+        "PC",
+        "ሞባይል"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "መንገድ"
+      ],
+      [
+        "6",
+        "አገልግሎት"
+      ],
+      [
+        "1",
+        "የፕሮጀክት ማጠቃለያ"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "ሂደቶች"
+      ],
+      [
+        "AI",
+        "የሰው ግምገማ"
+      ],
+      [
+        "BI",
+        "ሪፖርቶች"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "ዘመናዊነት"
+      ],
+      [
+        "API",
+        "ውህደት"
+      ],
+      [
+        "UX",
+        "እምነት"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "ድር"
+      ],
+      [
+        "Mobile",
+        "አጠቃቀም"
+      ],
+      [
+        "Local",
+        "ቁጥጥሮች"
+      ]
+    ],
+    "value": [
+      [
+        "የስራ ፍሰት",
+        "ሂደቶች"
+      ],
+      [
+        "Auto",
+        "ፈጣን"
+      ],
+      [
+        "Data",
+        "ቁጥጥሮች"
+      ]
+    ],
+    "risk": [
+      [
+        "ተጠቃሚዎች",
+        "ፈቃዶች"
+      ],
+      [
+        "Data",
+        "ደህንነት"
+      ],
+      [
+        "AI",
+        "የሰው ግምገማ"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "ፋይናንስ"
+      ],
+      [
+        "USD",
+        "ደረጃዎች"
+      ],
+      [
+        "Pause",
+        "ቁጥጥሮች"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "ፈጣን"
+      ],
+      [
+        "ደረጃዎች",
+        "የመንገድ ካርታ"
+      ],
+      [
+        "QA",
+        "ቁጥጥሮች"
+      ]
+    ],
+    "summary": [
+      [
+        "መንገድ",
+        "ማጠቃለያ"
+      ],
+      [
+        "Email",
+        "የፕሮጀክት ማጠቃለያ"
+      ],
+      [
+        "የሰው ግምገማ",
+        "እውቂያ"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "አማርኛ",
+      "title": "እንኳን ወደ HASHINMY በደህና መጡ",
+      "copy": "በአካባቢያዊ እና በዓለም አቀፍ ገበያዎች የሚሰሩ፣ የሚሸጡ እና የሚያድጉ ኩባንያዎች ለሚፈልጉት ልዩ ሶፍትዌር እንገነባለን። AI፣ አውቶሜሽን፣ የPC ፕሮግራሞች፣ DXF ኤክስፖርት ያለው CAD ሶፍትዌር፣ የድር መተግበሪያዎች፣ ክላውድ፣ SEO፣ ቻትቦቶች፣ የቴክኒክ ዋጋ መገመቻ መሣሪያዎች፣ ደህንነት እና የስራ ቀጣይነትን እናዋህዳለን።\nመደጂን እና ኮሎምቢያ መነሻችን ናቸው፤ የንግድ እና የቴክኒክ ተደራሽነታችን ዓለም አቀፍ ነው።\nበ100% የሚፈንድ መፍትሄዎች የኩባንያዎችን ቴክኖሎጂያዊ እድገት እንደግፋለን፣ ከፍተኛ እምቅ አቅማቸውን እንዲደርሱ፣ ምርታማነታቸውን እንዲያሻሽሉ እና በበለጠ ብቃት እንዲሰፉ እንረዳቸዋለን።",
+      "optionQuestion": "የትኛውን አማራጭ ይፈልጋሉ?",
+      "progress": "መጀመሪያ",
+      "core": "HASHINMY",
+      "insight": "የመጀመሪያው ምርመራ እውነተኛ ፍላጎትን ወደ ግልጽ፣ ሊፈንድ የሚችል እና ለእድገት ዝግጁ የቴክኒክ መንገድ ለመቀየር ይረዳል።",
+      "options": [
+        {
+          "label": "ያለ ፋይናንስ",
+          "hint": "ያለ ፋይናንስ ዋጋ ማቅረቢያ መቀበል እፈልጋለሁ",
+          "tech": "ያለ ፋይናንስ",
+          "insight": "የፋይናንስ እቅድ ሳይኖር ቀጥታ ዋጋ ማቅረቢያ መቀበል እፈልጋለሁ።"
+        },
+        {
+          "label": "100% ፋይናንስ",
+          "hint": "በUSD ግልጽ ክፍያዎች መቀጠል እፈልጋለሁ",
+          "tech": "የUSD ክፍያዎች",
+          "insight": "100% ፋይናንስን እንደ ዋና መንገድ መቀጠል እፈልጋለሁ።"
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "መንገድ",
+      "title": "ይምረጡ · አገልግሎት · ዋጋ",
+      "optionQuestion": "ይምረጡ · አገልግሎት",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ይምረጡ, አገልግሎት, ዋጋ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "መንገድ",
+      "core": "አገልግሎት",
+      "insight": "መንገድ. ዋጋ.",
+      "options": [
+        {
+          "label": "ብጁ ሶፍትዌር · ምርት",
+          "hint": "ድር · የሞባይል መተግበሪያ · PC ሶፍትዌር",
+          "tech": "ሶፍትዌር · ምርት",
+          "insight": "የተመረጠው አቅጣጫ: ብጁ ሶፍትዌር፣ ምርት — ድር፣ የሞባይል መተግበሪያ፣ PC ሶፍትዌር።"
+        },
+        {
+          "label": "አውቶሜሽን · ሰው ሰራሽ ብልህነት",
+          "hint": "RPA · API · ሰው ሰራሽ ብልህነት",
+          "tech": "አውቶሜሽን · ሰው ሰራሽ ብልህነት",
+          "insight": "የተመረጠው አቅጣጫ: አውቶሜሽን፣ ሰው ሰራሽ ብልህነት — RPA፣ API፣ ሰው ሰራሽ ብልህነት።"
+        },
+        {
+          "label": "ዘመናዊነት · ሂደቶች",
+          "hint": "Excel · ውህደት · የስራ ፍሰት",
+          "tech": "ዘመናዊነት · የስራ ፍሰት",
+          "insight": "የተመረጠው አቅጣጫ: ዘመናዊነት፣ ሂደቶች — Excel፣ ውህደት፣ የስራ ፍሰት።"
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "ምርት",
+      "title": "ብጁ ሶፍትዌር · አጠቃቀም",
+      "optionQuestion": "ይምረጡ · ድር · የሞባይል መተግበሪያ · PC ሶፍትዌር",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ብጁ ሶፍትዌር, አጠቃቀም ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ምርት",
+      "core": "መገንባት",
+      "options": [
+        {
+          "label": "ድር",
+          "hint": "ድር · backend · ውሂብ",
+          "tech": "ድር · backend",
+          "insight": "የተመረጠው አቅጣጫ: ድር — ድር፣ backend፣ ውሂብ። ይህ ምርጫ የHashinmy ሀሳብን ያቀናል።"
+        },
+        {
+          "label": "የሞባይል መተግበሪያ",
+          "hint": "PWA/App · አጠቃቀም",
+          "tech": "mobile/PWA",
+          "insight": "የተመረጠው አቅጣጫ: የሞባይል መተግበሪያ — PWA/App፣ አጠቃቀም።"
+        },
+        {
+          "label": "PC ሶፍትዌር",
+          "hint": "desktop/local · ቁጥጥሮች",
+          "tech": "desktop/local",
+          "insight": "የተመረጠው አቅጣጫ: PC ሶፍትዌር — desktop/local፣ ቁጥጥሮች።"
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "ሰው ሰራሽ ብልህነት · አውቶሜሽን",
+      "title": "አውቶሜሽን · ሂደቶች",
+      "optionQuestion": "ይምረጡ · አውቶሜሽን",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ አውቶሜሽን, ሂደቶች ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "አውቶሜሽን",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "ሂደቶች · አውቶሜሽን",
+          "hint": "RPA · API · ፈጣን",
+          "tech": "RPA/API",
+          "insight": "የተመረጠው አቅጣጫ: ሂደቶች፣ አውቶሜሽን — RPA፣ API፣ ፈጣን።"
+        },
+        {
+          "label": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+          "hint": "ሰው ሰራሽ ብልህነት · ማጠቃለያ · ቁጥጥሮች",
+          "tech": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+          "insight": "የተመረጠው አቅጣጫ: ሰው ሰራሽ ብልህነት፣ የሰው ግምገማ — ሰው ሰራሽ ብልህነት፣ ማጠቃለያ፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "ውሂብ · ሪፖርቶች",
+          "hint": "BI · ሪፖርቶች",
+          "tech": "BI/dashboard",
+          "insight": "የተመረጠው አቅጣጫ: ውሂብ፣ ሪፖርቶች — BI፣ ሪፖርቶች።"
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "ዘመናዊነት",
+      "title": "ዘመናዊነት · ሂደቶች",
+      "optionQuestion": "ይምረጡ · ዘመናዊነት",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ዘመናዊነት, ሂደቶች ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ዘመናዊነት",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · የስራ ፍሰት",
+          "hint": "ሂደቶች · ፈቃዶች",
+          "tech": "የስራ ፍሰት · ፈቃዶች",
+          "insight": "የተመረጠው አቅጣጫ: Excel፣ የስራ ፍሰት — ሂደቶች፣ ፈቃዶች።"
+        },
+        {
+          "label": "ውህደት · ውሂብ",
+          "hint": "API · ቁጥጥሮች",
+          "tech": "API · ውህደት",
+          "insight": "የተመረጠው አቅጣጫ: ውህደት፣ ውሂብ — API፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "UX/UI · እምነት",
+          "hint": "ተሞክሮ · ዋጋ",
+          "tech": "UX/UI + product",
+          "insight": "የተመረጠው አቅጣጫ: UX/UI፣ እምነት — ተሞክሮ፣ ዋጋ።"
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "አጠቃቀም · ሂደቶች",
+      "optionQuestion": "ይምረጡ · አጠቃቀም",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ አጠቃቀም, ሂደቶች ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "አጠቃቀም",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "ድር · መንገድ",
+          "hint": "cloud · backend · ውሂብ",
+          "tech": "cloud backend",
+          "insight": "የተመረጠው አቅጣጫ: ድር፣ መንገድ — cloud፣ backend፣ ውሂብ።"
+        },
+        {
+          "label": "የሞባይል መተግበሪያ · አጠቃቀም",
+          "hint": "የሞባይል መተግበሪያ · tablet · sync",
+          "tech": "mobile first",
+          "insight": "የተመረጠው አቅጣጫ: የሞባይል መተግበሪያ፣ አጠቃቀም — የሞባይል መተግበሪያ፣ tablet፣ sync።"
+        },
+        {
+          "label": "PC · ቁጥጥሮች",
+          "hint": "desktop/local · ደህንነት",
+          "tech": "desktop/local",
+          "insight": "የተመረጠው አቅጣጫ: PC፣ ቁጥጥሮች — desktop/local፣ ደህንነት።"
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "ዋጋ",
+      "title": "ዋጋ · ይምረጡ",
+      "optionQuestion": "ይምረጡ · ዋጋ",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ዋጋ, ይምረጡ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ዋጋ",
+      "core": "ዋጋ",
+      "options": [
+        {
+          "label": "ሂደቶች · የስራ ፍሰት",
+          "hint": "ፈቃዶች · ቁጥጥሮች",
+          "tech": "workflow + RBAC",
+          "insight": "የተመረጠው አቅጣጫ: ሂደቶች፣ የስራ ፍሰት — ፈቃዶች፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "አውቶሜሽን · ፈጣን",
+          "hint": "RPA/API · ሂደቶች",
+          "tech": "RPA/API",
+          "insight": "የተመረጠው አቅጣጫ: አውቶሜሽን፣ ፈጣን — RPA/API፣ ሂደቶች።"
+        },
+        {
+          "label": "ውሂብ · ሰው ሰራሽ ብልህነት",
+          "hint": "ሪፖርቶች · ሰው ሰራሽ ብልህነት",
+          "tech": "BI + AI",
+          "insight": "የተመረጠው አቅጣጫ: ውሂብ፣ ሰው ሰራሽ ብልህነት — ሪፖርቶች፣ ሰው ሰራሽ ብልህነት።"
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "እምነት · ቁጥጥሮች",
+      "title": "ደህንነት · ይምረጡ",
+      "optionQuestion": "ይምረጡ · ደህንነት",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ደህንነት, ይምረጡ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ደህንነት",
+      "core": "እምነት",
+      "options": [
+        {
+          "label": "ተጠቃሚዎች · ፈቃዶች",
+          "hint": "RBAC · ቁጥጥሮች",
+          "tech": "RBAC + audit",
+          "insight": "የተመረጠው አቅጣጫ: ተጠቃሚዎች፣ ፈቃዶች — RBAC፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "ውሂብ · ደህንነት",
+          "hint": "ውሂብ · ቁጥጥሮች",
+          "tech": "በንድፍ የተገነባ ደህንነት",
+          "insight": "የተመረጠው አቅጣጫ: ውሂብ፣ ደህንነት — ውሂብ፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+          "hint": "አውቶሜሽን · ቁጥጥሮች",
+          "tech": "AI governance",
+          "insight": "የተመረጠው አቅጣጫ: ሰው ሰራሽ ብልህነት፣ የሰው ግምገማ — አውቶሜሽን፣ ቁጥጥሮች።"
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "የተጠበቀ ካፒታል · ፋይናንስ",
+      "title": "ፋይናንስ · የመንገድ ካርታ",
+      "optionQuestion": "ይምረጡ · ፋይናንስ",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ ፋይናንስ, የመንገድ ካርታ ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ፋይናንስ",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% ፋይናንስ",
+          "hint": "USD · ደረጃዎች · የተጠበቀ ካፒታል",
+          "tech": "USD · ፋይናንስ",
+          "insight": "የተመረጠው አቅጣጫ: 100% ፋይናንስ — USD፣ ደረጃዎች፣ የተጠበቀ ካፒታል።"
+        },
+        {
+          "label": "ቀጥታ ዋጋ · ደረጃዎች",
+          "hint": "የመንገድ ካርታ · ደረጃዎች",
+          "tech": "የመንገድ ካርታ",
+          "insight": "የተመረጠው አቅጣጫ: ቀጥታ ዋጋ፣ ደረጃዎች — የመንገድ ካርታ፣ ደረጃዎች።"
+        },
+        {
+          "label": "እውቂያ · የሰው ግምገማ",
+          "hint": "የፕሮጀክት ማጠቃለያ · እውቂያ",
+          "tech": "የሰው ግምገማ",
+          "insight": "የተመረጠው አቅጣጫ: እውቂያ፣ የሰው ግምገማ — የፕሮጀክት ማጠቃለያ፣ እውቂያ።"
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "ፍጥነት",
+      "title": "የመንገድ ካርታ · ፍጥነት",
+      "optionQuestion": "ይምረጡ · ፍጥነት",
+      "copy": "በዚህ ማያ ገጽ ተግባራዊ ትኩረቱ የመንገድ ካርታ, ፍጥነት ነው፣ መንገዱ የንግድ እና ቴክኒክ አውድ እንዲይዝ። Hashinmy ይህን ምርጫ ወደ ግልጽ መንገድ ይቀይራል፣ የስፋት መግለጫ፣ ቁጥጥሮች እና ቀጣይ እርምጃዎች ጋር፣ ንግዱ በትንሽ ግጭት እንዲሸጥ፣ እንዲሰራ ወይም እንዲያድግ።",
+      "progress": "ፍጥነት",
+      "core": "የመንገድ ካርታ",
+      "options": [
+        {
+          "label": "ፈጣን · MVP",
+          "hint": "ምርት · ፈጣን",
+          "tech": "MVP",
+          "insight": "የተመረጠው አቅጣጫ: ፈጣን፣ MVP — ምርት፣ ፈጣን። ይህ ምርጫ የHashinmy ሀሳብን ያቀናል።"
+        },
+        {
+          "label": "1-3 · ደረጃዎች",
+          "hint": "የመንገድ ካርታ · ቁጥጥሮች",
+          "tech": "ደረጃዎች",
+          "insight": "የተመረጠው አቅጣጫ: 1-3፣ ደረጃዎች — የመንገድ ካርታ፣ ቁጥጥሮች።"
+        },
+        {
+          "label": "ኢንተርፕራይዝ · የመንገድ ካርታ",
+          "hint": "ደህንነት · ኢንተርፕራይዝ",
+          "tech": "የኢንተርፕራይዝ መንገድ ካርታ",
+          "insight": "የተመረጠው አቅጣጫ: ኢንተርፕራይዝ፣ የመንገድ ካርታ — ደህንነት፣ ኢንተርፕራይዝ።"
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "መንገድ · ማጠቃለያ",
+      "title": "የፕሮጀክት ማጠቃለያ · ማጠቃለያ",
+      "copy": "መንገድዎ ተዘጋጅቷል። ከመላክዎ በፊት ማንኛውንም አስፈላጊ ዝርዝር ማከል ይችላሉ፤ የ Hashinmy ቡድን የፕሮጀክቱን አቅጣጫ፣ የፋይናንስ አማራጭ እና ቀጣይ እርምጃዎችን በግልጽ የንግድ እና ቴክኒክ አውድ ይገመግማል።",
+      "progress": "የፕሮጀክት ማጠቃለያ",
+      "core": "የፕሮጀክት ማጠቃለያ",
+      "insight": "መንገድ. የፕሮጀክት ማጠቃለያ. እውቂያ.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "መንገድ",
+    "service": "አገልግሎት",
+    "operation": "አጠቃቀም",
+    "value": "ዋጋ",
+    "risk": "ደህንነት",
+    "financing": "ፋይናንስ",
+    "timeline": "ፍጥነት"
+  },
+  "valueLabels": {
+    "diagnostico": "የፕሮጀክት ማጠቃለያ · መንገድ",
+    "producto_digital": "ብጁ ሶፍትዌር · ምርት",
+    "automatizacion_ia": "አውቶሜሽን · ሰው ሰራሽ ብልህነት",
+    "modernizacion_operativa": "ዘመናዊነት · ሂደቶች",
+    "software_online": "ድር · ሶፍትዌር",
+    "app_movil": "የሞባይል መተግበሪያ",
+    "software_pc": "PC ሶፍትዌር",
+    "automatizacion": "አውቶሜሽን · ሂደቶች",
+    "ia": "ሰው ሰራሽ ብልህነት · ውህደት",
+    "modernizacion": "ዘመናዊነት",
+    "web_global": "ድር · መንገድ",
+    "mobile_first": "የሞባይል መተግበሪያ · አጠቃቀም",
+    "pc_local": "PC · ቁጥጥሮች",
+    "workflow": "የስራ ፍሰት · ሂደቶች",
+    "automation": "አውቶሜሽን · ፈጣን",
+    "analytics": "ውሂብ · ሪፖርቶች",
+    "ai": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+    "experience": "UX/UI · እምነት",
+    "analytics_ai": "ውሂብ · ሰው ሰራሽ ብልህነት",
+    "roles_permisos": "ተጠቃሚዎች · ፈቃዶች",
+    "datos_sensibles": "ውሂብ · ደህንነት",
+    "ia_controlada": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+    "financiamiento_100": "100% ፋይናንስ",
+    "sin_financiacion": "ቀጥታ ዋጋ",
+    "fases": "ቀጥታ ዋጋ · ደረጃዎች",
+    "contacto_directo": "እውቂያ · የሰው ግምገማ",
+    "mvp_rapido": "ፈጣን · MVP",
+    "1_3_meses": "1-3 · ደረጃዎች",
+    "enterprise": "ኢንተርፕራይዝ · የመንገድ ካርታ"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "ብጁ ሶፍትዌር · ምርት",
+      "operation": "architecture · የፕሮጀክት ማጠቃለያ",
+      "value": "ዋጋ · የፕሮጀክት ማጠቃለያ",
+      "risk": "ደህንነት · የፕሮጀክት ማጠቃለያ",
+      "financing": "ፋይናንስ · የፕሮጀክት ማጠቃለያ",
+      "timeline": "ፍጥነት · የፕሮጀክት ማጠቃለያ",
+      "technical": "ሶፍትዌር · architecture"
+    },
+    "technicalParts": {
+      "software_online": "ድር · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · ሶፍትዌር",
+      "automatizacion": "RPA/API አውቶሜሽን",
+      "ia": "ሰው ሰራሽ ብልህነት · የሰው ግምገማ",
+      "modernizacion": "ዘመናዊነት",
+      "web_global": "ባክኤንድ + ዳታቤዝ",
+      "mobile_first": "የሞባይል መተግበሪያ · sync",
+      "pc_local": "local · ቁጥጥሮች",
+      "workflow": "ፈቃዶች · የስራ ፍሰት",
+      "automation": "አውቶሜሽን · ውህደት",
+      "analytics": "dashboard/BI",
+      "ai": "ሰው ሰራሽ ብልህነት · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "ውሂብ · ደህንነት",
+      "ia_controlada": "AI governance · የሰው ግምገማ"
+    },
+    "controlBase": [
+      "ውሂብ",
+      "ቁጥጥሮች"
+    ],
+    "controlParts": {
+      "web_global": "ፈቃዶች",
+      "software_online": "ፈቃዶች",
+      "ia": "የሰው ግምገማ",
+      "analytics_ai": "የሰው ግምገማ",
+      "ai": "የሰው ግምገማ",
+      "automatizacion": "አውቶሜሽን · ሪፖርቶች",
+      "automation": "አውቶሜሽን · ሪፖርቶች",
+      "roles_permisos": "ፈቃዶች · ቁጥጥሮች",
+      "datos_sensibles": "ውሂብ · ደህንነት",
+      "ia_controlada": "የሰው ግምገማ · ቁጥጥሮች",
+      "financiamiento_100": "100% ፋይናንስ",
+      "sin_financiacion": "ቀጥታ ዋጋ"
+    },
+    "nextSteps": {
+      "noService": "እውቂያ · የፕሮጀክት ማጠቃለያ",
+      "mvp": "MVP · የፕሮጀክት ማጠቃለያ",
+      "enterprise": "ኢንተርፕራይዝ · የመንገድ ካርታ",
+      "default": "ሶፍትዌር · የመንገድ ካርታ"
+    }
+  },
+  "schemaVersion": 1
+}

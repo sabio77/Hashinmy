@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "defaultLanguage": "es",
+  "generatedAt": "2026-06-26T14:30:17.466Z",
+  "source": "detected-from-textX-and-textX-seo",
+  "languages": [
+    {
+      "code": "es",
+      "name": "Spanish",
+      "nativeName": "Español",
+      "htmlLang": "es",
+      "dir": "ltr"
+    },
+    {
+      "code": "en",
+      "name": "English",
+      "nativeName": "English",
+      "htmlLang": "en",
+      "dir": "ltr"
+    },
+    {
+      "code": "de",
+      "name": "German",
+      "nativeName": "Deutsch",
+      "htmlLang": "de",
+      "dir": "ltr"
+    }
+  ]
+}

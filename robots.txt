@@ -1,10 +1,5 @@
 User-agent: *
 Allow: /
+Sitemap: https://hashinmy.com/sitemap.xml
 
-Sitemap: https://www.hashinmy.com/sitemap.xml
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
+# Hashinmy mantiene rutas HTML estáticas para productos, industrias, formas de pago, proceso y glosario.

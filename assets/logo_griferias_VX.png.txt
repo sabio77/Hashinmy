@@ -1,0 +1,1 @@
+Prompt para logo Griferías VX: recrear o preparar el logo oficial de Griferías VX respetando el texto, la marca VX, proporción horizontal, trazos y contraste original. Debe guardarse como assets/logo_griferias_VX.png, optimizado para web, legible sobre tarjeta clara y sin cambios de identidad.

@@ -1,0 +1,724 @@
+{
+  "iso": "hu",
+  "name": "Hungarian",
+  "nativeName": "Magyar",
+  "htmlLang": "hu",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | egyedi szoftver útvonal",
+    "description": "Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
+    "ogTitle": "Hashinmy | egyedi szoftver",
+    "ogDescription": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Magyar, Hungarian, Szolgáltatás, útvonal, Használat, Érték, finanszírozás, biztonság, web · szoftver, mobilalkalmazás, PC szoftver, automatizálás, mesterséges intelligencia · integráció, modernizáció, projektösszefoglaló · útvonal, egyedi szoftver · Termék, automatizálás · mesterséges intelligencia, modernizáció · folyamatok, automatizálás · folyamatok, web · útvonal, mobilalkalmazás · Használat, PC · kontrollok, munkafolyamat · folyamatok, automatizálás · gyors, adatok · jelentések, mesterséges intelligencia · emberi felülvizsgálat, UX/UI · bizalom, adatok · mesterséges intelligencia, felhasználók · engedélyek, adatok · biztonság, 100% finanszírozás, közvetlen ajánlat, közvetlen ajánlat · fázisok, kapcsolat · emberi felülvizsgálat, gyors · MVP, 1-3 · fázisok, enterprise · ütemterv, Hashinmy, hashinmy.com, egyedi szoftver · Termék · 100% finanszírozás, web · szoftver · PWA, ecommerce · egyedi szoftver · Termék, egyedi szoftver · Termék · CAD/DXF, közvetlen ajánlat · 100% finanszírozás, API, UX/UI, ecommerce · automatizálás · folyamatok, mesterséges intelligencia · integráció · enterprise · ütemterv, Iparágak · egyedi szoftver · Termék, Finanszírozás most, API · web · útvonal, közvetlen ajánlat · egyedi szoftver · Termék, web · szoftver · SEO, chatbots · mesterséges intelligencia · integráció, Colombia · Medellín · egyedi szoftver · Termék, API · enterprise · ütemterv, adatok · biztonság · egyedi szoftver · Termék, enterprise · ütemterv · egyedi szoftver · Termék, CRM · enterprise · ütemterv, ERP · egyedi szoftver · Termék, web · szoftver · UX/UI · bizalom, web · szoftver · portal"
+  },
+  "ui": {
+    "skip": "Válasszon · útvonal",
+    "stageLabel": "Hashinmy · élmény · útvonal",
+    "topbarLabel": "kontrollok · Hashinmy",
+    "brandAria": "Újrakezdés · Hashinmy",
+    "brandSmall": "egyedi szoftver · mesterséges intelligencia",
+    "progressLabel": "útvonal · Tempó",
+    "languageLabel": "Nyelv",
+    "languageAria": "Válasszon · Nyelv",
+    "contentLabel": "élmény · projektösszefoglaló",
+    "pathLabelAria": "útvonal · összefoglaló",
+    "decisionZoneLabel": "Válasszon · Szolgáltatás",
+    "summaryLabelAria": "összefoglaló · projektösszefoglaló",
+    "footerLabel": "kontrollok · útvonal",
+    "primaryFinance": "Finanszírozás most",
+    "primaryQuote": "Kérjen ajánlatot",
+    "back": "Vissza",
+    "restart": "Újrakezdés",
+    "contactLabel": "kapcsolat · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · kapcsolat",
+    "commentLabel": "Írja le a projektjét",
+    "commentPlaceholder": "Mondja el, melyik folyamatot szeretné javítani, milyen rajzra, alkatrészre vagy rendszerre van szüksége, és minden műszaki részletet, amely segít egy egyértelmű út előkészítésében.",
+    "submitRoute": "Útvonal küldése a Hashinmynek",
+    "copySummaryAction": "Összefoglaló másolása",
+    "formNote": "A válaszai csak ebben a böngészőben maradnak mentve, amíg el nem dönti, hogy elküldi őket.",
+    "contactRequired": "Adjon meg e-mailt, WhatsAppot vagy cégnevet, hogy a Hashinmy felvehesse Önnel a kapcsolatot az előkészített útvonallal.",
+    "copySuccess": "Az összefoglaló másolva. Beillesztheti WhatsAppba, e-mailbe vagy CRM-be.",
+    "copyFailure": "Az összefoglaló másolása nem sikerült; küldje el az útvonalat a Hashinmynek az űrlapon keresztül.",
+    "mailOpening": "Megnyílik az e-mail az előkészített útvonallal; ellenőrizze, mielőtt elküldi a Hashinmynek.",
+    "waitSummary": "összefoglaló · projektösszefoglaló",
+    "preparingOptions": "Opciók előkészítése",
+    "optionFallback": "Válasszon · útvonal",
+    "pathLabel": "útvonal · összefoglaló",
+    "pathEmpty": "Válasszon · útvonal · projektösszefoglaló",
+    "interactionFallback": "élmény",
+    "summaryTitle": "Hashinmy interaktív kérés",
+    "projectChosen": "Termék · Válasszon",
+    "expectedUse": "Használat",
+    "wantedValue": "Érték",
+    "prioritySecurity": "biztonság",
+    "paymentMode": "finanszírozás",
+    "financing": "finanszírozás",
+    "pace": "Tempó",
+    "technicalBase": "Javasolt technikai alap",
+    "suggestedControls": "kontrollok",
+    "nextStep": "ütemterv · fázisok",
+    "contact": "kapcsolat",
+    "additionalComment": "Opcionális megjegyzés",
+    "registeredInteractions": "útvonal · összefoglaló",
+    "directRouteRequested": "közvetlen ajánlat. útvonal.",
+    "directQuoteSubject": "Hashinmy · közvetlen ajánlat",
+    "financedSubject": "Hashinmy · egyedi szoftver · finanszírozás",
+    "directQuoteAudit": "közvetlen ajánlat. projektösszefoglaló. útvonal.",
+    "financeAudit": "100% finanszírozás. projektösszefoglaló. útvonal.",
+    "directQuoteTech": "közvetlen ajánlat · projektösszefoglaló",
+    "financeTech": "USD · fázisok · projektösszefoglaló",
+    "topActionsLabel": "Termékek · Nyelv",
+    "proofEntryAria": "Tapasztalatunk · Hashinmy",
+    "proofOpenButton": "Tapasztalatunk",
+    "proofTitle": "Tapasztalatunk",
+    "proofLead": "Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
+    "proofCloseAria": "Bezárás · Tapasztalatunk",
+    "proofContentAria": "Tapasztalatunk · Gyakori kérdések",
+    "proofSummaryAria": "bizalom · kontrollok",
+    "proofSummaryTitle": "bizalom · kontrollok · Hashinmy",
+    "proofTrustLabel": "bizalom · kontrollok:",
+    "proofTrustText": "Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen. Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
+    "proofMethodLabel": "Módszertan:",
+    "proofMethodText": "Felmérés, tervezés, fejlesztés, tesztelés, átadás és támogatás. Medellín és Kolumbia a kiindulópontunk; a hatókör globális.",
+    "proofUseCasesLabel": "Felhasználási esetek:",
+    "proofUseCasesText": "Asztalosipari vállalkozások, értékesítés, készlet, műszaki ajánlatok, támogatás, CRM, portálok, e-kereskedelem és működési automatizálás.",
+    "proofBrandsTitle": "A munkánkhoz kapcsolódó márkák, projektek és vállalatok",
+    "proofBrandsAria": "A munkánkhoz kapcsolódó márkák, projektek és vállalatok",
+    "proofLogoPlaceholder": "Tapasztalatunk Hashinmy",
+    "proofLogoAltTemplate": "{name} logója",
+    "proofFaqAria": "Gyakori kérdések · Tapasztalatunk",
+    "proofFaqWhyQuestion": "Miért válaszd a Hashinmy-t?",
+    "proofFaqWhyAnswer": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot.",
+    "proofFaqWhoQuestion": "Kinek szól?",
+    "proofFaqWhoAnswer": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot. Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+    "proofFaqStartQuestion": "Hogyan kezdjem el?",
+    "proofFaqStartAnswer": "Az útvonal készen áll. Küldés előtt hozzáadhat bármilyen fontos részletet; a Hashinmy csapata egyértelmű üzleti és technikai kontextusban áttekinti a projekt irányát, a finanszírozási lehetőséget és a következő lépéseket. közvetlen ajánlat. projektösszefoglaló. útvonal.",
+    "proofBrandsStructuredDescription": "A munkánkhoz kapcsolódó márkák, projektek és vállalatok"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · szoftver",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobilalkalmazás",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC szoftver",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatizálás",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "mesterséges intelligencia · integráció",
+      "tech": "mesterséges intelligencia · munkafolyamat",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernizáció",
+      "tech": "szoftver · kontrollok",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "védett tőke"
+    },
+    "serviceFamily": {
+      "symbol": "útvonal",
+      "label": "Szolgáltatás · Válasszon"
+    },
+    "buildType": {
+      "symbol": "Fejlesztés",
+      "label": "Termék"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatizálás"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernizáció"
+    },
+    "operation": {
+      "symbol": "Használat",
+      "label": "Használat"
+    },
+    "value": {
+      "symbol": "Érték",
+      "label": "Érték · kontrollok"
+    },
+    "risk": {
+      "symbol": "bizalom",
+      "label": "biztonság · kontrollok"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% finanszírozás"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "ütemterv"
+    },
+    "summary": {
+      "symbol": "összefoglaló",
+      "label": "projektösszefoglaló"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "egyedi"
+      ],
+      [
+        "AI",
+        "automatizálás"
+      ],
+      [
+        "PC",
+        "mobil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "útvonal"
+      ],
+      [
+        "6",
+        "Szolgáltatás"
+      ],
+      [
+        "1",
+        "projektösszefoglaló"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "folyamatok"
+      ],
+      [
+        "AI",
+        "emberi felülvizsgálat"
+      ],
+      [
+        "BI",
+        "jelentések"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernizáció"
+      ],
+      [
+        "API",
+        "integráció"
+      ],
+      [
+        "UX",
+        "bizalom"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Használat"
+      ],
+      [
+        "Local",
+        "kontrollok"
+      ]
+    ],
+    "value": [
+      [
+        "munkafolyamat",
+        "folyamatok"
+      ],
+      [
+        "Auto",
+        "gyors"
+      ],
+      [
+        "Data",
+        "kontrollok"
+      ]
+    ],
+    "risk": [
+      [
+        "felhasználók",
+        "engedélyek"
+      ],
+      [
+        "Data",
+        "biztonság"
+      ],
+      [
+        "AI",
+        "emberi felülvizsgálat"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "finanszírozás"
+      ],
+      [
+        "USD",
+        "fázisok"
+      ],
+      [
+        "Pause",
+        "kontrollok"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "gyors"
+      ],
+      [
+        "fázisok",
+        "ütemterv"
+      ],
+      [
+        "QA",
+        "kontrollok"
+      ]
+    ],
+    "summary": [
+      [
+        "útvonal",
+        "összefoglaló"
+      ],
+      [
+        "Email",
+        "projektösszefoglaló"
+      ],
+      [
+        "emberi felülvizsgálat",
+        "kapcsolat"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Magyar",
+      "title": "Üdvözöljük a HASHINMY-nél",
+      "copy": "Egyedi szoftvert készítünk olyan vállalatoknak, amelyek helyi és nemzetközi piacokon működnek, értékesítenek és növekednek. Integráljuk az AI-t, az automatizálást, a PC-programokat, a DXF-exportot támogató CAD-szoftvert, a webalkalmazásokat, a felhőt, a SEO-t, a chatbotokat, a műszaki árajánlatkészítő eszközöket, a biztonságot és az üzletmenet-folytonosságot.\nMedellín és Kolumbia a kiindulópontunk; kereskedelmi és technikai elérésünk globális.\n100%-ban finanszírozott megoldásokkal ösztönözzük a vállalatok technológiai fejlődését, segítve őket a teljes potenciál elérésében, a termelékenység javításában és a hatékonyabb skálázásban.",
+      "optionQuestion": "Melyik lehetőséget szeretné?",
+      "progress": "Kezdés",
+      "core": "HASHINMY",
+      "insight": "A kezdeti diagnózis segít egy valós igényt világos, finanszírozható és növekedésre kész technikai úttá alakítani.",
+      "options": [
+        {
+          "label": "Finanszírozás nélkül",
+          "hint": "Finanszírozás nélküli ajánlatot szeretnék kapni",
+          "tech": "Finanszírozás nélkül",
+          "insight": "Közvetlen ajánlatot szeretnék kapni finanszírozási terv nélkül."
+        },
+        {
+          "label": "100% finanszírozás",
+          "hint": "Világos USD-részletekkel szeretnék továbblépni",
+          "tech": "USD-részletek",
+          "insight": "A 100% finanszírozást szeretném fő modellként választani."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "útvonal",
+      "title": "Válasszon · Szolgáltatás · Érték",
+      "optionQuestion": "Válasszon · Szolgáltatás",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Válasszon, Szolgáltatás, Érték, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "útvonal",
+      "core": "Szolgáltatás",
+      "insight": "útvonal. Érték.",
+      "options": [
+        {
+          "label": "egyedi szoftver · Termék",
+          "hint": "web · mobilalkalmazás · PC szoftver",
+          "tech": "szoftver · Termék",
+          "insight": "Kiválasztott irány: egyedi szoftver, Termék — web, mobilalkalmazás, PC szoftver."
+        },
+        {
+          "label": "automatizálás · mesterséges intelligencia",
+          "hint": "RPA · API · mesterséges intelligencia",
+          "tech": "automatizálás · mesterséges intelligencia",
+          "insight": "Kiválasztott irány: automatizálás, mesterséges intelligencia — RPA, API, mesterséges intelligencia."
+        },
+        {
+          "label": "modernizáció · folyamatok",
+          "hint": "Excel · integráció · munkafolyamat",
+          "tech": "modernizáció · munkafolyamat",
+          "insight": "Kiválasztott irány: modernizáció, folyamatok — Excel, integráció, munkafolyamat."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Termék",
+      "title": "egyedi szoftver · Használat",
+      "optionQuestion": "Válasszon · web · mobilalkalmazás · PC szoftver",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: egyedi szoftver, Használat, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "Termék",
+      "core": "Fejlesztés",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · adatok",
+          "tech": "web · backend",
+          "insight": "Kiválasztott irány: web — web, backend, adatok."
+        },
+        {
+          "label": "mobilalkalmazás",
+          "hint": "PWA/App · Használat",
+          "tech": "mobile/PWA",
+          "insight": "Kiválasztott irány: mobilalkalmazás — PWA/App, Használat."
+        },
+        {
+          "label": "PC szoftver",
+          "hint": "desktop/local · kontrollok",
+          "tech": "desktop/local",
+          "insight": "Kiválasztott irány: PC szoftver — desktop/local, kontrollok."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "mesterséges intelligencia · automatizálás",
+      "title": "automatizálás · folyamatok",
+      "optionQuestion": "Válasszon · automatizálás",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: automatizálás, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "automatizálás",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "folyamatok · automatizálás",
+          "hint": "RPA · API · gyors",
+          "tech": "RPA/API",
+          "insight": "Kiválasztott irány: folyamatok, automatizálás — RPA, API, gyors."
+        },
+        {
+          "label": "mesterséges intelligencia · emberi felülvizsgálat",
+          "hint": "mesterséges intelligencia · összefoglaló · kontrollok",
+          "tech": "mesterséges intelligencia · emberi felülvizsgálat",
+          "insight": "Kiválasztott irány: mesterséges intelligencia, emberi felülvizsgálat — mesterséges intelligencia, összefoglaló, kontrollok."
+        },
+        {
+          "label": "adatok · jelentések",
+          "hint": "BI · jelentések",
+          "tech": "BI/dashboard",
+          "insight": "Kiválasztott irány: adatok, jelentések — BI, jelentések."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernizáció",
+      "title": "modernizáció · folyamatok",
+      "optionQuestion": "Válasszon · modernizáció",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: modernizáció, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "modernizáció",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · munkafolyamat",
+          "hint": "folyamatok · engedélyek",
+          "tech": "munkafolyamat · engedélyek",
+          "insight": "Kiválasztott irány: Excel, munkafolyamat — folyamatok, engedélyek."
+        },
+        {
+          "label": "integráció · adatok",
+          "hint": "API · kontrollok",
+          "tech": "API · integráció",
+          "insight": "Kiválasztott irány: integráció, adatok — API, kontrollok."
+        },
+        {
+          "label": "UX/UI · bizalom",
+          "hint": "élmény · Érték",
+          "tech": "UX/UI + product",
+          "insight": "Kiválasztott irány: UX/UI, bizalom — élmény, Érték."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Használat · folyamatok",
+      "optionQuestion": "Válasszon · Használat",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Használat, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "Használat",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · útvonal",
+          "hint": "cloud · backend · adatok",
+          "tech": "cloud backend",
+          "insight": "Kiválasztott irány: web, útvonal — cloud, backend, adatok."
+        },
+        {
+          "label": "mobilalkalmazás · Használat",
+          "hint": "mobilalkalmazás · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Kiválasztott irány: mobilalkalmazás, Használat — mobilalkalmazás, tablet, sync."
+        },
+        {
+          "label": "PC · kontrollok",
+          "hint": "desktop/local · biztonság",
+          "tech": "desktop/local",
+          "insight": "Kiválasztott irány: PC, kontrollok — desktop/local, biztonság."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Érték",
+      "title": "Érték · Válasszon",
+      "optionQuestion": "Válasszon · Érték",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Érték, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "Érték",
+      "core": "Érték",
+      "options": [
+        {
+          "label": "folyamatok · munkafolyamat",
+          "hint": "engedélyek · kontrollok",
+          "tech": "workflow + RBAC",
+          "insight": "Kiválasztott irány: folyamatok, munkafolyamat — engedélyek, kontrollok."
+        },
+        {
+          "label": "automatizálás · gyors",
+          "hint": "RPA/API · folyamatok",
+          "tech": "RPA/API",
+          "insight": "Kiválasztott irány: automatizálás, gyors — RPA/API, folyamatok."
+        },
+        {
+          "label": "adatok · mesterséges intelligencia",
+          "hint": "jelentések · mesterséges intelligencia",
+          "tech": "BI + AI",
+          "insight": "Kiválasztott irány: adatok, mesterséges intelligencia — jelentések, mesterséges intelligencia."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "bizalom · kontrollok",
+      "title": "biztonság · Válasszon",
+      "optionQuestion": "Válasszon · biztonság",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "biztonság",
+      "core": "bizalom",
+      "options": [
+        {
+          "label": "felhasználók · engedélyek",
+          "hint": "RBAC · kontrollok",
+          "tech": "RBAC + audit",
+          "insight": "Kiválasztott irány: felhasználók, engedélyek — RBAC, kontrollok."
+        },
+        {
+          "label": "adatok · biztonság",
+          "hint": "adatok · kontrollok",
+          "tech": "biztonság már a tervezéstől",
+          "insight": "Kiválasztott irány: adatok, biztonság — adatok, kontrollok."
+        },
+        {
+          "label": "mesterséges intelligencia · emberi felülvizsgálat",
+          "hint": "automatizálás · kontrollok",
+          "tech": "AI governance",
+          "insight": "Kiválasztott irány: mesterséges intelligencia, emberi felülvizsgálat — automatizálás, kontrollok."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "védett tőke · finanszírozás",
+      "title": "finanszírozás · ütemterv",
+      "optionQuestion": "Válasszon · finanszírozás",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: finanszírozás, ütemterv, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "finanszírozás",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% finanszírozás",
+          "hint": "USD · fázisok · védett tőke",
+          "tech": "USD · finanszírozás",
+          "insight": "Kiválasztott irány: 100% finanszírozás — USD, fázisok, védett tőke."
+        },
+        {
+          "label": "közvetlen ajánlat · fázisok",
+          "hint": "ütemterv · fázisok",
+          "tech": "ütemterv",
+          "insight": "Kiválasztott irány: közvetlen ajánlat, fázisok — ütemterv, fázisok."
+        },
+        {
+          "label": "kapcsolat · emberi felülvizsgálat",
+          "hint": "projektösszefoglaló · kapcsolat",
+          "tech": "emberi felülvizsgálat",
+          "insight": "Kiválasztott irány: kapcsolat, emberi felülvizsgálat — projektösszefoglaló, kapcsolat."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Tempó",
+      "title": "ütemterv · Tempó",
+      "optionQuestion": "Válasszon · Tempó",
+      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: ütemterv, Tempó, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "progress": "Tempó",
+      "core": "ütemterv",
+      "options": [
+        {
+          "label": "gyors · MVP",
+          "hint": "Termék · gyors",
+          "tech": "MVP",
+          "insight": "Kiválasztott irány: gyors, MVP — Termék, gyors."
+        },
+        {
+          "label": "1-3 · fázisok",
+          "hint": "ütemterv · kontrollok",
+          "tech": "fázisok",
+          "insight": "Kiválasztott irány: 1-3, fázisok — ütemterv, kontrollok."
+        },
+        {
+          "label": "enterprise · ütemterv",
+          "hint": "biztonság · enterprise",
+          "tech": "vállalati ütemterv",
+          "insight": "Kiválasztott irány: enterprise, ütemterv — biztonság, enterprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "útvonal · összefoglaló",
+      "title": "projektösszefoglaló · összefoglaló",
+      "copy": "Az útvonal készen áll. Küldés előtt hozzáadhat bármilyen fontos részletet; a Hashinmy csapata egyértelmű üzleti és technikai kontextusban áttekinti a projekt irányát, a finanszírozási lehetőséget és a következő lépéseket.",
+      "progress": "projektösszefoglaló",
+      "core": "projektösszefoglaló",
+      "insight": "útvonal. projektösszefoglaló. kapcsolat.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "útvonal",
+    "service": "Szolgáltatás",
+    "operation": "Használat",
+    "value": "Érték",
+    "risk": "biztonság",
+    "financing": "finanszírozás",
+    "timeline": "Tempó"
+  },
+  "valueLabels": {
+    "diagnostico": "projektösszefoglaló · útvonal",
+    "producto_digital": "egyedi szoftver · Termék",
+    "automatizacion_ia": "automatizálás · mesterséges intelligencia",
+    "modernizacion_operativa": "modernizáció · folyamatok",
+    "software_online": "web · szoftver",
+    "app_movil": "mobilalkalmazás",
+    "software_pc": "PC szoftver",
+    "automatizacion": "automatizálás · folyamatok",
+    "ia": "mesterséges intelligencia · integráció",
+    "modernizacion": "modernizáció",
+    "web_global": "web · útvonal",
+    "mobile_first": "mobilalkalmazás · Használat",
+    "pc_local": "PC · kontrollok",
+    "workflow": "munkafolyamat · folyamatok",
+    "automation": "automatizálás · gyors",
+    "analytics": "adatok · jelentések",
+    "ai": "mesterséges intelligencia · emberi felülvizsgálat",
+    "experience": "UX/UI · bizalom",
+    "analytics_ai": "adatok · mesterséges intelligencia",
+    "roles_permisos": "felhasználók · engedélyek",
+    "datos_sensibles": "adatok · biztonság",
+    "ia_controlada": "mesterséges intelligencia · emberi felülvizsgálat",
+    "financiamiento_100": "100% finanszírozás",
+    "sin_financiacion": "közvetlen ajánlat",
+    "fases": "közvetlen ajánlat · fázisok",
+    "contacto_directo": "kapcsolat · emberi felülvizsgálat",
+    "mvp_rapido": "gyors · MVP",
+    "1_3_meses": "1-3 · fázisok",
+    "enterprise": "enterprise · ütemterv"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "egyedi szoftver · Termék",
+      "operation": "architecture · projektösszefoglaló",
+      "value": "Érték · projektösszefoglaló",
+      "risk": "biztonság · projektösszefoglaló",
+      "financing": "finanszírozás · projektösszefoglaló",
+      "timeline": "Tempó · projektösszefoglaló",
+      "technical": "szoftver · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · szoftver",
+      "automatizacion": "RPA/API-automatizálás",
+      "ia": "mesterséges intelligencia · emberi felülvizsgálat",
+      "modernizacion": "modernizáció",
+      "web_global": "háttérrendszer + adatbázis",
+      "mobile_first": "mobilalkalmazás · sync",
+      "pc_local": "local · kontrollok",
+      "workflow": "engedélyek · munkafolyamat",
+      "automation": "automatizálás · integráció",
+      "analytics": "dashboard/BI",
+      "ai": "mesterséges intelligencia · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "adatok · biztonság",
+      "ia_controlada": "AI governance · emberi felülvizsgálat"
+    },
+    "controlBase": [
+      "adatok",
+      "kontrollok"
+    ],
+    "controlParts": {
+      "web_global": "engedélyek",
+      "software_online": "engedélyek",
+      "ia": "emberi felülvizsgálat",
+      "analytics_ai": "emberi felülvizsgálat",
+      "ai": "emberi felülvizsgálat",
+      "automatizacion": "automatizálás · jelentések",
+      "automation": "automatizálás · jelentések",
+      "roles_permisos": "engedélyek · kontrollok",
+      "datos_sensibles": "adatok · biztonság",
+      "ia_controlada": "emberi felülvizsgálat · kontrollok",
+      "financiamiento_100": "100% finanszírozás",
+      "sin_financiacion": "közvetlen ajánlat"
+    },
+    "nextSteps": {
+      "noService": "kapcsolat · projektösszefoglaló",
+      "mvp": "MVP · projektösszefoglaló",
+      "enterprise": "enterprise · ütemterv",
+      "default": "szoftver · ütemterv"
+    }
+  },
+  "schemaVersion": 1
+}

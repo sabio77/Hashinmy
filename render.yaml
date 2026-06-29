@@ -1,0 +1,126 @@
+services:
+  - type: web
+    name: hashinmy-immersive-static-site
+    runtime: static
+    buildCommand: npm run check
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), payment=()
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=3600, must-revalidate
+      - path: /css/*
+        name: Cache-Control
+        value: public, max-age=300, must-revalidate
+      - path: /js/*
+        name: Cache-Control
+        value: public, max-age=300, must-revalidate
+      - path: /textX/*
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /textX/*.json
+        name: Content-Type
+        value: application/json; charset=utf-8
+      - path: /textX/seo/*.json
+        name: Content-Type
+        value: application/json; charset=utf-8
+      - path: /llms.txt
+        name: Content-Type
+        value: text/plain; charset=utf-8
+      - path: /llms.txt
+        name: Cache-Control
+        value: public, max-age=300, must-revalidate
+      - path: /robots.txt
+        name: Content-Type
+        value: text/plain; charset=utf-8
+      - path: /404.html
+        name: X-Robots-Tag
+        value: noindex, nofollow, noarchive
+    routes:
+
+      # Redirecciones canónicas hacia rutas multilenguaje con isocode.
+      - type: redirect
+        source: /productos/*
+        destination: /es/productos/:splat
+      - type: redirect
+        source: /industrias/*
+        destination: /es/industrias/:splat
+      - type: redirect
+        source: /casos-de-uso/*
+        destination: /es/casos-de-uso/:splat
+      - type: redirect
+        source: /formas-de-pago/*
+        destination: /es/formas-de-pago/:splat
+      - type: redirect
+        source: /proceso-confianza/*
+        destination: /es/proceso-confianza/:splat
+      - type: redirect
+        source: /glosario/*
+        destination: /es/glosario/:splat
+      - type: redirect
+        source: /l/en/*
+        destination: /en/:splat
+      # Redirecciones 301 para conservar autoridad SEO de URLs .html históricas de hashinmy.com.
+      - type: redirect
+        source: /software-a-la-medida-colombia.html
+        destination: /es/productos/software-a-medida/
+      - type: redirect
+        source: /desarrollo-software-colombia.html
+        destination: /es/productos/desarrollo-software-colombia-medellin/
+      - type: redirect
+        source: /desarrollo-software-medellin.html
+        destination: /es/productos/desarrollo-software-colombia-medellin/
+      - type: redirect
+        source: /software-para-carpinterias.html
+        destination: /es/industrias/software-para-carpinterias/
+      - type: redirect
+        source: /cotizador-tecnico-aprovechamiento-material.html
+        destination: /es/productos/cotizador-tecnico-aprovechamiento/
+      - type: redirect
+        source: /paginas-web-seo-colombia.html
+        destination: /es/productos/paginas-web-seo/
+      - type: redirect
+        source: /chatbots-empresariales-colombia.html
+        destination: /es/productos/chatbots-empresariales/
+      - type: redirect
+        source: /implementacion-ia-empresas-colombia.html
+        destination: /es/productos/ia-para-empresas/
+      - type: redirect
+        source: /software-empresarial-colombia.html
+        destination: /es/productos/desarrollo-software-colombia-medellin/
+      - type: redirect
+        source: /automatizacion-procesos-empresariales-colombia.html
+        destination: /es/productos/automatizacion-procesos/
+      - type: redirect
+        source: /desarrollo-aplicaciones-web-colombia.html
+        destination: /es/productos/aplicaciones-web-pwa/
+      - type: redirect
+        source: /desarrollo-aplicaciones-moviles-colombia.html
+        destination: /es/productos/apps-moviles/
+      - type: redirect
+        source: /desarrollo-api-colombia.html
+        destination: /es/productos/desarrollo-api/
+      - type: redirect
+        source: /software-seguro-empresas-colombia.html
+        destination: /es/productos/software-seguro-para-empresas/
+      - type: redirect
+        source: /transformacion-digital-empresas-colombia.html
+        destination: /es/productos/transformacion-digital/

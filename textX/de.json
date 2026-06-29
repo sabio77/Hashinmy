@@ -1,0 +1,724 @@
+{
+  "iso": "de",
+  "name": "German",
+  "nativeName": "Deutsch",
+  "htmlLang": "de",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | maßgeschneiderte Software Route",
+    "description": "Immersive Hashinmy-Erfahrung, um individuelle Software, KI, Automatisierung, mobile App und PC-Systeme mit Finanzierung oder direktem Angebot zu definieren.",
+    "ogTitle": "Hashinmy | maßgeschneiderte Software",
+    "ogDescription": "Ein interaktiver Weg ohne Scrollen, um Ihr Softwareprojekt zu klären und den nächsten Schritt zu wählen.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Deutsch, German, Service, Route, Nutzung, Wert, Finanzierung, Sicherheit, Web · Software, mobile App, PC-Software, Automatisierung, KI · Integration, Modernisierung, Projektanforderungen · Route, maßgeschneiderte Software · Produkt, Automatisierung · KI, Modernisierung · Prozesse, Automatisierung · Prozesse, Web · Route, mobile App · Nutzung, PC · Kontrollen, Workflow · Prozesse, Automatisierung · schnell, Daten · Berichte, KI · menschliche Prüfung, UX/UI · Vertrauen, Daten · KI, Benutzer · Berechtigungen, Daten · Sicherheit, 100% Finanzierung, direktes Angebot, direktes Angebot · Phasen, Kontakt · menschliche Prüfung, schnell · MVP, 1-3 · Phasen, Enterprise · Roadmap, Hashinmy, hashinmy.com, maßgeschneiderte Software · Produkt · 100% Finanzierung, Web · Software · PWA, ecommerce · maßgeschneiderte Software · Produkt, maßgeschneiderte Software · Produkt · CAD/DXF, direktes Angebot · 100% Finanzierung, API, UX/UI, ecommerce · Automatisierung · Prozesse, KI · Integration · Enterprise · Roadmap, Branchen · maßgeschneiderte Software · Produkt, Jetzt finanzieren, API · Web · Route, direktes Angebot · maßgeschneiderte Software · Produkt, Web · Software · SEO, chatbots · KI · Integration, Colombia · Medellín · maßgeschneiderte Software · Produkt, API · Enterprise · Roadmap, Daten · Sicherheit · maßgeschneiderte Software · Produkt, Enterprise · Roadmap · maßgeschneiderte Software · Produkt, CRM · Enterprise · Roadmap, ERP · maßgeschneiderte Software · Produkt, Web · Software · UX/UI · Vertrauen, Web · Software · portal"
+  },
+  "ui": {
+    "skip": "Zur aktuellen Frage springen",
+    "stageLabel": "Interaktive Hashinmy-Erfahrung",
+    "topbarLabel": "Kontrollen · Hashinmy",
+    "brandAria": "Neu starten · Hashinmy",
+    "brandSmall": "Software + KI nach Maß",
+    "progressLabel": "Route · Tempo",
+    "languageLabel": "Sprache",
+    "languageAria": "Wählen · Sprache",
+    "contentLabel": "Hauptinhalt der Szene",
+    "pathLabelAria": "Route · Zusammenfassung",
+    "decisionZoneLabel": "Optionen der aktuellen Szene",
+    "summaryLabelAria": "Zusammenfassung · Projektanforderungen",
+    "footerLabel": "Kontrollen · Route",
+    "primaryFinance": "Jetzt finanzieren",
+    "primaryQuote": "Jetzt Angebot anfragen",
+    "back": "Zurück",
+    "restart": "Neu starten",
+    "contactLabel": "Kontakt · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · Kontakt",
+    "commentLabel": "Beschreiben Sie Ihr Projekt",
+    "commentPlaceholder": "Teilen Sie uns mit, welchen Prozess Sie verbessern möchten, welche Zeichnung, welches Teil oder System Sie benötigen und welche technischen Details helfen, eine klare Route vorzubereiten.",
+    "submitRoute": "Route an Hashinmy senden",
+    "copySummaryAction": "Zusammenfassung kopieren",
+    "formNote": "Ihre Antworten bleiben nur in diesem Browser gespeichert, bis Sie sie senden.",
+    "contactRequired": "Fügen Sie E-Mail, WhatsApp oder Unternehmen hinzu, damit Hashinmy Sie mit der vorbereiteten Route kontaktieren kann.",
+    "copySuccess": "Zusammenfassung kopiert. Sie können sie in WhatsApp, E-Mail oder CRM einfügen.",
+    "copyFailure": "Automatisches Kopieren war nicht möglich. Der E-Mail-Versand bereitet die Zusammenfassung trotzdem vor.",
+    "mailOpening": "Ihr E-Mail-Programm wird mit der vorbereiteten Route geöffnet.",
+    "waitSummary": "Zusammenfassung · Projektanforderungen",
+    "preparingOptions": "Optionen werden vorbereitet",
+    "optionFallback": "Wählen · Route",
+    "pathLabel": "Route · Zusammenfassung",
+    "pathEmpty": "Jede Auswahl baut Ihr Projektanforderungen",
+    "interactionFallback": "Erlebnis",
+    "summaryTitle": "Interaktive Hashinmy-Anfrage",
+    "projectChosen": "Produkt · Wählen",
+    "expectedUse": "Nutzung",
+    "wantedValue": "Wert",
+    "prioritySecurity": "Sicherheit",
+    "paymentMode": "Finanzierung",
+    "financing": "Finanzierung",
+    "pace": "Tempo",
+    "technicalBase": "Empfohlene technische Grundlage",
+    "suggestedControls": "Kontrollen",
+    "nextStep": "Roadmap · Phasen",
+    "contact": "Kontakt",
+    "additionalComment": "Optionaler Kommentar",
+    "registeredInteractions": "Route · Zusammenfassung",
+    "directRouteRequested": "direktes Angebot. Route.",
+    "directQuoteSubject": "Hashinmy · direktes Angebot",
+    "financedSubject": "Hashinmy · maßgeschneiderte Software · Finanzierung",
+    "directQuoteAudit": "Die Route geht direkt zum Projektanforderungen, um ein klares Angebot vorzubereiten.",
+    "financeAudit": "Die Route geht zum Projektanforderungen mit Finanzierung als Hauptpriorität.",
+    "directQuoteTech": "direktes Angebot · Projektanforderungen",
+    "financeTech": "USD · Phasen · Projektanforderungen",
+    "topActionsLabel": "Produkte · Sprache",
+    "proofEntryAria": "Unsere Erfahrung · Hashinmy",
+    "proofOpenButton": "Unsere Erfahrung",
+    "proofTitle": "Unsere Erfahrung",
+    "proofLead": "Immersive Hashinmy-Erfahrung, um individuelle Software, KI, Automatisierung, mobile App und PC-Systeme mit Finanzierung oder direktem Angebot zu definieren.",
+    "proofCloseAria": "Schließen · Unsere Erfahrung",
+    "proofContentAria": "Unsere Erfahrung · Häufige Fragen",
+    "proofSummaryAria": "Vertrauen · Kontrollen",
+    "proofSummaryTitle": "Vertrauen · Kontrollen · Hashinmy",
+    "proofTrustLabel": "Vertrauen · Kontrollen:",
+    "proofTrustText": "Sicherheit wird nicht am Ende ergänzt. Sie wird mit Berechtigungen, Audit und klaren Regeln passend zur Operation entworfen. Immersive Hashinmy-Erfahrung, um individuelle Software, KI, Automatisierung, mobile App und PC-Systeme mit Finanzierung oder direktem Angebot zu definieren.",
+    "proofMethodLabel": "Methodik:",
+    "proofMethodText": "Diagnose, Design, Entwicklung, Tests, Übergabe und Support. Medellín und Kolumbien sind unser Ursprung; die Reichweite ist global.",
+    "proofUseCasesLabel": "Anwendungsfälle:",
+    "proofUseCasesText": "Schreinereien, Vertrieb, Inventar, technische Angebote, Support, CRM, UX/UI · Vertrauene, E-Commerce und operative Automatisierung.",
+    "proofBrandsTitle": "Marken, Projekte und Unternehmen, die mit unserer Arbeit verbunden sind",
+    "proofBrandsAria": "Marken, Projekte und Unternehmen, die mit unserer Arbeit verbunden sind",
+    "proofLogoPlaceholder": "Unsere Erfahrung Hashinmy",
+    "proofLogoAltTemplate": "Logo von {name}",
+    "proofFaqAria": "Häufige Fragen · Unsere Erfahrung",
+    "proofFaqWhyQuestion": "Warum Hashinmy wählen?",
+    "proofFaqWhyAnswer": "Ein interaktiver Weg ohne Scrollen, um Ihr Softwareprojekt zu klären und den nächsten Schritt zu wählen.",
+    "proofFaqWhoQuestion": "Für wen?",
+    "proofFaqWhoAnswer": "Ein interaktiver Weg ohne Scrollen, um Ihr Softwareprojekt zu klären und den nächsten Schritt zu wählen. Sicherheit wird nicht am Ende ergänzt. Sie wird mit Berechtigungen, Audit und klaren Regeln passend zur Operation entworfen.",
+    "proofFaqStartQuestion": "Wie fange ich an?",
+    "proofFaqStartAnswer": "Ihre Route ist bereit. Vor dem Senden können Sie wichtige Details ergänzen; das Hashinmy-Team prüft Projektausrichtung, Finanzierungsoption und nächste Schritte mit klarem geschäftlichem und technischem Kontext. Die Route geht direkt zum Projektanforderungen, um ein klares Angebot vorzubereiten.",
+    "proofBrandsStructuredDescription": "Marken, Projekte und Unternehmen, die mit unserer Arbeit verbunden sind"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "Web · Software",
+      "tech": "Web · backend",
+      "short": "Web"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobile App",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC-Software",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "Automatisierung",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "KI · Integration",
+      "tech": "KI · Workflow",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "Modernisierung",
+      "tech": "Software · Kontrollen",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "geschütztes Kapital"
+    },
+    "serviceFamily": {
+      "symbol": "Route",
+      "label": "Service · Wählen"
+    },
+    "buildType": {
+      "symbol": "Entwicklung",
+      "label": "Produkt"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "Automatisierung"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "Modernisierung"
+    },
+    "operation": {
+      "symbol": "Nutzung",
+      "label": "Nutzung"
+    },
+    "value": {
+      "symbol": "Wert",
+      "label": "Wert · Kontrollen"
+    },
+    "risk": {
+      "symbol": "Vertrauen",
+      "label": "Sicherheit · Kontrollen"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% Finanzierung"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "Roadmap"
+    },
+    "summary": {
+      "symbol": "Zusammenfassung",
+      "label": "Projektanforderungen"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "maßgeschneidert"
+      ],
+      [
+        "KI",
+        "Automatisierung"
+      ],
+      [
+        "PC",
+        "mobil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "Route"
+      ],
+      [
+        "6",
+        "Service"
+      ],
+      [
+        "1",
+        "Projektanforderungen"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "Prozesse"
+      ],
+      [
+        "AI",
+        "menschliche Prüfung"
+      ],
+      [
+        "BI",
+        "Berichte"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "Modernisierung"
+      ],
+      [
+        "API",
+        "Integration"
+      ],
+      [
+        "UX",
+        "Vertrauen"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "Web"
+      ],
+      [
+        "Mobile",
+        "Nutzung"
+      ],
+      [
+        "Local",
+        "Kontrollen"
+      ]
+    ],
+    "value": [
+      [
+        "Workflow",
+        "Prozesse"
+      ],
+      [
+        "Auto",
+        "schnell"
+      ],
+      [
+        "Data",
+        "Kontrollen"
+      ]
+    ],
+    "risk": [
+      [
+        "Benutzer",
+        "Berechtigungen"
+      ],
+      [
+        "Data",
+        "Sicherheit"
+      ],
+      [
+        "AI",
+        "menschliche Prüfung"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "Finanzierung"
+      ],
+      [
+        "USD",
+        "Phasen"
+      ],
+      [
+        "Pause",
+        "Kontrollen"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "schnell"
+      ],
+      [
+        "Phasen",
+        "Roadmap"
+      ],
+      [
+        "QA",
+        "Kontrollen"
+      ]
+    ],
+    "summary": [
+      [
+        "Route",
+        "Zusammenfassung"
+      ],
+      [
+        "Email",
+        "Projektanforderungen"
+      ],
+      [
+        "menschliche Prüfung",
+        "Kontakt"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Deutsch",
+      "title": "Willkommen bei HASHINMY",
+      "copy": "Wir entwickeln maßgeschneiderte Software für Unternehmen, die in lokalen und internationalen Märkten arbeiten, verkaufen und wachsen. Wir integrieren KI, Automatisierung, PC-Programme, CAD-Software mit DXF-Export, Webanwendungen, Cloud, SEO, Chatbots, technische Kalkulationstools, Sicherheit und operative Kontinuität.\nMedellín und Kolumbien sind unser Ursprung; unsere kommerzielle und technische Reichweite ist global.\nWir fördern die technologische Entwicklung von Unternehmen mit zu 100 % finanzierten Lösungen und helfen ihnen, ihr volles Potenzial zu erreichen, ihre Produktivität zu verbessern und effizienter zu skalieren.",
+      "optionQuestion": "Welche Option möchten Sie?",
+      "progress": "Start",
+      "core": "HASHINMY",
+      "insight": "Die erste Diagnose hilft, einen realen Bedarf in einen klaren, finanzierbaren technischen Fahrplan zu verwandeln, der auf Wachstum vorbereitet ist.",
+      "options": [
+        {
+          "label": "Ohne Finanzierung",
+          "hint": "Ich möchte ein Angebot ohne Finanzierung erhalten",
+          "tech": "Ohne Finanzierung",
+          "insight": "Ich möchte ein direktes Angebot ohne Finanzierungsplan erhalten."
+        },
+        {
+          "label": "100 % Finanzierung",
+          "hint": "Ich möchte mit klaren Raten in USD fortfahren",
+          "tech": "USD-Raten",
+          "insight": "Ich möchte mit 100 % Finanzierung als Hauptmodell fortfahren."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "Route",
+      "title": "Was möchten Sie zuerst erreichen?",
+      "optionQuestion": "Was möchten Sie zuerst lösen?",
+      "copy": "Wählen Sie den Startpunkt und wir bereiten eine klare Route vor, die Ihren Bedarf in ein reales Angebot mit Priorität und Geschäftskontext übersetzt.",
+      "progress": "Route",
+      "core": "Service",
+      "insight": "Route. Wert.",
+      "options": [
+        {
+          "label": "maßgeschneiderte Software · Produkt",
+          "hint": "Web · mobile App · PC-Software",
+          "tech": "Software · Produkt",
+          "insight": "Gewählte Richtung: maßgeschneiderte Software, Produkt — Web, mobile App, PC-Software."
+        },
+        {
+          "label": "Automatisierung · KI",
+          "hint": "RPA · API · KI",
+          "tech": "Automatisierung · KI",
+          "insight": "Gewählte Richtung: Automatisierung, KI — RPA, API, KI."
+        },
+        {
+          "label": "Modernisierung · Prozesse",
+          "hint": "Excel · Integration · Workflow",
+          "tech": "Modernisierung · Workflow",
+          "insight": "Gewählte Richtung: Modernisierung, Prozesse — Excel, Integration, Workflow."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produkt",
+      "title": "Wo soll Ihre Software laufen?",
+      "optionQuestion": "Wo möchten Sie sie nutzen?",
+      "copy": "Diese Entscheidung definiert die technische Basis: Browser, Mobilgerät oder PC. Hashinmy kann später Module kombinieren, wenn das Projekt es braucht.",
+      "progress": "Produkt",
+      "core": "Entwicklung",
+      "options": [
+        {
+          "label": "Web",
+          "hint": "Web · backend · Daten",
+          "tech": "Web · backend",
+          "insight": "Gewählte Richtung: Web — Web, backend, Daten."
+        },
+        {
+          "label": "mobile App",
+          "hint": "PWA/App · Nutzung",
+          "tech": "mobile/PWA",
+          "insight": "Gewählte Richtung: mobile App — PWA/App, Nutzung."
+        },
+        {
+          "label": "PC-Software",
+          "hint": "desktop/local · Kontrollen",
+          "tech": "desktop/local",
+          "insight": "Gewählte Richtung: PC-Software — desktop/local, Kontrollen."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "KI · Automatisierung",
+      "title": "Welchen Teil soll das System für Sie übernehmen?",
+      "optionQuestion": "Was möchten Sie zuerst automatisieren?",
+      "copy": "Automatisierung bedeutet nicht, KI aus Trendgründen einzubauen. Es geht darum, Wiederholung, Fehler und Reibung dort zu entfernen, wo sie wirklich kosten.",
+      "progress": "Automatisierung",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "Prozesse · Automatisierung",
+          "hint": "RPA · API · schnell",
+          "tech": "RPA/API",
+          "insight": "Gewählte Richtung: Prozesse, Automatisierung — RPA, API, schnell."
+        },
+        {
+          "label": "KI · menschliche Prüfung",
+          "hint": "KI · Zusammenfassung · Kontrollen",
+          "tech": "KI · menschliche Prüfung",
+          "insight": "Gewählte Richtung: KI, menschliche Prüfung — KI, Zusammenfassung, Kontrollen."
+        },
+        {
+          "label": "Daten · Berichte",
+          "hint": "BI · Berichte",
+          "tech": "BI/dashboard",
+          "insight": "Gewählte Richtung: Daten, Berichte — BI, Berichte."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "Modernisierung",
+      "title": "Was möchten Sie hinter sich lassen?",
+      "optionQuestion": "Was möchten Sie zuerst ersetzen?",
+      "copy": "Modernisierung verwandelt isolierte Werkzeuge in ein sichereres, messbares System, das mit Ihrem Unternehmen wachsen kann.",
+      "progress": "Modernisierung",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · Workflow",
+          "hint": "Prozesse · Berechtigungen",
+          "tech": "Workflow · Berechtigungen",
+          "insight": "Gewählte Richtung: Excel, Workflow — Prozesse, Berechtigungen."
+        },
+        {
+          "label": "Integration · Daten",
+          "hint": "API · Kontrollen",
+          "tech": "API · Integration",
+          "insight": "Gewählte Richtung: Integration, Daten — API, Kontrollen."
+        },
+        {
+          "label": "UX/UI · Vertrauen",
+          "hint": "Erlebnis · Wert",
+          "tech": "UX/UI + product",
+          "insight": "Gewählte Richtung: UX/UI, Vertrauen — Erlebnis, Wert."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Wie soll es im Alltag genutzt werden?",
+      "optionQuestion": "Wo muss es am besten funktionieren?",
+      "copy": "Ihre Antwort zeigt, ob Backend, Synchronisierung, mobile App oder lokale Software die richtige Basis für den echten Betrieb ist.",
+      "progress": "Nutzung",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "Web · Route",
+          "hint": "cloud · backend · Daten",
+          "tech": "cloud backend",
+          "insight": "Gewählte Richtung: Web, Route — cloud, backend, Daten."
+        },
+        {
+          "label": "mobile App · Nutzung",
+          "hint": "mobile App · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Gewählte Richtung: mobile App, Nutzung — mobile App, tablet, sync."
+        },
+        {
+          "label": "PC · Kontrollen",
+          "hint": "desktop/local · Sicherheit",
+          "tech": "desktop/local",
+          "insight": "Gewählte Richtung: PC, Kontrollen — desktop/local, Sicherheit."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Wert",
+      "title": "Was soll sich zuerst verbessern?",
+      "optionQuestion": "Welches Ergebnis möchten Sie zuerst sehen?",
+      "copy": "Eine gute Plattform sieht nicht nur gut aus. Sie ordnet Prozesse, automatisiert Arbeit und zeigt Daten, die bessere Entscheidungen ermöglichen.",
+      "progress": "Wert",
+      "core": "Wert",
+      "options": [
+        {
+          "label": "Prozesse · Workflow",
+          "hint": "Berechtigungen · Kontrollen",
+          "tech": "workflow + RBAC",
+          "insight": "Gewählte Richtung: Prozesse, Workflow — Berechtigungen, Kontrollen."
+        },
+        {
+          "label": "Automatisierung · schnell",
+          "hint": "RPA/API · Prozesse",
+          "tech": "RPA/API",
+          "insight": "Gewählte Richtung: Automatisierung, schnell — RPA/API, Prozesse."
+        },
+        {
+          "label": "Daten · KI",
+          "hint": "Berichte · KI",
+          "tech": "BI + AI",
+          "insight": "Gewählte Richtung: Daten, KI — Berichte, KI."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "Vertrauen · Kontrollen",
+      "title": "Was muss am stärksten geschützt sein?",
+      "optionQuestion": "Was möchten Sie besser schützen?",
+      "copy": "Sicherheit wird nicht am Ende ergänzt. Sie wird mit Berechtigungen, Audit und klaren Regeln passend zur Operation entworfen.",
+      "progress": "Sicherheit",
+      "core": "Vertrauen",
+      "options": [
+        {
+          "label": "Benutzer · Berechtigungen",
+          "hint": "RBAC · Kontrollen",
+          "tech": "RBAC + audit",
+          "insight": "Gewählte Richtung: Benutzer, Berechtigungen — RBAC, Kontrollen."
+        },
+        {
+          "label": "Daten · Sicherheit",
+          "hint": "Daten · Kontrollen",
+          "tech": "Sicherheit ab Design",
+          "insight": "Gewählte Richtung: Daten, Sicherheit — Daten, Kontrollen."
+        },
+        {
+          "label": "KI · menschliche Prüfung",
+          "hint": "Automatisierung · Kontrollen",
+          "tech": "AI governance",
+          "insight": "Gewählte Richtung: KI, menschliche Prüfung — Automatisierung, Kontrollen."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "geschütztes Kapital · Finanzierung",
+      "title": "Wie möchten Sie vorankommen, ohne den Betrieb zu bremsen?",
+      "optionQuestion": "Wie möchten Sie die Zahlung ordnen?",
+      "copy": "Die Entwicklung kann in USD-Raten nach Umfang, Freigaben und Umsetzungsrhythmus organisiert werden.",
+      "progress": "Finanzierung",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% Finanzierung",
+          "hint": "USD · Phasen · geschütztes Kapital",
+          "tech": "USD · Finanzierung",
+          "insight": "Gewählte Richtung: 100% Finanzierung — USD, Phasen, geschütztes Kapital."
+        },
+        {
+          "label": "direktes Angebot · Phasen",
+          "hint": "Roadmap · Phasen",
+          "tech": "Roadmap",
+          "insight": "Gewählte Richtung: direktes Angebot, Phasen — Roadmap, Phasen."
+        },
+        {
+          "label": "Kontakt · menschliche Prüfung",
+          "hint": "Projektanforderungen · Kontakt",
+          "tech": "menschliche Prüfung",
+          "insight": "Gewählte Richtung: Kontakt, menschliche Prüfung — Projektanforderungen, Kontakt."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Tempo",
+      "title": "Wie schnell muss es nutzbar sein?",
+      "optionQuestion": "Welcher Rhythmus passt am besten?",
+      "copy": "Diese Antwort trennt eine erste wertvolle Version von einer größeren Plattform, die kontrolliert in Etappen entsteht.",
+      "progress": "Tempo",
+      "core": "Roadmap",
+      "options": [
+        {
+          "label": "schnell · MVP",
+          "hint": "Produkt · schnell",
+          "tech": "MVP",
+          "insight": "Gewählte Richtung: schnell, MVP — Produkt, schnell."
+        },
+        {
+          "label": "1-3 · Phasen",
+          "hint": "Roadmap · Kontrollen",
+          "tech": "Phasen",
+          "insight": "Gewählte Richtung: 1-3, Phasen — Roadmap, Kontrollen."
+        },
+        {
+          "label": "Enterprise · Roadmap",
+          "hint": "Sicherheit · Enterprise",
+          "tech": "Enterprise-Roadmap",
+          "insight": "Gewählte Richtung: Enterprise, Roadmap — Sicherheit, Enterprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "Route · Zusammenfassung",
+      "title": "Wir haben verstanden, wonach Sie suchen.",
+      "copy": "Ihre Route ist bereit. Vor dem Senden können Sie wichtige Details ergänzen; das Hashinmy-Team prüft Projektausrichtung, Finanzierungsoption und nächste Schritte mit klarem geschäftlichem und technischem Kontext.",
+      "progress": "Projektanforderungen",
+      "core": "Projektanforderungen",
+      "insight": "Route. Projektanforderungen. Kontakt.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "Route",
+    "service": "Service",
+    "operation": "Nutzung",
+    "value": "Wert",
+    "risk": "Sicherheit",
+    "financing": "Finanzierung",
+    "timeline": "Tempo"
+  },
+  "valueLabels": {
+    "diagnostico": "Projektanforderungen · Route",
+    "producto_digital": "maßgeschneiderte Software · Produkt",
+    "automatizacion_ia": "Automatisierung · KI",
+    "modernizacion_operativa": "Modernisierung · Prozesse",
+    "software_online": "Web · Software",
+    "app_movil": "mobile App",
+    "software_pc": "PC-Software",
+    "automatizacion": "Automatisierung · Prozesse",
+    "ia": "KI · Integration",
+    "modernizacion": "Modernisierung",
+    "web_global": "Web · Route",
+    "mobile_first": "mobile App · Nutzung",
+    "pc_local": "PC · Kontrollen",
+    "workflow": "Workflow · Prozesse",
+    "automation": "Automatisierung · schnell",
+    "analytics": "Daten · Berichte",
+    "ai": "KI · menschliche Prüfung",
+    "experience": "UX/UI · Vertrauen",
+    "analytics_ai": "Daten · KI",
+    "roles_permisos": "Benutzer · Berechtigungen",
+    "datos_sensibles": "Daten · Sicherheit",
+    "ia_controlada": "KI · menschliche Prüfung",
+    "financiamiento_100": "100% Finanzierung",
+    "sin_financiacion": "direktes Angebot",
+    "fases": "direktes Angebot · Phasen",
+    "contacto_directo": "Kontakt · menschliche Prüfung",
+    "mvp_rapido": "schnell · MVP",
+    "1_3_meses": "1-3 · Phasen",
+    "enterprise": "Enterprise · Roadmap"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "maßgeschneiderte Software · Produkt",
+      "operation": "architecture · Projektanforderungen",
+      "value": "Wert · Projektanforderungen",
+      "risk": "Sicherheit · Projektanforderungen",
+      "financing": "Finanzierung · Projektanforderungen",
+      "timeline": "Tempo · Projektanforderungen",
+      "technical": "Software · architecture"
+    },
+    "technicalParts": {
+      "software_online": "Web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · Software",
+      "automatizacion": "RPA/API-Automatisierung",
+      "ia": "KI · menschliche Prüfung",
+      "modernizacion": "Modernisierung",
+      "web_global": "Backend + Datenbank",
+      "mobile_first": "mobile App · sync",
+      "pc_local": "local · Kontrollen",
+      "workflow": "Berechtigungen · Workflow",
+      "automation": "Automatisierung · Integration",
+      "analytics": "dashboard/BI",
+      "ai": "KI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "Daten · Sicherheit",
+      "ia_controlada": "AI governance · menschliche Prüfung"
+    },
+    "controlBase": [
+      "Daten",
+      "Kontrollen"
+    ],
+    "controlParts": {
+      "web_global": "Berechtigungen",
+      "software_online": "Berechtigungen",
+      "ia": "menschliche Prüfung",
+      "analytics_ai": "menschliche Prüfung",
+      "ai": "menschliche Prüfung",
+      "automatizacion": "Automatisierung · Berichte",
+      "automation": "Automatisierung · Berichte",
+      "roles_permisos": "Berechtigungen · Kontrollen",
+      "datos_sensibles": "Daten · Sicherheit",
+      "ia_controlada": "menschliche Prüfung · Kontrollen",
+      "financiamiento_100": "100% Finanzierung",
+      "sin_financiacion": "direktes Angebot"
+    },
+    "nextSteps": {
+      "noService": "Kontakt · Projektanforderungen",
+      "mvp": "MVP · Projektanforderungen",
+      "enterprise": "Enterprise · Roadmap",
+      "default": "Software · Roadmap"
+    }
+  },
+  "schemaVersion": 1
+}

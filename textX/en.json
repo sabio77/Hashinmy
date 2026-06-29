@@ -1,0 +1,724 @@
+{
+  "iso": "en",
+  "name": "English",
+  "nativeName": "English",
+  "htmlLang": "en",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | Global custom software with AI, cloud and security",
+    "description": "Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
+    "ogTitle": "Hashinmy | Custom software, AI, CAD DXF, cloud, PC, SEO and chatbots",
+    "ogDescription": "A technology company rooted in Medellín, Colombia, with global reach for secure, traceable and scalable business software, including CAD with DXF export.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, financeable custom software, custom software development, artificial intelligence for companies, business process automation, web apps PWA, business mobile apps, PC software systems, BI dashboards, ecommerce software, restaurant software, clinic software, logistics software, real estate software, education software, software payment options, software project financing, monthly software maintenance, API integrations, data migration, digital security, cloud software, technology glossary for companies, technical quoting and material optimization, carpentry software, SEO websites in Colombia, business chatbots in Colombia, cloud and data backup, software development in Medellín, business software in Colombia, PC software with cloud, area quoting, Hashinmy Medellín, API development, secure business software, digital transformation, business API, metalworking software, manufacturing software, software for commercial companies, CRM and sales follow-up, lightweight custom ERP, customer web portal, inventory and production, software for service businesses, Hashinmy Medellin Colombia, installable PC programs"
+  },
+  "ui": {
+    "skip": "Skip to the current question",
+    "stageLabel": "Interactive Hashinmy experience",
+    "topbarLabel": "Main controls",
+    "brandAria": "Return to the Hashinmy start",
+    "brandSmall": "Custom software + AI",
+    "progressLabel": "Route progress",
+    "languageLabel": "Language",
+    "languageAria": "Change initial language",
+    "contentLabel": "Main scene content",
+    "pathLabelAria": "Registered decisions",
+    "decisionZoneLabel": "Current scene options",
+    "summaryLabelAria": "Generated summary",
+    "footerLabel": "Scene navigation",
+    "primaryFinance": "Request diagnosis",
+    "primaryQuote": "Quote my system",
+    "back": "Back",
+    "restart": "Restart",
+    "contactLabel": "Contact details",
+    "contactPlaceholder": "Email address",
+    "commentLabel": "Describe your project",
+    "commentPlaceholder": "Tell us which process you want to improve, which drawing, part or system you need, and any technical detail that helps us prepare a clear route.",
+    "submitRoute": "Send to Hashinmy",
+    "copySummaryAction": "Copy summary",
+    "formNote": "Your answers stay saved only in this browser until you decide to send them.",
+    "contactRequired": "Add your email address and WhatsApp number so Hashinmy can confirm the request and contact you with the prepared route.",
+    "copySuccess": "Summary copied. You can paste it into WhatsApp, email or CRM.",
+    "copyFailure": "Automatic copy failed. Email sending will still prepare the summary.",
+    "mailOpening": "We could not confirm through memoriaBACKEND on this attempt. We will open your email app with the prepared route as a fallback.",
+    "waitSummary": "Preparing summary",
+    "preparingOptions": "Preparing options",
+    "optionFallback": "Choose an option",
+    "pathLabel": "Your Decisions:",
+    "pathEmpty": "Every tap builds your brief",
+    "interactionFallback": "Interaction",
+    "summaryTitle": "Hashinmy interactive request",
+    "projectChosen": "Selected project",
+    "expectedUse": "Expected use",
+    "wantedValue": "Wanted value",
+    "prioritySecurity": "Priority security",
+    "paymentMode": "Payment mode",
+    "financing": "Financing",
+    "pace": "Pace",
+    "technicalBase": "Suggested technical base",
+    "suggestedControls": "Suggested controls",
+    "nextStep": "Next step",
+    "contact": "Contact",
+    "additionalComment": "Additional comment",
+    "registeredInteractions": "Registered interactions",
+    "directRouteRequested": "Direct route requested.",
+    "directQuoteSubject": "Hashinmy quote request",
+    "financedSubject": "Hashinmy financed software request",
+    "directQuoteAudit": "The route jumps to diagnosis to quote your system with a clear scope.",
+    "financeAudit": "The route jumps to diagnosis with financing as the main priority.",
+    "directQuoteTech": "system quote + scope review",
+    "financeTech": "diagnosis + USD installments + scope review",
+    "topActionsLabel": "Products · Language",
+    "proofEntryAria": "Our Experience · Hashinmy",
+    "proofOpenButton": "Our Experience",
+    "proofTitle": "Our Experience",
+    "proofLead": "Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
+    "proofCloseAria": "Close · Our Experience",
+    "proofContentAria": "Our Experience · Frequently asked questions",
+    "proofSummaryAria": "Trust and control",
+    "proofSummaryTitle": "Trust and control · Hashinmy",
+    "proofTrustLabel": "Trust and control:",
+    "proofTrustText": "Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation. Hashinmy builds custom software, AI automation, PC systems, CAD software with DXF export, web apps, cloud backup, SEO, chatbots and technical quoting tools for local and international companies.",
+    "proofMethodLabel": "Process and trust:",
+    "proofMethodText": "How we work, protect data, integrate systems and keep the product alive.",
+    "proofUseCasesLabel": "Use cases:",
+    "proofUseCasesText": "Clear examples to identify what a company needs.",
+    "proofBrandsTitle": "Brands, projects and companies related to our work",
+    "proofBrandsAria": "Brands, projects and companies related to our work",
+    "proofLogoPlaceholder": "Our Experience Hashinmy",
+    "proofLogoAltTemplate": "{name} logo",
+    "proofFaqAria": "Frequently asked questions · Our Experience",
+    "proofFaqWhyQuestion": "Why choose Hashinmy?",
+    "proofFaqWhyAnswer": "A technology company rooted in Medellín, Colombia, with global reach for secure, traceable and scalable business software, including CAD with DXF export.",
+    "proofFaqWhoQuestion": "Who it helps?",
+    "proofFaqWhoAnswer": "Solutions explained by business type: commerce, health, logistics, education and services. Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation.",
+    "proofFaqStartQuestion": "How do I start?",
+    "proofFaqStartAnswer": "Your route is ready. Before sending it, you can add any detail that matters; the Hashinmy team will review the project direction, financing option and next steps with clear commercial and technical context. The route jumps to diagnosis to quote your system with a clear scope.",
+    "proofBrandsStructuredDescription": "Brands, projects and companies related to our work"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "Online software",
+      "tech": "web + backend",
+      "short": "Web"
+    },
+    {
+      "value": "app_movil",
+      "label": "Mobile application",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC software",
+      "tech": "desktop/local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "Automation",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI integration",
+      "tech": "AI workflows",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "Modernization",
+      "tech": "modular system",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "protected capital"
+    },
+    "serviceFamily": {
+      "symbol": "Route",
+      "label": "right service"
+    },
+    "buildType": {
+      "symbol": "Build",
+      "label": "digital product"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "real automation"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "connected operation"
+    },
+    "operation": {
+      "symbol": "Where",
+      "label": "architecture"
+    },
+    "value": {
+      "symbol": "Engine",
+      "label": "operational value"
+    },
+    "risk": {
+      "symbol": "Trust",
+      "label": "security and control"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "clear installments"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "roadmap"
+    },
+    "summary": {
+      "symbol": "Ready",
+      "label": "generated brief"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "custom"
+      ],
+      [
+        "AI",
+        "automation"
+      ],
+      [
+        "PC",
+        "mobile"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "compact routes"
+      ],
+      [
+        "6",
+        "capabilities"
+      ],
+      [
+        "1",
+        "live brief"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "less tasks"
+      ],
+      [
+        "AI",
+        "assistance"
+      ],
+      [
+        "BI",
+        "decisions"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "unified system"
+      ],
+      [
+        "API",
+        "connections"
+      ],
+      [
+        "UX",
+        "trust"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "global access"
+      ],
+      [
+        "Mobile",
+        "field work"
+      ],
+      [
+        "Local",
+        "internal control"
+      ]
+    ],
+    "value": [
+      [
+        "Flow",
+        "order"
+      ],
+      [
+        "Auto",
+        "speed"
+      ],
+      [
+        "Data",
+        "control"
+      ]
+    ],
+    "risk": [
+      [
+        "Roles",
+        "permissions"
+      ],
+      [
+        "Data",
+        "traceability"
+      ],
+      [
+        "AI",
+        "human control"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "financing"
+      ],
+      [
+        "USD",
+        "monthly plan"
+      ],
+      [
+        "Pause",
+        "no interest while paused"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "fast"
+      ],
+      [
+        "Phases",
+        "modular"
+      ],
+      [
+        "QA",
+        "validated"
+      ]
+    ],
+    "summary": [
+      [
+        "Route",
+        "defined"
+      ],
+      [
+        "Email",
+        "prepared"
+      ],
+      [
+        "Human",
+        "review"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "English",
+      "title": "Welcome to HASHINMY",
+      "copy": "We build custom software for companies that operate, sell and grow in local and international markets. We integrate AI, automation, PC programs, CAD software with DXF export, web applications, cloud, SEO, chatbots, technical quoting tools, security and operational continuity.\nMedellín and Colombia are our origin; our commercial and technical reach is global.\nWe drive companies’ technological development with 100% financed solutions, helping them reach their full potential, improve productivity and scale more efficiently.",
+      "optionQuestion": "Which option would you like?",
+      "progress": "Start",
+      "core": "HASHINMY",
+      "insight": "The initial diagnosis helps turn a real need into a clear, finance-ready technical route prepared to grow.",
+      "options": [
+        {
+          "label": "No financing",
+          "hint": "I want to receive a quote with no financing",
+          "tech": "No financing",
+          "insight": "I want to receive a direct quote without a financing plan."
+        },
+        {
+          "label": "100% financing",
+          "hint": "I want to move forward with clear USD installments",
+          "tech": "USD installments",
+          "insight": "I want to move forward with 100% financing as the main modality."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "First door",
+      "title": "What do you want to achieve first?",
+      "optionQuestion": "What do you want to solve first?",
+      "copy": "Choose the starting point and we will prepare a clear route to turn your need into a real proposal. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "progress": "Route",
+      "core": "Service",
+      "insight": "I choose the path that best fits my current priority.",
+      "options": [
+        {
+          "label": "Build software",
+          "hint": "A platform, app or system (digital product)",
+          "tech": "product engineering",
+          "insight": "I want to build a custom digital product."
+        },
+        {
+          "label": "Automate or use AI",
+          "hint": "Less manual work (RPA, API or AI)",
+          "tech": "automation + AI",
+          "insight": "I want the system to work for my team, not the other way around."
+        },
+        {
+          "label": "Modernize operations",
+          "hint": "Replace Excel or old systems (modernization)",
+          "tech": "legacy modernization",
+          "insight": "I want to turn scattered processes into a connected operation."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Digital product",
+      "title": "Where should your software open?",
+      "optionQuestion": "Where do you want to use it?",
+      "copy": "This decision defines the foundation: browser, phone or PC. Hashinmy can combine modules later if the project needs it.",
+      "progress": "Product",
+      "core": "Build",
+      "options": [
+        {
+          "label": "In a browser",
+          "hint": "From anywhere (web + backend)",
+          "tech": "web + backend",
+          "insight": "I want browser access with server, database and a route ready to scale."
+        },
+        {
+          "label": "On mobile",
+          "hint": "For sales, support or field teams (app/PWA)",
+          "tech": "mobile/PWA",
+          "insight": "I need a fast phone experience with synchronized data."
+        },
+        {
+          "label": "On a PC",
+          "hint": "Internal or critical use (desktop/local)",
+          "tech": "desktop/local",
+          "insight": "I need local control, strong performance and stable internal operation."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "Intelligent engine",
+      "title": "Which part should the system do for you?",
+      "optionQuestion": "What do you want to automate first?",
+      "copy": "Automation is not adding AI because it is trendy: it removes friction, errors and repeated tasks where it really hurts.",
+      "progress": "Automation",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "Repeated tasks",
+          "hint": "Less copy and paste (RPA + APIs)",
+          "tech": "RPA/API",
+          "insight": "I want process robots, integrations and automatic flows."
+        },
+        {
+          "label": "AI assistant",
+          "hint": "Classify, summarize or respond (AI)",
+          "tech": "AI assistant",
+          "insight": "I want useful AI with clear rules, traceability and safe limits."
+        },
+        {
+          "label": "Visible data",
+          "hint": "Indicators and reports (dashboard/BI)",
+          "tech": "BI/dashboard",
+          "insight": "I need to see my operation in numbers to decide better."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "Current operation",
+      "title": "What do you want to leave behind?",
+      "optionQuestion": "What do you want to replace first?",
+      "copy": "Modernization turns isolated tools into a safer, measurable system prepared to grow. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "progress": "Modernize",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel or old system",
+          "hint": "Move to controlled flows (workflow)",
+          "tech": "workflow + roles",
+          "insight": "I want to replace spreadsheets and manual processes with modules and permissions."
+        },
+        {
+          "label": "Separated tools",
+          "hint": "Connect data and actions (APIs)",
+          "tech": "API integration",
+          "insight": "I want my systems to connect and avoid duplicate typing."
+        },
+        {
+          "label": "Unprofessional image",
+          "hint": "Better experience and sales (UX/UI)",
+          "tech": "UX/UI + product",
+          "insight": "I want a platform that communicates trust, clarity and readiness to sell more."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "Architecture without complexity",
+      "title": "How should it be used in real life?",
+      "optionQuestion": "Where do you need it to work best?",
+      "copy": "Your answer tells us whether backend, synchronization, mobile app or local software makes more sense.",
+      "progress": "Use",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "From anywhere",
+          "hint": "Online users (web + backend)",
+          "tech": "cloud backend",
+          "insight": "I want browser, server and data available when I need them."
+        },
+        {
+          "label": "Team on the move",
+          "hint": "Phone or tablet (PWA/app)",
+          "tech": "mobile first",
+          "insight": "I need mobile speed, clear permissions and reliable synchronization."
+        },
+        {
+          "label": "PC or internal network",
+          "hint": "Local control (desktop/local)",
+          "tech": "desktop/local",
+          "insight": "I need it to work strongly on desktop and synchronize later if needed."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Visible value",
+      "title": "What should improve first?",
+      "optionQuestion": "What result do you want to notice first?",
+      "copy": "A good platform is not only attractive: it organizes, automates and shows useful data for decisions.",
+      "progress": "Value",
+      "core": "Engine",
+      "options": [
+        {
+          "label": "Organize processes",
+          "hint": "Statuses, roles and permissions (workflow)",
+          "tech": "workflow + RBAC",
+          "insight": "First I want to organize how each case moves inside my business."
+        },
+        {
+          "label": "Automate work",
+          "hint": "Save operational time (RPA/API)",
+          "tech": "RPA/API",
+          "insight": "I want to recover time by reducing repetitive tasks and human errors."
+        },
+        {
+          "label": "Measure with data or AI",
+          "hint": "Reports, alerts or assistant (BI/AI)",
+          "tech": "BI + AI",
+          "insight": "I want to turn scattered information into visible decisions."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "Trust and control",
+      "title": "What should feel most protected?",
+      "optionQuestion": "What do you want to protect better?",
+      "copy": "Security is not added at the end: it is designed with permissions, auditing and clear rules based on the operation.",
+      "progress": "Security",
+      "core": "Trust",
+      "options": [
+        {
+          "label": "Users and permissions",
+          "hint": "Each role sees only what it needs (RBAC)",
+          "tech": "RBAC + audit",
+          "insight": "I want roles, permissions, change history and access control from the start."
+        },
+        {
+          "label": "Sensitive data",
+          "hint": "Traceability and validations (security)",
+          "tech": "security by design",
+          "insight": "I need validations, event logs and protection for critical information."
+        },
+        {
+          "label": "AI or critical processes",
+          "hint": "Automate with human review (governance)",
+          "tech": "AI governance",
+          "insight": "I want AI and automation with limits, traceability and human review when needed."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "Protected cash flow",
+      "title": "How do you want to move forward without stopping operations?",
+      "optionQuestion": "How do you want to organize payment?",
+      "copy": "Development can be organized in USD installments according to scope and approval. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "progress": "Financing",
+      "core": "USD",
+      "options": [
+        {
+          "label": "Finance 100%",
+          "hint": "Avoid pulling all capital at once (USD installments)",
+          "tech": "USD installments",
+          "insight": "I want a financeable, clear and monthly proposal."
+        },
+        {
+          "label": "Quote by phases",
+          "hint": "Start with the essentials (modular roadmap)",
+          "tech": "modular roadmap",
+          "insight": "I want to launch by modules, validate first and grow with control."
+        },
+        {
+          "label": "Talk to someone",
+          "hint": "I want human guidance (commercial review)",
+          "tech": "human review",
+          "insight": "I want Hashinmy to contact me with a clear route and enough context."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Execution pace",
+      "title": "How soon should it start breathing?",
+      "optionQuestion": "Which pace fits you best?",
+      "copy": "This separates a useful first version from a large platform built by stages. Hashinmy turns this choice into a clear route with scope, controls and next steps, so the business can sell, operate or scale with less friction.",
+      "progress": "Pace",
+      "core": "Roadmap",
+      "options": [
+        {
+          "label": "As soon as possible",
+          "hint": "First functional version (MVP)",
+          "tech": "MVP",
+          "insight": "I want to find the minimum core that already creates value."
+        },
+        {
+          "label": "1 to 3 months",
+          "hint": "Validated modular build (short phases)",
+          "tech": "short phases",
+          "insight": "I want to define scope, build, test and launch with control."
+        },
+        {
+          "label": "Enterprise stages",
+          "hint": "Robust architecture (enterprise roadmap)",
+          "tech": "enterprise roadmap",
+          "insight": "I want security, scaling, auditing and planned evolution."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "Route understood",
+      "title": "We now understand what you need.",
+      "copy": "Your route is ready. Before sending it, you can add any detail that matters; the Hashinmy team will review the project direction, financing option and next steps with clear commercial and technical context.",
+      "progress": "Request",
+      "core": "Brief",
+      "insight": "My route is ready to be sent with contact and optional comment.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "Route",
+    "service": "Service",
+    "operation": "Use",
+    "value": "Value",
+    "risk": "Security",
+    "financing": "Mode",
+    "timeline": "Pace"
+  },
+  "valueLabels": {
+    "diagnostico": "Guided diagnosis",
+    "producto_digital": "Build software",
+    "automatizacion_ia": "Automate or use AI",
+    "modernizacion_operativa": "Modernize operations",
+    "software_online": "Online software",
+    "app_movil": "Mobile application",
+    "software_pc": "PC software",
+    "automatizacion": "Business automation",
+    "ia": "AI integration",
+    "modernizacion": "Complete modernization",
+    "web_global": "From anywhere",
+    "mobile_first": "Team on the move",
+    "pc_local": "PC or internal network",
+    "workflow": "Organize processes",
+    "automation": "Automate work",
+    "analytics": "Visible data",
+    "ai": "AI assistant",
+    "experience": "Professional experience",
+    "analytics_ai": "Data or AI",
+    "roles_permisos": "Users and permissions",
+    "datos_sensibles": "Sensitive data",
+    "ia_controlada": "AI or critical processes",
+    "financiamiento_100": "100% financing",
+    "sin_financiacion": "Direct quote",
+    "fases": "Quote by phases",
+    "contacto_directo": "Direct contact",
+    "mvp_rapido": "Fast MVP",
+    "1_3_meses": "1 to 3 months",
+    "enterprise": "Enterprise stages"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "Custom software project",
+      "operation": "Architecture to be defined",
+      "value": "Objective to be defined",
+      "risk": "Security to be defined",
+      "financing": "Mode to be defined",
+      "timeline": "Pace to be defined",
+      "technical": "modular architecture to be defined"
+    },
+    "technicalParts": {
+      "software_online": "web platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local application",
+      "automatizacion": "RPA/API automation",
+      "ia": "AI layer with supervision",
+      "modernizacion": "modular modernization",
+      "web_global": "backend + database",
+      "mobile_first": "mobile synchronization",
+      "pc_local": "local control with optional synchronization",
+      "workflow": "roles/permissions and statuses",
+      "automation": "integrations and process robots",
+      "analytics": "dashboard/BI",
+      "ai": "intelligent assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "premium UX/UI",
+      "roles_permisos": "RBAC and user audit",
+      "datos_sensibles": "data validations and traceability",
+      "ia_controlada": "AI governance and human review"
+    },
+    "controlBase": [
+      "data validations",
+      "traceability"
+    ],
+    "controlParts": {
+      "web_global": "roles/permissions",
+      "software_online": "roles/permissions",
+      "ia": "human AI supervision",
+      "analytics_ai": "human AI supervision",
+      "ai": "human AI supervision",
+      "automatizacion": "automation audit",
+      "automation": "automation audit",
+      "roles_permisos": "role matrix",
+      "datos_sensibles": "sensitive data protection",
+      "ia_controlada": "limits and human review",
+      "financiamiento_100": "clear financing conditions",
+      "sin_financiacion": "clear scope and price"
+    },
+    "nextSteps": {
+      "noService": "Commercial contact with preliminary brief",
+      "mvp": "Executive diagnosis + MVP scope",
+      "enterprise": "Enterprise architecture by stages",
+      "default": "Commercial and technical architecture"
+    }
+  },
+  "schemaVersion": 1
+}

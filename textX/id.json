@@ -1,0 +1,724 @@
+{
+  "iso": "id",
+  "name": "Indonesian",
+  "nativeName": "Bahasa Indonesia",
+  "htmlLang": "id",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | perangkat lunak khusus rute",
+    "description": "Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
+    "ogTitle": "Hashinmy | perangkat lunak khusus",
+    "ogDescription": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Bahasa Indonesia, Indonesian, Layanan, rute, Penggunaan, Nilai, pembiayaan, keamanan, web · perangkat lunak, aplikasi seluler, perangkat lunak PC, otomatisasi, AI · integrasi, modernisasi, ringkasan proyek · rute, perangkat lunak khusus · Produk, otomatisasi · AI, modernisasi · proses, otomatisasi · proses, web · rute, aplikasi seluler · Penggunaan, PC · kontrol, alur kerja · proses, otomatisasi · cepat, data · laporan, AI · tinjauan manusia, UX/UI · kepercayaan, data · AI, pengguna · izin, data · keamanan, pembiayaan 100%, penawaran langsung, penawaran langsung · fase, kontak · tinjauan manusia, cepat · MVP, 1-3 · fase, enterprise · peta jalan, Hashinmy, hashinmy.com, perangkat lunak khusus · Produk · pembiayaan 100%, web · perangkat lunak · PWA, ecommerce · perangkat lunak khusus · Produk, perangkat lunak khusus · Produk · CAD/DXF, penawaran langsung · pembiayaan 100%, API, UX/UI, ecommerce · otomatisasi · proses, AI · integrasi · enterprise · peta jalan, Industri · perangkat lunak khusus · Produk, Biayai sekarang, API · web · rute, penawaran langsung · perangkat lunak khusus · Produk, web · perangkat lunak · SEO, chatbots · AI · integrasi, Colombia · Medellín · perangkat lunak khusus · Produk, API · enterprise · peta jalan, data · keamanan · perangkat lunak khusus · Produk, enterprise · peta jalan · perangkat lunak khusus · Produk, CRM · enterprise · peta jalan, ERP · perangkat lunak khusus · Produk, web · perangkat lunak · UX/UI · kepercayaan, web · perangkat lunak · portal"
+  },
+  "ui": {
+    "skip": "Pilih · rute",
+    "stageLabel": "Hashinmy · pengalaman · rute",
+    "topbarLabel": "kontrol · Hashinmy",
+    "brandAria": "Mulai ulang · Hashinmy",
+    "brandSmall": "perangkat lunak khusus · AI",
+    "progressLabel": "rute · Kecepatan",
+    "languageLabel": "Bahasa",
+    "languageAria": "Pilih · Bahasa",
+    "contentLabel": "pengalaman · ringkasan proyek",
+    "pathLabelAria": "rute · ringkasan",
+    "decisionZoneLabel": "Pilih · Layanan",
+    "summaryLabelAria": "ringkasan · ringkasan proyek",
+    "footerLabel": "kontrol · rute",
+    "primaryFinance": "Biayai sekarang",
+    "primaryQuote": "Minta penawaran",
+    "back": "Kembali",
+    "restart": "Mulai ulang",
+    "contactLabel": "kontak · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · kontak",
+    "commentLabel": "Jelaskan proyek Anda",
+    "commentPlaceholder": "Ceritakan proses mana yang ingin Anda tingkatkan, gambar, komponen, atau sistem apa yang dibutuhkan, serta detail teknis apa pun yang membantu kami menyiapkan rute yang jelas.",
+    "submitRoute": "Kirim rute ke Hashinmy",
+    "copySummaryAction": "Salin ringkasan",
+    "formNote": "Jawaban Anda hanya tersimpan di peramban ini sampai Anda memutuskan untuk mengirimnya.",
+    "contactRequired": "Tambahkan email, WhatsApp, atau nama perusahaan agar Hashinmy dapat menghubungi Anda dengan rute yang sudah disiapkan.",
+    "copySuccess": "Ringkasan berhasil disalin. Anda dapat menempelkannya ke WhatsApp, email, atau CRM.",
+    "copyFailure": "Ringkasan tidak dapat disalin; kirim rute ke Hashinmy melalui formulir.",
+    "mailOpening": "Email berisi rute yang sudah disiapkan sedang dibuka; tinjau sebelum dikirim ke Hashinmy.",
+    "waitSummary": "ringkasan · ringkasan proyek",
+    "preparingOptions": "Menyiapkan opsi",
+    "optionFallback": "Pilih · rute",
+    "pathLabel": "rute · ringkasan",
+    "pathEmpty": "Setiap pilihan menyusun ringkasan proyek Anda",
+    "interactionFallback": "pengalaman",
+    "summaryTitle": "Permintaan interaktif Hashinmy",
+    "projectChosen": "Produk · Pilih",
+    "expectedUse": "Penggunaan",
+    "wantedValue": "Nilai",
+    "prioritySecurity": "keamanan",
+    "paymentMode": "pembiayaan",
+    "financing": "pembiayaan",
+    "pace": "Kecepatan",
+    "technicalBase": "Fondasi teknis yang disarankan",
+    "suggestedControls": "kontrol",
+    "nextStep": "peta jalan · fase",
+    "contact": "kontak",
+    "additionalComment": "Komentar opsional",
+    "registeredInteractions": "rute · ringkasan",
+    "directRouteRequested": "penawaran langsung. rute.",
+    "directQuoteSubject": "Hashinmy · penawaran langsung",
+    "financedSubject": "Hashinmy · perangkat lunak khusus · pembiayaan",
+    "directQuoteAudit": "penawaran langsung. ringkasan proyek. rute.",
+    "financeAudit": "pembiayaan 100%. ringkasan proyek. rute.",
+    "directQuoteTech": "penawaran langsung · ringkasan proyek",
+    "financeTech": "USD · fase · ringkasan proyek",
+    "topActionsLabel": "Produk · Bahasa",
+    "proofEntryAria": "Pengalaman Kami · Hashinmy",
+    "proofOpenButton": "Pengalaman Kami",
+    "proofTitle": "Pengalaman Kami",
+    "proofLead": "Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
+    "proofCloseAria": "Tutup · Pengalaman Kami",
+    "proofContentAria": "Pengalaman Kami · Pertanyaan umum",
+    "proofSummaryAria": "kepercayaan · kontrol",
+    "proofSummaryTitle": "kepercayaan · kontrol · Hashinmy",
+    "proofTrustLabel": "kepercayaan · kontrol:",
+    "proofTrustText": "Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas. Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
+    "proofMethodLabel": "Metodologi:",
+    "proofMethodText": "Diagnosis, desain, pengembangan, pengujian, penyerahan, dan dukungan. Medellín dan Kolombia adalah asal kami; jangkauannya global.",
+    "proofUseCasesLabel": "Contoh penggunaan:",
+    "proofUseCasesText": "Usaha pertukangan, penjualan, inventaris, penawaran teknis, dukungan, CRM, UX/UI · kepercayaan, ecommerce, dan otomatisasi operasional.",
+    "proofBrandsTitle": "Merek, proyek, dan perusahaan yang terkait dengan pekerjaan kami",
+    "proofBrandsAria": "Merek, proyek, dan perusahaan yang terkait dengan pekerjaan kami",
+    "proofLogoPlaceholder": "Pengalaman Kami Hashinmy",
+    "proofLogoAltTemplate": "Logo {name}",
+    "proofFaqAria": "Pertanyaan umum · Pengalaman Kami",
+    "proofFaqWhyQuestion": "Mengapa memilih Hashinmy?",
+    "proofFaqWhyAnswer": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran.",
+    "proofFaqWhoQuestion": "Untuk siapa?",
+    "proofFaqWhoAnswer": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran. Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas.",
+    "proofFaqStartQuestion": "Bagaimana saya memulai?",
+    "proofFaqStartAnswer": "Rute Anda sudah siap. Sebelum dikirim, Anda dapat menambahkan detail penting; tim Hashinmy akan meninjau arah proyek, opsi pembiayaan, dan langkah berikutnya dengan konteks bisnis serta teknis yang jelas. penawaran langsung. ringkasan proyek. rute.",
+    "proofBrandsStructuredDescription": "Merek, proyek, dan perusahaan yang terkait dengan pekerjaan kami"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · perangkat lunak",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "aplikasi seluler",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "perangkat lunak PC",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "otomatisasi",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · integrasi",
+      "tech": "AI · alur kerja",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernisasi",
+      "tech": "perangkat lunak · kontrol",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "modal terlindungi"
+    },
+    "serviceFamily": {
+      "symbol": "rute",
+      "label": "Layanan · Pilih"
+    },
+    "buildType": {
+      "symbol": "Pembuatan",
+      "label": "Produk"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "otomatisasi"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernisasi"
+    },
+    "operation": {
+      "symbol": "Penggunaan",
+      "label": "Penggunaan"
+    },
+    "value": {
+      "symbol": "Nilai",
+      "label": "Nilai · kontrol"
+    },
+    "risk": {
+      "symbol": "kepercayaan",
+      "label": "keamanan · kontrol"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "pembiayaan 100%"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "peta jalan"
+    },
+    "summary": {
+      "symbol": "ringkasan",
+      "label": "ringkasan proyek"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "khusus"
+      ],
+      [
+        "AI",
+        "otomatisasi"
+      ],
+      [
+        "PC",
+        "seluler"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "rute"
+      ],
+      [
+        "6",
+        "Layanan"
+      ],
+      [
+        "1",
+        "ringkasan proyek"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "proses"
+      ],
+      [
+        "AI",
+        "tinjauan manusia"
+      ],
+      [
+        "BI",
+        "laporan"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernisasi"
+      ],
+      [
+        "API",
+        "integrasi"
+      ],
+      [
+        "UX",
+        "kepercayaan"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Penggunaan"
+      ],
+      [
+        "Local",
+        "kontrol"
+      ]
+    ],
+    "value": [
+      [
+        "alur kerja",
+        "proses"
+      ],
+      [
+        "Auto",
+        "cepat"
+      ],
+      [
+        "Data",
+        "kontrol"
+      ]
+    ],
+    "risk": [
+      [
+        "pengguna",
+        "izin"
+      ],
+      [
+        "Data",
+        "keamanan"
+      ],
+      [
+        "AI",
+        "tinjauan manusia"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "pembiayaan"
+      ],
+      [
+        "USD",
+        "fase"
+      ],
+      [
+        "Pause",
+        "kontrol"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "cepat"
+      ],
+      [
+        "fase",
+        "peta jalan"
+      ],
+      [
+        "QA",
+        "kontrol"
+      ]
+    ],
+    "summary": [
+      [
+        "rute",
+        "ringkasan"
+      ],
+      [
+        "Email",
+        "ringkasan proyek"
+      ],
+      [
+        "tinjauan manusia",
+        "kontak"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Bahasa Indonesia",
+      "title": "Selamat datang di HASHINMY",
+      "copy": "Kami membangun software khusus untuk perusahaan yang beroperasi, menjual, dan bertumbuh di pasar lokal maupun internasional. Kami mengintegrasikan AI, otomatisasi, program PC, software CAD dengan ekspor DXF, aplikasi web, cloud, SEO, chatbot, alat penawaran teknis, keamanan, dan keberlanjutan operasional.\nMedellín dan Kolombia adalah asal kami; jangkauan komersial dan teknis kami bersifat global.\nKami mendorong pengembangan teknologi perusahaan melalui solusi dengan pembiayaan 100%, membantu mereka mencapai potensi maksimal, meningkatkan produktivitas, dan berkembang lebih efisien.",
+      "optionQuestion": "Opsi mana yang Anda inginkan?",
+      "progress": "Mulai",
+      "core": "HASHINMY",
+      "insight": "Diagnosis awal membantu mengubah kebutuhan nyata menjadi rute teknis yang jelas, dapat dibiayai, dan siap untuk berkembang.",
+      "options": [
+        {
+          "label": "Tanpa pembiayaan",
+          "hint": "Saya ingin menerima penawaran tanpa pembiayaan",
+          "tech": "Tanpa pembiayaan",
+          "insight": "Saya ingin menerima penawaran langsung tanpa rencana pembiayaan."
+        },
+        {
+          "label": "Pembiayaan 100%",
+          "hint": "Saya ingin melanjutkan dengan cicilan USD yang jelas",
+          "tech": "cicilan USD",
+          "insight": "Saya ingin melanjutkan dengan pembiayaan 100% sebagai model utama."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "rute",
+      "title": "Apa yang ingin Anda capai lebih dulu?",
+      "optionQuestion": "Apa yang ingin diselesaikan dulu?",
+      "copy": "Pilih titik awal dan kami menyiapkan rute yang jelas untuk mengubah kebutuhan Anda menjadi proposal nyata.",
+      "progress": "rute",
+      "core": "Layanan",
+      "insight": "rute. Nilai.",
+      "options": [
+        {
+          "label": "perangkat lunak khusus · Produk",
+          "hint": "web · aplikasi seluler · perangkat lunak PC",
+          "tech": "perangkat lunak · Produk",
+          "insight": "Arah yang dipilih: perangkat lunak khusus, Produk — web, aplikasi seluler, perangkat lunak PC."
+        },
+        {
+          "label": "otomatisasi · AI",
+          "hint": "RPA · API · AI",
+          "tech": "otomatisasi · AI",
+          "insight": "Arah yang dipilih: otomatisasi, AI — RPA, API, AI."
+        },
+        {
+          "label": "modernisasi · proses",
+          "hint": "Excel · integrasi · alur kerja",
+          "tech": "modernisasi · alur kerja",
+          "insight": "Arah yang dipilih: modernisasi, proses — Excel, integrasi, alur kerja."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produk",
+      "title": "Di mana software Anda harus dibuka?",
+      "optionQuestion": "Di mana Anda ingin menggunakannya?",
+      "copy": "Keputusan ini menentukan dasar: browser, ponsel, atau PC. Hashinmy dapat menggabungkan modul jika proyek membutuhkannya.",
+      "progress": "Produk",
+      "core": "Pembuatan",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · data",
+          "tech": "web · backend",
+          "insight": "Arah yang dipilih: web — web, backend, data."
+        },
+        {
+          "label": "aplikasi seluler",
+          "hint": "PWA/App · Penggunaan",
+          "tech": "mobile/PWA",
+          "insight": "Arah yang dipilih: aplikasi seluler — PWA/App, Penggunaan."
+        },
+        {
+          "label": "perangkat lunak PC",
+          "hint": "desktop/local · kontrol",
+          "tech": "desktop/local",
+          "insight": "Arah yang dipilih: perangkat lunak PC — desktop/local, kontrol."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "AI · otomatisasi",
+      "title": "Bagian mana yang harus dikerjakan sistem untuk Anda?",
+      "optionQuestion": "Apa yang ingin diotomatisasi dulu?",
+      "copy": "Otomatisasi bukan sekadar memakai AI karena tren. Ini tentang mengurangi pekerjaan berulang, kesalahan, dan gesekan yang paling terasa.",
+      "progress": "otomatisasi",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "proses · otomatisasi",
+          "hint": "RPA · API · cepat",
+          "tech": "RPA/API",
+          "insight": "Arah yang dipilih: proses, otomatisasi — RPA, API, cepat."
+        },
+        {
+          "label": "AI · tinjauan manusia",
+          "hint": "AI · ringkasan · kontrol",
+          "tech": "AI · tinjauan manusia",
+          "insight": "Arah yang dipilih: AI, tinjauan manusia — AI, ringkasan, kontrol."
+        },
+        {
+          "label": "data · laporan",
+          "hint": "BI · laporan",
+          "tech": "BI/dashboard",
+          "insight": "Arah yang dipilih: data, laporan — BI, laporan."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernisasi",
+      "title": "Apa yang ingin Anda tinggalkan?",
+      "optionQuestion": "Apa yang ingin diganti dulu?",
+      "copy": "Modernisasi mengubah alat yang terpisah menjadi sistem yang lebih aman, terukur, dan siap tumbuh.",
+      "progress": "modernisasi",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · alur kerja",
+          "hint": "proses · izin",
+          "tech": "alur kerja · izin",
+          "insight": "Arah yang dipilih: Excel, alur kerja — proses, izin."
+        },
+        {
+          "label": "integrasi · data",
+          "hint": "API · kontrol",
+          "tech": "API · integrasi",
+          "insight": "Arah yang dipilih: integrasi, data — API, kontrol."
+        },
+        {
+          "label": "UX/UI · kepercayaan",
+          "hint": "pengalaman · Nilai",
+          "tech": "UX/UI + product",
+          "insight": "Arah yang dipilih: UX/UI, kepercayaan — pengalaman, Nilai."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Bagaimana sistem harus dipakai dalam operasi nyata?",
+      "optionQuestion": "Di mana harus bekerja paling baik?",
+      "copy": "Jawaban Anda menunjukkan apakah prioritasnya backend, sinkronisasi, aplikasi mobile, atau software lokal.",
+      "progress": "Penggunaan",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · rute",
+          "hint": "cloud · backend · data",
+          "tech": "cloud backend",
+          "insight": "Arah yang dipilih: web, rute — cloud, backend, data."
+        },
+        {
+          "label": "aplikasi seluler · Penggunaan",
+          "hint": "aplikasi seluler · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Arah yang dipilih: aplikasi seluler, Penggunaan — aplikasi seluler, tablet, sync."
+        },
+        {
+          "label": "PC · kontrol",
+          "hint": "desktop/local · keamanan",
+          "tech": "desktop/local",
+          "insight": "Arah yang dipilih: PC, kontrol — desktop/local, keamanan."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Nilai",
+      "title": "Apa yang harus membaik lebih dulu?",
+      "optionQuestion": "Hasil apa yang ingin Anda lihat dulu?",
+      "copy": "Platform yang baik bukan hanya terlihat bagus. Ia merapikan proses, mengotomatisasi kerja, dan menampilkan data untuk keputusan.",
+      "progress": "Nilai",
+      "core": "Nilai",
+      "options": [
+        {
+          "label": "proses · alur kerja",
+          "hint": "izin · kontrol",
+          "tech": "workflow + RBAC",
+          "insight": "Arah yang dipilih: proses, alur kerja — izin, kontrol."
+        },
+        {
+          "label": "otomatisasi · cepat",
+          "hint": "RPA/API · proses",
+          "tech": "RPA/API",
+          "insight": "Arah yang dipilih: otomatisasi, cepat — RPA/API, proses."
+        },
+        {
+          "label": "data · AI",
+          "hint": "laporan · AI",
+          "tech": "BI + AI",
+          "insight": "Arah yang dipilih: data, AI — laporan, AI."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "kepercayaan · kontrol",
+      "title": "Apa yang harus paling terlindungi?",
+      "optionQuestion": "Apa yang ingin Anda lindungi lebih baik?",
+      "copy": "Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas.",
+      "progress": "keamanan",
+      "core": "kepercayaan",
+      "options": [
+        {
+          "label": "pengguna · izin",
+          "hint": "RBAC · kontrol",
+          "tech": "RBAC + audit",
+          "insight": "Arah yang dipilih: pengguna, izin — RBAC, kontrol."
+        },
+        {
+          "label": "data · keamanan",
+          "hint": "data · kontrol",
+          "tech": "keamanan sejak desain",
+          "insight": "Arah yang dipilih: data, keamanan — data, kontrol."
+        },
+        {
+          "label": "AI · tinjauan manusia",
+          "hint": "otomatisasi · kontrol",
+          "tech": "AI governance",
+          "insight": "Arah yang dipilih: AI, tinjauan manusia — otomatisasi, kontrol."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "modal terlindungi · pembiayaan",
+      "title": "Bagaimana maju tanpa menghambat operasi?",
+      "optionQuestion": "Bagaimana Anda ingin mengatur pembayaran?",
+      "copy": "Pengembangan dapat diatur dalam cicilan USD sesuai ruang lingkup, persetujuan, dan ritme implementasi.",
+      "progress": "pembiayaan",
+      "core": "USD",
+      "options": [
+        {
+          "label": "pembiayaan 100%",
+          "hint": "USD · fase · modal terlindungi",
+          "tech": "USD · pembiayaan",
+          "insight": "Arah yang dipilih: pembiayaan 100% — USD, fase, modal terlindungi."
+        },
+        {
+          "label": "penawaran langsung · fase",
+          "hint": "peta jalan · fase",
+          "tech": "peta jalan",
+          "insight": "Arah yang dipilih: penawaran langsung, fase — peta jalan, fase."
+        },
+        {
+          "label": "kontak · tinjauan manusia",
+          "hint": "ringkasan proyek · kontak",
+          "tech": "tinjauan manusia",
+          "insight": "Arah yang dipilih: kontak, tinjauan manusia — ringkasan proyek, kontak."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Kecepatan",
+      "title": "Seberapa cepat harus mulai berjalan?",
+      "optionQuestion": "Ritme mana yang paling cocok?",
+      "copy": "Jawaban ini membedakan versi awal yang berguna dari platform besar yang dibangun bertahap. Hashinmy mengubah pilihan ini menjadi rute yang jelas dengan cakupan, kontrol, dan langkah berikutnya, agar bisnis bisa menjual, beroperasi, atau tumbuh dengan lebih sedikit hambatan.",
+      "progress": "Kecepatan",
+      "core": "peta jalan",
+      "options": [
+        {
+          "label": "cepat · MVP",
+          "hint": "Produk · cepat",
+          "tech": "MVP",
+          "insight": "Arah yang dipilih: cepat, MVP — Produk, cepat."
+        },
+        {
+          "label": "1-3 · fase",
+          "hint": "peta jalan · kontrol",
+          "tech": "fase",
+          "insight": "Arah yang dipilih: 1-3, fase — peta jalan, kontrol."
+        },
+        {
+          "label": "enterprise · peta jalan",
+          "hint": "keamanan · enterprise",
+          "tech": "peta jalan enterprise",
+          "insight": "Arah yang dipilih: enterprise, peta jalan — keamanan, enterprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "rute · ringkasan",
+      "title": "Kami sudah memahami yang Anda cari.",
+      "copy": "Rute Anda sudah siap. Sebelum dikirim, Anda dapat menambahkan detail penting; tim Hashinmy akan meninjau arah proyek, opsi pembiayaan, dan langkah berikutnya dengan konteks bisnis serta teknis yang jelas.",
+      "progress": "ringkasan proyek",
+      "core": "ringkasan proyek",
+      "insight": "rute. ringkasan proyek. kontak.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "rute",
+    "service": "Layanan",
+    "operation": "Penggunaan",
+    "value": "Nilai",
+    "risk": "keamanan",
+    "financing": "pembiayaan",
+    "timeline": "Kecepatan"
+  },
+  "valueLabels": {
+    "diagnostico": "ringkasan proyek · rute",
+    "producto_digital": "perangkat lunak khusus · Produk",
+    "automatizacion_ia": "otomatisasi · AI",
+    "modernizacion_operativa": "modernisasi · proses",
+    "software_online": "web · perangkat lunak",
+    "app_movil": "aplikasi seluler",
+    "software_pc": "perangkat lunak PC",
+    "automatizacion": "otomatisasi · proses",
+    "ia": "AI · integrasi",
+    "modernizacion": "modernisasi",
+    "web_global": "web · rute",
+    "mobile_first": "aplikasi seluler · Penggunaan",
+    "pc_local": "PC · kontrol",
+    "workflow": "alur kerja · proses",
+    "automation": "otomatisasi · cepat",
+    "analytics": "data · laporan",
+    "ai": "AI · tinjauan manusia",
+    "experience": "UX/UI · kepercayaan",
+    "analytics_ai": "data · AI",
+    "roles_permisos": "pengguna · izin",
+    "datos_sensibles": "data · keamanan",
+    "ia_controlada": "AI · tinjauan manusia",
+    "financiamiento_100": "pembiayaan 100%",
+    "sin_financiacion": "penawaran langsung",
+    "fases": "penawaran langsung · fase",
+    "contacto_directo": "kontak · tinjauan manusia",
+    "mvp_rapido": "cepat · MVP",
+    "1_3_meses": "1-3 · fase",
+    "enterprise": "enterprise · peta jalan"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "perangkat lunak khusus · Produk",
+      "operation": "architecture · ringkasan proyek",
+      "value": "Nilai · ringkasan proyek",
+      "risk": "keamanan · ringkasan proyek",
+      "financing": "pembiayaan · ringkasan proyek",
+      "timeline": "Kecepatan · ringkasan proyek",
+      "technical": "perangkat lunak · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · perangkat lunak",
+      "automatizacion": "otomatisasi RPA/API",
+      "ia": "AI · tinjauan manusia",
+      "modernizacion": "modernisasi",
+      "web_global": "backend + basis data",
+      "mobile_first": "aplikasi seluler · sync",
+      "pc_local": "local · kontrol",
+      "workflow": "izin · alur kerja",
+      "automation": "otomatisasi · integrasi",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "data · keamanan",
+      "ia_controlada": "AI governance · tinjauan manusia"
+    },
+    "controlBase": [
+      "data",
+      "kontrol"
+    ],
+    "controlParts": {
+      "web_global": "izin",
+      "software_online": "izin",
+      "ia": "tinjauan manusia",
+      "analytics_ai": "tinjauan manusia",
+      "ai": "tinjauan manusia",
+      "automatizacion": "otomatisasi · laporan",
+      "automation": "otomatisasi · laporan",
+      "roles_permisos": "izin · kontrol",
+      "datos_sensibles": "data · keamanan",
+      "ia_controlada": "tinjauan manusia · kontrol",
+      "financiamiento_100": "pembiayaan 100%",
+      "sin_financiacion": "penawaran langsung"
+    },
+    "nextSteps": {
+      "noService": "kontak · ringkasan proyek",
+      "mvp": "MVP · ringkasan proyek",
+      "enterprise": "enterprise · peta jalan",
+      "default": "perangkat lunak · peta jalan"
+    }
+  },
+  "schemaVersion": 1
+}

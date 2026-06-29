@@ -1,0 +1,724 @@
+{
+  "iso": "cs",
+  "name": "Czech",
+  "nativeName": "Čeština",
+  "htmlLang": "cs",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | software na míru trasa",
+    "description": "Hashinmy zážitek: software na míru. umělá inteligence + automatizace. mobilní aplikace + PC software. 100% financování / přímá nabídka.",
+    "ogTitle": "Hashinmy | software na míru",
+    "ogDescription": "trasa Vybrat. software projektové zadání. financování / Získat nabídku.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Čeština, Czech, Služba, trasa, Použití, Hodnota, financování, bezpečnost, web · software, mobilní aplikace, PC software, automatizace, umělá inteligence · integrace, modernizace, projektové zadání · trasa, software na míru · Produkt, automatizace · umělá inteligence, modernizace · procesy, automatizace · procesy, web · trasa, mobilní aplikace · Použití, PC · kontroly, workflow · procesy, automatizace · rychle, data · reporty, umělá inteligence · lidská kontrola, UX/UI · důvěra, data · umělá inteligence, uživatelé · oprávnění, data · bezpečnost, 100% financování, přímá nabídka, přímá nabídka · fáze, kontakt · lidská kontrola, rychle · MVP, 1-3 · fáze, enterprise · plán cesty, Hashinmy, hashinmy.com, software na míru · Produkt · 100% financování, web · software · PWA, ecommerce · software na míru · Produkt, software na míru · Produkt · CAD/DXF, přímá nabídka · 100% financování, API, UX/UI, ecommerce · automatizace · procesy, umělá inteligence · integrace · enterprise · plán cesty, Odvětví · software na míru · Produkt, Financovat nyní, API · web · trasa, přímá nabídka · software na míru · Produkt, web · software · SEO, chatbots · umělá inteligence · integrace, Colombia · Medellín · software na míru · Produkt, API · enterprise · plán cesty, data · bezpečnost · software na míru · Produkt, enterprise · plán cesty · software na míru · Produkt, CRM · enterprise · plán cesty, ERP · software na míru · Produkt, web · software · UX/UI · důvěra, web · software · portal"
+  },
+  "ui": {
+    "skip": "Vybrat · trasa",
+    "stageLabel": "Hashinmy · zážitek · trasa",
+    "topbarLabel": "kontroly · Hashinmy",
+    "brandAria": "Začít znovu · Hashinmy",
+    "brandSmall": "software na míru · umělá inteligence",
+    "progressLabel": "trasa · Tempo",
+    "languageLabel": "Jazyk",
+    "languageAria": "Vybrat · Jazyk",
+    "contentLabel": "zážitek · projektové zadání",
+    "pathLabelAria": "trasa · shrnutí",
+    "decisionZoneLabel": "Vybrat · Služba",
+    "summaryLabelAria": "shrnutí · projektové zadání",
+    "footerLabel": "kontroly · trasa",
+    "primaryFinance": "Financovat nyní",
+    "primaryQuote": "Získat nabídku",
+    "back": "Zpět",
+    "restart": "Začít znovu",
+    "contactLabel": "kontakt · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · kontakt",
+    "commentLabel": "Popište svůj projekt",
+    "commentPlaceholder": "Řekněte nám, který proces chcete zlepšit, jaký výkres, díl nebo systém potřebujete a jakýkoli technický detail, který pomůže připravit jasnou cestu.",
+    "submitRoute": "Odeslat trasu do Hashinmy",
+    "copySummaryAction": "Kopírovat shrnutí",
+    "formNote": "Vaše odpovědi zůstanou uložené jen v tomto prohlížeči, dokud se nerozhodnete je odeslat.",
+    "contactRequired": "Přidejte e-mail, WhatsApp nebo název firmy, aby vás Hashinmy mohlo kontaktovat s připravenou trasou.",
+    "copySuccess": "Souhrn byl zkopírován. Můžete ho vložit do WhatsAppu, e-mailu nebo CRM.",
+    "copyFailure": "Souhrn se nepodařilo zkopírovat; odešlete trasu do Hashinmy pomocí formuláře.",
+    "mailOpening": "Otevírá se e-mail s připravenou trasou; před odesláním do Hashinmy jej zkontrolujte.",
+    "waitSummary": "shrnutí · projektové zadání",
+    "preparingOptions": "Připravujeme možnosti",
+    "optionFallback": "Vybrat · trasa",
+    "pathLabel": "trasa · shrnutí",
+    "pathEmpty": "Vybrat · trasa · projektové zadání",
+    "interactionFallback": "zážitek",
+    "summaryTitle": "Interaktivní žádost Hashinmy",
+    "projectChosen": "Produkt · Vybrat",
+    "expectedUse": "Použití",
+    "wantedValue": "Hodnota",
+    "prioritySecurity": "bezpečnost",
+    "paymentMode": "financování",
+    "financing": "financování",
+    "pace": "Tempo",
+    "technicalBase": "Doporučený technický základ",
+    "suggestedControls": "kontroly",
+    "nextStep": "plán cesty · fáze",
+    "contact": "kontakt",
+    "additionalComment": "Volitelný komentář",
+    "registeredInteractions": "trasa · shrnutí",
+    "directRouteRequested": "přímá nabídka. trasa.",
+    "directQuoteSubject": "Hashinmy · přímá nabídka",
+    "financedSubject": "Hashinmy · software na míru · financování",
+    "directQuoteAudit": "přímá nabídka. projektové zadání. trasa.",
+    "financeAudit": "100% financování. projektové zadání. trasa.",
+    "directQuoteTech": "přímá nabídka · projektové zadání",
+    "financeTech": "USD · fáze · projektové zadání",
+    "topActionsLabel": "Produkty · Jazyk",
+    "proofEntryAria": "Naše zkušenost · Hashinmy",
+    "proofOpenButton": "Naše zkušenost",
+    "proofTitle": "Naše zkušenost",
+    "proofLead": "Hashinmy zážitek: software na míru. umělá inteligence + automatizace. mobilní aplikace + PC software. 100% financování / přímá nabídka.",
+    "proofCloseAria": "Zavřít · Naše zkušenost",
+    "proofContentAria": "Naše zkušenost · Časté otázky",
+    "proofSummaryAria": "důvěra · kontroly",
+    "proofSummaryTitle": "důvěra · kontroly · Hashinmy",
+    "proofTrustLabel": "důvěra · kontroly:",
+    "proofTrustText": "Na této obrazovce se praktické zaměření soustředí na bezpečnost, Vybrat, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením. Hashinmy zážitek: software na míru. umělá inteligence + automatizace. mobilní aplikace + PC software. 100% financování / přímá nabídka.",
+    "proofMethodLabel": "Metodika:",
+    "proofMethodText": "Diagnostika, návrh, vývoj, testování, předání a podpora. Medellín a Kolumbie jsou náš původ; dosah je globální.",
+    "proofUseCasesLabel": "Případy použití:",
+    "proofUseCasesText": "Truhlářské firmy, prodej, sklad, technické cenové nabídky, podpora, CRM, portály, e-commerce a provozní automatizace.",
+    "proofBrandsTitle": "Značky, projekty a společnosti související s naší prací",
+    "proofBrandsAria": "Značky, projekty a společnosti související s naší prací",
+    "proofLogoPlaceholder": "Naše zkušenost Hashinmy",
+    "proofLogoAltTemplate": "Logo {name}",
+    "proofFaqAria": "Časté otázky · Naše zkušenost",
+    "proofFaqWhyQuestion": "Proč zvolit Hashinmy?",
+    "proofFaqWhyAnswer": "trasa Vybrat. software projektové zadání. financování / Získat nabídku.",
+    "proofFaqWhoQuestion": "Pro koho?",
+    "proofFaqWhoAnswer": "trasa Vybrat. software projektové zadání. financování / Získat nabídku. Na této obrazovce se praktické zaměření soustředí na bezpečnost, Vybrat, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+    "proofFaqStartQuestion": "Jak začnu?",
+    "proofFaqStartAnswer": "Vaše cesta je připravena. Před odesláním můžete doplnit jakýkoli důležitý detail; tým Hashinmy posoudí směr projektu, možnost financování a další kroky s jasným obchodním i technickým kontextem. přímá nabídka. projektové zadání. trasa.",
+    "proofBrandsStructuredDescription": "Značky, projekty a společnosti související s naší prací"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · software",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobilní aplikace",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC software",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatizace",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "umělá inteligence · integrace",
+      "tech": "umělá inteligence · workflow",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernizace",
+      "tech": "software · kontroly",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "chráněný kapitál"
+    },
+    "serviceFamily": {
+      "symbol": "trasa",
+      "label": "Služba · Vybrat"
+    },
+    "buildType": {
+      "symbol": "Vývoj",
+      "label": "Produkt"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatizace"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernizace"
+    },
+    "operation": {
+      "symbol": "Použití",
+      "label": "Použití"
+    },
+    "value": {
+      "symbol": "Hodnota",
+      "label": "Hodnota · kontroly"
+    },
+    "risk": {
+      "symbol": "důvěra",
+      "label": "bezpečnost · kontroly"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% financování"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "plán cesty"
+    },
+    "summary": {
+      "symbol": "shrnutí",
+      "label": "projektové zadání"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "na míru"
+      ],
+      [
+        "AI",
+        "automatizace"
+      ],
+      [
+        "PC",
+        "mobilní"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "trasa"
+      ],
+      [
+        "6",
+        "Služba"
+      ],
+      [
+        "1",
+        "projektové zadání"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "procesy"
+      ],
+      [
+        "AI",
+        "lidská kontrola"
+      ],
+      [
+        "BI",
+        "reporty"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernizace"
+      ],
+      [
+        "API",
+        "integrace"
+      ],
+      [
+        "UX",
+        "důvěra"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Použití"
+      ],
+      [
+        "Local",
+        "kontroly"
+      ]
+    ],
+    "value": [
+      [
+        "workflow",
+        "procesy"
+      ],
+      [
+        "Auto",
+        "rychle"
+      ],
+      [
+        "Data",
+        "kontroly"
+      ]
+    ],
+    "risk": [
+      [
+        "uživatelé",
+        "oprávnění"
+      ],
+      [
+        "Data",
+        "bezpečnost"
+      ],
+      [
+        "AI",
+        "lidská kontrola"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "financování"
+      ],
+      [
+        "USD",
+        "fáze"
+      ],
+      [
+        "Pause",
+        "kontroly"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "rychle"
+      ],
+      [
+        "fáze",
+        "plán cesty"
+      ],
+      [
+        "QA",
+        "kontroly"
+      ]
+    ],
+    "summary": [
+      [
+        "trasa",
+        "shrnutí"
+      ],
+      [
+        "Email",
+        "projektové zadání"
+      ],
+      [
+        "lidská kontrola",
+        "kontakt"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Čeština",
+      "title": "Vítejte v HASHINMY",
+      "copy": "Vyvíjíme software na míru pro firmy, které působí, prodávají a rostou na místních i mezinárodních trzích. Integrujeme AI, automatizaci, programy pro PC, CAD software s exportem DXF, webové aplikace, cloud, SEO, chatboty, technické kalkulační nástroje, bezpečnost a provozní kontinuitu.\nMedellín a Kolumbie jsou naším původem; obchodní i technický dosah je globální.\nPodporujeme technologický rozvoj firem pomocí 100% financovaných řešení, která jim pomáhají dosáhnout maximálního potenciálu, zvýšit produktivitu a škálovat efektivněji.",
+      "optionQuestion": "Kterou možnost chcete?",
+      "progress": "Začátek",
+      "core": "HASHINMY",
+      "insight": "Úvodní diagnostika pomáhá proměnit skutečnou potřebu v jasnou, financovatelnou technickou cestu připravenou k růstu.",
+      "options": [
+        {
+          "label": "Bez financování",
+          "hint": "Chci získat nabídku bez financování",
+          "tech": "Bez financování",
+          "insight": "Chci získat přímou nabídku bez finančního plánu."
+        },
+        {
+          "label": "100% financování",
+          "hint": "Chci pokračovat s jasnými splátkami v USD",
+          "tech": "splátky USD",
+          "insight": "Chci pokračovat se 100% financováním jako hlavním modelem."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "trasa",
+      "title": "Vybrat · Služba · Hodnota",
+      "optionQuestion": "Vybrat · Služba",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na Vybrat, Služba, Hodnota, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "trasa",
+      "core": "Služba",
+      "insight": "trasa. Hodnota.",
+      "options": [
+        {
+          "label": "software na míru · Produkt",
+          "hint": "web · mobilní aplikace · PC software",
+          "tech": "software · Produkt",
+          "insight": "Zvolený směr: software na míru, Produkt — web, mobilní aplikace, PC software."
+        },
+        {
+          "label": "automatizace · umělá inteligence",
+          "hint": "RPA · API · umělá inteligence",
+          "tech": "automatizace · umělá inteligence",
+          "insight": "Zvolený směr: automatizace, umělá inteligence — RPA, API, umělá inteligence."
+        },
+        {
+          "label": "modernizace · procesy",
+          "hint": "Excel · integrace · workflow",
+          "tech": "modernizace · workflow",
+          "insight": "Zvolený směr: modernizace, procesy — Excel, integrace, workflow."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produkt",
+      "title": "software na míru · Použití",
+      "optionQuestion": "Vybrat · web · mobilní aplikace · PC software",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na software na míru, Použití, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "Produkt",
+      "core": "Vývoj",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · data",
+          "tech": "web · backend",
+          "insight": "Zvolený směr: web — web, backend, data."
+        },
+        {
+          "label": "mobilní aplikace",
+          "hint": "PWA/App · Použití",
+          "tech": "mobile/PWA",
+          "insight": "Zvolený směr: mobilní aplikace — PWA/App, Použití."
+        },
+        {
+          "label": "PC software",
+          "hint": "desktop/local · kontroly",
+          "tech": "desktop/local",
+          "insight": "Zvolený směr: PC software — desktop/local, kontroly."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "umělá inteligence · automatizace",
+      "title": "automatizace · procesy",
+      "optionQuestion": "Vybrat · automatizace",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na automatizace, procesy, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "automatizace",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "procesy · automatizace",
+          "hint": "RPA · API · rychle",
+          "tech": "RPA/API",
+          "insight": "Zvolený směr: procesy, automatizace — RPA, API, rychle."
+        },
+        {
+          "label": "umělá inteligence · lidská kontrola",
+          "hint": "umělá inteligence · shrnutí · kontroly",
+          "tech": "umělá inteligence · lidská kontrola",
+          "insight": "Zvolený směr: umělá inteligence, lidská kontrola — umělá inteligence, shrnutí, kontroly."
+        },
+        {
+          "label": "data · reporty",
+          "hint": "BI · reporty",
+          "tech": "BI/dashboard",
+          "insight": "Zvolený směr: data, reporty — BI, reporty."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernizace",
+      "title": "modernizace · procesy",
+      "optionQuestion": "Vybrat · modernizace",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na modernizace, procesy, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "modernizace",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · workflow",
+          "hint": "procesy · oprávnění",
+          "tech": "workflow · oprávnění",
+          "insight": "Zvolený směr: Excel, workflow — procesy, oprávnění."
+        },
+        {
+          "label": "integrace · data",
+          "hint": "API · kontroly",
+          "tech": "API · integrace",
+          "insight": "Zvolený směr: integrace, data — API, kontroly."
+        },
+        {
+          "label": "UX/UI · důvěra",
+          "hint": "zážitek · Hodnota",
+          "tech": "UX/UI + product",
+          "insight": "Zvolený směr: UX/UI, důvěra — zážitek, Hodnota."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Použití · procesy",
+      "optionQuestion": "Vybrat · Použití",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na Použití, procesy, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "Použití",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · trasa",
+          "hint": "cloud · backend · data",
+          "tech": "cloud backend",
+          "insight": "Zvolený směr: web, trasa — cloud, backend, data."
+        },
+        {
+          "label": "mobilní aplikace · Použití",
+          "hint": "mobilní aplikace · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Zvolený směr: mobilní aplikace, Použití — mobilní aplikace, tablet, sync."
+        },
+        {
+          "label": "PC · kontroly",
+          "hint": "desktop/local · bezpečnost",
+          "tech": "desktop/local",
+          "insight": "Zvolený směr: PC, kontroly — desktop/local, bezpečnost."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Hodnota",
+      "title": "Hodnota · Vybrat",
+      "optionQuestion": "Vybrat · Hodnota",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na Hodnota, Vybrat, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "Hodnota",
+      "core": "Hodnota",
+      "options": [
+        {
+          "label": "procesy · workflow",
+          "hint": "oprávnění · kontroly",
+          "tech": "workflow + RBAC",
+          "insight": "Zvolený směr: procesy, workflow — oprávnění, kontroly."
+        },
+        {
+          "label": "automatizace · rychle",
+          "hint": "RPA/API · procesy",
+          "tech": "RPA/API",
+          "insight": "Zvolený směr: automatizace, rychle — RPA/API, procesy."
+        },
+        {
+          "label": "data · umělá inteligence",
+          "hint": "reporty · umělá inteligence",
+          "tech": "BI + AI",
+          "insight": "Zvolený směr: data, umělá inteligence — reporty, umělá inteligence."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "důvěra · kontroly",
+      "title": "bezpečnost · Vybrat",
+      "optionQuestion": "Vybrat · bezpečnost",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na bezpečnost, Vybrat, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "bezpečnost",
+      "core": "důvěra",
+      "options": [
+        {
+          "label": "uživatelé · oprávnění",
+          "hint": "RBAC · kontroly",
+          "tech": "RBAC + audit",
+          "insight": "Zvolený směr: uživatelé, oprávnění — RBAC, kontroly."
+        },
+        {
+          "label": "data · bezpečnost",
+          "hint": "data · kontroly",
+          "tech": "bezpečnost už v návrhu",
+          "insight": "Zvolený směr: data, bezpečnost — data, kontroly."
+        },
+        {
+          "label": "umělá inteligence · lidská kontrola",
+          "hint": "automatizace · kontroly",
+          "tech": "AI governance",
+          "insight": "Zvolený směr: umělá inteligence, lidská kontrola — automatizace, kontroly."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "chráněný kapitál · financování",
+      "title": "financování · plán cesty",
+      "optionQuestion": "Vybrat · financování",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na financování, plán cesty, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "financování",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% financování",
+          "hint": "USD · fáze · chráněný kapitál",
+          "tech": "USD · financování",
+          "insight": "Zvolený směr: 100% financování — USD, fáze, chráněný kapitál."
+        },
+        {
+          "label": "přímá nabídka · fáze",
+          "hint": "plán cesty · fáze",
+          "tech": "plán cesty",
+          "insight": "Zvolený směr: přímá nabídka, fáze — plán cesty, fáze."
+        },
+        {
+          "label": "kontakt · lidská kontrola",
+          "hint": "projektové zadání · kontakt",
+          "tech": "lidská kontrola",
+          "insight": "Zvolený směr: kontakt, lidská kontrola — projektové zadání, kontakt."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Tempo",
+      "title": "plán cesty · Tempo",
+      "optionQuestion": "Vybrat · Tempo",
+      "copy": "Na této obrazovce se praktické zaměření soustředí na plán cesty, Tempo, aby si cesta zachovala obchodní i technický kontext. Hashinmy převádí tuto volbu na jasnou cestu s rozsahem, kontrolami a dalšími kroky, aby firma mohla prodávat, fungovat nebo růst s menším třením.",
+      "progress": "Tempo",
+      "core": "plán cesty",
+      "options": [
+        {
+          "label": "rychle · MVP",
+          "hint": "Produkt · rychle",
+          "tech": "MVP",
+          "insight": "Zvolený směr: rychle, MVP — Produkt, rychle."
+        },
+        {
+          "label": "1-3 · fáze",
+          "hint": "plán cesty · kontroly",
+          "tech": "fáze",
+          "insight": "Zvolený směr: 1-3, fáze — plán cesty, kontroly."
+        },
+        {
+          "label": "enterprise · plán cesty",
+          "hint": "bezpečnost · enterprise",
+          "tech": "podnikový plán rozvoje",
+          "insight": "Zvolený směr: enterprise, plán cesty — bezpečnost, enterprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "trasa · shrnutí",
+      "title": "projektové zadání · shrnutí",
+      "copy": "Vaše cesta je připravena. Před odesláním můžete doplnit jakýkoli důležitý detail; tým Hashinmy posoudí směr projektu, možnost financování a další kroky s jasným obchodním i technickým kontextem.",
+      "progress": "projektové zadání",
+      "core": "projektové zadání",
+      "insight": "trasa. projektové zadání. kontakt.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "trasa",
+    "service": "Služba",
+    "operation": "Použití",
+    "value": "Hodnota",
+    "risk": "bezpečnost",
+    "financing": "financování",
+    "timeline": "Tempo"
+  },
+  "valueLabels": {
+    "diagnostico": "projektové zadání · trasa",
+    "producto_digital": "software na míru · Produkt",
+    "automatizacion_ia": "automatizace · umělá inteligence",
+    "modernizacion_operativa": "modernizace · procesy",
+    "software_online": "web · software",
+    "app_movil": "mobilní aplikace",
+    "software_pc": "PC software",
+    "automatizacion": "automatizace · procesy",
+    "ia": "umělá inteligence · integrace",
+    "modernizacion": "modernizace",
+    "web_global": "web · trasa",
+    "mobile_first": "mobilní aplikace · Použití",
+    "pc_local": "PC · kontroly",
+    "workflow": "workflow · procesy",
+    "automation": "automatizace · rychle",
+    "analytics": "data · reporty",
+    "ai": "umělá inteligence · lidská kontrola",
+    "experience": "UX/UI · důvěra",
+    "analytics_ai": "data · umělá inteligence",
+    "roles_permisos": "uživatelé · oprávnění",
+    "datos_sensibles": "data · bezpečnost",
+    "ia_controlada": "umělá inteligence · lidská kontrola",
+    "financiamiento_100": "100% financování",
+    "sin_financiacion": "přímá nabídka",
+    "fases": "přímá nabídka · fáze",
+    "contacto_directo": "kontakt · lidská kontrola",
+    "mvp_rapido": "rychle · MVP",
+    "1_3_meses": "1-3 · fáze",
+    "enterprise": "enterprise · plán cesty"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "software na míru · Produkt",
+      "operation": "architecture · projektové zadání",
+      "value": "Hodnota · projektové zadání",
+      "risk": "bezpečnost · projektové zadání",
+      "financing": "financování · projektové zadání",
+      "timeline": "Tempo · projektové zadání",
+      "technical": "software · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · software",
+      "automatizacion": "automatizace RPA/API",
+      "ia": "umělá inteligence · lidská kontrola",
+      "modernizacion": "modernizace",
+      "web_global": "backend + databáze",
+      "mobile_first": "mobilní aplikace · sync",
+      "pc_local": "local · kontroly",
+      "workflow": "oprávnění · workflow",
+      "automation": "automatizace · integrace",
+      "analytics": "dashboard/BI",
+      "ai": "umělá inteligence · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "data · bezpečnost",
+      "ia_controlada": "AI governance · lidská kontrola"
+    },
+    "controlBase": [
+      "data",
+      "kontroly"
+    ],
+    "controlParts": {
+      "web_global": "oprávnění",
+      "software_online": "oprávnění",
+      "ia": "lidská kontrola",
+      "analytics_ai": "lidská kontrola",
+      "ai": "lidská kontrola",
+      "automatizacion": "automatizace · reporty",
+      "automation": "automatizace · reporty",
+      "roles_permisos": "oprávnění · kontroly",
+      "datos_sensibles": "data · bezpečnost",
+      "ia_controlada": "lidská kontrola · kontroly",
+      "financiamiento_100": "100% financování",
+      "sin_financiacion": "přímá nabídka"
+    },
+    "nextSteps": {
+      "noService": "kontakt · projektové zadání",
+      "mvp": "MVP · projektové zadání",
+      "enterprise": "enterprise · plán cesty",
+      "default": "software · plán cesty"
+    }
+  },
+  "schemaVersion": 1
+}

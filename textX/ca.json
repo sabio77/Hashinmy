@@ -1,0 +1,724 @@
+{
+  "iso": "ca",
+  "name": "Catalan",
+  "nativeName": "Català",
+  "htmlLang": "ca",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | programari a mida ruta",
+    "description": "Hashinmy experiència: programari a mida. IA + automatització. aplicació mòbil + programari per a PC. finançament 100% / pressupost directe.",
+    "ogTitle": "Hashinmy | programari a mida",
+    "ogDescription": "ruta Tria. programari resum del projecte. finançament / Demana pressupost.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Català, Catalan, Servei, ruta, Ús, Valor, finançament, seguretat, web · programari, aplicació mòbil, programari per a PC, automatització, IA · integració, modernització, resum del projecte · ruta, programari a mida · Producte, automatització · IA, modernització · processos, automatització · processos, web · ruta, aplicació mòbil · Ús, PC · controls, flux de treball · processos, automatització · ràpid, dades · informes, IA · revisió humana, UX/UI · confiança, dades · IA, usuaris · permisos, dades · seguretat, finançament 100%, pressupost directe, pressupost directe · fases, contacte · revisió humana, ràpid · MVP, 1-3 · fases, empresa · full de ruta, Hashinmy, hashinmy.com, programari a mida · Producte · finançament 100%, web · programari · PWA, ecommerce · programari a mida · Producte, programari a mida · Producte · CAD/DXF, pressupost directe · finançament 100%, API, UX/UI, ecommerce · automatització · processos, IA · integració · empresa · full de ruta, Indústries · programari a mida · Producte, Finança ara, API · web · ruta, pressupost directe · programari a mida · Producte, web · programari · SEO, chatbots · IA · integració, Colombia · Medellín · programari a mida · Producte, API · empresa · full de ruta, dades · seguretat · programari a mida · Producte, empresa · full de ruta · programari a mida · Producte, CRM · empresa · full de ruta, ERP · programari a mida · Producte, web · programari · UX/UI · confiança, web · programari · portal"
+  },
+  "ui": {
+    "skip": "Tria · ruta",
+    "stageLabel": "Hashinmy · experiència · ruta",
+    "topbarLabel": "controls · Hashinmy",
+    "brandAria": "Reinicia · Hashinmy",
+    "brandSmall": "programari a mida · IA",
+    "progressLabel": "ruta · Ritme",
+    "languageLabel": "Idioma",
+    "languageAria": "Tria · Idioma",
+    "contentLabel": "experiència · resum del projecte",
+    "pathLabelAria": "ruta · resum",
+    "decisionZoneLabel": "Tria · Servei",
+    "summaryLabelAria": "resum · resum del projecte",
+    "footerLabel": "controls · ruta",
+    "primaryFinance": "Finança ara",
+    "primaryQuote": "Demana pressupost",
+    "back": "Enrere",
+    "restart": "Reinicia",
+    "contactLabel": "contacte · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · contacte",
+    "commentLabel": "Descriu el teu projecte",
+    "commentPlaceholder": "Explica quin procés vols millorar, quin plànol, peça o sistema necessites i qualsevol detall tècnic que ajudi a preparar una ruta clara.",
+    "submitRoute": "Envia la ruta a Hashinmy",
+    "copySummaryAction": "Copiar resum",
+    "formNote": "Les teves respostes només queden desades en aquest navegador fins que decideixis enviar-les.",
+    "contactRequired": "Afegeix un correu, WhatsApp o el nom de l’empresa perquè Hashinmy pugui contactar-te amb la ruta preparada.",
+    "copySuccess": "Resum copiat. Pots enganxar-lo a WhatsApp, correu o CRM.",
+    "copyFailure": "No s’ha pogut copiar el resum; envia la ruta a Hashinmy des del formulari.",
+    "mailOpening": "S’està obrint el correu amb la ruta preparada; revisa’l abans d’enviar-lo a Hashinmy.",
+    "waitSummary": "resum · resum del projecte",
+    "preparingOptions": "Preparant opcions",
+    "optionFallback": "Tria · ruta",
+    "pathLabel": "ruta · resum",
+    "pathEmpty": "Tria · ruta · resum del projecte",
+    "interactionFallback": "experiència",
+    "summaryTitle": "Sol·licitud interactiva de Hashinmy",
+    "projectChosen": "Producte · Tria",
+    "expectedUse": "Ús",
+    "wantedValue": "Valor",
+    "prioritySecurity": "seguretat",
+    "paymentMode": "finançament",
+    "financing": "finançament",
+    "pace": "Ritme",
+    "technicalBase": "Base tècnica recomanada",
+    "suggestedControls": "controls",
+    "nextStep": "full de ruta · fases",
+    "contact": "contacte",
+    "additionalComment": "Comentari opcional",
+    "registeredInteractions": "ruta · resum",
+    "directRouteRequested": "pressupost directe. ruta.",
+    "directQuoteSubject": "Hashinmy · pressupost directe",
+    "financedSubject": "Hashinmy · programari a mida · finançament",
+    "directQuoteAudit": "pressupost directe. resum del projecte. ruta.",
+    "financeAudit": "finançament 100%. resum del projecte. ruta.",
+    "directQuoteTech": "pressupost directe · resum del projecte",
+    "financeTech": "USD · fases · resum del projecte",
+    "topActionsLabel": "Productes · Idioma",
+    "proofEntryAria": "La nostra experiència · Hashinmy",
+    "proofOpenButton": "La nostra experiència",
+    "proofTitle": "La nostra experiència",
+    "proofLead": "Hashinmy experiència: programari a mida. IA + automatització. aplicació mòbil + programari per a PC. finançament 100% / pressupost directe.",
+    "proofCloseAria": "Tanca · La nostra experiència",
+    "proofContentAria": "La nostra experiència · Preguntes freqüents",
+    "proofSummaryAria": "confiança · controls",
+    "proofSummaryTitle": "confiança · controls · Hashinmy",
+    "proofTrustLabel": "confiança · controls:",
+    "proofTrustText": "En aquesta pantalla el focus pràctic és seguretat, Tria, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció. Hashinmy experiència: programari a mida. IA + automatització. aplicació mòbil + programari per a PC. finançament 100% / pressupost directe.",
+    "proofMethodLabel": "Metodologia:",
+    "proofMethodText": "Diagnosi, disseny, desenvolupament, proves, lliurament i suport. Medellín i Colòmbia són el nostre origen; l’abast és global.",
+    "proofUseCasesLabel": "Casos d’ús:",
+    "proofUseCasesText": "Fusteries, vendes, inventari, pressupostos tècnics, suport, CRM, UX/UI · confianças, comerç electrònic i automatització operativa.",
+    "proofBrandsTitle": "Marques, projectes i empreses relacionats amb la nostra feina",
+    "proofBrandsAria": "Marques, projectes i empreses relacionats amb la nostra feina",
+    "proofLogoPlaceholder": "La nostra experiència Hashinmy",
+    "proofLogoAltTemplate": "Logotip de {name}",
+    "proofFaqAria": "Preguntes freqüents · La nostra experiència",
+    "proofFaqWhyQuestion": "Per què triar Hashinmy?",
+    "proofFaqWhyAnswer": "ruta Tria. programari resum del projecte. finançament / Demana pressupost.",
+    "proofFaqWhoQuestion": "Per a qui?",
+    "proofFaqWhoAnswer": "ruta Tria. programari resum del projecte. finançament / Demana pressupost. En aquesta pantalla el focus pràctic és seguretat, Tria, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+    "proofFaqStartQuestion": "Com començo?",
+    "proofFaqStartAnswer": "La teva ruta ja està preparada. Abans d’enviar-la pots afegir qualsevol detall important; l’equip de Hashinmy revisarà l’orientació del projecte, l’opció de finançament i els pròxims passos amb context comercial i tècnic clar. pressupost directe. resum del projecte. ruta.",
+    "proofBrandsStructuredDescription": "Marques, projectes i empreses relacionats amb la nostra feina"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · programari",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "aplicació mòbil",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "programari per a PC",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatització",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "IA · integració",
+      "tech": "IA · flux de treball",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernització",
+      "tech": "programari · controls",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "capital protegit"
+    },
+    "serviceFamily": {
+      "symbol": "ruta",
+      "label": "Servei · Tria"
+    },
+    "buildType": {
+      "symbol": "Construcció",
+      "label": "Producte"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatització"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernització"
+    },
+    "operation": {
+      "symbol": "Ús",
+      "label": "Ús"
+    },
+    "value": {
+      "symbol": "Valor",
+      "label": "Valor · controls"
+    },
+    "risk": {
+      "symbol": "confiança",
+      "label": "seguretat · controls"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "finançament 100%"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "full de ruta"
+    },
+    "summary": {
+      "symbol": "resum",
+      "label": "resum del projecte"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "a mida"
+      ],
+      [
+        "IA",
+        "automatització"
+      ],
+      [
+        "PC",
+        "mòbil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "ruta"
+      ],
+      [
+        "6",
+        "Servei"
+      ],
+      [
+        "1",
+        "resum del projecte"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "processos"
+      ],
+      [
+        "AI",
+        "revisió humana"
+      ],
+      [
+        "BI",
+        "informes"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernització"
+      ],
+      [
+        "API",
+        "integració"
+      ],
+      [
+        "UX",
+        "confiança"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Ús"
+      ],
+      [
+        "Local",
+        "controls"
+      ]
+    ],
+    "value": [
+      [
+        "flux de treball",
+        "processos"
+      ],
+      [
+        "Auto",
+        "ràpid"
+      ],
+      [
+        "Data",
+        "controls"
+      ]
+    ],
+    "risk": [
+      [
+        "usuaris",
+        "permisos"
+      ],
+      [
+        "Data",
+        "seguretat"
+      ],
+      [
+        "AI",
+        "revisió humana"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "finançament"
+      ],
+      [
+        "USD",
+        "fases"
+      ],
+      [
+        "Pause",
+        "controls"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "ràpid"
+      ],
+      [
+        "fases",
+        "full de ruta"
+      ],
+      [
+        "QA",
+        "controls"
+      ]
+    ],
+    "summary": [
+      [
+        "ruta",
+        "resum"
+      ],
+      [
+        "Email",
+        "resum del projecte"
+      ],
+      [
+        "revisió humana",
+        "contacte"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Català",
+      "title": "Benvingut a HASHINMY",
+      "copy": "Construïm programari a mida per a companyies que operen, venen i creixen en mercats locals i internacionals. Integram IA, automatització, programes per a PC, programari CAD amb exportació DXF, aplicacions web, núvol, SEO, chatbots, eines de pressupost tècnic, seguretat i continuïtat operativa.\nMedellín i Colòmbia són el nostre origen; l’abast comercial i tècnic és global.\nImpulsem el desenvolupament tecnològic de les empreses amb solucions finançades al 100%, ajudant-les a assolir el seu màxim potencial, millorar la productivitat i escalar amb més eficiència.",
+      "optionQuestion": "Quina opció t’agradaria?",
+      "progress": "Inici",
+      "core": "HASHINMY",
+      "insight": "El diagnòstic inicial ajuda a convertir una necessitat real en una ruta tècnica clara, finançable i preparada per créixer.",
+      "options": [
+        {
+          "label": "Sense finançament",
+          "hint": "Vull rebre un pressupost sense finançament",
+          "tech": "Sense finançament",
+          "insight": "Vull rebre un pressupost directe, sense pla de finançament."
+        },
+        {
+          "label": "Finançament 100%",
+          "hint": "Vull avançar amb quotes clares en USD",
+          "tech": "quotes USD",
+          "insight": "Vull avançar amb finançament 100% com a modalitat principal."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "ruta",
+      "title": "Tria · Servei · Valor",
+      "optionQuestion": "Tria · Servei",
+      "copy": "En aquesta pantalla el focus pràctic és Tria, Servei, Valor, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "ruta",
+      "core": "Servei",
+      "insight": "ruta. Valor.",
+      "options": [
+        {
+          "label": "programari a mida · Producte",
+          "hint": "web · aplicació mòbil · programari per a PC",
+          "tech": "programari · Producte",
+          "insight": "Direcció seleccionada: programari a mida, Producte — web, aplicació mòbil, programari per a PC."
+        },
+        {
+          "label": "automatització · IA",
+          "hint": "RPA · API · IA",
+          "tech": "automatització · IA",
+          "insight": "Direcció seleccionada: automatització, IA — RPA, API, IA."
+        },
+        {
+          "label": "modernització · processos",
+          "hint": "Excel · integració · flux de treball",
+          "tech": "modernització · flux de treball",
+          "insight": "Direcció seleccionada: modernització, processos — Excel, integració, flux de treball."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Producte",
+      "title": "programari a mida · Ús",
+      "optionQuestion": "Tria · web · aplicació mòbil · programari per a PC",
+      "copy": "En aquesta pantalla el focus pràctic és programari a mida, Ús, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "Producte",
+      "core": "Construcció",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · dades",
+          "tech": "web · backend",
+          "insight": "Direcció seleccionada: web — web, backend, dades."
+        },
+        {
+          "label": "aplicació mòbil",
+          "hint": "PWA/App · Ús",
+          "tech": "mobile/PWA",
+          "insight": "Direcció seleccionada: aplicació mòbil — PWA/App, Ús."
+        },
+        {
+          "label": "programari per a PC",
+          "hint": "desktop/local · controls",
+          "tech": "desktop/local",
+          "insight": "Direcció seleccionada: programari per a PC — desktop/local, controls."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "IA · automatització",
+      "title": "automatització · processos",
+      "optionQuestion": "Tria · automatització",
+      "copy": "En aquesta pantalla el focus pràctic és automatització, processos, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "automatització",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "processos · automatització",
+          "hint": "RPA · API · ràpid",
+          "tech": "RPA/API",
+          "insight": "Direcció seleccionada: processos, automatització — RPA, API, ràpid."
+        },
+        {
+          "label": "IA · revisió humana",
+          "hint": "IA · resum · controls",
+          "tech": "IA · revisió humana",
+          "insight": "Direcció seleccionada: IA, revisió humana — IA, resum, controls."
+        },
+        {
+          "label": "dades · informes",
+          "hint": "BI · informes",
+          "tech": "BI/dashboard",
+          "insight": "Direcció seleccionada: dades, informes — BI, informes."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernització",
+      "title": "modernització · processos",
+      "optionQuestion": "Tria · modernització",
+      "copy": "En aquesta pantalla el focus pràctic és modernització, processos, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "modernització",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · flux de treball",
+          "hint": "processos · permisos",
+          "tech": "flux de treball · permisos",
+          "insight": "Direcció seleccionada: Excel, flux de treball — processos, permisos."
+        },
+        {
+          "label": "integració · dades",
+          "hint": "API · controls",
+          "tech": "API · integració",
+          "insight": "Direcció seleccionada: integració, dades — API, controls."
+        },
+        {
+          "label": "UX/UI · confiança",
+          "hint": "experiència · Valor",
+          "tech": "UX/UI + product",
+          "insight": "Direcció seleccionada: UX/UI, confiança — experiència, Valor."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Ús · processos",
+      "optionQuestion": "Tria · Ús",
+      "copy": "En aquesta pantalla el focus pràctic és Ús, processos, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "Ús",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · ruta",
+          "hint": "cloud · backend · dades",
+          "tech": "cloud backend",
+          "insight": "Direcció seleccionada: web, ruta — cloud, backend, dades."
+        },
+        {
+          "label": "aplicació mòbil · Ús",
+          "hint": "aplicació mòbil · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Direcció seleccionada: aplicació mòbil, Ús — aplicació mòbil, tablet, sync."
+        },
+        {
+          "label": "PC · controls",
+          "hint": "desktop/local · seguretat",
+          "tech": "desktop/local",
+          "insight": "Direcció seleccionada: PC, controls — desktop/local, seguretat."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Valor",
+      "title": "Valor · Tria",
+      "optionQuestion": "Tria · Valor",
+      "copy": "En aquesta pantalla el focus pràctic és Valor, Tria, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "Valor",
+      "core": "Valor",
+      "options": [
+        {
+          "label": "processos · flux de treball",
+          "hint": "permisos · controls",
+          "tech": "workflow + RBAC",
+          "insight": "Direcció seleccionada: processos, flux de treball — permisos, controls."
+        },
+        {
+          "label": "automatització · ràpid",
+          "hint": "RPA/API · processos",
+          "tech": "RPA/API",
+          "insight": "Direcció seleccionada: automatització, ràpid — RPA/API, processos."
+        },
+        {
+          "label": "dades · IA",
+          "hint": "informes · IA",
+          "tech": "BI + AI",
+          "insight": "Direcció seleccionada: dades, IA — informes, IA."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "confiança · controls",
+      "title": "seguretat · Tria",
+      "optionQuestion": "Tria · seguretat",
+      "copy": "En aquesta pantalla el focus pràctic és seguretat, Tria, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "seguretat",
+      "core": "confiança",
+      "options": [
+        {
+          "label": "usuaris · permisos",
+          "hint": "RBAC · controls",
+          "tech": "RBAC + audit",
+          "insight": "Direcció seleccionada: usuaris, permisos — RBAC, controls."
+        },
+        {
+          "label": "dades · seguretat",
+          "hint": "dades · controls",
+          "tech": "seguretat des del disseny",
+          "insight": "Direcció seleccionada: dades, seguretat — dades, controls."
+        },
+        {
+          "label": "IA · revisió humana",
+          "hint": "automatització · controls",
+          "tech": "AI governance",
+          "insight": "Direcció seleccionada: IA, revisió humana — automatització, controls."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "capital protegit · finançament",
+      "title": "finançament · full de ruta",
+      "optionQuestion": "Tria · finançament",
+      "copy": "En aquesta pantalla el focus pràctic és finançament, full de ruta, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "finançament",
+      "core": "USD",
+      "options": [
+        {
+          "label": "finançament 100%",
+          "hint": "USD · fases · capital protegit",
+          "tech": "USD · finançament",
+          "insight": "Direcció seleccionada: finançament 100% — USD, fases, capital protegit."
+        },
+        {
+          "label": "pressupost directe · fases",
+          "hint": "full de ruta · fases",
+          "tech": "full de ruta",
+          "insight": "Direcció seleccionada: pressupost directe, fases — full de ruta, fases."
+        },
+        {
+          "label": "contacte · revisió humana",
+          "hint": "resum del projecte · contacte",
+          "tech": "revisió humana",
+          "insight": "Direcció seleccionada: contacte, revisió humana — resum del projecte, contacte."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Ritme",
+      "title": "full de ruta · Ritme",
+      "optionQuestion": "Tria · Ritme",
+      "copy": "En aquesta pantalla el focus pràctic és full de ruta, Ritme, perquè la ruta mantingui context comercial i tècnic. Hashinmy converteix aquesta elecció en una ruta clara amb abast, controls i pròxims passos, perquè el negoci vengui, operi o creixi amb menys fricció.",
+      "progress": "Ritme",
+      "core": "full de ruta",
+      "options": [
+        {
+          "label": "ràpid · MVP",
+          "hint": "Producte · ràpid",
+          "tech": "MVP",
+          "insight": "Direcció seleccionada: ràpid, MVP — Producte, ràpid."
+        },
+        {
+          "label": "1-3 · fases",
+          "hint": "full de ruta · controls",
+          "tech": "fases",
+          "insight": "Direcció seleccionada: 1-3, fases — full de ruta, controls."
+        },
+        {
+          "label": "empresa · full de ruta",
+          "hint": "seguretat · empresa",
+          "tech": "full de ruta empresarial",
+          "insight": "Direcció seleccionada: empresa, full de ruta — seguretat, empresa."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "ruta · resum",
+      "title": "resum del projecte · resum",
+      "copy": "La teva ruta ja està preparada. Abans d’enviar-la pots afegir qualsevol detall important; l’equip de Hashinmy revisarà l’orientació del projecte, l’opció de finançament i els pròxims passos amb context comercial i tècnic clar.",
+      "progress": "resum del projecte",
+      "core": "resum del projecte",
+      "insight": "ruta. resum del projecte. contacte.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "ruta",
+    "service": "Servei",
+    "operation": "Ús",
+    "value": "Valor",
+    "risk": "seguretat",
+    "financing": "finançament",
+    "timeline": "Ritme"
+  },
+  "valueLabels": {
+    "diagnostico": "resum del projecte · ruta",
+    "producto_digital": "programari a mida · Producte",
+    "automatizacion_ia": "automatització · IA",
+    "modernizacion_operativa": "modernització · processos",
+    "software_online": "web · programari",
+    "app_movil": "aplicació mòbil",
+    "software_pc": "programari per a PC",
+    "automatizacion": "automatització · processos",
+    "ia": "IA · integració",
+    "modernizacion": "modernització",
+    "web_global": "web · ruta",
+    "mobile_first": "aplicació mòbil · Ús",
+    "pc_local": "PC · controls",
+    "workflow": "flux de treball · processos",
+    "automation": "automatització · ràpid",
+    "analytics": "dades · informes",
+    "ai": "IA · revisió humana",
+    "experience": "UX/UI · confiança",
+    "analytics_ai": "dades · IA",
+    "roles_permisos": "usuaris · permisos",
+    "datos_sensibles": "dades · seguretat",
+    "ia_controlada": "IA · revisió humana",
+    "financiamiento_100": "finançament 100%",
+    "sin_financiacion": "pressupost directe",
+    "fases": "pressupost directe · fases",
+    "contacto_directo": "contacte · revisió humana",
+    "mvp_rapido": "ràpid · MVP",
+    "1_3_meses": "1-3 · fases",
+    "enterprise": "empresa · full de ruta"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "programari a mida · Producte",
+      "operation": "architecture · resum del projecte",
+      "value": "Valor · resum del projecte",
+      "risk": "seguretat · resum del projecte",
+      "financing": "finançament · resum del projecte",
+      "timeline": "Ritme · resum del projecte",
+      "technical": "programari · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · programari",
+      "automatizacion": "automatització RPA/API",
+      "ia": "IA · revisió humana",
+      "modernizacion": "modernització",
+      "web_global": "backend + base de dades",
+      "mobile_first": "aplicació mòbil · sync",
+      "pc_local": "local · controls",
+      "workflow": "permisos · flux de treball",
+      "automation": "automatització · integració",
+      "analytics": "dashboard/BI",
+      "ai": "IA · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "dades · seguretat",
+      "ia_controlada": "AI governance · revisió humana"
+    },
+    "controlBase": [
+      "dades",
+      "controls"
+    ],
+    "controlParts": {
+      "web_global": "permisos",
+      "software_online": "permisos",
+      "ia": "revisió humana",
+      "analytics_ai": "revisió humana",
+      "ai": "revisió humana",
+      "automatizacion": "automatització · informes",
+      "automation": "automatització · informes",
+      "roles_permisos": "permisos · controls",
+      "datos_sensibles": "dades · seguretat",
+      "ia_controlada": "revisió humana · controls",
+      "financiamiento_100": "finançament 100%",
+      "sin_financiacion": "pressupost directe"
+    },
+    "nextSteps": {
+      "noService": "contacte · resum del projecte",
+      "mvp": "MVP · resum del projecte",
+      "enterprise": "empresa · full de ruta",
+      "default": "programari · full de ruta"
+    }
+  },
+  "schemaVersion": 1
+}

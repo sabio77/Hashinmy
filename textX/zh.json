@@ -1,0 +1,724 @@
+{
+  "iso": "zh",
+  "name": "Chinese",
+  "nativeName": "中文",
+  "htmlLang": "zh",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | 定制软件 路线",
+    "description": "Hashinmy 体验: 定制软件. 人工智能 + 自动化. 移动应用 + PC 软件. 100% 融资 / 直接报价.",
+    "ogTitle": "Hashinmy | 定制软件",
+    "ogDescription": "路线 选择. 软件 需求简报. 融资 / 立即报价.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "中文, Chinese, 服务, 路线, 使用, 价值, 融资, 安全, 网页 · 软件, 移动应用, PC 软件, 自动化, 人工智能 · 集成, 现代化, 需求简报 · 路线, 定制软件 · 产品, 自动化 · 人工智能, 现代化 · 流程, 自动化 · 流程, 网页 · 路线, 移动应用 · 使用, PC · 控制, 工作流 · 流程, 自动化 · 快速, 数据 · 报表, 人工智能 · 人工审核, UX/UI · 信任, 数据 · 人工智能, 用户 · 权限, 数据 · 安全, 100% 融资, 直接报价, 直接报价 · 分阶段, 联系 · 人工审核, 快速 · MVP, 1-3 · 分阶段, 企业级 · 路线图, Hashinmy, hashinmy.com, 定制软件 · 产品 · 100% 融资, 网页 · 软件 · PWA, ecommerce · 定制软件 · 产品, 定制软件 · 产品 · CAD/DXF, 直接报价 · 100% 融资, API, UX/UI, ecommerce · 自动化 · 流程, 人工智能 · 集成 · 企业级 · 路线图, 行业 · 定制软件 · 产品, 立即融资, API · 网页 · 路线, 直接报价 · 定制软件 · 产品, 网页 · 软件 · SEO, chatbots · 人工智能 · 集成, Colombia · Medellín · 定制软件 · 产品, API · 企业级 · 路线图, 数据 · 安全 · 定制软件 · 产品, 企业级 · 路线图 · 定制软件 · 产品, CRM · 企业级 · 路线图, ERP · 定制软件 · 产品, 网页 · 软件 · UX/UI · 信任, 网页 · 软件 · portal"
+  },
+  "ui": {
+    "skip": "选择 · 路线",
+    "stageLabel": "Hashinmy · 体验 · 路线",
+    "topbarLabel": "控制 · Hashinmy",
+    "brandAria": "重新开始 · Hashinmy",
+    "brandSmall": "定制软件 · 人工智能",
+    "progressLabel": "路线 · 节奏",
+    "languageLabel": "语言",
+    "languageAria": "选择 · 语言",
+    "contentLabel": "体验 · 需求简报",
+    "pathLabelAria": "路线 · 摘要",
+    "decisionZoneLabel": "选择 · 服务",
+    "summaryLabelAria": "摘要 · 需求简报",
+    "footerLabel": "控制 · 路线",
+    "primaryFinance": "立即融资",
+    "primaryQuote": "立即报价",
+    "back": "返回",
+    "restart": "重新开始",
+    "contactLabel": "联系 · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · 联系",
+    "commentLabel": "描述你的项目",
+    "commentPlaceholder": "请告诉我们你想改进哪个流程、需要哪种图纸、零件或系统，以及任何有助于准备清晰路线的技术细节。",
+    "submitRoute": "发送路线给 Hashinmy",
+    "copySummaryAction": "复制摘要",
+    "formNote": "你的回答只会保存在此浏览器中，直到你决定发送。",
+    "contactRequired": "请添加邮箱、WhatsApp 或公司名称，以便 Hashinmy 带着准备好的路线联系你。",
+    "copySuccess": "摘要已复制。你可以粘贴到 WhatsApp、邮件或 CRM。",
+    "copyFailure": "无法复制摘要；请通过表单把路线发送给 Hashinmy。",
+    "mailOpening": "包含已准备路线的邮件正在打开；发送给 Hashinmy 前请先检查。",
+    "waitSummary": "摘要 · 需求简报",
+    "preparingOptions": "正在准备选项",
+    "optionFallback": "选择 · 路线",
+    "pathLabel": "路线 · 摘要",
+    "pathEmpty": "每次选择都会组成你的 项目概要",
+    "interactionFallback": "体验",
+    "summaryTitle": "Hashinmy 互动需求",
+    "projectChosen": "产品 · 选择",
+    "expectedUse": "使用",
+    "wantedValue": "价值",
+    "prioritySecurity": "安全",
+    "paymentMode": "融资",
+    "financing": "融资",
+    "pace": "节奏",
+    "technicalBase": "建议的技术基础",
+    "suggestedControls": "控制",
+    "nextStep": "路线图 · 分阶段",
+    "contact": "联系",
+    "additionalComment": "可选备注",
+    "registeredInteractions": "路线 · 摘要",
+    "directRouteRequested": "直接报价. 路线.",
+    "directQuoteSubject": "Hashinmy · 直接报价",
+    "financedSubject": "Hashinmy · 定制软件 · 融资",
+    "directQuoteAudit": "直接报价. 需求简报. 路线.",
+    "financeAudit": "100% 融资. 需求简报. 路线.",
+    "directQuoteTech": "直接报价 · 需求简报",
+    "financeTech": "USD · 分阶段 · 需求简报",
+    "topActionsLabel": "产品 · 语言",
+    "proofEntryAria": "我们的经验 · Hashinmy",
+    "proofOpenButton": "我们的经验",
+    "proofTitle": "我们的经验",
+    "proofLead": "Hashinmy 体验: 定制软件. 人工智能 + 自动化. 移动应用 + PC 软件. 100% 融资 / 直接报价.",
+    "proofCloseAria": "关闭 · 我们的经验",
+    "proofContentAria": "我们的经验 · 常见问题",
+    "proofSummaryAria": "信任 · 控制",
+    "proofSummaryTitle": "信任 · 控制 · Hashinmy",
+    "proofTrustLabel": "信任 · 控制:",
+    "proofTrustText": "安全不是最后才补上的功能，而是从权限、审计和清晰规则开始设计。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。 Hashinmy 体验: 定制软件. 人工智能 + 自动化. 移动应用 + PC 软件. 100% 融资 / 直接报价.",
+    "proofMethodLabel": "方法论：",
+    "proofMethodText": "诊断、设计、开发、测试、交付与支持。麦德林和哥伦比亚是我们的起点；服务范围面向全球。",
+    "proofUseCasesLabel": "应用场景：",
+    "proofUseCasesText": "木工企业、销售、库存、技术报价、支持、CRM、门户、电商和运营自动化。",
+    "proofBrandsTitle": "与我们工作相关的品牌、项目和公司",
+    "proofBrandsAria": "与我们工作相关的品牌、项目和公司",
+    "proofLogoPlaceholder": "我们的经验 Hashinmy",
+    "proofLogoAltTemplate": "{name} 标志",
+    "proofFaqAria": "常见问题 · 我们的经验",
+    "proofFaqWhyQuestion": "为什么选择 Hashinmy？",
+    "proofFaqWhyAnswer": "路线 选择. 软件 需求简报. 融资 / 立即报价.",
+    "proofFaqWhoQuestion": "适合对象?",
+    "proofFaqWhoAnswer": "路线 选择. 软件 需求简报. 融资 / 立即报价. 安全不是最后才补上的功能，而是从权限、审计和清晰规则开始设计。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+    "proofFaqStartQuestion": "如何开始？",
+    "proofFaqStartAnswer": "你的路线已经准备好。发送之前，你可以补充任何重要细节；Hashinmy 团队会结合清晰的商业和技术背景，审核项目方向、融资选择和下一步。 直接报价. 需求简报. 路线.",
+    "proofBrandsStructuredDescription": "与我们工作相关的品牌、项目和公司"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "网页 · 软件",
+      "tech": "网页 · backend",
+      "short": "网页"
+    },
+    {
+      "value": "app_movil",
+      "label": "移动应用",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC 软件",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "自动化",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "人工智能 · 集成",
+      "tech": "人工智能 · 工作流",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "现代化",
+      "tech": "软件 · 控制",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "受保护资金"
+    },
+    "serviceFamily": {
+      "symbol": "路线",
+      "label": "服务 · 选择"
+    },
+    "buildType": {
+      "symbol": "构建",
+      "label": "产品"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "自动化"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "现代化"
+    },
+    "operation": {
+      "symbol": "使用",
+      "label": "使用"
+    },
+    "value": {
+      "symbol": "价值",
+      "label": "价值 · 控制"
+    },
+    "risk": {
+      "symbol": "信任",
+      "label": "安全 · 控制"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% 融资"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "路线图"
+    },
+    "summary": {
+      "symbol": "摘要",
+      "label": "需求简报"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "定制"
+      ],
+      [
+        "AI",
+        "自动化"
+      ],
+      [
+        "PC",
+        "移动"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "路线"
+      ],
+      [
+        "6",
+        "服务"
+      ],
+      [
+        "1",
+        "需求简报"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "流程"
+      ],
+      [
+        "AI",
+        "人工审核"
+      ],
+      [
+        "BI",
+        "报表"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "现代化"
+      ],
+      [
+        "API",
+        "集成"
+      ],
+      [
+        "UX",
+        "信任"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "网页"
+      ],
+      [
+        "Mobile",
+        "使用"
+      ],
+      [
+        "Local",
+        "控制"
+      ]
+    ],
+    "value": [
+      [
+        "工作流",
+        "流程"
+      ],
+      [
+        "Auto",
+        "快速"
+      ],
+      [
+        "Data",
+        "控制"
+      ]
+    ],
+    "risk": [
+      [
+        "用户",
+        "权限"
+      ],
+      [
+        "Data",
+        "安全"
+      ],
+      [
+        "AI",
+        "人工审核"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "融资"
+      ],
+      [
+        "USD",
+        "分阶段"
+      ],
+      [
+        "Pause",
+        "控制"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "快速"
+      ],
+      [
+        "分阶段",
+        "路线图"
+      ],
+      [
+        "QA",
+        "控制"
+      ]
+    ],
+    "summary": [
+      [
+        "路线",
+        "摘要"
+      ],
+      [
+        "Email",
+        "需求简报"
+      ],
+      [
+        "人工审核",
+        "联系"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "中文",
+      "title": "欢迎来到 HASHINMY",
+      "copy": "我们为在本地和国际市场运营、销售并成长的公司打造定制软件。我们整合人工智能、自动化、PC 程序、支持 DXF 导出的 CAD 软件、网页应用、云端、SEO、聊天机器人、技术报价工具、安全与业务连续性。\n麦德林和哥伦比亚是我们的起点；我们的商业与技术服务面向全球。\n我们通过 100% 融资的解决方案推动企业技术发展，帮助企业释放最大潜力、提升生产力，并以更高效率扩展。",
+      "optionQuestion": "你想选择哪一种方式？",
+      "progress": "开始",
+      "core": "HASHINMY",
+      "insight": "初步诊断可以把真实需求转化为清晰、可融资、并为增长做好准备的技术路线。",
+      "options": [
+        {
+          "label": "不融资",
+          "hint": "我想获得不含融资的报价",
+          "tech": "不融资",
+          "insight": "我想收到直接报价，不包含融资计划。"
+        },
+        {
+          "label": "100% 融资",
+          "hint": "我想用清晰的 USD 分期推进",
+          "tech": "USD 分期",
+          "insight": "我想把 100% 融资作为主要推进方式。"
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "路线",
+      "title": "你最想先完成什么？",
+      "optionQuestion": "你想先解决什么问题？",
+      "copy": "选择起点后，我们会把你的需求整理成清晰路线，让它变成可执行的真实方案。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "路线",
+      "core": "服务",
+      "insight": "路线. 价值.",
+      "options": [
+        {
+          "label": "定制软件 · 产品",
+          "hint": "网页 · 移动应用 · PC 软件",
+          "tech": "软件 · 产品",
+          "insight": "已选择的方向: 定制软件，产品 — 网页，移动应用，PC 软件。"
+        },
+        {
+          "label": "自动化 · 人工智能",
+          "hint": "RPA · API · 人工智能",
+          "tech": "自动化 · 人工智能",
+          "insight": "已选择的方向: 自动化，人工智能 — RPA，API，人工智能。"
+        },
+        {
+          "label": "现代化 · 流程",
+          "hint": "Excel · 集成 · 工作流",
+          "tech": "现代化 · 工作流",
+          "insight": "已选择的方向: 现代化，流程 — Excel，集成，工作流。"
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "产品",
+      "title": "你的软件应该在哪里打开？",
+      "optionQuestion": "你想在哪里使用它？",
+      "copy": "这个选择会决定基础架构：浏览器、手机或 PC。项目需要时，Hashinmy 之后也可以组合多个模块。",
+      "progress": "产品",
+      "core": "构建",
+      "options": [
+        {
+          "label": "网页",
+          "hint": "网页 · backend · 数据",
+          "tech": "网页 · backend",
+          "insight": "已选择的方向: 网页 — 网页，backend，数据。"
+        },
+        {
+          "label": "移动应用",
+          "hint": "PWA/App · 使用",
+          "tech": "mobile/PWA",
+          "insight": "已选择的方向: 移动应用 — PWA/App，使用。"
+        },
+        {
+          "label": "PC 软件",
+          "hint": "desktop/local · 控制",
+          "tech": "desktop/local",
+          "insight": "已选择的方向: PC 软件 — desktop/local，控制。"
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "人工智能 · 自动化",
+      "title": "系统应该替你完成哪一部分？",
+      "optionQuestion": "你想先自动化什么？",
+      "copy": "自动化不是为了追逐人工智能潮流，而是减少重复任务、错误和真正影响运营的摩擦。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "自动化",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "流程 · 自动化",
+          "hint": "RPA · API · 快速",
+          "tech": "RPA/API",
+          "insight": "已选择的方向: 流程，自动化 — RPA，API，快速。"
+        },
+        {
+          "label": "人工智能 · 人工审核",
+          "hint": "人工智能 · 摘要 · 控制",
+          "tech": "人工智能 · 人工审核",
+          "insight": "已选择的方向: 人工智能，人工审核 — 人工智能，摘要，控制。"
+        },
+        {
+          "label": "数据 · 报表",
+          "hint": "BI · 报表",
+          "tech": "BI/dashboard",
+          "insight": "已选择的方向: 数据，报表 — BI，报表。"
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "现代化",
+      "title": "你想告别什么？",
+      "optionQuestion": "你想先替换什么？",
+      "copy": "现代化会把分散工具变成更安全、可衡量、并且能继续扩展的系统。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "现代化",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · 工作流",
+          "hint": "流程 · 权限",
+          "tech": "工作流 · 权限",
+          "insight": "已选择的方向: Excel，工作流 — 流程，权限。"
+        },
+        {
+          "label": "集成 · 数据",
+          "hint": "API · 控制",
+          "tech": "API · 集成",
+          "insight": "已选择的方向: 集成，数据 — API，控制。"
+        },
+        {
+          "label": "UX/UI · 信任",
+          "hint": "体验 · 价值",
+          "tech": "UX/UI + product",
+          "insight": "已选择的方向: UX/UI，信任 — 体验，价值。"
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "它在真实工作中应该怎样使用？",
+      "optionQuestion": "它最需要在哪里表现稳定？",
+      "copy": "你的回答会说明更适合优先做后台、同步、移动应用，还是本地软件。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "使用",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "网页 · 路线",
+          "hint": "cloud · backend · 数据",
+          "tech": "cloud backend",
+          "insight": "已选择的方向: 网页，路线 — cloud，backend，数据。"
+        },
+        {
+          "label": "移动应用 · 使用",
+          "hint": "移动应用 · tablet · sync",
+          "tech": "mobile first",
+          "insight": "已选择的方向: 移动应用，使用 — 移动应用，tablet，sync。"
+        },
+        {
+          "label": "PC · 控制",
+          "hint": "desktop/local · 安全",
+          "tech": "desktop/local",
+          "insight": "已选择的方向: PC，控制 — desktop/local，安全。"
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "价值",
+      "title": "什么应该先改善？",
+      "optionQuestion": "你想先看到什么结果？",
+      "copy": "好的平台不只是好看。它会整理流程、自动化工作，并呈现能支持决策的数据。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "价值",
+      "core": "价值",
+      "options": [
+        {
+          "label": "流程 · 工作流",
+          "hint": "权限 · 控制",
+          "tech": "workflow + RBAC",
+          "insight": "已选择的方向: 流程，工作流 — 权限，控制。"
+        },
+        {
+          "label": "自动化 · 快速",
+          "hint": "RPA/API · 流程",
+          "tech": "RPA/API",
+          "insight": "已选择的方向: 自动化，快速 — RPA/API，流程。"
+        },
+        {
+          "label": "数据 · 人工智能",
+          "hint": "报表 · 人工智能",
+          "tech": "BI + AI",
+          "insight": "已选择的方向: 数据，人工智能 — 报表，人工智能。"
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "信任 · 控制",
+      "title": "什么需要最强保护？",
+      "optionQuestion": "你最想保护什么？",
+      "copy": "安全不是最后才补上的功能，而是从权限、审计和清晰规则开始设计。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "安全",
+      "core": "信任",
+      "options": [
+        {
+          "label": "用户 · 权限",
+          "hint": "RBAC · 控制",
+          "tech": "RBAC + audit",
+          "insight": "已选择的方向: 用户，权限 — RBAC，控制。"
+        },
+        {
+          "label": "数据 · 安全",
+          "hint": "数据 · 控制",
+          "tech": "从设计阶段内置安全",
+          "insight": "已选择的方向: 数据，安全 — 数据，控制。"
+        },
+        {
+          "label": "人工智能 · 人工审核",
+          "hint": "自动化 · 控制",
+          "tech": "AI governance",
+          "insight": "已选择的方向: 人工智能，人工审核 — 自动化，控制。"
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "受保护资金 · 融资",
+      "title": "怎样推进而不拖慢运营？",
+      "optionQuestion": "你想怎样安排付款？",
+      "copy": "开发可以按照范围、审批和上线节奏，以 USD 分期方式组织。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "融资",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% 融资",
+          "hint": "USD · 分阶段 · 受保护资金",
+          "tech": "USD · 融资",
+          "insight": "已选择的方向: 100% 融资 — USD，分阶段，受保护资金。"
+        },
+        {
+          "label": "直接报价 · 分阶段",
+          "hint": "路线图 · 分阶段",
+          "tech": "路线图",
+          "insight": "已选择的方向: 直接报价，分阶段 — 路线图，分阶段。"
+        },
+        {
+          "label": "联系 · 人工审核",
+          "hint": "需求简报 · 联系",
+          "tech": "人工审核",
+          "insight": "已选择的方向: 联系，人工审核 — 需求简报，联系。"
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "节奏",
+      "title": "它需要多快开始运行？",
+      "optionQuestion": "哪种节奏更适合你？",
+      "copy": "这个答案会区分先做可用版本，还是按阶段建设更大的平台。 Hashinmy 会把这个选择整理成清晰路线，包含范围、控制点和下一步，让业务更少阻力地销售、运营或扩张。",
+      "progress": "节奏",
+      "core": "路线图",
+      "options": [
+        {
+          "label": "快速 · MVP",
+          "hint": "产品 · 快速",
+          "tech": "MVP",
+          "insight": "已选择的方向: 快速，MVP — 产品，快速。"
+        },
+        {
+          "label": "1-3 · 分阶段",
+          "hint": "路线图 · 控制",
+          "tech": "分阶段",
+          "insight": "已选择的方向: 1-3，分阶段 — 路线图，控制。"
+        },
+        {
+          "label": "企业级 · 路线图",
+          "hint": "安全 · 企业级",
+          "tech": "企业级路线图",
+          "insight": "已选择的方向: 企业级，路线图 — 安全，企业级。"
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "路线 · 摘要",
+      "title": "我们已经理解你的需求。",
+      "copy": "你的路线已经准备好。发送之前，你可以补充任何重要细节；Hashinmy 团队会结合清晰的商业和技术背景，审核项目方向、融资选择和下一步。",
+      "progress": "需求简报",
+      "core": "需求简报",
+      "insight": "路线. 需求简报. 联系.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "路线",
+    "service": "服务",
+    "operation": "使用",
+    "value": "价值",
+    "risk": "安全",
+    "financing": "融资",
+    "timeline": "节奏"
+  },
+  "valueLabels": {
+    "diagnostico": "需求简报 · 路线",
+    "producto_digital": "定制软件 · 产品",
+    "automatizacion_ia": "自动化 · 人工智能",
+    "modernizacion_operativa": "现代化 · 流程",
+    "software_online": "网页 · 软件",
+    "app_movil": "移动应用",
+    "software_pc": "PC 软件",
+    "automatizacion": "自动化 · 流程",
+    "ia": "人工智能 · 集成",
+    "modernizacion": "现代化",
+    "web_global": "网页 · 路线",
+    "mobile_first": "移动应用 · 使用",
+    "pc_local": "PC · 控制",
+    "workflow": "工作流 · 流程",
+    "automation": "自动化 · 快速",
+    "analytics": "数据 · 报表",
+    "ai": "人工智能 · 人工审核",
+    "experience": "UX/UI · 信任",
+    "analytics_ai": "数据 · 人工智能",
+    "roles_permisos": "用户 · 权限",
+    "datos_sensibles": "数据 · 安全",
+    "ia_controlada": "人工智能 · 人工审核",
+    "financiamiento_100": "100% 融资",
+    "sin_financiacion": "直接报价",
+    "fases": "直接报价 · 分阶段",
+    "contacto_directo": "联系 · 人工审核",
+    "mvp_rapido": "快速 · MVP",
+    "1_3_meses": "1-3 · 分阶段",
+    "enterprise": "企业级 · 路线图"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "定制软件 · 产品",
+      "operation": "architecture · 需求简报",
+      "value": "价值 · 需求简报",
+      "risk": "安全 · 需求简报",
+      "financing": "融资 · 需求简报",
+      "timeline": "节奏 · 需求简报",
+      "technical": "软件 · architecture"
+    },
+    "technicalParts": {
+      "software_online": "网页 · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · 软件",
+      "automatizacion": "RPA/API 自动化",
+      "ia": "人工智能 · 人工审核",
+      "modernizacion": "现代化",
+      "web_global": "后端 + 数据库",
+      "mobile_first": "移动应用 · sync",
+      "pc_local": "local · 控制",
+      "workflow": "权限 · 工作流",
+      "automation": "自动化 · 集成",
+      "analytics": "dashboard/BI",
+      "ai": "人工智能 · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "数据 · 安全",
+      "ia_controlada": "AI governance · 人工审核"
+    },
+    "controlBase": [
+      "数据",
+      "控制"
+    ],
+    "controlParts": {
+      "web_global": "权限",
+      "software_online": "权限",
+      "ia": "人工审核",
+      "analytics_ai": "人工审核",
+      "ai": "人工审核",
+      "automatizacion": "自动化 · 报表",
+      "automation": "自动化 · 报表",
+      "roles_permisos": "权限 · 控制",
+      "datos_sensibles": "数据 · 安全",
+      "ia_controlada": "人工审核 · 控制",
+      "financiamiento_100": "100% 融资",
+      "sin_financiacion": "直接报价"
+    },
+    "nextSteps": {
+      "noService": "联系 · 需求简报",
+      "mvp": "MVP · 需求简报",
+      "enterprise": "企业级 · 路线图",
+      "default": "软件 · 路线图"
+    }
+  },
+  "schemaVersion": 1
+}

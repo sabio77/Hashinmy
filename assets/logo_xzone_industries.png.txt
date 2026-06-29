@@ -1,0 +1,1 @@
+Prompt para logo Xzone Industries: recrear o preparar el logo oficial de Xzone Industries respetando la X blanca, texto Xzone, fondo oscuro, composición cuadrada y contraste original. Debe guardarse como assets/logo_xzone_industries.png, con alta nitidez y sin añadir textos o símbolos nuevos.

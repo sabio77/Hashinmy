@@ -1,0 +1,724 @@
+{
+  "iso": "fr",
+  "name": "French",
+  "nativeName": "Français",
+  "htmlLang": "fr",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | logiciel sur mesure parcours",
+    "description": "Parcours immersif Hashinmy pour définir un logiciel sur mesure, une IA opérationnelle, une automatisation, une application mobile ou un système PC avec financement ou devis direct.",
+    "ogTitle": "Hashinmy | logiciel sur mesure",
+    "ogDescription": "Une expérience interactive sans scroll pour clarifier votre projet logiciel et choisir la meilleure façon d'avancer.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Français, French, Service, parcours, Usage, Valeur, financement, sécurité, web · logiciel, application mobile, logiciel PC, automatisation, IA · intégration, modernisation, cahier des charges · parcours, logiciel sur mesure · Produit, automatisation · IA, modernisation · processus, automatisation · processus, web · parcours, application mobile · Usage, PC · contrôles, workflow · processus, automatisation · rapide, données · rapports, IA · revue humaine, UX/UI · confiance, données · IA, utilisateurs · permissions, données · sécurité, financement 100%, devis direct, devis direct · phases, contact · revue humaine, rapide · MVP, 1-3 · phases, entreprise · feuille de route, Hashinmy, hashinmy.com, logiciel sur mesure · Produit · financement 100%, web · logiciel · PWA, ecommerce · logiciel sur mesure · Produit, logiciel sur mesure · Produit · CAD/DXF, devis direct · financement 100%, API, UX/UI, ecommerce · automatisation · processus, IA · intégration · entreprise · feuille de route, Secteurs · logiciel sur mesure · Produit, Financer maintenant, API · web · parcours, devis direct · logiciel sur mesure · Produit, web · logiciel · SEO, chatbots · IA · intégration, Colombia · Medellín · logiciel sur mesure · Produit, API · entreprise · feuille de route, données · sécurité · logiciel sur mesure · Produit, entreprise · feuille de route · logiciel sur mesure · Produit, CRM · entreprise · feuille de route, ERP · logiciel sur mesure · Produit, web · logiciel · UX/UI · confiance, web · logiciel · portal"
+  },
+  "ui": {
+    "skip": "Aller à la question actuelle",
+    "stageLabel": "Expérience interactive Hashinmy",
+    "topbarLabel": "contrôles · Hashinmy",
+    "brandAria": "Recommencer · Hashinmy",
+    "brandSmall": "Logiciel sur mesure + IA",
+    "progressLabel": "parcours · Rythme",
+    "languageLabel": "Langue",
+    "languageAria": "Choisir · Langue",
+    "contentLabel": "Contenu principal de la scène",
+    "pathLabelAria": "parcours · résumé",
+    "decisionZoneLabel": "Options de la scène actuelle",
+    "summaryLabelAria": "résumé · cahier des charges",
+    "footerLabel": "contrôles · parcours",
+    "primaryFinance": "Financer maintenant",
+    "primaryQuote": "Demander un devis",
+    "back": "Retour",
+    "restart": "Recommencer",
+    "contactLabel": "contact · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · contact",
+    "commentLabel": "Décrivez votre projet",
+    "commentPlaceholder": "Indiquez le processus à améliorer, le plan, la pièce ou le système dont vous avez besoin, ainsi que tout détail technique utile pour préparer un parcours clair.",
+    "submitRoute": "Envoyer le parcours à Hashinmy",
+    "copySummaryAction": "Copier le résumé",
+    "formNote": "Vos réponses restent enregistrées uniquement dans ce navigateur jusqu’à ce que vous décidiez de les envoyer.",
+    "contactRequired": "Ajoutez un e-mail, WhatsApp ou une entreprise afin que Hashinmy puisse vous contacter avec le parcours préparé.",
+    "copySuccess": "Résumé copié. Vous pouvez le coller dans WhatsApp, un e-mail ou un CRM.",
+    "copyFailure": "La copie automatique n'a pas fonctionné. L'envoi par e-mail préparera quand même le résumé.",
+    "mailOpening": "Ouverture de votre application e-mail avec le parcours préparé.",
+    "waitSummary": "résumé · cahier des charges",
+    "preparingOptions": "Préparation des options",
+    "optionFallback": "Choisir · parcours",
+    "pathLabel": "parcours · résumé",
+    "pathEmpty": "Chaque choix construit votre cahier des charges",
+    "interactionFallback": "expérience",
+    "summaryTitle": "Demande interactive Hashinmy",
+    "projectChosen": "Produit · Choisir",
+    "expectedUse": "Usage",
+    "wantedValue": "Valeur",
+    "prioritySecurity": "sécurité",
+    "paymentMode": "financement",
+    "financing": "financement",
+    "pace": "Rythme",
+    "technicalBase": "Base technique recommandée",
+    "suggestedControls": "contrôles",
+    "nextStep": "feuille de route · phases",
+    "contact": "contact",
+    "additionalComment": "Commentaire facultatif",
+    "registeredInteractions": "parcours · résumé",
+    "directRouteRequested": "devis direct. parcours.",
+    "directQuoteSubject": "Hashinmy · devis direct",
+    "financedSubject": "Hashinmy · logiciel sur mesure · financement",
+    "directQuoteAudit": "Le parcours va directement au cahier des charges pour préparer un devis clair.",
+    "financeAudit": "Le parcours arrive au cahier des charges avec le financement comme priorité principale.",
+    "directQuoteTech": "devis direct · cahier des charges",
+    "financeTech": "USD · phases · cahier des charges",
+    "topActionsLabel": "Produits · Langue",
+    "proofEntryAria": "Notre expérience · Hashinmy",
+    "proofOpenButton": "Notre expérience",
+    "proofTitle": "Notre expérience",
+    "proofLead": "Parcours immersif Hashinmy pour définir un logiciel sur mesure, une IA opérationnelle, une automatisation, une application mobile ou un système PC avec financement ou devis direct.",
+    "proofCloseAria": "Fermer · Notre expérience",
+    "proofContentAria": "Notre expérience · Questions fréquentes",
+    "proofSummaryAria": "confiance · contrôles",
+    "proofSummaryTitle": "confiance · contrôles · Hashinmy",
+    "proofTrustLabel": "confiance · contrôles:",
+    "proofTrustText": "La sécurité ne s'ajoute pas à la fin. Elle se conçoit avec permissions, audit et règles claires selon le type d'opération. Parcours immersif Hashinmy pour définir un logiciel sur mesure, une IA opérationnelle, une automatisation, une application mobile ou un système PC avec financement ou devis direct.",
+    "proofMethodLabel": "Méthodologie :",
+    "proofMethodText": "Diagnostic, conception, développement, tests, livraison et support. Medellín et la Colombie sont notre origine ; notre portée est mondiale.",
+    "proofUseCasesLabel": "Cas d’usage :",
+    "proofUseCasesText": "Menuiseries, ventes, inventaire, devis techniques, support, CRM, portails, commerce électronique et automatisation opérationnelle.",
+    "proofBrandsTitle": "Marques, projets et entreprises liés à notre travail",
+    "proofBrandsAria": "Marques, projets et entreprises liés à notre travail",
+    "proofLogoPlaceholder": "Notre expérience Hashinmy",
+    "proofLogoAltTemplate": "Logo de {name}",
+    "proofFaqAria": "Questions fréquentes · Notre expérience",
+    "proofFaqWhyQuestion": "Pourquoi choisir Hashinmy ?",
+    "proofFaqWhyAnswer": "Une expérience interactive sans scroll pour clarifier votre projet logiciel et choisir la meilleure façon d'avancer.",
+    "proofFaqWhoQuestion": "Pour qui?",
+    "proofFaqWhoAnswer": "Une expérience interactive sans scroll pour clarifier votre projet logiciel et choisir la meilleure façon d'avancer. La sécurité ne s'ajoute pas à la fin. Elle se conçoit avec permissions, audit et règles claires selon le type d'opération.",
+    "proofFaqStartQuestion": "Comment commencer ?",
+    "proofFaqStartAnswer": "Votre parcours est prêt. Avant l’envoi, vous pouvez ajouter tout détail important; l’équipe Hashinmy examinera l’orientation du projet, l’option de financement et les prochaines étapes avec un contexte commercial et technique clair. Le parcours va directement au cahier des charges pour préparer un devis clair.",
+    "proofBrandsStructuredDescription": "Marques, projets et entreprises liés à notre travail"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · logiciel",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "application mobile",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "logiciel PC",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatisation",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "IA · intégration",
+      "tech": "IA · workflow",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernisation",
+      "tech": "logiciel · contrôles",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "capital protégé"
+    },
+    "serviceFamily": {
+      "symbol": "parcours",
+      "label": "Service · Choisir"
+    },
+    "buildType": {
+      "symbol": "Construction",
+      "label": "Produit"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatisation"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernisation"
+    },
+    "operation": {
+      "symbol": "Usage",
+      "label": "Usage"
+    },
+    "value": {
+      "symbol": "Valeur",
+      "label": "Valeur · contrôles"
+    },
+    "risk": {
+      "symbol": "confiance",
+      "label": "sécurité · contrôles"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "financement 100%"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "feuille de route"
+    },
+    "summary": {
+      "symbol": "résumé",
+      "label": "cahier des charges"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "sur mesure"
+      ],
+      [
+        "IA",
+        "automatisation"
+      ],
+      [
+        "PC",
+        "mobile"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "parcours"
+      ],
+      [
+        "6",
+        "Service"
+      ],
+      [
+        "1",
+        "cahier des charges"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "processus"
+      ],
+      [
+        "AI",
+        "revue humaine"
+      ],
+      [
+        "BI",
+        "rapports"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernisation"
+      ],
+      [
+        "API",
+        "intégration"
+      ],
+      [
+        "UX",
+        "confiance"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Usage"
+      ],
+      [
+        "Local",
+        "contrôles"
+      ]
+    ],
+    "value": [
+      [
+        "workflow",
+        "processus"
+      ],
+      [
+        "Auto",
+        "rapide"
+      ],
+      [
+        "Data",
+        "contrôles"
+      ]
+    ],
+    "risk": [
+      [
+        "utilisateurs",
+        "permissions"
+      ],
+      [
+        "Data",
+        "sécurité"
+      ],
+      [
+        "AI",
+        "revue humaine"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "financement"
+      ],
+      [
+        "USD",
+        "phases"
+      ],
+      [
+        "Pause",
+        "contrôles"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "rapide"
+      ],
+      [
+        "phases",
+        "feuille de route"
+      ],
+      [
+        "QA",
+        "contrôles"
+      ]
+    ],
+    "summary": [
+      [
+        "parcours",
+        "résumé"
+      ],
+      [
+        "Email",
+        "cahier des charges"
+      ],
+      [
+        "revue humaine",
+        "contact"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Français",
+      "title": "Bienvenue chez HASHINMY",
+      "copy": "Nous développons des logiciels sur mesure pour les entreprises qui opèrent, vendent et grandissent sur des marchés locaux et internationaux. Nous intégrons IA, automatisation, programmes pour PC, logiciel CAD avec export DXF, applications web, cloud, SEO, chatbots, outils de chiffrage technique, sécurité et continuité opérationnelle.\nMedellín et la Colombie sont notre origine ; notre portée commerciale et technique est mondiale.\nNous stimulons le développement technologique des entreprises avec des solutions financées à 100 %, en les aidant à atteindre leur plein potentiel, à améliorer leur productivité et à évoluer plus efficacement.",
+      "optionQuestion": "Quelle option souhaitez-vous ?",
+      "progress": "Départ",
+      "core": "HASHINMY",
+      "insight": "Le diagnostic initial aide à transformer un besoin réel en feuille de route technique claire, finançable et prête à évoluer.",
+      "options": [
+        {
+          "label": "Sans financement",
+          "hint": "Je souhaite recevoir un devis sans financement",
+          "tech": "Sans financement",
+          "insight": "Je souhaite recevoir un devis direct, sans plan de financement."
+        },
+        {
+          "label": "Financement 100 %",
+          "hint": "Je souhaite avancer avec des mensualités claires en USD",
+          "tech": "mensualités USD",
+          "insight": "Je souhaite avancer avec le financement 100 % comme modalité principale."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "parcours",
+      "title": "Que voulez-vous réussir en premier ?",
+      "optionQuestion": "Que souhaitez-vous résoudre d'abord ?",
+      "copy": "Choisissez le point de départ et nous préparons un parcours clair pour transformer votre besoin en proposition réelle. L'objectif est de parler service, valeur et priorité sans perdre le contexte métier.",
+      "progress": "parcours",
+      "core": "Service",
+      "insight": "parcours. Valeur.",
+      "options": [
+        {
+          "label": "logiciel sur mesure · Produit",
+          "hint": "web · application mobile · logiciel PC",
+          "tech": "logiciel · Produit",
+          "insight": "Direction sélectionnée: logiciel sur mesure, Produit — web, application mobile, logiciel PC."
+        },
+        {
+          "label": "automatisation · IA",
+          "hint": "RPA · API · IA",
+          "tech": "automatisation · IA",
+          "insight": "Direction sélectionnée: automatisation, IA — RPA, API, IA."
+        },
+        {
+          "label": "modernisation · processus",
+          "hint": "Excel · intégration · workflow",
+          "tech": "modernisation · workflow",
+          "insight": "Direction sélectionnée: modernisation, processus — Excel, intégration, workflow."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produit",
+      "title": "Où votre logiciel doit-il s'ouvrir ?",
+      "optionQuestion": "Où voulez-vous l'utiliser ?",
+      "copy": "Cette décision définit la base technique : navigateur, téléphone ou PC. Hashinmy peut ensuite combiner des modules si le projet exige plusieurs environnements.",
+      "progress": "Produit",
+      "core": "Construction",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · données",
+          "tech": "web · backend",
+          "insight": "Direction sélectionnée: web — web, backend, données."
+        },
+        {
+          "label": "application mobile",
+          "hint": "PWA/App · Usage",
+          "tech": "mobile/PWA",
+          "insight": "Direction sélectionnée: application mobile — PWA/App, Usage."
+        },
+        {
+          "label": "logiciel PC",
+          "hint": "desktop/local · contrôles",
+          "tech": "desktop/local",
+          "insight": "Direction sélectionnée: logiciel PC — desktop/local, contrôles."
+        }
+      ]
+    },
+    "automationType": {
+      "eyebrow": "IA · automatisation",
+      "title": "Quelle partie le système doit-il faire pour vous ?",
+      "optionQuestion": "Que voulez-vous automatiser en premier ?",
+      "copy": "Automatiser ne veut pas dire ajouter de l'IA par mode. Il s'agit de retirer les tâches répétitives, les erreurs et les points de friction là où ils coûtent vraiment.",
+      "progress": "automatisation",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "processus · automatisation",
+          "hint": "RPA · API · rapide",
+          "tech": "RPA/API",
+          "insight": "Direction sélectionnée: processus, automatisation — RPA, API, rapide."
+        },
+        {
+          "label": "IA · revue humaine",
+          "hint": "IA · résumé · contrôles",
+          "tech": "IA · revue humaine",
+          "insight": "Direction sélectionnée: IA, revue humaine — IA, résumé, contrôles."
+        },
+        {
+          "label": "données · rapports",
+          "hint": "BI · rapports",
+          "tech": "BI/dashboard",
+          "insight": "Direction sélectionnée: données, rapports — BI, rapports."
+        }
+      ]
+    },
+    "modernization": {
+      "eyebrow": "modernisation",
+      "title": "Que voulez-vous laisser derrière vous ?",
+      "optionQuestion": "Que voulez-vous remplacer en premier ?",
+      "copy": "La modernisation transforme des outils isolés en un système plus sûr, mesurable et prêt à évoluer avec l'entreprise.",
+      "progress": "modernisation",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · workflow",
+          "hint": "processus · permissions",
+          "tech": "workflow · permissions",
+          "insight": "Direction sélectionnée: Excel, workflow — processus, permissions."
+        },
+        {
+          "label": "intégration · données",
+          "hint": "API · contrôles",
+          "tech": "API · intégration",
+          "insight": "Direction sélectionnée: intégration, données — API, contrôles."
+        },
+        {
+          "label": "UX/UI · confiance",
+          "hint": "expérience · Valeur",
+          "tech": "UX/UI + product",
+          "insight": "Direction sélectionnée: UX/UI, confiance — expérience, Valeur."
+        }
+      ]
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Comment doit-il être utilisé au quotidien ?",
+      "optionQuestion": "Où doit-il fonctionner le mieux ?",
+      "copy": "Votre réponse indique s'il faut privilégier un backend, une synchronisation mobile, une application ou un logiciel local pour l'opération réelle.",
+      "progress": "Usage",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · parcours",
+          "hint": "cloud · backend · données",
+          "tech": "cloud backend",
+          "insight": "Direction sélectionnée: web, parcours — cloud, backend, données."
+        },
+        {
+          "label": "application mobile · Usage",
+          "hint": "application mobile · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Direction sélectionnée: application mobile, Usage — application mobile, tablet, sync."
+        },
+        {
+          "label": "PC · contrôles",
+          "hint": "desktop/local · sécurité",
+          "tech": "desktop/local",
+          "insight": "Direction sélectionnée: PC, contrôles — desktop/local, sécurité."
+        }
+      ]
+    },
+    "value": {
+      "eyebrow": "Valeur",
+      "title": "Qu'est-ce qui doit s'améliorer en premier ?",
+      "optionQuestion": "Quel résultat voulez-vous voir d'abord ?",
+      "copy": "Une bonne plateforme ne se contente pas d'être belle. Elle organise, automatise et montre des données utiles pour décider avec plus de contrôle.",
+      "progress": "Valeur",
+      "core": "Valeur",
+      "options": [
+        {
+          "label": "processus · workflow",
+          "hint": "permissions · contrôles",
+          "tech": "workflow + RBAC",
+          "insight": "Direction sélectionnée: processus, workflow — permissions, contrôles."
+        },
+        {
+          "label": "automatisation · rapide",
+          "hint": "RPA/API · processus",
+          "tech": "RPA/API",
+          "insight": "Direction sélectionnée: automatisation, rapide — RPA/API, processus."
+        },
+        {
+          "label": "données · IA",
+          "hint": "rapports · IA",
+          "tech": "BI + AI",
+          "insight": "Direction sélectionnée: données, IA — rapports, IA."
+        }
+      ]
+    },
+    "risk": {
+      "eyebrow": "confiance · contrôles",
+      "title": "Qu'est-ce qui doit être le mieux protégé ?",
+      "optionQuestion": "Que voulez-vous mieux protéger ?",
+      "copy": "La sécurité ne s'ajoute pas à la fin. Elle se conçoit avec permissions, audit et règles claires selon le type d'opération.",
+      "progress": "sécurité",
+      "core": "confiance",
+      "options": [
+        {
+          "label": "utilisateurs · permissions",
+          "hint": "RBAC · contrôles",
+          "tech": "RBAC + audit",
+          "insight": "Direction sélectionnée: utilisateurs, permissions — RBAC, contrôles."
+        },
+        {
+          "label": "données · sécurité",
+          "hint": "données · contrôles",
+          "tech": "sécurité dès la conception",
+          "insight": "Direction sélectionnée: données, sécurité — données, contrôles."
+        },
+        {
+          "label": "IA · revue humaine",
+          "hint": "automatisation · contrôles",
+          "tech": "AI governance",
+          "insight": "Direction sélectionnée: IA, revue humaine — automatisation, contrôles."
+        }
+      ]
+    },
+    "finance": {
+      "eyebrow": "capital protégé · financement",
+      "title": "Comment avancer sans freiner votre opération ?",
+      "optionQuestion": "Comment voulez-vous organiser le paiement ?",
+      "copy": "Le développement peut être organisé en mensualités en USD selon le périmètre, les validations et le rythme qui protège votre capital.",
+      "progress": "financement",
+      "core": "USD",
+      "options": [
+        {
+          "label": "financement 100%",
+          "hint": "USD · phases · capital protégé",
+          "tech": "USD · financement",
+          "insight": "Direction sélectionnée: financement 100% — USD, phases, capital protégé."
+        },
+        {
+          "label": "devis direct · phases",
+          "hint": "feuille de route · phases",
+          "tech": "feuille de route",
+          "insight": "Direction sélectionnée: devis direct, phases — feuille de route, phases."
+        },
+        {
+          "label": "contact · revue humaine",
+          "hint": "cahier des charges · contact",
+          "tech": "revue humaine",
+          "insight": "Direction sélectionnée: contact, revue humaine — cahier des charges, contact."
+        }
+      ]
+    },
+    "timeline": {
+      "eyebrow": "Rythme",
+      "title": "Quand doit-il commencer à fonctionner ?",
+      "optionQuestion": "Quel rythme vous convient le mieux ?",
+      "copy": "Cette réponse sépare une première version utile d'une plateforme plus large construite par étapes, avec validation et contrôle.",
+      "progress": "Rythme",
+      "core": "feuille de route",
+      "options": [
+        {
+          "label": "rapide · MVP",
+          "hint": "Produit · rapide",
+          "tech": "MVP",
+          "insight": "Direction sélectionnée: rapide, MVP — Produit, rapide."
+        },
+        {
+          "label": "1-3 · phases",
+          "hint": "feuille de route · contrôles",
+          "tech": "phases",
+          "insight": "Direction sélectionnée: 1-3, phases — feuille de route, contrôles."
+        },
+        {
+          "label": "entreprise · feuille de route",
+          "hint": "sécurité · entreprise",
+          "tech": "feuille de route enterprise",
+          "insight": "Direction sélectionnée: entreprise, feuille de route — sécurité, entreprise."
+        }
+      ]
+    },
+    "summary": {
+      "eyebrow": "parcours · résumé",
+      "title": "Nous avons compris ce que vous recherchez.",
+      "copy": "Votre parcours est prêt. Avant l’envoi, vous pouvez ajouter tout détail important; l’équipe Hashinmy examinera l’orientation du projet, l’option de financement et les prochaines étapes avec un contexte commercial et technique clair.",
+      "progress": "cahier des charges",
+      "core": "cahier des charges",
+      "insight": "parcours. cahier des charges. contact.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "parcours",
+    "service": "Service",
+    "operation": "Usage",
+    "value": "Valeur",
+    "risk": "sécurité",
+    "financing": "financement",
+    "timeline": "Rythme"
+  },
+  "valueLabels": {
+    "diagnostico": "cahier des charges · parcours",
+    "producto_digital": "logiciel sur mesure · Produit",
+    "automatizacion_ia": "automatisation · IA",
+    "modernizacion_operativa": "modernisation · processus",
+    "software_online": "web · logiciel",
+    "app_movil": "application mobile",
+    "software_pc": "logiciel PC",
+    "automatizacion": "automatisation · processus",
+    "ia": "IA · intégration",
+    "modernizacion": "modernisation",
+    "web_global": "web · parcours",
+    "mobile_first": "application mobile · Usage",
+    "pc_local": "PC · contrôles",
+    "workflow": "workflow · processus",
+    "automation": "automatisation · rapide",
+    "analytics": "données · rapports",
+    "ai": "IA · revue humaine",
+    "experience": "UX/UI · confiance",
+    "analytics_ai": "données · IA",
+    "roles_permisos": "utilisateurs · permissions",
+    "datos_sensibles": "données · sécurité",
+    "ia_controlada": "IA · revue humaine",
+    "financiamiento_100": "financement 100%",
+    "sin_financiacion": "devis direct",
+    "fases": "devis direct · phases",
+    "contacto_directo": "contact · revue humaine",
+    "mvp_rapido": "rapide · MVP",
+    "1_3_meses": "1-3 · phases",
+    "enterprise": "entreprise · feuille de route"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "logiciel sur mesure · Produit",
+      "operation": "architecture · cahier des charges",
+      "value": "Valeur · cahier des charges",
+      "risk": "sécurité · cahier des charges",
+      "financing": "financement · cahier des charges",
+      "timeline": "Rythme · cahier des charges",
+      "technical": "logiciel · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · logiciel",
+      "automatizacion": "automatisation RPA/API",
+      "ia": "IA · revue humaine",
+      "modernizacion": "modernisation",
+      "web_global": "backend + base de données",
+      "mobile_first": "application mobile · sync",
+      "pc_local": "local · contrôles",
+      "workflow": "permissions · workflow",
+      "automation": "automatisation · intégration",
+      "analytics": "dashboard/BI",
+      "ai": "IA · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "données · sécurité",
+      "ia_controlada": "AI governance · revue humaine"
+    },
+    "controlBase": [
+      "données",
+      "contrôles"
+    ],
+    "controlParts": {
+      "web_global": "permissions",
+      "software_online": "permissions",
+      "ia": "revue humaine",
+      "analytics_ai": "revue humaine",
+      "ai": "revue humaine",
+      "automatizacion": "automatisation · rapports",
+      "automation": "automatisation · rapports",
+      "roles_permisos": "permissions · contrôles",
+      "datos_sensibles": "données · sécurité",
+      "ia_controlada": "revue humaine · contrôles",
+      "financiamiento_100": "financement 100%",
+      "sin_financiacion": "devis direct"
+    },
+    "nextSteps": {
+      "noService": "contact · cahier des charges",
+      "mvp": "MVP · cahier des charges",
+      "enterprise": "entreprise · feuille de route",
+      "default": "logiciel · feuille de route"
+    }
+  },
+  "schemaVersion": 1
+}
