@@ -1,0 +1,738 @@
+{
+  "iso": "sw",
+  "name": "Swahili",
+  "nativeName": "Kiswahili",
+  "htmlLang": "sw",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | programu maalum njia",
+    "description": "Hashinmy uzoefu: programu maalum. AI + otomatiki. programu ya simu + programu ya PC. ufadhili 100% / bei ya moja kwa moja.",
+    "ogTitle": "Hashinmy | programu maalum",
+    "ogDescription": "njia Chagua. programu muhtasari. ufadhili / Pata bei sasa.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, programu maalum inayofadhiliwa 100%, teknolojia ya biashara inayofadhiliwa, uhandisi wa kidijitali kwa kampuni, akili bandia inayotumika, uendeshaji otomatiki wa michakato ya biashara, mabadiliko ya kidijitali bila kumaliza mtaji, uundaji wa programu kwa ufadhili, mifumo yenye akili kwa kampuni, programu ya kupanga michakato, otomatiki ya mauzo, otomatiki ya makadirio, programu ya hesabu ya bidhaa, CRM maalum, ERP nyepesi maalum, API za biashara, chatbots za biashara, kurasa za wavuti kama njia ya mauzo, majukwaa ya kidijitali maalum, programu kwa malipo yanayoweza kudhibitiwa, uboreshaji wa biashara, tija ya biashara, udhibiti wa uendeshaji, ripoti za biashara, mtiririko wa fedha uliolindwa, uundaji wa programu Medellín, programu za biashara nchini Colombia, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "Chagua · njia",
+    "stageLabel": "Hashinmy · uzoefu · njia",
+    "topbarLabel": "udhibiti · Hashinmy",
+    "brandAria": "Anza upya · Hashinmy",
+    "brandSmall": "programu maalum · AI",
+    "progressLabel": "njia · Kasi",
+    "languageLabel": "Lugha",
+    "languageAria": "Chagua · Lugha",
+    "contentLabel": "uzoefu · muhtasari",
+    "pathLabelAria": "njia · muhtasari",
+    "decisionZoneLabel": "Chagua · Huduma",
+    "summaryLabelAria": "muhtasari · muhtasari",
+    "footerLabel": "udhibiti · njia",
+    "primaryFinance": "Fadhili sasa",
+    "primaryQuote": "Pata bei sasa",
+    "back": "Rudi",
+    "restart": "Anza upya",
+    "contactLabel": "mawasiliano · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · mawasiliano",
+    "commentLabel": "Eleza mradi wako",
+    "commentPlaceholder": "Tuambie ni mchakato gani unataka kuboresha, ni mchoro, sehemu au mfumo gani unahitaji, na maelezo yoyote ya kiufundi yatakayosaidia kuandaa njia iliyo wazi.",
+    "submitRoute": "Tuma njia kwa Hashinmy",
+    "copySummaryAction": "Nakili muhtasari",
+    "formNote": "Majibu yako huhifadhiwa kwenye kivinjari hiki tu hadi utakapoamua kuyatuma.",
+    "contactRequired": "Ongeza barua pepe, WhatsApp au jina la kampuni ili Hashinmy iweze kuwasiliana nawe kwa njia iliyoandaliwa.",
+    "copySuccess": "Muhtasari umenakiliwa. Unaweza kuubandika kwenye WhatsApp, barua pepe au CRM.",
+    "copyFailure": "Muhtasari haukuweza kunakiliwa; tuma njia kwa Hashinmy kupitia fomu.",
+    "mailOpening": "Barua pepe yenye njia iliyoandaliwa inafunguliwa; ikague kabla ya kuituma kwa Hashinmy.",
+    "waitSummary": "muhtasari · muhtasari",
+    "preparingOptions": "Chaguo zinaandaliwa",
+    "optionFallback": "Chagua · njia",
+    "pathLabel": "njia · muhtasari",
+    "pathEmpty": "Kila chaguo hujenga muhtasari wa mradi yako",
+    "interactionFallback": "uzoefu",
+    "summaryTitle": "Ombi la mwingiliano la Hashinmy",
+    "projectChosen": "Bidhaa · Chagua",
+    "expectedUse": "Matumizi",
+    "wantedValue": "Thamani",
+    "prioritySecurity": "usalama",
+    "paymentMode": "ufadhili",
+    "financing": "ufadhili",
+    "pace": "Kasi",
+    "technicalBase": "Msingi wa kiufundi unaopendekezwa",
+    "suggestedControls": "udhibiti",
+    "nextStep": "mpango wa njia · awamu",
+    "contact": "mawasiliano",
+    "additionalComment": "Maoni ya hiari",
+    "registeredInteractions": "njia · muhtasari",
+    "directRouteRequested": "bei ya moja kwa moja. njia.",
+    "directQuoteSubject": "Hashinmy · bei ya moja kwa moja",
+    "financedSubject": "Hashinmy · programu maalum · ufadhili",
+    "directQuoteAudit": "bei ya moja kwa moja. muhtasari. njia.",
+    "financeAudit": "ufadhili 100%. muhtasari. njia.",
+    "directQuoteTech": "bei ya moja kwa moja · muhtasari",
+    "financeTech": "USD · awamu · muhtasari",
+    "topActionsLabel": "Bidhaa · Lugha",
+    "proofEntryAria": "Uzoefu Wetu · Hashinmy",
+    "proofOpenButton": "Uzoefu Wetu",
+    "proofTitle": "Uzoefu Wetu",
+    "proofLead": "Hashinmy uzoefu: programu maalum. AI + otomatiki. programu ya simu + programu ya PC. ufadhili 100% / bei ya moja kwa moja.",
+    "proofCloseAria": "Funga · Uzoefu Wetu",
+    "proofContentAria": "Uzoefu Wetu · Maswali ya mara kwa mara",
+    "proofSummaryAria": "uaminifu · udhibiti",
+    "proofSummaryTitle": "uaminifu · udhibiti · Hashinmy",
+    "proofTrustLabel": "uaminifu · udhibiti:",
+    "proofTrustText": "Usalama hauongezwi mwisho. Unabuniwa mapema kwa ruhusa, ukaguzi na sheria zilizo wazi. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo. Hashinmy uzoefu: programu maalum. AI + otomatiki. programu ya simu + programu ya PC. ufadhili 100% / bei ya moja kwa moja.",
+    "proofMethodLabel": "Mbinu ya kazi:",
+    "proofMethodText": "Uchunguzi, usanifu, uundaji, majaribio, teslimu na usaidizi. Medellín na Colombia ndicho chanzo chetu; upeo wetu ni wa kimataifa.",
+    "proofUseCasesLabel": "Matumizi:",
+    "proofUseCasesText": "Biashara za useremala, mauzo, hesabu ya bidhaa, nukuu za kiufundi, usaidizi, CRM, tovuti za huduma, biashara mtandaoni na otomatiki ya uendeshaji.",
+    "proofBrandsTitle": "Chapa, miradi na kampuni zinazohusiana na kazi yetu",
+    "proofBrandsAria": "Chapa, miradi na kampuni zinazohusiana na kazi yetu",
+    "proofLogoPlaceholder": "Uzoefu Wetu Hashinmy",
+    "proofLogoAltTemplate": "Nembo ya {name}",
+    "proofFaqAria": "Maswali ya mara kwa mara · Uzoefu Wetu",
+    "proofFaqWhyQuestion": "Kwa nini uchague Hashinmy?",
+    "proofFaqWhyAnswer": "njia Chagua. programu muhtasari. ufadhili / Pata bei sasa.",
+    "proofFaqWhoQuestion": "Kwa nani?",
+    "proofFaqWhoAnswer": "njia Chagua. programu muhtasari. ufadhili / Pata bei sasa. Usalama hauongezwi mwisho. Unabuniwa mapema kwa ruhusa, ukaguzi na sheria zilizo wazi. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+    "proofFaqStartQuestion": "Nianze vipi?",
+    "proofFaqStartAnswer": "Njia yako iko tayari. Kabla ya kuituma, unaweza kuongeza maelezo yoyote muhimu; timu ya Hashinmy itapitia mwelekeo wa mradi, chaguo la ufadhili na hatua zinazofuata kwa muktadha wazi wa kibiashara na kiufundi. bei ya moja kwa moja. muhtasari. njia.",
+    "proofBrandsStructuredDescription": "Chapa, miradi na kampuni zinazohusiana na kazi yetu"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "wavuti · programu",
+      "tech": "wavuti · backend",
+      "short": "wavuti"
+    },
+    {
+      "value": "app_movil",
+      "label": "programu ya simu",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "programu ya PC",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "otomatiki",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · muunganisho",
+      "tech": "AI · mtiririko wa kazi",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "uboreshaji",
+      "tech": "programu · udhibiti",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "mtaji uliolindwa"
+    },
+    "serviceFamily": {
+      "symbol": "njia",
+      "label": "Huduma · Chagua"
+    },
+    "buildType": {
+      "symbol": "Ujenzi",
+      "label": "Bidhaa"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "otomatiki"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "uboreshaji"
+    },
+    "operation": {
+      "symbol": "Matumizi",
+      "label": "Matumizi"
+    },
+    "value": {
+      "symbol": "Thamani",
+      "label": "Thamani · udhibiti"
+    },
+    "risk": {
+      "symbol": "uaminifu",
+      "label": "usalama · udhibiti"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "ufadhili 100%"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "mpango wa njia"
+    },
+    "summary": {
+      "symbol": "muhtasari",
+      "label": "muhtasari"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "maalum"
+      ],
+      [
+        "AI",
+        "otomatiki"
+      ],
+      [
+        "PC",
+        "ya simu"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "njia"
+      ],
+      [
+        "6",
+        "Huduma"
+      ],
+      [
+        "1",
+        "muhtasari"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "michakato"
+      ],
+      [
+        "AI",
+        "ukaguzi wa binadamu"
+      ],
+      [
+        "BI",
+        "ripoti"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "uboreshaji"
+      ],
+      [
+        "API",
+        "muunganisho"
+      ],
+      [
+        "UX",
+        "uaminifu"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "wavuti"
+      ],
+      [
+        "Mobile",
+        "Matumizi"
+      ],
+      [
+        "Local",
+        "udhibiti"
+      ]
+    ],
+    "value": [
+      [
+        "mtiririko wa kazi",
+        "michakato"
+      ],
+      [
+        "Auto",
+        "haraka"
+      ],
+      [
+        "Data",
+        "udhibiti"
+      ]
+    ],
+    "risk": [
+      [
+        "watumiaji",
+        "ruhusa"
+      ],
+      [
+        "Data",
+        "usalama"
+      ],
+      [
+        "AI",
+        "ukaguzi wa binadamu"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "ufadhili"
+      ],
+      [
+        "USD",
+        "awamu"
+      ],
+      [
+        "Pause",
+        "udhibiti"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "haraka"
+      ],
+      [
+        "awamu",
+        "mpango wa njia"
+      ],
+      [
+        "QA",
+        "udhibiti"
+      ]
+    ],
+    "summary": [
+      [
+        "njia",
+        "muhtasari"
+      ],
+      [
+        "Email",
+        "muhtasari"
+      ],
+      [
+        "ukaguzi wa binadamu",
+        "mawasiliano"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Kiswahili",
+      "title": "Karibu HASHINMY",
+      "copy": "Tunatengeneza programu maalum kwa kampuni zinazofanya kazi, kuuza na kukua katika masoko ya ndani na ya kimataifa. Tunaunganisha AI, otomatiki, programu za PC, programu ya CAD yenye usafirishaji wa DXF, programu za wavuti, wingu, SEO, chatbots, zana za makadirio ya kiufundi, usalama na mwendelezo wa uendeshaji.\nMedellín na Kolombia ndiko chimbuko letu; uwezo wetu wa kibiashara na kiufundi ni wa kimataifa.\nTunasukuma maendeleo ya teknolojia ya kampuni kwa suluhisho zinazofadhiliwa 100%, tukizisaidia kufikia uwezo wao wa juu, kuongeza tija na kukua kwa ufanisi zaidi.",
+      "optionQuestion": "Ungependa chaguo gani?",
+      "progress": "Mwanzo",
+      "core": "HASHINMY",
+      "insight": "Unaweza kuanza kwa uchunguzi, ufadhili au nukuu ya moja kwa moja; Hashinmy huanza na tatizo halisi kabla ya kufafanua upeo, njia ya malipo au teknolojia.",
+      "options": [
+        {
+          "label": "Uchunguzi wa uendeshaji",
+          "hint": "Nataka Hashinmy igundue mahali muda, pesa au taarifa zinapopotea",
+          "tech": "uchambuzi wa uendeshaji + njia ya kiufundi + uwezekano wa kifedha",
+          "insight": "Nataka kuanza kwa kuelewa uendeshaji wangu, kutambua mchakato unaozuia biashara zaidi na kupokea njia iliyo wazi kabla ya kuamua kufadhili, kuomba nukuu ya moja kwa moja au kujenga kwa hatua."
+        },
+        {
+          "label": "Ufadhili 100%",
+          "hint": "Nataka kuboresha bila malipo makubwa ya awali",
+          "tech": "ufadhili 100%",
+          "insight": "Nataka kuendelea na uundaji unaofadhiliwa 100% na kuulipa kwa malipo yanayoweza kudhibitiwa wakati mfumo unaanza kuzalisha thamani."
+        },
+        {
+          "label": "Nukuu ya moja kwa moja",
+          "hint": "Nataka kujua upeo na bei bila ufadhili",
+          "tech": "nukuu ya moja kwa moja",
+          "insight": "Nataka kupokea pendekezo la moja kwa moja lenye upeo, bei na muda ulio wazi ili niamue bila mpango wa ufadhili."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "njia",
+      "title": "Unataka kufanikisha nini kwanza?",
+      "optionQuestion": "Unataka kutatua nini kwanza?",
+      "copy": "Chagua pa kuanzia nasi tutaandaa njia iliyo wazi ili kugeuza hitaji lako kuwa pendekezo halisi. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+      "progress": "njia",
+      "core": "Huduma",
+      "insight": "Nachagua hitaji linaloathiri zaidi tija, mtiririko wa biashara au udhibiti wa uendeshaji ili suluhisho la kwanza la kiteknolojia lijibu maumivu halisi ya biashara.",
+      "options": [
+        {
+          "label": "programu maalum · Bidhaa",
+          "hint": "wavuti · programu ya simu · programu ya PC",
+          "tech": "programu · Bidhaa",
+          "insight": "Mwelekeo uliochaguliwa: programu maalum, Bidhaa — wavuti, programu ya simu, programu ya PC."
+        },
+        {
+          "label": "otomatiki · AI",
+          "hint": "RPA · API · AI",
+          "tech": "otomatiki · AI",
+          "insight": "Mwelekeo uliochaguliwa: otomatiki, AI — RPA, API, AI."
+        },
+        {
+          "label": "uboreshaji · michakato",
+          "hint": "Excel · muunganisho · mtiririko wa kazi",
+          "tech": "uboreshaji · mtiririko wa kazi",
+          "insight": "Mwelekeo uliochaguliwa: uboreshaji, michakato — Excel, muunganisho, mtiririko wa kazi."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Bidhaa",
+      "title": "Programu yako ifunguke wapi?",
+      "optionQuestion": "Unataka kuitumia wapi?",
+      "copy": "Uamuzi huu unaweka msingi: kivinjari, simu au PC. Hashinmy inaweza kuunganisha moduli baadaye ikiwa mradi unahitaji.",
+      "progress": "Bidhaa",
+      "core": "Ujenzi",
+      "options": [
+        {
+          "label": "wavuti",
+          "hint": "wavuti · backend · data",
+          "tech": "wavuti · backend",
+          "insight": "Mwelekeo uliochaguliwa: wavuti — wavuti, backend, data."
+        },
+        {
+          "label": "programu ya simu",
+          "hint": "PWA/App · Matumizi",
+          "tech": "mobile/PWA",
+          "insight": "Mwelekeo uliochaguliwa: programu ya simu — PWA/App, Matumizi."
+        },
+        {
+          "label": "programu ya PC",
+          "hint": "desktop/local · udhibiti",
+          "tech": "desktop/local",
+          "insight": "Mwelekeo uliochaguliwa: programu ya PC — desktop/local, udhibiti."
+        }
+      ],
+      "insight": "Jukwaa linapaswa kufunguka mahali ambapo timu yako tayari inafanya kazi, ili teknolojia ipange uendeshaji bila kulazimisha biashara kuzoea zana isiyo rahisi."
+    },
+    "automationType": {
+      "eyebrow": "AI · otomatiki",
+      "title": "Mfumo ufanye sehemu gani kwa niaba yako?",
+      "optionQuestion": "Unataka kuanza kuotomate nini?",
+      "copy": "Otomatiki si kuweka AI kwa sababu ya mtindo. Ni kuondoa kazi zinazorudiwa, makosa na msuguano pale panapouma zaidi.",
+      "progress": "otomatiki",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "michakato · otomatiki",
+          "hint": "RPA · API · haraka",
+          "tech": "RPA/API",
+          "insight": "Mwelekeo uliochaguliwa: michakato, otomatiki — RPA, API, haraka."
+        },
+        {
+          "label": "AI · ukaguzi wa binadamu",
+          "hint": "AI · muhtasari · udhibiti",
+          "tech": "AI · ukaguzi wa binadamu",
+          "insight": "Mwelekeo uliochaguliwa: AI, ukaguzi wa binadamu — AI, muhtasari, udhibiti."
+        },
+        {
+          "label": "data · ripoti",
+          "hint": "BI · ripoti",
+          "tech": "BI/dashboard",
+          "insight": "Mwelekeo uliochaguliwa: data, ripoti — BI, ripoti."
+        }
+      ],
+      "insight": "Otomatiki sahihi huanza na kazi inayojirudia zaidi, kuchelewa zaidi au kusababisha makosa mengi ya kibinadamu ndani ya uendeshaji wa kila siku."
+    },
+    "modernization": {
+      "eyebrow": "uboreshaji",
+      "title": "Unataka kuacha nini nyuma?",
+      "optionQuestion": "Unataka kubadilisha nini kwanza?",
+      "copy": "Usasaishaji hubadilisha zana zilizotawanyika kuwa mfumo salama zaidi, unaopimika na ulio tayari kukua.",
+      "progress": "uboreshaji",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · mtiririko wa kazi",
+          "hint": "michakato · ruhusa",
+          "tech": "mtiririko wa kazi · ruhusa",
+          "insight": "Mwelekeo uliochaguliwa: Excel, mtiririko wa kazi — michakato, ruhusa."
+        },
+        {
+          "label": "muunganisho · data",
+          "hint": "API · udhibiti",
+          "tech": "API · muunganisho",
+          "insight": "Mwelekeo uliochaguliwa: muunganisho, data — API, udhibiti."
+        },
+        {
+          "label": "UX/UI · uaminifu",
+          "hint": "uzoefu · Thamani",
+          "tech": "UX/UI + product",
+          "insight": "Mwelekeo uliochaguliwa: UX/UI, uaminifu — uzoefu, Thamani."
+        }
+      ],
+      "insight": "Kuacha lahajedwali, ujumbe uliotawanyika na mifumo ya zamani kunarejesha ufuatiliaji, kasi na udhibiti bila kubadilisha kiini cha biashara."
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Itumike vipi katika kazi halisi?",
+      "optionQuestion": "Inapaswa kufanya kazi bora wapi?",
+      "copy": "Jibu lako linaonyesha kama kipaumbele ni backend, usawazishaji, app ya simu au programu ya ndani. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+      "progress": "Matumizi",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "wavuti · njia",
+          "hint": "cloud · backend · data",
+          "tech": "cloud backend",
+          "insight": "Mwelekeo uliochaguliwa: wavuti, njia — cloud, backend, data."
+        },
+        {
+          "label": "programu ya simu · Matumizi",
+          "hint": "programu ya simu · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Mwelekeo uliochaguliwa: programu ya simu, Matumizi — programu ya simu, tablet, sync."
+        },
+        {
+          "label": "PC · udhibiti",
+          "hint": "desktop/local · usalama",
+          "tech": "desktop/local",
+          "insight": "Mwelekeo uliochaguliwa: PC, udhibiti — desktop/local, usalama."
+        }
+      ],
+      "insight": "Usanifu huamuliwa kutokana na matumizi halisi ili mfumo ufanye kazi ofisini, uwanjani, mauzoni, uzalishaji au usaidizi bila msuguano usiohitajika."
+    },
+    "value": {
+      "eyebrow": "Thamani",
+      "title": "Nini kiboreshwe kwanza?",
+      "optionQuestion": "Unataka kuona matokeo gani kwanza?",
+      "copy": "Jukwaa zuri si mwonekano pekee. Linapanga michakato, linaotomate kazi na kuonyesha data ya kufanya maamuzi.",
+      "progress": "Thamani",
+      "core": "Thamani",
+      "options": [
+        {
+          "label": "michakato · mtiririko wa kazi",
+          "hint": "ruhusa · udhibiti",
+          "tech": "workflow + RBAC",
+          "insight": "Mwelekeo uliochaguliwa: michakato, mtiririko wa kazi — ruhusa, udhibiti."
+        },
+        {
+          "label": "otomatiki · haraka",
+          "hint": "RPA/API · michakato",
+          "tech": "RPA/API",
+          "insight": "Mwelekeo uliochaguliwa: otomatiki, haraka — RPA/API, michakato."
+        },
+        {
+          "label": "data · AI",
+          "hint": "ripoti · AI",
+          "tech": "BI + AI",
+          "insight": "Mwelekeo uliochaguliwa: data, AI — ripoti, AI."
+        }
+      ],
+      "insight": "Thamani ya kwanza inayoonekana lazima ihalalishe uwekezaji: mpangilio zaidi, muda mdogo kupotea, data bora, tija zaidi au fursa zaidi za mauzo."
+    },
+    "risk": {
+      "eyebrow": "uaminifu · udhibiti",
+      "title": "Nini kilindwe zaidi?",
+      "optionQuestion": "Unataka kulinda nini vizuri zaidi?",
+      "copy": "Usalama hauongezwi mwisho. Unabuniwa mapema kwa ruhusa, ukaguzi na sheria zilizo wazi. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+      "progress": "usalama",
+      "core": "uaminifu",
+      "options": [
+        {
+          "label": "watumiaji · ruhusa",
+          "hint": "RBAC · udhibiti",
+          "tech": "RBAC + audit",
+          "insight": "Mwelekeo uliochaguliwa: watumiaji, ruhusa — RBAC, udhibiti."
+        },
+        {
+          "label": "data · usalama",
+          "hint": "data · udhibiti",
+          "tech": "usalama kuanzia usanifu",
+          "insight": "Mwelekeo uliochaguliwa: data, usalama — data, udhibiti."
+        },
+        {
+          "label": "AI · ukaguzi wa binadamu",
+          "hint": "otomatiki · udhibiti",
+          "tech": "AI governance",
+          "insight": "Mwelekeo uliochaguliwa: AI, ukaguzi wa binadamu — otomatiki, udhibiti."
+        }
+      ],
+      "insight": "Ukuaji unahitaji udhibiti; ndiyo maana ruhusa, ukaguzi, uthibitishaji na mipaka ya AI hubuniwa kabla ya kuendesha michakato muhimu kiotomatiki."
+    },
+    "finance": {
+      "eyebrow": "mtaji uliolindwa · ufadhili",
+      "title": "Uendeleeje bila kukwamisha uendeshaji?",
+      "optionQuestion": "Unataka kupanga malipo vipi?",
+      "copy": "Maendeleo yanaweza kupangwa kwa malipo ya USD kulingana na upeo, idhini na kasi ya utekelezaji. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+      "progress": "ufadhili",
+      "core": "USD",
+      "options": [
+        {
+          "label": "ufadhili 100%",
+          "hint": "USD · awamu · mtaji uliolindwa",
+          "tech": "USD · ufadhili",
+          "insight": "Mwelekeo uliochaguliwa: ufadhili 100% — USD, awamu, mtaji uliolindwa."
+        },
+        {
+          "label": "bei ya moja kwa moja · awamu",
+          "hint": "mpango wa njia · awamu",
+          "tech": "mpango wa njia",
+          "insight": "Mwelekeo uliochaguliwa: bei ya moja kwa moja, awamu — mpango wa njia, awamu."
+        },
+        {
+          "label": "mawasiliano · ukaguzi wa binadamu",
+          "hint": "muhtasari · mawasiliano",
+          "tech": "ukaguzi wa binadamu",
+          "insight": "Mwelekeo uliochaguliwa: mawasiliano, ukaguzi wa binadamu — muhtasari, mawasiliano."
+        }
+      ],
+      "insight": "Ufadhili hufanya iwezekane kuanza sasa, kulinda mtaji wa uendeshaji na kulipa wakati teknolojia inaokoa muda, kupanga michakato au kuongeza mauzo."
+    },
+    "timeline": {
+      "eyebrow": "Kasi",
+      "title": "Inahitaji kuanza kufanya kazi lini?",
+      "optionQuestion": "Kasi gani inakufaa zaidi?",
+      "copy": "Jibu hili hutenganisha toleo la kwanza lenye thamani na jukwaa kubwa linalojengwa kwa hatua. Hashinmy hugeuza chaguo hili kuwa njia iliyo wazi yenye wigo, udhibiti na hatua zinazofuata, ili biashara iweze kuuza, kuendesha au kukua kwa msuguano mdogo.",
+      "progress": "Kasi",
+      "core": "mpango wa njia",
+      "options": [
+        {
+          "label": "haraka · MVP",
+          "hint": "Bidhaa · haraka",
+          "tech": "MVP",
+          "insight": "Mwelekeo uliochaguliwa: haraka, MVP — Bidhaa, haraka."
+        },
+        {
+          "label": "1-3 · awamu",
+          "hint": "mpango wa njia · udhibiti",
+          "tech": "awamu",
+          "insight": "Mwelekeo uliochaguliwa: 1-3, awamu — mpango wa njia, udhibiti."
+        },
+        {
+          "label": "kibiashara kikubwa · mpango wa njia",
+          "hint": "usalama · kibiashara kikubwa",
+          "tech": "ramani ya njia ya biashara",
+          "insight": "Mwelekeo uliochaguliwa: kibiashara kikubwa, mpango wa njia — usalama, kibiashara kikubwa."
+        }
+      ],
+      "insight": "Mwendo sahihi hubadilisha hitaji kubwa kuwa makabidhiano yenye manufaa, yanayopimika na yanayoweza kufadhiliwa bila kupoteza maono ya mfumo mzima."
+    },
+    "summary": {
+      "eyebrow": "njia · muhtasari",
+      "title": "Tumeelewa unachotafuta.",
+      "copy": "Njia yako iko tayari. Kabla ya kuituma, unaweza kuongeza maelezo yoyote muhimu; timu ya Hashinmy itapitia mwelekeo wa mradi, chaguo la ufadhili na hatua zinazofuata kwa muktadha wazi wa kibiashara na kiufundi.",
+      "progress": "muhtasari",
+      "core": "muhtasari",
+      "insight": "Njia inakuwa tayari kuunganisha hitaji, maarifa ya biashara, upeo wa kiufundi, kipaumbele cha uendeshaji, thamani inayotarajiwa na mtindo wa malipo katika pendekezo linalowezekana.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "njia",
+    "service": "Huduma",
+    "operation": "Matumizi",
+    "value": "Thamani",
+    "risk": "usalama",
+    "financing": "ufadhili",
+    "timeline": "Kasi"
+  },
+  "valueLabels": {
+    "diagnostico": "muhtasari · njia",
+    "producto_digital": "programu maalum · Bidhaa",
+    "automatizacion_ia": "otomatiki · AI",
+    "modernizacion_operativa": "uboreshaji · michakato",
+    "software_online": "wavuti · programu",
+    "app_movil": "programu ya simu",
+    "software_pc": "programu ya PC",
+    "automatizacion": "otomatiki · michakato",
+    "ia": "AI · muunganisho",
+    "modernizacion": "uboreshaji",
+    "web_global": "wavuti · njia",
+    "mobile_first": "programu ya simu · Matumizi",
+    "pc_local": "PC · udhibiti",
+    "workflow": "mtiririko wa kazi · michakato",
+    "automation": "otomatiki · haraka",
+    "analytics": "data · ripoti",
+    "ai": "AI · ukaguzi wa binadamu",
+    "experience": "UX/UI · uaminifu",
+    "analytics_ai": "data · AI",
+    "roles_permisos": "watumiaji · ruhusa",
+    "datos_sensibles": "data · usalama",
+    "ia_controlada": "AI · ukaguzi wa binadamu",
+    "financiamiento_100": "ufadhili 100%",
+    "sin_financiacion": "bei ya moja kwa moja",
+    "fases": "bei ya moja kwa moja · awamu",
+    "contacto_directo": "mawasiliano · ukaguzi wa binadamu",
+    "mvp_rapido": "haraka · MVP",
+    "1_3_meses": "1-3 · awamu",
+    "enterprise": "kibiashara kikubwa · mpango wa njia"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "programu maalum · Bidhaa",
+      "operation": "architecture · muhtasari",
+      "value": "Thamani · muhtasari",
+      "risk": "usalama · muhtasari",
+      "financing": "ufadhili · muhtasari",
+      "timeline": "Kasi · muhtasari",
+      "technical": "programu · architecture"
+    },
+    "technicalParts": {
+      "software_online": "wavuti · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · programu",
+      "automatizacion": "uotomatishaji wa RPA/API",
+      "ia": "AI · ukaguzi wa binadamu",
+      "modernizacion": "uboreshaji",
+      "web_global": "mfumo wa nyuma + hifadhidata",
+      "mobile_first": "programu ya simu · sync",
+      "pc_local": "local · udhibiti",
+      "workflow": "ruhusa · mtiririko wa kazi",
+      "automation": "otomatiki · muunganisho",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "data · usalama",
+      "ia_controlada": "AI governance · ukaguzi wa binadamu"
+    },
+    "controlBase": [
+      "data",
+      "udhibiti"
+    ],
+    "controlParts": {
+      "web_global": "ruhusa",
+      "software_online": "ruhusa",
+      "ia": "ukaguzi wa binadamu",
+      "analytics_ai": "ukaguzi wa binadamu",
+      "ai": "ukaguzi wa binadamu",
+      "automatizacion": "otomatiki · ripoti",
+      "automation": "otomatiki · ripoti",
+      "roles_permisos": "ruhusa · udhibiti",
+      "datos_sensibles": "data · usalama",
+      "ia_controlada": "ukaguzi wa binadamu · udhibiti",
+      "financiamiento_100": "ufadhili 100%",
+      "sin_financiacion": "bei ya moja kwa moja"
+    },
+    "nextSteps": {
+      "noService": "mawasiliano · muhtasari",
+      "mvp": "MVP · muhtasari",
+      "enterprise": "kibiashara kikubwa · mpango wa njia",
+      "default": "programu · mpango wa njia"
+    }
+  },
+  "schemaVersion": 1
+}

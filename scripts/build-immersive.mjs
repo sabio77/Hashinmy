@@ -1075,7 +1075,7 @@ async function buildLlmsTxtFromSeoContent(seoContent) {
       '',
       `- ${markdownEscape(homeLabel)}: ${homeUrl}`,
       `- ${markdownEscape(hubLabel)}: ${hubUrl}`,
-      `- ${markdownEscape(compactLlmsLine(bundle.hubTitle || hubLabel))}: ${markdownEscape(compactLlmsLine(bundle.hubLead || bundle.hubMetaDescription || overviewLine, 360))}`,
+      `- ${markdownEscape(bundle.hubTitle || hubLabel)}: ${markdownEscape(compactLlmsLine(bundle.hubLead || bundle.hubMetaDescription || overviewLine, 360))}`,
       '',
       `### ${markdownEscape(detailTitle)}`,
       markdownEscape(detailLead),
