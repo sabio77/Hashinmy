@@ -2906,7 +2906,7 @@ body[data-scene="summary"] .hm-contact__actions .hm-button--primary {
 
 body[data-scene="intro"] .hm-stage {
   --hm-intro-edge-space: clamp(46px, 8.2vh, 90px);
-  --hm-intro-title-width: min(86vw, 820px);
+  --hm-intro-title-width: min(94vw, 1120px);
 }
 
 body[data-scene="intro"] .hm-stage::before,
@@ -2973,14 +2973,14 @@ body[data-scene="intro"] .hm-intro-logo.has-logo-image > span {
 }
 
 body[data-scene="intro"] .hm-intro-title {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: block;
   max-width: var(--hm-intro-title-width);
   color: #fff;
-  font-size: clamp(3rem, 8.3vw, 7.2rem);
-  line-height: .86;
-  letter-spacing: -.085em;
+  font-size: clamp(1.9rem, 4.35vw, 3.82rem);
+  line-height: 1.1;
+  letter-spacing: -.044em;
+  text-wrap: balance;
+  overflow-wrap: normal;
   text-shadow: 0 18px 58px rgba(0, 0, 0, .48);
 }
 
@@ -3106,7 +3106,8 @@ body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option[data-p
   }
 
   body[data-scene="intro"] .hm-intro-title {
-    font-size: clamp(2.2rem, 12vw, 4.8rem);
+    font-size: clamp(1.52rem, 7.15vw, 2.86rem);
+    line-height: 1.13;
   }
 
   body[data-scene="intro"] .hm-copy {
@@ -3502,16 +3503,16 @@ body[data-text-density="ultra"] .hm-option span {
 
 body[data-scene="intro"][data-text-density="compact"] .hm-intro-title,
 body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
-  letter-spacing: -.066em;
-  line-height: .9;
+  letter-spacing: -.048em;
+  line-height: 1.06;
 }
 
 body[data-scene="intro"][data-text-density="compact"] .hm-intro-title {
-  font-size: clamp(2.55rem, 7.35vw, 6.2rem);
+  font-size: clamp(1.76rem, 4vw, 3.36rem);
 }
 
 body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
-  font-size: clamp(2.12rem, 6.35vw, 5.3rem);
+  font-size: clamp(1.58rem, 3.55vw, 3rem);
 }
 
 body[data-scene="intro"][data-text-density="compact"] .hm-copy--intro-signature,
@@ -3558,11 +3559,11 @@ body[data-scene="summary"][data-text-density="ultra"] .hm-summary-item strong {
   }
 
   body[data-scene="intro"][data-text-density="compact"] .hm-intro-title {
-    font-size: clamp(1.92rem, 10.2vw, 4.12rem);
+    font-size: clamp(1.42rem, 6.55vw, 2.62rem);
   }
 
   body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
-    font-size: clamp(1.68rem, 8.7vw, 3.45rem);
+    font-size: clamp(1.28rem, 5.7vw, 2.32rem);
   }
 
   body[data-scene="intro"][data-text-density="compact"] .hm-copy--intro-signature,
@@ -4260,11 +4261,12 @@ body.hm-seo-is-open .hm-seo-entry {
 
 .hm-seo-hub h2 {
   margin: 0;
-  max-width: 15ch;
+  max-width: min(100%, 42ch);
   color: #fff;
-  font-size: clamp(1.65rem, 4.4vw, 4.5rem);
-  line-height: .92;
-  letter-spacing: -.07em;
+  font-size: clamp(1.36rem, 2.35vw, 2.4rem);
+  line-height: 1.12;
+  letter-spacing: -.034em;
+  text-wrap: balance;
 }
 
 .hm-seo-hub__intro p {
@@ -4482,7 +4484,8 @@ body[data-seo-hub="detail"] .hm-seo-card,
 }
 
 .hm-seo-fit-compact .hm-seo-hub h2 {
-  font-size: clamp(1.45rem, 3.5vw, 3.4rem);
+  font-size: clamp(1.2rem, 2.05vw, 2.05rem);
+  line-height: 1.14;
 }
 
 .hm-seo-fit-compact .hm-seo-card {
@@ -5754,4 +5757,313 @@ body[data-scene] .hm-proof-window .hm-home-proof {
   .hm-seo-fit-ultra .hm-seo-hub__cards {
     grid-template-columns: 1fr;
   }
+}
+
+/* Ajuste H1 elegante: escena 1 y ventana Productos. */
+body[data-scene="intro"] .hm-intro-title,
+body[data-scene="intro"] .hm-question.hm-intro-title {
+  max-width: min(92vw, 1060px);
+  font-size: clamp(1.72rem, 3.55vw, 3.25rem);
+  line-height: 1.12;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+
+body[data-scene="intro"] .hm-question.hm-typing-line {
+  min-height: clamp(2.15rem, 5.15vw, 4.85rem);
+}
+
+body[data-scene="intro"][data-text-density="compact"] .hm-intro-title,
+body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
+  max-width: min(92vw, 1080px);
+  line-height: 1.14;
+  letter-spacing: -.038em;
+}
+
+body[data-scene="intro"][data-text-density="compact"] .hm-intro-title {
+  font-size: clamp(1.58rem, 3.18vw, 2.95rem);
+}
+
+body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
+  font-size: clamp(1.44rem, 2.82vw, 2.62rem);
+}
+
+.hm-seo-hub h2 {
+  max-width: min(100%, 58ch);
+  font-size: clamp(1.12rem, 1.72vw, 1.82rem);
+  line-height: 1.18;
+  letter-spacing: -.026em;
+  text-wrap: balance;
+}
+
+.hm-seo-fit-compact .hm-seo-hub h2 {
+  max-width: min(100%, 60ch);
+  font-size: clamp(1.02rem, 1.46vw, 1.52rem);
+  line-height: 1.2;
+}
+
+.hm-seo-fit-ultra .hm-seo-hub h2 {
+  max-width: min(100%, 64ch);
+  font-size: clamp(.96rem, 1.25vw, 1.28rem);
+  line-height: 1.22;
+}
+
+@media (max-aspect-ratio: 4 / 3) {
+  body[data-scene="intro"] .hm-intro-title,
+  body[data-scene="intro"] .hm-question.hm-intro-title {
+    max-width: min(90vw, 760px);
+    font-size: clamp(1.42rem, 6.15vw, 2.42rem);
+    line-height: 1.15;
+    letter-spacing: -.034em;
+  }
+
+  body[data-scene="intro"][data-text-density="compact"] .hm-intro-title,
+  body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
+    font-size: clamp(1.28rem, 5.45vw, 2.12rem);
+    line-height: 1.16;
+  }
+
+  .hm-seo-hub h2 {
+    max-width: min(100%, 62ch);
+    font-size: clamp(1.04rem, 4.4vw, 1.46rem);
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 520px), (max-height: 560px) {
+  body[data-scene="intro"] .hm-intro-title,
+  body[data-scene="intro"] .hm-question.hm-intro-title {
+    max-width: min(90vw, 420px);
+    font-size: clamp(1.24rem, 5.9vw, 1.9rem);
+    line-height: 1.16;
+    letter-spacing: -.03em;
+  }
+
+  body[data-scene="intro"] .hm-question.hm-typing-line {
+    min-height: clamp(1.7rem, 8.8vw, 3.9rem);
+  }
+
+  .hm-seo-hub h2,
+  .hm-seo-fit-compact .hm-seo-hub h2,
+  .hm-seo-fit-ultra .hm-seo-hub h2 {
+    max-width: min(100%, 66ch);
+    font-size: clamp(.98rem, 4.8vw, 1.22rem);
+    line-height: 1.22;
+    letter-spacing: -.018em;
+  }
+}
+
+
+/* Iteración proporciones escena 1: primera vista más compacta, ordenada y elegante. */
+body[data-scene="intro"] .hm-card-decision-flow {
+  width: min(96vw, 1025px);
+  max-height: min(calc(var(--hm-real-vh, 100svh) - max(64px, var(--hm-safe-top)) - max(42px, var(--hm-safe-bottom))), 650px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(8px, 1.15vh, 14px);
+}
+
+body[data-scene="intro"] .hm-card,
+:root[data-theme="dark"] body[data-scene="intro"] .hm-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 clamp(16px, 2.6vw, 34px) !important;
+  gap: clamp(5px, .82vh, 9px);
+}
+
+body[data-scene="intro"] .hm-card-decision-break {
+  display: none !important;
+}
+
+body[data-scene="intro"] .hm-intro-title,
+body[data-scene="intro"] .hm-question.hm-intro-title,
+body[data-scene="intro"][data-text-density="compact"] .hm-intro-title,
+body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
+  max-width: min(100%, 735px);
+  font-size: clamp(1.628rem, 3.058vw, 2.838rem);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  text-shadow: 0 14px 44px rgba(0, 0, 0, .45);
+}
+
+body[data-scene="intro"] .hm-question.hm-typing-line {
+  min-height: clamp(2.09rem, 4.708vw, 4.532rem);
+}
+
+body[data-scene="intro"] .hm-intro-title__lead {
+  font-size: .528em;
+  line-height: 1.02;
+}
+
+body[data-scene="intro"] .hm-intro-title__brand {
+  line-height: .86;
+}
+
+body[data-scene="intro"] .hm-copy--intro-signature,
+:root[data-theme="dark"] body[data-scene="intro"] .hm-copy--intro-signature,
+body[data-scene="intro"][data-text-density="compact"] .hm-copy--intro-signature,
+body[data-scene="intro"][data-text-density="ultra"] .hm-copy--intro-signature {
+  display: -webkit-box;
+  width: min(100%, 700px);
+  max-width: min(100%, 700px);
+  margin-inline: auto;
+  color: rgba(232, 238, 243, .82);
+  font-size: clamp(.814rem, 1.023vw, .968rem);
+  line-height: 1.3;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+body[data-scene="intro"] .hm-home-proof-entry {
+  max-width: 100%;
+  margin-top: clamp(5px, .75vh, 9px);
+}
+
+body[data-scene="intro"] .hm-textbutton.hm-home-proof-entry__button {
+  min-height: clamp(34px, 4.7vh, 38px);
+  padding: clamp(7px, .9vw, 9px) clamp(16px, 2vw, 22px);
+  font-size: clamp(.748rem, .902vw, .858rem);
+  letter-spacing: .075em;
+  box-shadow: 0 12px 28px rgba(7, 19, 31, .12), inset 0 0 0 1px rgba(255, 255, 255, .32);
+}
+
+body[data-scene="intro"] .hm-decision-zone {
+  width: min(100%, 790px) !important;
+  gap: clamp(7px, 1vh, 12px);
+}
+
+body[data-scene="intro"] .hm-option-question {
+  max-width: min(100%, 690px);
+  font-size: clamp(.946rem, 1.276vw, 1.122rem);
+  line-height: 1.2;
+  letter-spacing: -.018em;
+}
+
+body[data-scene="intro"] .hm-options {
+  width: min(100%, 790px);
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: clamp(6px, .75vw, 9px);
+  padding: clamp(6px, .7vw, 8px);
+  border-radius: clamp(24px, 2.6vw, 34px);
+  background: rgba(6, 16, 24, .3);
+  box-shadow: 0 14px 48px rgba(0, 0, 0, .2), 0 0 0 1px rgba(126, 231, 255, .11) inset;
+}
+
+body[data-scene="intro"] .hm-option {
+  min-height: clamp(76px, 9.4vh, 88px);
+  border-radius: clamp(18px, 1.9vw, 26px);
+  padding: clamp(9px, 1.05vw, 13px) clamp(10px, 1.35vw, 16px);
+}
+
+body[data-scene="intro"] .hm-option strong {
+  margin-bottom: 4px;
+  font-size: clamp(.858rem, 1.078vw, 1.012rem);
+  line-height: 1.12;
+  letter-spacing: -.018em;
+}
+
+body[data-scene="intro"] .hm-option span,
+body[data-scene="intro"] .hm-options.is-ready .hm-option span,
+body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option span,
+body[data-scene="intro"] .hm-options.is-ready .hm-option[data-priority="high"] span,
+body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option[data-priority="high"] span {
+  font-size: clamp(.638rem, .792vw, .748rem);
+  line-height: 1.18;
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  body[data-scene="intro"] .hm-card-decision-flow {
+    width: min(96vw, 775px);
+    max-height: calc(var(--hm-real-vh, 100svh) - max(20px, var(--hm-safe-top)) - max(20px, var(--hm-safe-bottom)));
+    gap: clamp(6px, .9vh, 10px);
+  }
+
+  body[data-scene="intro"] .hm-intro-title,
+  body[data-scene="intro"] .hm-question.hm-intro-title,
+  body[data-scene="intro"][data-text-density="compact"] .hm-intro-title,
+  body[data-scene="intro"][data-text-density="ultra"] .hm-intro-title {
+    max-width: min(100%, 520px);
+    font-size: clamp(1.298rem, 5.885vw, 2.002rem);
+    line-height: 1.13;
+  }
+
+  body[data-scene="intro"] .hm-question.hm-typing-line {
+    min-height: clamp(1.705rem, 8.8vw, 3.685rem);
+  }
+
+  body[data-scene="intro"] .hm-copy--intro-signature,
+  :root[data-theme="dark"] body[data-scene="intro"] .hm-copy--intro-signature {
+    font-size: clamp(.726rem, 2.585vw, .858rem);
+    line-height: 1.24;
+    -webkit-line-clamp: 3;
+  }
+
+  body[data-scene="intro"] .hm-options {
+    width: min(100%, 520px);
+    grid-template-columns: 1fr !important;
+    border-radius: clamp(20px, 6vw, 28px);
+  }
+
+  body[data-scene="intro"] .hm-option {
+    min-height: 44px;
+    border-radius: 999px;
+    padding-block: 9px;
+  }
+
+  body[data-scene="intro"] .hm-option span,
+  body[data-scene="intro"] .hm-options.is-ready .hm-option span,
+  body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option span,
+  body[data-scene="intro"] .hm-options.is-ready .hm-option[data-priority="high"] span,
+  body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option[data-priority="high"] span {
+    display: none;
+  }
+}
+
+
+/* Solicitud directa: hm-card 25% más ancho sin modificar alturas. */
+.hm-card {
+  width: min(50vw, 762.5px);
+}
+
+body:not([data-scene="intro"]):not([data-scene="summary"]) .hm-card-decision-flow {
+  grid-template-columns: minmax(325px, min(38.75vw, 650px)) minmax(320px, min(34vw, 560px));
+}
+
+body[data-scene="intro"] .hm-card-decision-flow {
+  width: min(96vw, 1025px);
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  body[data-scene="intro"] .hm-card-decision-flow {
+    width: min(96vw, 775px);
+  }
+}
+
+/* Solicitud directa: letras auxiliares de escena 1 aumentadas 10%. */
+body[data-scene="intro"] .hm-progress {
+  font-size: .792rem;
+}
+
+body[data-scene="intro"] .hm-language span {
+  font-size: .682rem;
+}
+
+body[data-scene="intro"] .hm-language select {
+  font-size: 1.1em;
+}
+
+body[data-scene="intro"] .hm-interaction-wait {
+  font-size: .737rem;
+}
+
+body[data-scene="intro"] .hm-seo-entry {
+  font-size: clamp(.88rem, 1.1vw, 1.056rem);
+}
+
+body[data-scene="intro"] .hm-intro-logo {
+  font-size: clamp(1.65rem, 3.41vw, 3.41rem);
 }

@@ -1341,10 +1341,10 @@ assertAtomicChoiceTransition(jsText, 'js/hashinmy-immersive.js');
 assert(
   jsText.includes(`intro: {
       options: [
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }], priority: 'high' },
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }], priority: 'high' },
         { next: 'serviceFamily', sets: [{ key: 'financing', value: 'sin_financiacion' }] }`),
-  'La escena inicial debe priorizar diagnóstico operativo antes de financiación o cotización, sin romper el avance a serviceFamily.'
+  'La escena inicial debe mantener diagnóstico, financiación y cotización, pero solo la financiación 100% debe llevar priority high sin romper el avance a serviceFamily.'
 );
 
 assert(jsText.includes('function getSeoUiLabel') && jsText.includes("getSeoUiLabel('classicViewLabel'") && jsText.includes("getSeoUiLabel('modernViewLabel'") && jsText.includes("getSeoUiLabel('detailLead'") && jsText.includes("getSeoUiLabel('scopeCatalogLabel'") && jsText.includes("getSeoUiLabel('glossarySetLabel'") && jsText.includes("getSeoUiLabel('categoryNavLabel'") && jsText.includes('function applyLocalizedSeoDomText') && jsText.includes('data-seo-i18n-text') && jsText.includes('data-seo-i18n-aria'), 'js/hashinmy-immersive.js debe resolver rótulos SEO clásicos/modernos, ARIA del hub y nombres semánticos JSON-LD desde textX/seo/{isocode}.json y no con fallback genérico por idioma.');

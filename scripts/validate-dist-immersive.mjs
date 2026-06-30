@@ -1510,10 +1510,10 @@ if (!failures.length) {
 assert(
   jsText.includes(`intro: {
       options: [
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }], priority: 'high' },
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }], priority: 'high' },
         { next: 'serviceFamily', sets: [{ key: 'financing', value: 'sin_financiacion' }] }`),
-  'La escena inicial debe priorizar diagnóstico operativo antes de financiación o cotización, sin romper el avance a serviceFamily.'
+  'La escena inicial debe mantener diagnóstico, financiación y cotización, pero solo la financiación 100% debe llevar priority high sin romper el avance a serviceFamily.'
 );
 
   const manifest = await readDetectedLanguageManifest();

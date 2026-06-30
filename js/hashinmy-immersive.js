@@ -672,8 +672,8 @@
   const baseScenes = {
     intro: {
       options: [
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }], priority: 'high' },
-        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'contacto_directo' }] },
+        { next: 'serviceFamily', sets: [{ key: 'financing', value: 'financiamiento_100' }], priority: 'high' },
         { next: 'serviceFamily', sets: [{ key: 'financing', value: 'sin_financiacion' }] }
       ]
     },
