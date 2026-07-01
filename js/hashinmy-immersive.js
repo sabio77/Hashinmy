@@ -5008,11 +5008,25 @@
     }, {});
   }
 
-  function buildMemoriaBackendStrictPayload(email = getClientEmail(), phone = getClientPhone()) {
+  function buildMemoriaBackendStrictPayload(email = getClientEmail(), phone = getClientPhone(), idempotencyKey = '') {
     const textoCliente = buildMemoriaBackendSubmissionText(email, phone);
+    const cleanIdempotencyKey = String(idempotencyKey || '').trim();
+    const cliente = {
+      nombre: getClientName(email),
+      email: String(email || '').trim(),
+      telefono: String(phone || '').trim()
+    };
+
     return {
       textoCliente,
-      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone)
+      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone),
+      idempotencyKey: cleanIdempotencyKey,
+      s: MEMORIA_BACKEND_SITE_ID,
+      cliente,
+      mensaje: textoCliente,
+      items: [],
+      notifyOwner: true,
+      autoSchedule: true
     };
   }
 
@@ -5336,22 +5350,20 @@
   }
 
   function isCommercialSubmissionConfirmed(response) {
-    if (!response || response.ok === 0 || response.ok === false) return false;
+    const hasSuccessfulFlag = response?.ok === 1 || response?.ok === true;
+    if (!hasSuccessfulFlag) return false;
     if (response.quote?.id) return true;
     if (response.submission?.id) return true;
     if (response.lead?.id || response.leadId) return true;
     if (response.ownerNotification?.id || response.operation?.id) return true;
-    return response.ok === 1 || response.ok === true;
+    if (response.appNotification?.ok === 1 || response.appNotification?.ok === true) return true;
+    return false;
   }
 
-  async function submitCommercialFlowWithSdk({ body, email, phone }) {
+  async function submitCommercialFlowWithSdk({ email, phone }) {
     const helper = await waitForMemoriaBackendCommercialHelper();
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
-    const payload = {
-      textoCliente: String(body || '').trim() || buildMemoriaBackendSubmissionText(email, phone),
-      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone),
-      idempotencyKey
-    };
+    const payload = buildMemoriaBackendStrictPayload(email, phone, idempotencyKey);
     const response = await withCommercialRequestTimeout(helper(payload));
 
     if (!isCommercialSubmissionConfirmed(response)) {
@@ -5466,12 +5478,11 @@
     }
 
     resetContactValidationState();
-    const body = buildMemoriaBackendSubmissionText(email, phone);
     setContactSubmitPending(true);
     setCommercialStatusDialog('loading', COMMERCIAL_LOADING_MESSAGE);
 
     try {
-      await submitCommercialFlowWithSdk({ body, email, phone });
+      await submitCommercialFlowWithSdk({ email, phone });
       closeCommercialStatusDialog();
       setContactResultState('success', {
         title: 'Solicitud enviada con éxito',
