@@ -1217,18 +1217,34 @@
   }
 
   function getVisitApiPayloadContext() {
-    let timeZone = '';
-    try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+    let timezone = '';
+    try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+
+    const languages = Array.from(navigator.languages || []).filter(Boolean).slice(0, 8);
+    const language = navigator.language || languages[0] || '';
 
     return {
       s: MEMORIA_BACKEND_SITE_ID,
       siteId: MEMORIA_BACKEND_SITE_ID,
       path: window.location.pathname || '/',
       href: window.location.href,
+      hrefPath: window.location.pathname + window.location.search + window.location.hash,
       referrer: document.referrer || '',
-      timeZone,
-      navigatorLanguage: navigator.language || '',
-      navigatorLanguages: Array.from(navigator.languages || []).filter(Boolean).slice(0, 8)
+      timezone,
+      timeZone: timezone,
+      tz: timezone,
+      language,
+      lang: language,
+      languages,
+      navigatorLanguage: language,
+      navigatorLanguages: languages,
+      visibilityState: document.visibilityState || '',
+      webdriver: navigator.webdriver === true,
+      screen: {
+        width: Number(window.screen?.width || 0),
+        height: Number(window.screen?.height || 0),
+        pixelRatio: Number(window.devicePixelRatio || 1)
+      }
     };
   }
 
@@ -1285,17 +1301,67 @@
     return language || countryCode ? { language, countryCode, raw: payload } : null;
   }
 
+  function getMemoriaBackendVisitSdkFunction() {
+    const api = window.memoriaBACKEND;
+    if (!api || typeof api !== 'object') return null;
+    return [
+      api.geoVisitApi,
+      api.registrarAperturaStatica,
+      api.detectarPaisEIdioma,
+      api.registerStaticOpen
+    ].find((candidate) => typeof candidate === 'function') || null;
+  }
+
   async function requestGeoVisitApiThroughSdk() {
     const sdkReady = await loadMemoriaBackendSdk({ waitForReady: true, timeoutMs: MEMORIA_BACKEND_GEO_VISIT_SDK_TIMEOUT_MS });
-    if (!sdkReady || typeof window.memoriaBACKEND?.geoVisitApi !== 'function') return null;
+    const visitFunction = sdkReady ? getMemoriaBackendVisitSdkFunction() : null;
+    if (!visitFunction) return extractGeoVisitContext(window.memoriaBACKENDVisit || null);
+
+    const context = getVisitApiPayloadContext();
     const response = await withMemoriaBackendGeoVisitTimeout(
-      window.memoriaBACKEND.geoVisitApi(getVisitApiPayloadContext()),
+      visitFunction === window.memoriaBACKEND.geoVisitApi
+        ? visitFunction(context)
+        : visitFunction({ auto: true, body: context }),
       MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS
     );
     return extractGeoVisitContext(response);
   }
 
-  async function requestGeoVisitApiDirectly() {
+  async function requestVisitOpeningApiDirectly() {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let timeoutId = 0;
+
+    try {
+      const url = new URL(`${MEMORIA_BACKEND_API_BASE_URL}/visitas/apertura`);
+      const context = getVisitApiPayloadContext();
+      url.searchParams.set('s', MEMORIA_BACKEND_SITE_ID);
+
+      const options = {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-MB-Site': MEMORIA_BACKEND_SITE_ID,
+          'X-Hashinmy-Action': 'webapp'
+        },
+        body: JSON.stringify(context)
+      };
+      if (controller) {
+        options.signal = controller.signal;
+        timeoutId = window.setTimeout(() => controller.abort(), MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS);
+      }
+
+      const response = await fetch(url.toString(), options);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return extractGeoVisitContext(await response.json());
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function requestLegacyGeoVisitApiDirectly() {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let timeoutId = 0;
 
@@ -1304,7 +1370,7 @@
       const context = getVisitApiPayloadContext();
       url.searchParams.set('s', MEMORIA_BACKEND_SITE_ID);
       url.searchParams.set('path', context.path || '/');
-      if (context.timeZone) url.searchParams.set('tz', context.timeZone);
+      if (context.timezone) url.searchParams.set('tz', context.timezone);
 
       const options = {
         method: 'GET',
@@ -1325,6 +1391,19 @@
       return extractGeoVisitContext(await response.json());
     } finally {
       if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function requestGeoVisitApiDirectly() {
+    try {
+      return await requestVisitOpeningApiDirectly();
+    } catch (primaryError) {
+      try {
+        return await requestLegacyGeoVisitApiDirectly();
+      } catch (legacyError) {
+        legacyError.primaryError = primaryError;
+        throw legacyError;
+      }
     }
   }
 
@@ -1360,7 +1439,7 @@
       }
       if (context?.countryCode) applyGeoVisitContext(context);
     } catch (error) {
-      console.warn('Hashinmy: geoVisitApi directo no pudo resolver idioma inicial.', error);
+      console.warn('Hashinmy: /visitas/apertura directo no pudo resolver idioma inicial.', error);
     }
 
     return '';
