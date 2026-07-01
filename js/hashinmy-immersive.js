@@ -6,6 +6,7 @@
   const LEGACY_STORAGE_KEYS = ['hashinmy_immersive_route_v5', 'hashinmy_immersive_route_v4', 'hashinmy_immersive_route_v3', 'hashinmy_immersive_route_v2', 'hashinmy_immersive_route_v1'];
   const CONTACT_EMAIL = 'sales@hashinmy.com';
   const MAILTO_MAX_SAFE_LENGTH = 1800;
+  const MEMORIA_BACKEND_SDK_URL = 'https://mapsx.app/sdk/memoria.js';
   const MEMORIA_BACKEND_COMMERCIAL_SDK_TIMEOUT_MS = 5200;
   const MEMORIA_BACKEND_COMMERCIAL_REQUEST_TIMEOUT_MS = 18000;
   const COMMERCIAL_FLOW_IDEMPOTENCY_PREFIX = 'hashinmy-web-cotizacion';
@@ -14,6 +15,16 @@
   const COMMERCIAL_ERROR_MESSAGE = 'No pudimos confirmar la recepción automática de la solicitud. Para no perder tu ruta, puedes comunicarte directamente por WhatsApp con el resumen ya preparado.';
   const COMMERCIAL_WHATSAPP_LABEL = 'Enviar por WhatsApp';
   const COMMERCIAL_WHATSAPP_ALIAS = 'principal';
+  const MEMORIA_BACKEND_SUBMISSION_FIELD_LABELS = Object.freeze([
+    'Necesidad',
+    'Proyecto elegido',
+    'Uso esperado',
+    'Valor buscado',
+    'Financiación',
+    'Ritmo',
+    'Base técnica sugerida',
+    'Contacto'
+  ]);
   const MAX_OPTIONS_PER_SCENE = 3;
   const PUBLIC_SITE_URL = 'https://hashinmy.com/';
   const LANGUAGE_PATH_PREFIX = 'l';
@@ -62,6 +73,9 @@
   const CRAMPED_VIEWPORT_WIDTH_PX = 430;
   const INITIAL_LOADER_CONFIRM_DELAY_MS = 100;
   const INITIAL_LOADER_EXIT_DURATION_MS = 460;
+  const INITIAL_SCENE_IMAGE_READY_TIMEOUT_MS = 480;
+  const POST_INITIAL_BOOT_DELAY_MS = 90;
+  const INITIAL_CRITICAL_SCENE_NAME = 'intro';
 
   let paisORIGEN = '';
   // No eliminar: paisORIGEN inicia en blanco y será alimentada por una futura API de memoriaBACKEND
@@ -3222,6 +3236,88 @@
     return true;
   }
 
+  function clonePlainData(source) {
+    try {
+      return JSON.parse(JSON.stringify(source || {}));
+    } catch {
+      return {};
+    }
+  }
+
+  function decodeInlineTextPayload(node) {
+    const rawPayload = String(node?.textContent || '').trim();
+    if (node?.dataset?.encoding !== 'base64') return rawPayload;
+
+    const binary = window.atob(rawPayload);
+    if (typeof TextDecoder === 'function') {
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    return decodeURIComponent(Array.from(binary, (character) => (
+      `%${character.charCodeAt(0).toString(16).padStart(2, '0')}`
+    )).join(''));
+  }
+
+  function readInlineInitialTextBundle() {
+    const node = document.getElementById('hmInitialTextBundle');
+    if (!node) return null;
+
+    try {
+      const bundle = JSON.parse(decodeInlineTextPayload(node) || '{}');
+      if (!bundle || typeof bundle !== 'object') return null;
+      const inlineLanguage = normalizeLanguageCode(node.dataset.language || bundle.iso || bundle.htmlLang || 'es');
+      return markResolvedTextBundle(clonePlainData(bundle), inlineLanguage);
+    } catch (error) {
+      console.warn('Hashinmy: no se pudo leer el paquete de arranque rápido.', error);
+      return null;
+    }
+  }
+
+  function getFastInitialTextBundle(preferredLanguage = state.language) {
+    const preferred = normalizeLanguageCode(preferredLanguage);
+    const preferredCachedBundle = readCachedTextBundle(preferred);
+    if (preferredCachedBundle) return preferredCachedBundle;
+
+    const inlineBundle = readInlineInitialTextBundle();
+    if (inlineBundle) return inlineBundle;
+
+    if (preferred !== 'es') {
+      const spanishCachedBundle = readCachedTextBundle('es');
+      if (spanishCachedBundle) return spanishCachedBundle;
+    }
+
+    return null;
+  }
+
+  function seedInitialCriticalText(preferredLanguage = state.language) {
+    const requestedLanguage = normalizeLanguageCode(preferredLanguage);
+    const bundle = getFastInitialTextBundle(requestedLanguage);
+    if (!bundle) return { requestedLanguage, resolvedLanguage: state.language, seeded: false };
+
+    const resolvedLanguage = getResolvedTextBundleLanguage(bundle, requestedLanguage);
+    state.language = resolvedLanguage;
+    state.text = bundle;
+    syncDocumentLanguage();
+    return { requestedLanguage, resolvedLanguage, seeded: true };
+  }
+
+  async function hydrateInitialLanguageAfterOpen(requestedLanguage, requestToken) {
+    try {
+      const applied = await applyLanguage(requestedLanguage, requestToken);
+      if (!applied || requestToken !== state.languageRequestToken) return false;
+
+      render();
+      publishRouteUpdate('initial-language-hydrated');
+      return true;
+    } catch (error) {
+      if (requestToken === state.languageRequestToken) {
+        console.warn(`Hashinmy: se mantuvo el texto inicial rápido mientras se reintenta el idioma ${requestedLanguage}.`, error);
+      }
+      return false;
+    }
+  }
+
   function getLanguageConfig(code = state.language) {
     return state.languageCatalog.find((language) => language.code === code)
       || state.languageCatalog[0]
@@ -4336,6 +4432,45 @@
     return `${baseUrl}${separator}hmAssetRetry=${Date.now()}`;
   }
 
+  function rememberResolvedSceneImage(file, url) {
+    if (!file || !url) return;
+    const baseUrl = buildSceneAssetUrl(file);
+    loadedImages.set(baseUrl, true);
+    resolvedSceneImageUrls.set(baseUrl, url);
+  }
+
+  function rememberMissingSceneImage(file) {
+    if (!file) return;
+    loadedImages.set(buildSceneAssetUrl(file), false);
+  }
+
+  function hydrateInitialSceneImageState() {
+    const initialAsset = sceneAssets[INITIAL_CRITICAL_SCENE_NAME] || sceneAssets.intro;
+    const initialFile = initialAsset?.file;
+    if (!initialFile) return;
+
+    [elements.sceneBackdropImage, elements.sceneArtImage].filter(Boolean).forEach((image) => {
+      const src = image.currentSrc || image.getAttribute('src') || '';
+      if (!src) return;
+
+      if (image.complete) {
+        if (image.naturalWidth > 0) {
+          rememberResolvedSceneImage(initialFile, src);
+        } else {
+          rememberMissingSceneImage(initialFile);
+        }
+        return;
+      }
+
+      image.addEventListener('load', () => {
+        rememberResolvedSceneImage(initialFile, image.currentSrc || src);
+      }, { once: true });
+      image.addEventListener('error', () => {
+        rememberMissingSceneImage(initialFile);
+      }, { once: true });
+    });
+  }
+
   function applySceneImage(url) {
     setSceneImageSource(url);
     elements.sceneArt?.style.setProperty('--hm-scene-image', `url("${url}")`);
@@ -4398,8 +4533,25 @@
     ].filter((name) => baseScenes[name])));
   }
 
-  function preloadSceneImageWindow(sceneName = state.scene) {
-    getSceneImagePreloadWindow(sceneName).forEach((name) => {
+  function getInitialSceneImagePreloadWindow(sceneName = state.scene) {
+    return Array.from(new Set([
+      INITIAL_CRITICAL_SCENE_NAME,
+      sceneName
+    ].filter((name) => baseScenes[name])));
+  }
+
+  function isInitialPageOpenForSecondaryScenePreloads() {
+    return document.documentElement.dataset.appReady === 'true'
+      || elements.pageLoader?.dataset.state === 'closing'
+      || elements.pageLoader?.dataset.state === 'done';
+  }
+
+  function preloadSceneImageWindow(sceneName = state.scene, { includeSecondaryScenes = isInitialPageOpenForSecondaryScenePreloads() } = {}) {
+    const sceneNames = includeSecondaryScenes
+      ? getSceneImagePreloadWindow(sceneName)
+      : getInitialSceneImagePreloadWindow(sceneName);
+
+    sceneNames.forEach((name) => {
       preloadSceneImage(name).catch(() => {});
     });
   }
@@ -4542,13 +4694,42 @@
     ].filter(Boolean).join(' | ');
   }
 
-  function buildCommercialOptionsPayload() {
+  function buildMemoriaBackendSubmissionEntries(email = getClientEmail(), phone = getClientPhone()) {
     const recommendation = buildRecommendation();
+    const comment = elements.comment?.value.trim() || '';
+    const contact = buildContactSummaryLine(email, phone);
+    const valuesByLabel = {
+      Necesidad: comment,
+      'Proyecto elegido': recommendation.service,
+      'Uso esperado': recommendation.operation,
+      'Valor buscado': recommendation.value,
+      'Financiación': recommendation.financing,
+      Ritmo: recommendation.timeline,
+      'Base técnica sugerida': recommendation.technical,
+      Contacto: contact
+    };
+
+    return MEMORIA_BACKEND_SUBMISSION_FIELD_LABELS.map((label) => [label, valuesByLabel[label] || '']);
+  }
+
+  function buildMemoriaBackendSubmissionText(email = getClientEmail(), phone = getClientPhone()) {
+    return buildMemoriaBackendSubmissionEntries(email, phone)
+      .map(([label, value]) => `${label}: ${String(value || '').trim()}`)
+      .join('\n');
+  }
+
+  function buildCommercialOptionsPayload(email = getClientEmail(), phone = getClientPhone()) {
+    return buildMemoriaBackendSubmissionEntries(email, phone).reduce((payload, [label, value]) => {
+      payload[label] = String(value || '').trim();
+      return payload;
+    }, {});
+  }
+
+  function buildMemoriaBackendStrictPayload(email = getClientEmail(), phone = getClientPhone()) {
+    const textoCliente = buildMemoriaBackendSubmissionText(email, phone);
     return {
-      answers: cloneAnswers(),
-      recommendation,
-      quoteMode: isQuoteMode(),
-      audit: state.audit.map(getLocalizedAuditEntry)
+      textoCliente,
+      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone)
     };
   }
 
@@ -4811,9 +4992,6 @@
 
     if (typeof window.memoriaBACKEND?.enviarFormulario === 'function') {
       return (payload) => window.memoriaBACKEND.enviarFormulario('cotizacion_hashinmy', {
-        nombre: payload?.client?.name || 'Cliente Hashinmy',
-        email: payload?.client?.email || '',
-        telefono: payload?.client?.phone || '',
         mensaje: payload?.textoCliente || '',
         opcionesSeleccionadas: payload?.opcionesSeleccionadas || {}
       }, {
@@ -4831,6 +5009,8 @@
   function waitForMemoriaBackendCommercialHelper() {
     const helper = getMemoriaBackendCommercialHelper();
     if (helper) return Promise.resolve(helper);
+
+    loadMemoriaBackendSdkAfterFirstRender();
 
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -4894,16 +5074,8 @@
     const helper = await waitForMemoriaBackendCommercialHelper();
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
     const response = await withCommercialRequestTimeout(helper({
+      ...buildMemoriaBackendStrictPayload(email, phone),
       textoCliente: body,
-      opcionesSeleccionadas: buildCommercialOptionsPayload(),
-      client: {
-        name: getClientName(email),
-        email,
-        phone
-      },
-      notifyOwner: true,
-      autoSchedule: false,
-      followUpHours: 24,
       idempotencyKey
     }));
 
@@ -4924,14 +5096,7 @@
   }
 
   function buildWhatsappFallbackMessage() {
-    const optionsText = buildSelectedOptionsText();
-    const contact = buildContactSummaryLine();
-    const comment = elements.comment?.value.trim() || '';
-    return [
-      `Hola, estoy necesitando un software, seleccione estas opciones ${optionsText}`,
-      contact ? `Mis datos de contacto son: ${contact}` : '',
-      comment ? `Comentario adicional: ${comment}` : ''
-    ].filter(Boolean).join('\n');
+    return buildMemoriaBackendSubmissionText();
   }
 
   function getWhatsappShareFallbackUrl(message) {
@@ -5026,7 +5191,7 @@
     }
 
     resetContactValidationState();
-    const body = buildSummaryText(true);
+    const body = buildMemoriaBackendSubmissionText(email, phone);
     setContactSubmitPending(true);
     setCommercialStatusDialog('loading', COMMERCIAL_LOADING_MESSAGE);
 
@@ -5519,7 +5684,196 @@
           if (state.seoHubOpen) renderSeoHub();
         })
         .catch((error) => console.warn('Hashinmy: no se pudo precargar SEO después del primer render.', error));
-    }, 0);
+    }, POST_INITIAL_BOOT_DELAY_MS);
+  }
+
+  function resolveWithTimeout(promise, timeoutMs, fallbackValue = false) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve(fallbackValue);
+      }, timeoutMs);
+
+      Promise.resolve(promise)
+        .then((value) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          resolve(value);
+        })
+        .catch(() => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          resolve(fallbackValue);
+        });
+    });
+  }
+
+  function getAllSceneNames() {
+    return Object.keys(baseScenes).filter((sceneName) => baseScenes[sceneName]);
+  }
+
+  function preloadInitialSceneImageForFastOpen(sceneName = state.scene, criticalScenePreloadPromise = null) {
+    const initialSceneName = baseScenes[sceneName] ? sceneName : INITIAL_CRITICAL_SCENE_NAME;
+    const criticalScenePromise = criticalScenePreloadPromise || preloadSceneImage(INITIAL_CRITICAL_SCENE_NAME);
+    const activeScenePromise = initialSceneName === INITIAL_CRITICAL_SCENE_NAME
+      ? criticalScenePromise
+      : preloadSceneImage(initialSceneName);
+
+    if (initialSceneName !== INITIAL_CRITICAL_SCENE_NAME) {
+      criticalScenePromise.catch(() => {});
+    }
+
+    return resolveWithTimeout(
+      activeScenePromise,
+      INITIAL_SCENE_IMAGE_READY_TIMEOUT_MS,
+      false
+    );
+  }
+
+  function runAfterInitialPageOpen(callback, initialSceneReadyPromise = Promise.resolve(false), delayMs = POST_INITIAL_BOOT_DELAY_MS) {
+    Promise.resolve(initialSceneReadyPromise)
+      .catch(() => false)
+      .finally(() => {
+        window.setTimeout(callback, INITIAL_LOADER_CONFIRM_DELAY_MS + INITIAL_LOADER_EXIT_DURATION_MS + delayMs);
+      });
+  }
+
+  function preloadRemainingSceneImagesAfterOpen(sceneName = state.scene) {
+    const priorityScenes = getSceneImagePreloadWindow(sceneName);
+    priorityScenes.forEach((name) => preloadSceneImage(name).catch(() => {}));
+
+    const loadRest = () => {
+      getAllSceneNames()
+        .filter((name) => !priorityScenes.includes(name))
+        .forEach((name) => preloadSceneImage(name).catch(() => {}));
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(loadRest, { timeout: 1600 });
+    } else {
+      window.setTimeout(loadRest, 220);
+    }
+  }
+
+  function seedFastLanguageCatalog() {
+    const cachedCatalog = readCachedLanguageCatalog();
+    const initialCatalog = mergeLanguageCatalogCandidates(cachedCatalog, fallbackLanguageCatalog());
+    setLanguageCatalog(isCompleteLanguageCatalog(initialCatalog) ? initialCatalog : buildLanguageCatalogFromCodes(['es']));
+  }
+
+  function bindRuntimeEvents() {
+    requestImmersiveMode().then(preserveResponsiveOrientation);
+    document.addEventListener('pointerdown', () => requestImmersiveMode().then(preserveResponsiveOrientation), { once: true, passive: true });
+    document.addEventListener('keydown', () => requestImmersiveMode().then(preserveResponsiveOrientation), { once: true });
+    elements.options.addEventListener('click', handleOptionClick);
+    elements.contact.addEventListener('submit', sendRequest);
+    elements.languageSelect?.addEventListener('change', handleLanguageChange);
+    elements.seoHubCategories?.addEventListener('keydown', handleSeoCategoryKeydown);
+    [elements.contactInfo, elements.contactPhone].forEach((input) => {
+      input?.addEventListener('input', () => {
+        resetContactValidationState();
+        elements.formNote.textContent = t('ui.formNote');
+      });
+      input?.addEventListener('invalid', (event) => {
+        event.preventDefault();
+        showLocalizedContactRequired(input);
+      });
+    });
+    document.addEventListener('click', handleActionClick);
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (state.proofWindowOpen) closeProofWindow({ focusReturn: true });
+      else if (state.seoHubOpen) closeSeoHub({ pushHistory: true });
+      else goBack();
+    });
+    window.addEventListener('popstate', () => {
+      applySeoRouteFromLocation({ replaceHistory: false });
+    });
+  }
+
+  function loadMemoriaBackendSdkAfterFirstRender() {
+    if (typeof window.memoriaBACKEND === 'object' && window.memoriaBACKEND) return;
+    if (document.querySelector('script[data-hm-memoria-backend-sdk="true"]')) return;
+
+    const script = document.createElement('script');
+    script.src = MEMORIA_BACKEND_SDK_URL;
+    script.async = true;
+    script.defer = true;
+    script.dataset.hmMemoriaBackendSdk = 'true';
+    script.addEventListener('error', () => {
+      console.warn('Hashinmy: memoriaBACKEND no se pudo cargar en segundo plano; se usará contacto directo si hace falta.');
+    }, { once: true });
+    document.head.appendChild(script);
+  }
+
+  function startPostInitialBoot({ initialSeoLookupPath = '', shouldOpenInitialSeoRoute = false, initialSceneReadyPromise = Promise.resolve(false), requestedInitialLanguage = state.language, initialLanguageRequestToken = state.languageRequestToken } = {}) {
+    runAfterInitialPageOpen(() => {
+      preloadRemainingSceneImagesAfterOpen(state.scene);
+    }, initialSceneReadyPromise, 0);
+
+    runAfterInitialPageOpen(() => {
+      hydrateInitialLanguageAfterOpen(requestedInitialLanguage, initialLanguageRequestToken);
+    }, initialSceneReadyPromise, 0);
+
+    runAfterInitialPageOpen(() => {
+      loadMemoriaBackendSdkAfterFirstRender();
+    }, initialSceneReadyPromise);
+
+    runAfterInitialPageOpen(() => {
+      loadProofLogos().catch((error) => {
+        console.warn('Hashinmy: no se pudieron cargar logos después del primer render.', error);
+      });
+    }, initialSceneReadyPromise);
+
+    runAfterInitialPageOpen(() => {
+      loadLanguageCatalog()
+        .then(() => {
+          syncLanguageSelector();
+          syncLocalizedSeoLinks();
+          if (state.seoHubOpen) renderSeoHub();
+        })
+        .catch((error) => console.warn('Hashinmy: no se pudo refrescar catálogo de idiomas después del primer render.', error));
+    }, initialSceneReadyPromise);
+
+    if (shouldOpenInitialSeoRoute) {
+      runAfterInitialPageOpen(async () => {
+        try {
+          await loadSeoContent();
+          const initialSeoRoute = findSeoRouteByPath(initialSeoLookupPath);
+          if (!initialSeoRoute) {
+            warmSeoContentAfterFirstRender();
+            return;
+          }
+
+          if (initialSeoRoute.language && normalizeLanguageCode(initialSeoRoute.language) !== state.language) {
+            const seoLanguageRequestToken = ++state.languageRequestToken;
+            state.language = normalizeLanguageCode(initialSeoRoute.language);
+            await applyLanguage(state.language, seoLanguageRequestToken);
+            render();
+          }
+
+          const initialClassicView = isSeoClassicViewRequestedFromLocation();
+          await openSeoHub({
+            itemId: initialClassicView ? '' : initialSeoRoute.item?.id || '',
+            categoryId: initialSeoRoute.item?.category || initialSeoRoute.bundle?.categories?.[0]?.id || '',
+            pushHistory: false,
+            replaceHistory: true,
+            classicView: initialClassicView
+          });
+        } catch (error) {
+          console.warn('Hashinmy: no se pudo resolver la ruta SEO inicial después del primer render.', error);
+          warmSeoContentAfterFirstRender();
+        }
+      }, initialSceneReadyPromise);
+    } else {
+      runAfterInitialPageOpen(() => {
+        warmSeoContentAfterFirstRender();
+      }, initialSceneReadyPromise);
+    }
   }
 
   function validateSceneMap() {
@@ -5559,68 +5913,43 @@
   async function init() {
     bindElements();
     renderProofLogos();
-    await loadProofLogos();
     validateSceneMap();
     setViewportHeightVariable();
     hydrateBrandLogo();
     hydrateProofLogos();
+    hydrateInitialSceneImageState();
     syncProofWindowButton();
-    await loadLanguageCatalog();
+    seedFastLanguageCatalog();
     readLanguage();
+
+    const initialLanguageRequestToken = ++state.languageRequestToken;
+    const initialTextSeed = seedInitialCriticalText(state.language);
+    const { requestedLanguage: requestedInitialLanguage } = initialTextSeed;
+    const criticalScenePreloadPromise = preloadSceneImage(INITIAL_CRITICAL_SCENE_NAME).catch(() => false);
     const initialSeoLookupPath = getSeoRouteLookupPathFromLocation();
     const shouldOpenInitialSeoRoute = shouldResolveInitialSeoRoute(initialSeoLookupPath);
-    let initialSeoRoute = null;
-    if (shouldOpenInitialSeoRoute) {
-      await loadSeoContent();
-      initialSeoRoute = findSeoRouteByPath(initialSeoLookupPath);
-      if (initialSeoRoute?.language) state.language = initialSeoRoute.language;
+
+    if (!initialTextSeed.seeded) {
+      await applyLanguage(requestedInitialLanguage, initialLanguageRequestToken);
     }
-    const initialLanguageRequestToken = ++state.languageRequestToken;
-    await applyLanguage(state.language, initialLanguageRequestToken);
+
     readStorage();
-    preloadSceneImageWindow(state.scene);
+
+    const initialSceneReadyPromise = preloadInitialSceneImageForFastOpen(state.scene, criticalScenePreloadPromise);
     render();
-    if (initialSeoRoute) {
-      const initialClassicView = isSeoClassicViewRequestedFromLocation();
-      await openSeoHub({
-        itemId: initialClassicView ? '' : initialSeoRoute.item?.id || '',
-        categoryId: initialSeoRoute.item?.category || initialSeoRoute.bundle?.categories?.[0]?.id || '',
-        pushHistory: false,
-        replaceHistory: true,
-        classicView: initialClassicView
-      });
-    } else {
-      warmSeoContentAfterFirstRender();
-    }
-    requestImmersiveMode().then(preserveResponsiveOrientation);
+    bindRuntimeEvents();
     publishRouteUpdate('init');
-    document.addEventListener('pointerdown', () => requestImmersiveMode().then(preserveResponsiveOrientation), { once: true, passive: true });
-    document.addEventListener('keydown', () => requestImmersiveMode().then(preserveResponsiveOrientation), { once: true });
-    elements.options.addEventListener('click', handleOptionClick);
-    elements.contact.addEventListener('submit', sendRequest);
-    elements.languageSelect?.addEventListener('change', handleLanguageChange);
-    elements.seoHubCategories?.addEventListener('keydown', handleSeoCategoryKeydown);
-    [elements.contactInfo, elements.contactPhone].forEach((input) => {
-      input?.addEventListener('input', () => {
-        resetContactValidationState();
-        elements.formNote.textContent = t('ui.formNote');
-      });
-      input?.addEventListener('invalid', (event) => {
-        event.preventDefault();
-        showLocalizedContactRequired(input);
-      });
+
+    initialSceneReadyPromise.finally(() => {
+      scheduleInitialPageLoaderRelease('initial-scene-ready');
     });
-    document.addEventListener('click', handleActionClick);
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape') return;
-      if (state.proofWindowOpen) closeProofWindow({ focusReturn: true });
-      else if (state.seoHubOpen) closeSeoHub({ pushHistory: true });
-      else goBack();
+    startPostInitialBoot({
+      initialSeoLookupPath,
+      shouldOpenInitialSeoRoute,
+      initialSceneReadyPromise,
+      requestedInitialLanguage,
+      initialLanguageRequestToken
     });
-    window.addEventListener('popstate', () => {
-      applySeoRouteFromLocation({ replaceHistory: false });
-    });
-    scheduleInitialPageLoaderRelease('init-complete');
   }
 
   function runInit() {
