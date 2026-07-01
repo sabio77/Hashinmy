@@ -5269,24 +5269,15 @@
   }
 
   function getMemoriaBackendCommercialHelper() {
-    if (typeof window.memoriaBACKEND?.flujoComercialCotizacion === 'function') {
-      return window.memoriaBACKEND.flujoComercialCotizacion.bind(window.memoriaBACKEND);
-    }
+    const api = window.memoriaBACKEND;
+    const flowFunction = api?.flujoComercialCotizacion;
+    if (typeof flowFunction !== 'function') return null;
 
-    if (typeof window.memoriaBACKEND?.enviarFormulario === 'function') {
-      return (payload) => window.memoriaBACKEND.enviarFormulario('cotizacion_hashinmy', {
-        mensaje: payload?.textoCliente || '',
-        opcionesSeleccionadas: payload?.opcionesSeleccionadas || {}
-      }, {
-        lead: true,
-        notify: true,
-        email: true,
-        alias: 'principal',
-        idempotencyKey: payload?.idempotencyKey
-      });
-    }
-
-    return null;
+    return (payload) => {
+      const idempotencyKey = String(payload?.idempotencyKey || '').trim();
+      const options = idempotencyKey ? { idempotencyKey } : undefined;
+      return flowFunction.call(api, payload, options);
+    };
   }
 
   function waitForMemoriaBackendCommercialHelper() {
@@ -5344,195 +5335,24 @@
     });
   }
 
-  function normalizeCommercialConfirmationToken(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-  }
-
-  function isCommercialExplicitRejection(response) {
-    if (response === false || response === 0) return true;
-    if (!response || typeof response !== 'object') return false;
-
-    const rejectedTokens = new Set([
-      '0',
-      'false',
-      'error',
-      'failed',
-      'failure',
-      'fail',
-      'rejected',
-      'denied',
-      'invalid',
-      'timeout',
-      'cancelled',
-      'canceled',
-      'no',
-      'ko'
-    ]);
-
-    if (response.ok === 0 || response.ok === false) return true;
-    if (response.success === 0 || response.success === false) return true;
-    if (response.confirmed === 0 || response.confirmed === false) return true;
-    if (response.confirmado === 0 || response.confirmado === false) return true;
-    if (response.recibido === 0 || response.recibido === false) return true;
-    if (typeof response.err === 'string' && response.err.trim()) return true;
-    if (typeof response.error === 'string' && response.error.trim()) return true;
-    if (Array.isArray(response.errors) && response.errors.length > 0) return true;
-
-    const statusValues = [
-      response.status,
-      response.estado,
-      response.result,
-      response.resultado
-    ].map(normalizeCommercialConfirmationToken).filter(Boolean);
-
-    return statusValues.some((token) => rejectedTokens.has(token));
-  }
-
-  function hasCommercialConfirmationId(response) {
-    if (!response || typeof response !== 'object') return false;
-
-    const directIdKeys = [
-      'id',
-      '_id',
-      'uuid',
-      'leadId',
-      'lead_id',
-      'submissionId',
-      'submission_id',
-      'quoteId',
-      'quote_id',
-      'operationId',
-      'operation_id',
-      'requestId',
-      'request_id',
-      'eventId',
-      'event_id',
-      'messageId',
-      'message_id'
-    ];
-
-    if (directIdKeys.some((key) => {
-      const value = response[key];
-      return typeof value === 'string' ? value.trim() : Boolean(value);
-    })) return true;
-
-    return [
-      response.quote,
-      response.submission,
-      response.lead,
-      response.ownerNotification,
-      response.operation,
-      response.data,
-      response.result,
-      response.resultado,
-      response.response,
-      response.respuesta,
-      response.formulario,
-      response.form,
-      response.record,
-      response.entry
-    ].some((nested) => nested && typeof nested === 'object' && hasCommercialConfirmationId(nested));
-  }
-
-  function hasCommercialConfirmationFlag(response) {
-    if (response === true || response === 1) return true;
-    if (!response || typeof response !== 'object') return false;
-
-    const confirmedTokens = new Set([
-      '1',
-      'true',
-      'ok',
-      'success',
-      'successful',
-      'received',
-      'recibido',
-      'accepted',
-      'aceptado',
-      'confirmed',
-      'confirmado',
-      'saved',
-      'guardado',
-      'created',
-      'creado',
-      'queued',
-      'enqueued',
-      'processed',
-      'completed',
-      'done'
-    ]);
-
-    const directFlags = [
-      response.ok,
-      response.success,
-      response.confirmed,
-      response.confirmado,
-      response.received,
-      response.recibido,
-      response.accepted,
-      response.aceptado,
-      response.saved,
-      response.guardado,
-      response.created,
-      response.creado,
-      response.sent,
-      response.enviado
-    ];
-
-    if (directFlags.some((value) => value === true || value === 1 || confirmedTokens.has(normalizeCommercialConfirmationToken(value)))) {
-      return true;
-    }
-
-    const statusValues = [
-      response.status,
-      response.estado,
-      response.result,
-      response.resultado,
-      response.message,
-      response.mensaje
-    ].map(normalizeCommercialConfirmationToken).filter(Boolean);
-
-    if (statusValues.some((token) => confirmedTokens.has(token))) return true;
-
-    const httpStatus = Number(response.status || response.statusCode || response.code || 0);
-    if (Number.isFinite(httpStatus) && httpStatus >= 200 && httpStatus < 300) return true;
-
-    return [
-      response.data,
-      response.response,
-      response.respuesta,
-      response.result,
-      response.resultado,
-      response.meta,
-      response.confirmation,
-      response.confirmacion
-    ].some((nested) => nested && typeof nested === 'object' && hasCommercialConfirmationFlag(nested));
-  }
-
   function isCommercialSubmissionConfirmed(response) {
-    if (isCommercialExplicitRejection(response)) return false;
-
-    // Algunos helpers del SDK confirman por resolución exitosa de la promesa y no devuelven cuerpo.
-    // Si memoriaBACKEND rechazó o falló la recepción, el helper debe lanzar/rechazar y entra al catch.
-    if (response == null) return true;
-
-    if (hasCommercialConfirmationId(response)) return true;
-    if (hasCommercialConfirmationFlag(response)) return true;
-
-    return false;
+    if (!response || response.ok === 0 || response.ok === false) return false;
+    if (response.quote?.id) return true;
+    if (response.submission?.id) return true;
+    if (response.lead?.id || response.leadId) return true;
+    if (response.ownerNotification?.id || response.operation?.id) return true;
+    return response.ok === 1 || response.ok === true;
   }
 
   async function submitCommercialFlowWithSdk({ body, email, phone }) {
     const helper = await waitForMemoriaBackendCommercialHelper();
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
-    const response = await withCommercialRequestTimeout(helper({
-      ...buildMemoriaBackendStrictPayload(email, phone),
-      textoCliente: body,
+    const payload = {
+      textoCliente: String(body || '').trim() || buildMemoriaBackendSubmissionText(email, phone),
+      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone),
       idempotencyKey
-    }));
+    };
+    const response = await withCommercialRequestTimeout(helper(payload));
 
     if (!isCommercialSubmissionConfirmed(response)) {
       throw new Error(response?.err || 'Hashinmy no confirmó la recepción de la solicitud');
