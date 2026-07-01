@@ -29,13 +29,13 @@
     "summaryLabelAria": "Genererad sammanfattning",
     "footerLabel": "Scennavigering",
     "primaryFinance": "Begär diagnos",
-    "primaryQuote": "Offert på mitt system",
+    "primaryQuote": "Offerera mitt system",
     "back": "Tillbaka",
     "restart": "Starta om",
     "contactLabel": "Kontaktuppgifter",
     "contactPlaceholder": "Företagets e-postadress",
     "commentLabel": "Beskriv ditt projekt",
-    "commentPlaceholder": "Berätta vilken process du vill ordna, automatisera eller omvandla till programvara: försäljning, offerter, lager, produktion, support, data, kundservice, webbplats, API, chatbot eller plattform. Ange vad som gör att du förlorar tid, pengar eller information så att vi kan förbereda en tydlig teknisk och finansiell väg.",
+    "commentPlaceholder": "Berätta vilken process du vill ordna, automatisera eller omvandla till programvara: försäljning, offerter, lager, produktion, support, data, kundservice, webbplats, API, chatbot eller plattform. Ta med vad som gör att företaget förlorar tid, pengar eller information, så att vi kan förbereda en tydlig teknisk och finansiell väg.",
     "submitRoute": "Skicka till Hashinmy",
     "copySummaryAction": "Kopiera sammanfattning",
     "formNote": "Dina svar sparas bara i den här webbläsaren tills du väljer att skicka dem.",
@@ -341,12 +341,12 @@
   "scenes": {
     "intro": {
       "eyebrow": "Svenska",
-      "title": "Välkommen till HASHINMY",
-      "copy": "Vi bygger skräddarsydd programvara för företag som driver verksamhet, säljer och växer på lokala och internationella marknader. Vi integrerar AI, automatisering, PC-program, CAD-programvara med DXF-export, webbapplikationer, moln, SEO, chattbotar, tekniska offertverktyg, säkerhet och operativ kontinuitet.\nMedellín och Colombia är vårt ursprung; vår kommersiella och tekniska räckvidd är global.\nVi driver företags tekniska utveckling med 100% finansierade lösningar och hjälper dem att nå sin fulla potential, förbättra produktiviteten och skala mer effektivt.",
-      "optionQuestion": "Vilket alternativ vill du ha?",
+      "title": "Skräddarsydd teknik med 100 % finansiering för tillväxt utan att tömma kapitalet",
+      "copy": "Hashinmy omvandlar affärsprocesser till intelligent anpassad programvara, automatisering och tillämpad AI. Vi analyserar verksamheten, hittar var tid, pengar eller information går förlorad och bygger teknik som kan finansieras fullt ut, så att modernisering inte kräver en stor första investering. Vi är inte en vanlig webbyrå eller en generisk leverantör; vi förenar affärsstrategi, mjukvaruteknik, AI och tillgänglig finansiering.",
+      "optionQuestion": "Vilket första steg känns bäst för ditt företag?",
       "progress": "Start",
       "core": "HASHINMY",
-      "insight": "Du kan börja med diagnos, finansiering eller direkt offert; Hashinmy utgår från det verkliga problemet innan omfattning, betalningsform eller teknik definieras.",
+      "insight": "Du kan börja med diagnos, finansiering eller direkt offert; Hashinmy utgår från det verkliga problemet innan omfattning, betalningsform eller teknik bestäms.",
       "options": [
         {
           "label": "Operativ diagnos",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "väg",
-      "title": "Välj · Tjänst · Värde",
-      "optionQuestion": "Välj · Tjänst",
-      "copy": "På den här skärmen ligger det praktiska fokuset på Välj, Tjänst, Värde, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
-      "progress": "väg",
+      "title": "Vilken process behöver sluta improviseras?",
+      "optionQuestion": "Var gör verksamheten mest ont idag?",
+      "copy": "Välj var företaget förlorar mest tid, kontroll eller försäljning. Hashinmy börjar inte med att sälja en isolerad tjänst; först förstår vi verksamheten och sedan definierar vi en väg som kopplar programvara, AI, automatisering och en genomförbar implementeringsform.",
+      "progress": "Väg",
       "core": "Tjänst",
-      "insight": "Jag väljer behovet som påverkar produktivitet, kommersiellt flöde eller operativ kontroll mest, så att den första tekniska lösningen svarar på en verklig affärssmärta.",
+      "insight": "Jag väljer det behov som påverkar produktivitet, kommersiellt flöde eller operativ kontroll mest, så att den första tekniska lösningen svarar på ett verkligt affärsproblem.",
       "options": [
         {
           "label": "anpassad programvara · Produkt",
@@ -399,9 +399,9 @@
     },
     "buildType": {
       "eyebrow": "Produkt",
-      "title": "anpassad programvara · Användning",
-      "optionQuestion": "Välj · webb · mobilapp · PC-programvara",
-      "copy": "På den här skärmen ligger det praktiska fokuset på anpassad programvara, Användning, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
+      "title": "Var bör din programvara öppnas?",
+      "optionQuestion": "Var vill du använda den?",
+      "copy": "Den tekniska basen måste följa hur verksamheten faktiskt arbetar. Den kan vara webbläsare, mobil, PC eller en kombination i etapper, alltid med en arkitektur som kan växa utan att systemet byggs om från grunden.",
       "progress": "Produkt",
       "core": "Bygge",
       "options": [
@@ -424,14 +424,14 @@
           "insight": "Vald riktning: PC-programvara — desktop/local, kontroller."
         }
       ],
-      "insight": "Plattformen ska öppnas där ditt team redan arbetar, så att tekniken ordnar verksamheten utan att tvinga företaget att anpassa sig till ett obekvämt verktyg."
+      "insight": "Plattformen ska öppnas där teamet redan arbetar, så att tekniken ordnar verksamheten utan att tvinga företaget till ett obekvämt verktyg."
     },
     "automationType": {
       "eyebrow": "AI · automatisering",
-      "title": "automatisering · processer",
-      "optionQuestion": "Välj · automatisering",
-      "copy": "På den här skärmen ligger det praktiska fokuset på automatisering, processer, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
-      "progress": "automatisering",
+      "title": "Vilken del ska systemet göra åt dig?",
+      "optionQuestion": "Vad vill du automatisera först?",
+      "copy": "AI och automatisering är meningsfulla först när de löser konkret friktion: upprepade uppgifter, långsam service, spridda data, beslut utan information eller processer som är för beroende av mänskligt minne.",
+      "progress": "Automatisering",
       "core": "AI + RPA",
       "options": [
         {
@@ -453,14 +453,14 @@
           "insight": "Vald riktning: data, rapporter — BI, rapporter."
         }
       ],
-      "insight": "Rätt automatisering börjar med det arbete som upprepas mest, försenas mest eller skapar flest mänskliga fel i den dagliga verksamheten."
+      "insight": "Rätt automatisering börjar med arbetet som upprepas mest, försenas mest eller orsakar flest mänskliga fel."
     },
     "modernization": {
       "eyebrow": "modernisering",
-      "title": "modernisering · processer",
-      "optionQuestion": "Välj · modernisering",
-      "copy": "På den här skärmen ligger det praktiska fokuset på modernisering, processer, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
-      "progress": "modernisering",
+      "title": "Vad vill du lämna bakom dig?",
+      "optionQuestion": "Vad vill du ersätta först?",
+      "copy": "Modernisering är inte att byta verktyg för modets skull; det är att förvandla kalkylblad, lösa meddelanden och gamla system till en tydligare, säkrare och mätbar verksamhet som kan växa med färre fel.",
+      "progress": "Modernisera",
       "core": "360",
       "options": [
         {
@@ -482,13 +482,13 @@
           "insight": "Vald riktning: UX/UI, förtroende — upplevelse, Värde."
         }
       ],
-      "insight": "Att lämna kalkylark, lösa meddelanden och gamla system bakom sig gör det möjligt att återfå spårbarhet, hastighet och kontroll utan att ändra företagets kärna."
+      "insight": "När kalkylblad, lösa meddelanden och gamla system lämnas bakom återfår företaget spårbarhet, hastighet och kontroll utan att ändra verksamhetens kärna."
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Användning · processer",
-      "optionQuestion": "Välj · Användning",
-      "copy": "På den här skärmen ligger det praktiska fokuset på Användning, processer, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
+      "title": "Hur ska det användas i verkligheten?",
+      "optionQuestion": "Var behöver det fungera bäst?",
+      "copy": "Programvaran ska fungera där arbetet sker: kontor, fält, försäljning, produktion, support eller ledning. Svaret definierar synkronisering, behörigheter, backend, mobil upplevelse eller lokal kontroll enligt den verkliga verksamheten.",
       "progress": "Användning",
       "core": "Architecture",
       "options": [
@@ -511,13 +511,13 @@
           "insight": "Vald riktning: PC, kontroller — desktop/local, säkerhet."
         }
       ],
-      "insight": "Arkitekturen bestäms utifrån den verkliga användningen så att systemet fungerar på kontor, i fält, försäljning, produktion eller support utan onödig friktion."
+      "insight": "Arkitekturen väljs från verklig användning så att systemet fungerar på kontor, i fält, försäljning, produktion eller support utan onödig friktion."
     },
     "value": {
       "eyebrow": "Värde",
-      "title": "Värde · Välj",
-      "optionQuestion": "Välj · Värde",
-      "copy": "På den här skärmen ligger det praktiska fokuset på Värde, Välj, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
+      "title": "Vad bör förbättras först?",
+      "optionQuestion": "Vilket resultat vill du märka först?",
+      "copy": "En bra plattform ska kännas nyttig tidigt: ordna ärenden, automatisera uppgifter, visa användbara data och hjälpa försäljningen. Värdet designas så att systemet börjar motivera sin investering i verksamheten.",
       "progress": "Värde",
       "core": "Värde",
       "options": [
@@ -540,14 +540,14 @@
           "insight": "Vald riktning: data, AI — rapporter, AI."
         }
       ],
-      "insight": "Det första synliga värdet ska motivera investeringen: mer ordning, mindre förlorad tid, bättre data, högre produktivitet eller fler säljmöjligheter."
+      "insight": "Det första synliga värdet ska motivera investeringen: mer ordning, mindre förlorad tid, bättre data, högre produktivitet eller fler säljchanser."
     },
     "risk": {
       "eyebrow": "förtroende · kontroller",
-      "title": "säkerhet · Välj",
-      "optionQuestion": "Välj · säkerhet",
-      "copy": "På den här skärmen ligger det praktiska fokuset på säkerhet, Välj, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
-      "progress": "säkerhet",
+      "title": "Vad måste kännas mest skyddat?",
+      "optionQuestion": "Vad vill du skydda bättre?",
+      "copy": "Förtroende byggs från första modulen med roller, behörigheter, revision, valideringar och gränser för AI. På så sätt får företaget fart utan att förlora kontroll över data, beslut och kritiska processer.",
+      "progress": "Säkerhet",
       "core": "förtroende",
       "options": [
         {
@@ -569,14 +569,14 @@
           "insight": "Vald riktning: AI, mänsklig granskning — automatisering, kontroller."
         }
       ],
-      "insight": "Tillväxt kräver kontroll; därför utformas behörigheter, revision, valideringar och gränser för AI innan kritiska processer automatiseras."
+      "insight": "Tillväxt kräver kontroll; därför designas behörigheter, revision, valideringar och AI-gränser innan kritiska processer automatiseras."
     },
     "finance": {
       "eyebrow": "skyddat kapital · finansiering",
-      "title": "finansiering · roadmap",
-      "optionQuestion": "Välj · finansiering",
-      "copy": "På den här skärmen ligger det praktiska fokuset på finansiering, roadmap, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
-      "progress": "finansiering",
+      "title": "Hur vill du modernisera utan att tömma kapitalet?",
+      "optionQuestion": "Vilken modell gör det möjligt att gå vidare nu?",
+      "copy": "Med Hashinmy behöver företaget inte välja mellan att skydda kassaflödet och att modernisera. Vi strukturerar omfattningen, finansierar 100 % av utvecklingen när diagnosen tillåter det och definierar hanterbara delbetalningar så att programvaran kan börja skapa värde medan den betalas. Finansiering ersätter inte ingenjörsarbetet; den gör det tillgängligt för företag som behöver ordna processer, automatisera arbete, integrera AI och växa utan att decapitaliseras.",
+      "progress": "100 % finansiering",
       "core": "USD",
       "options": [
         {
@@ -598,13 +598,13 @@
           "insight": "Vald riktning: kontakt, mänsklig granskning — projektsammanfattning, kontakt."
         }
       ],
-      "insight": "Finansieringen gör det möjligt att gå vidare nu, skydda rörelsekapital och betala medan tekniken sparar tid, ordnar processer eller driver försäljning."
+      "insight": "Finansiering gör det möjligt att börja nu, skydda rörelsekapital och betala medan tekniken sparar tid, ordnar processer eller driver försäljning."
     },
     "timeline": {
       "eyebrow": "Tempo",
-      "title": "roadmap · Tempo",
-      "optionQuestion": "Välj · Tempo",
-      "copy": "På den här skärmen ligger det praktiska fokuset på roadmap, Tempo, så att vägen behåller affärs- och teknikkontext. Hashinmy gör detta val till en tydlig väg med omfattning, kontroller och nästa steg, så att verksamheten kan sälja, driva eller växa med mindre friktion.",
+      "title": "Hur snabbt måste systemet börja andas?",
+      "optionQuestion": "Vilket tempo passar bäst?",
+      "copy": "Tempot avgör hur ett stort behov blir till nyttiga leveranser. Vi kan börja med en MVP, en kort fas eller en företagsarkitektur, samtidigt som varje steg har operativt och finansiellt värde.",
       "progress": "Tempo",
       "core": "roadmap",
       "options": [
@@ -627,15 +627,15 @@
           "insight": "Vald riktning: enterprise, roadmap — säkerhet, enterprise."
         }
       ],
-      "insight": "Rätt tempo omvandlar ett stort behov till användbara, mätbara och finansierbara leveranser utan att tappa visionen för hela systemet."
+      "insight": "Rätt tempo gör ett stort behov till nyttiga, mätbara och finansierbara leveranser utan att tappa visionen för hela systemet."
     },
     "summary": {
       "eyebrow": "väg · sammanfattning",
-      "title": "projektsammanfattning · sammanfattning",
-      "copy": "Din väg är klar. Innan du skickar kan du lägga till viktiga detaljer; Hashinmy-teamet granskar projektets riktning, finansieringsalternativ och nästa steg med tydlig affärsmässig och teknisk kontext.",
-      "progress": "projektsammanfattning",
+      "title": "Din tekniska väg är klar.",
+      "copy": "Vi har redan en första läsning av behovet, betalningsmodellen och den operativa prioriteten. Lägg till den kontext som saknas så att Hashinmy kan analysera verksamheten, föreslå en anpassad lösning och förbereda en genomförbar teknisk, kommersiell och finansiell väg. Nästa samtal bör koppla affärsproblem, intern kunskap, systemets omfattning, prioritet, förväntat värde och betalningsform samtidigt som kassaflödet skyddas.",
+      "progress": "Förfrågan",
       "core": "projektsammanfattning",
-      "insight": "Rutten är redo att koppla behov, företagskunskap, teknisk omfattning, operativ prioritet, förväntat värde och betalningsmodell i ett genomförbart förslag.",
+      "insight": "Vägen är klar för att koppla behov, företagskunskap, teknisk omfattning, operativ prioritet, förväntat värde och betalningsmodell i ett genomförbart förslag.",
       "options": []
     }
   },

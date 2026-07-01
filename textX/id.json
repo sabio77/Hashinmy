@@ -5,14 +5,14 @@
   "htmlLang": "id",
   "dir": "ltr",
   "meta": {
-    "title": "Hashinmy | perangkat lunak khusus rute",
-    "description": "Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
-    "ogTitle": "Hashinmy | perangkat lunak khusus",
-    "ogDescription": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran.",
+    "title": "Hashinmy | Perangkat lunak, AI, dan otomatisasi dibiayai 100%",
+    "description": "Hashinmy mengembangkan perangkat lunak khusus, AI, dan otomatisasi dengan pembiayaan 100% untuk memodernisasi perusahaan tanpa menguras arus kas.",
+    "ogTitle": "Hashinmy | Teknologi bisnis khusus dibiayai 100%",
+    "ogDescription": "Mitra teknologi untuk membangun perangkat lunak, AI, dan otomatisasi khusus, dengan diagnosis operasional dan pembiayaan pengembangan 100%.",
     "appleTitle": "Hashinmy",
     "applicationName": "Hashinmy",
     "author": "Hashinmy",
-    "keywords": "Bahasa Indonesia, Indonesian, Layanan, rute, Penggunaan, Nilai, pembiayaan, keamanan, web · perangkat lunak, aplikasi seluler, perangkat lunak PC, otomatisasi, AI · integrasi, modernisasi, ringkasan proyek · rute, perangkat lunak khusus · Produk, otomatisasi · AI, modernisasi · proses, otomatisasi · proses, web · rute, aplikasi seluler · Penggunaan, PC · kontrol, alur kerja · proses, otomatisasi · cepat, data · laporan, AI · tinjauan manusia, UX/UI · kepercayaan, data · AI, pengguna · izin, data · keamanan, pembiayaan 100%, penawaran langsung, penawaran langsung · fase, kontak · tinjauan manusia, cepat · MVP, 1-3 · fase, enterprise · peta jalan, Hashinmy, hashinmy.com, perangkat lunak khusus · Produk · pembiayaan 100%, web · perangkat lunak · PWA, ecommerce · perangkat lunak khusus · Produk, perangkat lunak khusus · Produk · CAD/DXF, penawaran langsung · pembiayaan 100%, API, UX/UI, ecommerce · otomatisasi · proses, AI · integrasi · enterprise · peta jalan, Industri · perangkat lunak khusus · Produk, Biayai sekarang, API · web · rute, penawaran langsung · perangkat lunak khusus · Produk, web · perangkat lunak · SEO, chatbots · AI · integrasi, Colombia · Medellín · perangkat lunak khusus · Produk, API · enterprise · peta jalan, data · keamanan · perangkat lunak khusus · Produk, enterprise · peta jalan · perangkat lunak khusus · Produk, CRM · enterprise · peta jalan, ERP · perangkat lunak khusus · Produk, web · perangkat lunak · UX/UI · kepercayaan, web · perangkat lunak · portal"
+    "keywords": "Hashinmy, hashinmy.com, perangkat lunak khusus dibiayai 100%, teknologi bisnis dibiayai, rekayasa digital untuk perusahaan, kecerdasan buatan terapan, otomatisasi proses bisnis, transformasi digital tanpa menguras modal, pengembangan perangkat lunak dengan pembiayaan, sistem pintar untuk perusahaan, perangkat lunak untuk menata proses, otomatisasi penjualan, otomatisasi penawaran, perangkat lunak inventaris, AI dengan tinjauan manusia, diagnosis operasional, pengembangan bertahap, keamanan digital bisnis"
   },
   "ui": {
     "skip": "Pilih · rute",
@@ -23,34 +23,34 @@
     "progressLabel": "rute · Kecepatan",
     "languageLabel": "Bahasa",
     "languageAria": "Pilih · Bahasa",
-    "contentLabel": "pengalaman · ringkasan proyek",
+    "contentLabel": "Konten utama adegan",
     "pathLabelAria": "rute · ringkasan",
     "decisionZoneLabel": "Pilih · Layanan",
-    "summaryLabelAria": "ringkasan · ringkasan proyek",
+    "summaryLabelAria": "Ringkasan yang dibuat",
     "footerLabel": "kontrol · rute",
-    "primaryFinance": "Biayai sekarang",
-    "primaryQuote": "Minta penawaran",
+    "primaryFinance": "Minta diagnosis",
+    "primaryQuote": "Buat penawaran sistem saya",
     "back": "Kembali",
     "restart": "Mulai ulang",
     "contactLabel": "kontak · Hashinmy",
     "contactPlaceholder": "Email · WhatsApp · kontak",
     "commentLabel": "Jelaskan proyek Anda",
-    "commentPlaceholder": "Ceritakan proses mana yang ingin Anda tingkatkan, gambar, komponen, atau sistem apa yang dibutuhkan, serta detail teknis apa pun yang membantu kami menyiapkan rute yang jelas.",
+    "commentPlaceholder": "Ceritakan proses apa yang ingin Anda rapikan, otomatisasi, atau ubah menjadi perangkat lunak: penjualan, penawaran harga, inventaris, produksi, dukungan, data, layanan pelanggan, halaman web, API, chatbot, atau platform. Sertakan hal yang membuat Anda kehilangan waktu, uang, atau informasi agar kami dapat menyiapkan rute teknis dan finansial yang jelas.",
     "submitRoute": "Kirim rute ke Hashinmy",
     "copySummaryAction": "Salin ringkasan",
     "formNote": "Jawaban Anda hanya tersimpan di peramban ini sampai Anda memutuskan untuk mengirimnya.",
-    "contactRequired": "Tambahkan email, WhatsApp, atau nama perusahaan agar Hashinmy dapat menghubungi Anda dengan rute yang sudah disiapkan.",
+    "contactRequired": "Tambahkan email bisnis dan WhatsApp Anda agar Hashinmy dapat mengonfirmasi permintaan dan menghubungi Anda dengan rute yang sudah disiapkan.",
     "copySuccess": "Ringkasan berhasil disalin. Anda dapat menempelkannya ke WhatsApp, email, atau CRM.",
-    "copyFailure": "Ringkasan tidak dapat disalin; kirim rute ke Hashinmy melalui formulir.",
-    "mailOpening": "Email berisi rute yang sudah disiapkan sedang dibuka; tinjau sebelum dikirim ke Hashinmy.",
-    "waitSummary": "ringkasan · ringkasan proyek",
+    "copyFailure": "Ringkasan tidak dapat disalin secara otomatis. Pengiriman melalui email tetap akan menyiapkan ringkasan.",
+    "mailOpening": "Kami tidak dapat mengonfirmasi melalui memoriaBACKEND pada percobaan ini. Kami akan membuka aplikasi email Anda dengan rute yang sudah disiapkan sebagai cadangan.",
+    "waitSummary": "Menyiapkan rute teknologi",
     "preparingOptions": "Menyiapkan opsi",
     "optionFallback": "Pilih · rute",
     "pathLabel": "rute · ringkasan",
-    "pathEmpty": "Setiap pilihan menyusun ringkasan proyek Anda",
+    "pathEmpty": "Setiap pilihan menyusun rangkuman proyek Anda",
     "interactionFallback": "pengalaman",
-    "summaryTitle": "Permintaan interaktif Hashinmy",
-    "projectChosen": "Produk · Pilih",
+    "summaryTitle": "Rute teknologi yang disiapkan oleh Hashinmy",
+    "projectChosen": "Proyek yang dipilih",
     "expectedUse": "Penggunaan",
     "wantedValue": "Nilai",
     "prioritySecurity": "keamanan",
@@ -61,28 +61,28 @@
     "suggestedControls": "kontrol",
     "nextStep": "peta jalan · fase",
     "contact": "kontak",
-    "additionalComment": "Komentar opsional",
+    "additionalComment": "Komentar tambahan",
     "registeredInteractions": "rute · ringkasan",
     "directRouteRequested": "penawaran langsung. rute.",
     "directQuoteSubject": "Hashinmy · penawaran langsung",
     "financedSubject": "Hashinmy · perangkat lunak khusus · pembiayaan",
-    "directQuoteAudit": "penawaran langsung. ringkasan proyek. rute.",
-    "financeAudit": "pembiayaan 100%. ringkasan proyek. rute.",
-    "directQuoteTech": "penawaran langsung · ringkasan proyek",
-    "financeTech": "USD · fase · ringkasan proyek",
+    "directQuoteAudit": "Rute langsung menuju diagnosis untuk membuat penawaran sistem dengan cakupan, nilai operasional, dan cara implementasi yang jelas.",
+    "financeAudit": "Rute langsung menuju diagnosis dengan pembiayaan 100% pengembangan sebagai prioritas utama.",
+    "directQuoteTech": "diagnosis sistem + cakupan teknis dan komersial",
+    "financeTech": "diagnosis + pembiayaan 100% + cicilan terkelola",
     "topActionsLabel": "Produk · Bahasa",
     "proofEntryAria": "Pengalaman Kami · Hashinmy",
     "proofOpenButton": "Pengalaman Kami",
-    "proofTitle": "Pengalaman Kami",
-    "proofLead": "Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
+    "proofTitle": "Rekayasa digital yang dibiayai",
+    "proofLead": "Hashinmy bukan agensi halaman web atau penyedia generik. Hashinmy adalah firma rekayasa digital yang mengubah proses bisnis menjadi perangkat lunak, AI, dan otomatisasi khusus, dengan pembiayaan 100% untuk memodernisasi tanpa menguras operasi.",
     "proofCloseAria": "Tutup · Pengalaman Kami",
     "proofContentAria": "Pengalaman Kami · Pertanyaan umum",
     "proofSummaryAria": "kepercayaan · kontrol",
-    "proofSummaryTitle": "kepercayaan · kontrol · Hashinmy",
-    "proofTrustLabel": "kepercayaan · kontrol:",
-    "proofTrustText": "Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas. Hashinmy pengalaman: perangkat lunak khusus. AI + otomatisasi. aplikasi seluler + perangkat lunak PC. pembiayaan 100% / penawaran langsung.",
+    "proofSummaryTitle": "Teknologi khusus dibiayai 100% untuk menata operasi, melindungi modal, dan bertumbuh dengan kontrol",
+    "proofTrustLabel": "Kepercayaan teknis:",
+    "proofTrustText": "strategi bisnis, perangkat lunak khusus, AI terapan, otomatisasi, API, kanal penjualan web, chatbot, diagnosis operasional, pembiayaan 100%, cicilan terkelola, keamanan, izin, keterlacakan, data berguna, dan kesinambungan.",
     "proofMethodLabel": "Metodologi:",
-    "proofMethodText": "Diagnosis, desain, pengembangan, pengujian, penyerahan, dan dukungan. Medellín dan Kolombia adalah asal kami; jangkauannya global.",
+    "proofMethodText": "kami meninjau operasi nyata, menemukan kehilangan waktu, uang, atau informasi, memprioritaskan modul dengan pengembalian tertinggi, merancang solusi yang tepat, dan mendampingi pembiayaan, implementasi, pengujian, adopsi, serta evolusi.",
     "proofUseCasesLabel": "Contoh penggunaan:",
     "proofUseCasesText": "Usaha pertukangan, penjualan, inventaris, penawaran teknis, dukungan, CRM, UX/UI · kepercayaan, ecommerce, dan otomatisasi operasional.",
     "proofBrandsTitle": "Merek, proyek, dan perusahaan yang terkait dengan pekerjaan kami",
@@ -91,11 +91,11 @@
     "proofLogoAltTemplate": "Logo {name}",
     "proofFaqAria": "Pertanyaan umum · Pengalaman Kami",
     "proofFaqWhyQuestion": "Mengapa memilih Hashinmy?",
-    "proofFaqWhyAnswer": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran.",
+    "proofFaqWhyAnswer": "Karena Hashinmy tidak menjual kode terpisah atau teknologi generik: Hashinmy mengubah masalah operasional konkret menjadi sistem yang jelas, aman, terukur, dan layak secara finansial.",
     "proofFaqWhoQuestion": "Untuk siapa?",
-    "proofFaqWhoAnswer": "rute Pilih. perangkat lunak ringkasan proyek. pembiayaan / Minta penawaran. Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas.",
+    "proofFaqWhoAnswer": "Untuk perusahaan kecil, menengah, atau besar yang perlu menata proses, mengotomatiskan pekerjaan, mengintegrasikan AI, menjual lebih baik, atau membuat perangkat lunak sendiri sambil melindungi arus kas.",
     "proofFaqStartQuestion": "Bagaimana saya memulai?",
-    "proofFaqStartAnswer": "Rute Anda sudah siap. Sebelum dikirim, Anda dapat menambahkan detail penting; tim Hashinmy akan meninjau arah proyek, opsi pembiayaan, dan langkah berikutnya dengan konteks bisnis serta teknis yang jelas. penawaran langsung. ringkasan proyek. rute.",
+    "proofFaqStartAnswer": "Minta diagnosis untuk meninjau operasi, menemukan kehilangan waktu, uang, atau informasi, dan menyiapkan rute teknis, komersial, serta finansial yang jelas.",
     "proofBrandsStructuredDescription": "Merek, proyek, dan perusahaan yang terkait dengan pekerjaan kami"
   },
   "services": [
@@ -179,7 +179,7 @@
     },
     "summary": {
       "symbol": "ringkasan",
-      "label": "ringkasan proyek"
+      "label": "rangkuman dibuat"
     }
   },
   "metricsByScene": {
@@ -208,7 +208,7 @@
       ],
       [
         "1",
-        "ringkasan proyek"
+        "rangkuman aktif"
       ]
     ],
     "buildType": [
@@ -330,7 +330,7 @@
       ],
       [
         "Email",
-        "ringkasan proyek"
+        "email siap"
       ],
       [
         "tinjauan manusia",
@@ -341,8 +341,8 @@
   "scenes": {
     "intro": {
       "eyebrow": "Bahasa Indonesia",
-      "title": "Selamat datang di HASHINMY",
-      "copy": "Kami membangun software khusus untuk perusahaan yang beroperasi, menjual, dan bertumbuh di pasar lokal maupun internasional. Kami mengintegrasikan AI, otomatisasi, program PC, software CAD dengan ekspor DXF, aplikasi web, cloud, SEO, chatbot, alat penawaran teknis, keamanan, dan keberlanjutan operasional.\nMedellín dan Kolombia adalah asal kami; jangkauan komersial dan teknis kami bersifat global.\nKami mendorong pengembangan teknologi perusahaan melalui solusi dengan pembiayaan 100%, membantu mereka mencapai potensi maksimal, meningkatkan produktivitas, dan berkembang lebih efisien.",
+      "title": "Teknologi khusus dibiayai 100% untuk tumbuh tanpa menguras modal",
+      "copy": "Hashinmy mengubah proses bisnis menjadi perangkat lunak cerdas, otomatisasi, dan kecerdasan buatan khusus. Kami menganalisis operasi, menemukan di mana waktu, uang, atau informasi hilang, dan membangun teknologi yang dapat dibiayai 100% untuk modernisasi tanpa menuntut investasi awal yang besar.\nKami bukan agensi halaman web atau penyedia generik: kami adalah mitra teknologi yang menyatukan strategi bisnis, rekayasa perangkat lunak, AI terapan, dan pembiayaan yang terjangkau.\nPerusahaan Anda sudah memiliki pengetahuan, pengalaman, dan visi. Kami mengubahnya menjadi sistem yang menata penjualan, penawaran harga, inventaris, dukungan, data, proses internal, dan kanal digital, sambil menjaga arus kas ketika solusi mulai menghasilkan nilai.",
       "optionQuestion": "Opsi mana yang Anda inginkan?",
       "progress": "Mulai",
       "core": "HASHINMY",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "rute",
-      "title": "Apa yang ingin Anda capai lebih dulu?",
+      "title": "Proses mana yang perlu berhenti diimprovisasi?",
       "optionQuestion": "Apa yang ingin diselesaikan dulu?",
-      "copy": "Pilih titik awal dan kami menyiapkan rute yang jelas untuk mengubah kebutuhan Anda menjadi proposal nyata.",
+      "copy": "Pilih di mana perusahaan Anda paling banyak kehilangan waktu, kontrol, atau penjualan. Hashinmy tidak mulai dengan menjual layanan terpisah: kami memahami operasi terlebih dahulu, lalu menentukan rute yang menghubungkan perangkat lunak, AI, otomatisasi, dan bentuk implementasi yang layak.",
       "progress": "rute",
       "core": "Layanan",
-      "insight": "Saya memilih kebutuhan yang paling memengaruhi produktivitas, alur komersial, atau kendali operasional agar solusi teknologi pertama menjawab masalah nyata bisnis.",
+      "insight": "Saya memilih kebutuhan yang paling memengaruhi produktivitas, alur komersial, atau kontrol operasional agar solusi teknologi pertama menjawab masalah bisnis yang nyata.",
       "options": [
         {
           "label": "perangkat lunak khusus · Produk",
@@ -401,7 +401,7 @@
       "eyebrow": "Produk",
       "title": "Di mana software Anda harus dibuka?",
       "optionQuestion": "Di mana Anda ingin menggunakannya?",
-      "copy": "Keputusan ini menentukan dasar: browser, ponsel, atau PC. Hashinmy dapat menggabungkan modul jika proyek membutuhkannya.",
+      "copy": "Dasar teknis harus mengikuti cara kerja nyata bisnis. Bisa berupa browser, ponsel, PC, atau kombinasi bertahap, selalu dengan arsitektur yang siap tumbuh tanpa membangun ulang sistem dari nol.",
       "progress": "Produk",
       "core": "Pembuatan",
       "options": [
@@ -430,7 +430,7 @@
       "eyebrow": "AI · otomatisasi",
       "title": "Bagian mana yang harus dikerjakan sistem untuk Anda?",
       "optionQuestion": "Apa yang ingin diotomatisasi dulu?",
-      "copy": "Otomatisasi bukan sekadar memakai AI karena tren. Ini tentang mengurangi pekerjaan berulang, kesalahan, dan gesekan yang paling terasa.",
+      "copy": "Kecerdasan buatan dan otomatisasi hanya masuk akal ketika menyelesaikan gesekan konkret: tugas berulang, layanan lambat, data tersebar, keputusan tanpa informasi, atau proses yang terlalu bergantung pada ingatan manusia.",
       "progress": "otomatisasi",
       "core": "AI + RPA",
       "options": [
@@ -459,7 +459,7 @@
       "eyebrow": "modernisasi",
       "title": "Apa yang ingin Anda tinggalkan?",
       "optionQuestion": "Apa yang ingin diganti dulu?",
-      "copy": "Modernisasi mengubah alat yang terpisah menjadi sistem yang lebih aman, terukur, dan siap tumbuh.",
+      "copy": "Modernisasi bukan mengganti alat karena tren; modernisasi mengubah spreadsheet, pesan terpisah, dan sistem lama menjadi operasi yang lebih jelas, aman, terukur, dan siap tumbuh dengan lebih sedikit kesalahan.",
       "progress": "modernisasi",
       "core": "360",
       "options": [
@@ -486,9 +486,9 @@
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Bagaimana sistem harus dipakai dalam operasi nyata?",
+      "title": "Bagaimana seharusnya digunakan dalam kehidupan nyata?",
       "optionQuestion": "Di mana harus bekerja paling baik?",
-      "copy": "Jawaban Anda menunjukkan apakah prioritasnya backend, sinkronisasi, aplikasi mobile, atau software lokal.",
+      "copy": "Perangkat lunak harus berfungsi di tempat kerja terjadi: kantor, lapangan, penjualan, produksi, dukungan, atau manajemen. Jawaban ini menentukan sinkronisasi, izin, backend, pengalaman seluler, atau kontrol lokal sesuai operasi nyata.",
       "progress": "Penggunaan",
       "core": "Architecture",
       "options": [
@@ -517,7 +517,7 @@
       "eyebrow": "Nilai",
       "title": "Apa yang harus membaik lebih dulu?",
       "optionQuestion": "Hasil apa yang ingin Anda lihat dulu?",
-      "copy": "Platform yang baik bukan hanya terlihat bagus. Ia merapikan proses, mengotomatisasi kerja, dan menampilkan data untuk keputusan.",
+      "copy": "Platform yang baik harus terasa berguna sejak awal: menata kasus, mengotomatiskan tugas, menampilkan data yang dapat ditindaklanjuti, dan membantu penjualan. Nilai dirancang agar sistem mulai membenarkan investasinya dalam operasi.",
       "progress": "Nilai",
       "core": "Nilai",
       "options": [
@@ -546,7 +546,7 @@
       "eyebrow": "kepercayaan · kontrol",
       "title": "Apa yang harus paling terlindungi?",
       "optionQuestion": "Apa yang ingin Anda lindungi lebih baik?",
-      "copy": "Keamanan tidak ditambahkan di akhir. Ia dirancang sejak awal dengan izin, audit, dan aturan jelas.",
+      "copy": "Kepercayaan dirancang sejak modul pertama dengan peran, izin, audit, validasi, dan batas untuk kecerdasan buatan. Dengan begitu perusahaan mendapatkan kecepatan tanpa kehilangan kontrol atas data, keputusan, dan proses kritis.",
       "progress": "keamanan",
       "core": "kepercayaan",
       "options": [
@@ -573,9 +573,9 @@
     },
     "finance": {
       "eyebrow": "modal terlindungi · pembiayaan",
-      "title": "Bagaimana maju tanpa menghambat operasi?",
+      "title": "Bagaimana Anda ingin memodernisasi tanpa menguras modal?",
       "optionQuestion": "Bagaimana Anda ingin mengatur pembayaran?",
-      "copy": "Pengembangan dapat diatur dalam cicilan USD sesuai ruang lingkup, persetujuan, dan ritme implementasi.",
+      "copy": "Dengan Hashinmy, perusahaan tidak perlu memilih antara menjaga kas atau memodernisasi diri. Kami menyusun cakupan, membiayai 100% pengembangan ketika diagnosis memungkinkan, dan menentukan cicilan terkelola agar perangkat lunak mulai menghasilkan nilai saat dibayar. Pembiayaan tidak menggantikan rekayasa; pembiayaan membuatnya dapat diakses oleh perusahaan yang perlu menata proses, mengotomatiskan pekerjaan, mengintegrasikan AI, dan tumbuh tanpa menguras modal.",
       "progress": "pembiayaan",
       "core": "USD",
       "options": [
@@ -593,9 +593,9 @@
         },
         {
           "label": "kontak · tinjauan manusia",
-          "hint": "ringkasan proyek · kontak",
+          "hint": "Saya membutuhkan panduan teknis dan finansial",
           "tech": "tinjauan manusia",
-          "insight": "Arah yang dipilih: kontak, tinjauan manusia — ringkasan proyek, kontak."
+          "insight": "Saya ingin Hashinmy meninjau kasus saya dan mengusulkan rute yang layak menurut operasi, prioritas, cakupan, dan cara pembayaran."
         }
       ],
       "insight": "Pembiayaan membuat kemajuan sekarang menjadi layak, melindungi modal operasional, dan memungkinkan pembayaran saat teknologi menghemat waktu, merapikan proses, atau mendorong penjualan."
@@ -604,7 +604,7 @@
       "eyebrow": "Kecepatan",
       "title": "Seberapa cepat harus mulai berjalan?",
       "optionQuestion": "Ritme mana yang paling cocok?",
-      "copy": "Jawaban ini membedakan versi awal yang berguna dari platform besar yang dibangun bertahap. Hashinmy mengubah pilihan ini menjadi rute yang jelas dengan cakupan, kontrol, dan langkah berikutnya, agar bisnis bisa menjual, beroperasi, atau tumbuh dengan lebih sedikit hambatan.",
+      "copy": "Ritme menentukan cara mengubah kebutuhan besar menjadi rilis yang berguna. Kita dapat memulai dengan MVP, fase singkat, atau arsitektur perusahaan, sambil memastikan setiap kemajuan memiliki nilai operasional dan finansial.",
       "progress": "Kecepatan",
       "core": "peta jalan",
       "options": [
@@ -631,11 +631,11 @@
     },
     "summary": {
       "eyebrow": "rute · ringkasan",
-      "title": "Kami sudah memahami yang Anda cari.",
-      "copy": "Rute Anda sudah siap. Sebelum dikirim, Anda dapat menambahkan detail penting; tim Hashinmy akan meninjau arah proyek, opsi pembiayaan, dan langkah berikutnya dengan konteks bisnis serta teknis yang jelas.",
-      "progress": "ringkasan proyek",
-      "core": "ringkasan proyek",
-      "insight": "Rute siap menghubungkan kebutuhan, pengetahuan bisnis, cakupan teknis, prioritas operasional, nilai yang diharapkan, dan model pembayaran menjadi proposal yang layak.",
+      "title": "Rute teknologi Anda sudah siap.",
+      "copy": "Kami sudah memiliki pembacaan awal tentang kebutuhan, modalitas pembayaran, dan prioritas operasional. Tambahkan konteks yang masih kurang agar Hashinmy dapat menganalisis operasi Anda, mengusulkan solusi khusus, dan menyiapkan rute teknis, komersial, serta finansial yang layak.\nPercakapan berikutnya harus menghubungkan masalah bisnis, pengetahuan internal, cakupan sistem, prioritas, nilai yang diharapkan, dan cara pembayaran, sambil menjaga arus kas ketika perangkat lunak mulai menghasilkan hasil.",
+      "progress": "Ringkasan",
+      "core": "Rangkuman",
+      "insight": "Rute siap menghubungkan kebutuhan, pengetahuan bisnis, cakupan teknis, prioritas operasional, nilai yang diharapkan, dan model pembayaran dalam proposal yang layak.",
       "options": []
     }
   },
@@ -649,7 +649,7 @@
     "timeline": "Kecepatan"
   },
   "valueLabels": {
-    "diagnostico": "ringkasan proyek · rute",
+    "diagnostico": "diagnosis · rute",
     "producto_digital": "perangkat lunak khusus · Produk",
     "automatizacion_ia": "otomatisasi · AI",
     "modernizacion_operativa": "modernisasi · proses",
@@ -682,11 +682,11 @@
   "recommendation": {
     "defaults": {
       "service": "perangkat lunak khusus · Produk",
-      "operation": "architecture · ringkasan proyek",
-      "value": "Nilai · ringkasan proyek",
-      "risk": "keamanan · ringkasan proyek",
-      "financing": "pembiayaan · ringkasan proyek",
-      "timeline": "Kecepatan · ringkasan proyek",
+      "operation": "Arsitektur sesuai operasi nyata",
+      "value": "Nilai operasional untuk diprioritaskan",
+      "risk": "Kontrol untuk ditentukan",
+      "financing": "Model finansial untuk ditentukan",
+      "timeline": "Ritme untuk ditentukan",
       "technical": "perangkat lunak · architecture"
     },
     "technicalParts": {
@@ -728,8 +728,8 @@
       "sin_financiacion": "penawaran langsung"
     },
     "nextSteps": {
-      "noService": "kontak · ringkasan proyek",
-      "mvp": "MVP · ringkasan proyek",
+      "noService": "Diagnosis komersial dengan konteks operasional awal",
+      "mvp": "Diagnosis eksekutif + modul nilai pertama",
       "enterprise": "enterprise · peta jalan",
       "default": "perangkat lunak · peta jalan"
     }

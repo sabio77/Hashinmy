@@ -11,6 +11,9 @@
   const COMMERCIAL_FLOW_IDEMPOTENCY_PREFIX = 'hashinmy-web-cotizacion';
   const COMMERCIAL_LOADING_MESSAGE = 'Enviando tu solicitud a Hashinmy...';
   const COMMERCIAL_SUCCESS_MESSAGE = '¡Solicitud recibida! Revisaremos tu información y te enviaremos la cotización al correo indicado. Si tenemos alguna duda, nos pondremos en contacto contigo por WhatsApp.';
+  const COMMERCIAL_ERROR_MESSAGE = 'No pudimos confirmar la recepción automática de la solicitud. Para no perder tu ruta, puedes comunicarte directamente por WhatsApp con el resumen ya preparado.';
+  const COMMERCIAL_WHATSAPP_LABEL = 'Enviar por WhatsApp';
+  const COMMERCIAL_WHATSAPP_ALIAS = 'principal';
   const MAX_OPTIONS_PER_SCENE = 3;
   const PUBLIC_SITE_URL = 'https://hashinmy.com/';
   const LANGUAGE_PATH_PREFIX = 'l';
@@ -781,6 +784,7 @@
   const elements = {};
   const loadedImages = new Map();
   const resolvedSceneImageUrls = new Map();
+  const preloadingSceneImages = new Map();
 
   function $(selector) {
     return document.querySelector(selector);
@@ -4128,6 +4132,7 @@
     if (pushHistory && state.scene !== nextScene) state.history.push(snapshot);
     document.body.dataset.transitionDirection = 'forward';
     setBusy(true);
+    preloadSceneImageWindow(nextScene);
 
     window.setTimeout(() => {
       state.scene = nextScene;
@@ -4154,6 +4159,8 @@
     const previous = state.history.pop();
     document.body.dataset.transitionDirection = 'back';
     setBusy(true);
+    const previousSceneName = typeof previous === 'string' ? previous : previous?.scene;
+    if (baseScenes[previousSceneName]) preloadSceneImageWindow(previousSceneName);
 
     window.setTimeout(() => {
       restoreSnapshot(previous);
@@ -4175,6 +4182,7 @@
     state.answers = {};
     state.audit = [];
     clearStorage();
+    preloadSceneImageWindow('intro');
     render();
     publishRouteUpdate('restart');
   }
@@ -4337,6 +4345,65 @@
     state.activeImageUrl = url;
   }
 
+  function preloadSceneImage(sceneName) {
+    const asset = getSceneAsset(sceneName);
+    const file = asset?.file;
+    if (!file) return Promise.resolve(false);
+
+    const baseUrl = buildSceneAssetUrl(file);
+    if (loadedImages.get(baseUrl) === true) return Promise.resolve(true);
+    if (preloadingSceneImages.has(baseUrl)) return preloadingSceneImages.get(baseUrl);
+
+    const preloadPromise = new Promise((resolve) => {
+      const probe = new Image();
+      probe.decoding = 'async';
+      probe.loading = 'eager';
+      probe.addEventListener('load', () => {
+        loadedImages.set(baseUrl, true);
+        resolvedSceneImageUrls.set(baseUrl, baseUrl);
+        resolve(true);
+      }, { once: true });
+      probe.addEventListener('error', () => {
+        loadedImages.set(baseUrl, false);
+        resolve(false);
+      }, { once: true });
+      probe.src = baseUrl;
+    }).finally(() => {
+      preloadingSceneImages.delete(baseUrl);
+    });
+
+    preloadingSceneImages.set(baseUrl, preloadPromise);
+    return preloadPromise;
+  }
+
+  function getPreviousSceneName() {
+    const lastSnapshot = state.history[state.history.length - 1];
+    if (typeof lastSnapshot === 'string') return baseScenes[lastSnapshot] ? lastSnapshot : '';
+    return baseScenes[lastSnapshot?.scene] ? lastSnapshot.scene : '';
+  }
+
+  function getNextSceneNames(sceneName = state.scene) {
+    const scene = getLocalizedScene(sceneName);
+    return getSceneOptions(scene)
+      .map((choice) => resolveNextScene(choice))
+      .filter((nextScene) => baseScenes[nextScene]);
+  }
+
+  function getSceneImagePreloadWindow(sceneName = state.scene) {
+    return Array.from(new Set([
+      'intro',
+      getPreviousSceneName(),
+      sceneName,
+      ...getNextSceneNames(sceneName)
+    ].filter((name) => baseScenes[name])));
+  }
+
+  function preloadSceneImageWindow(sceneName = state.scene) {
+    getSceneImagePreloadWindow(sceneName).forEach((name) => {
+      preloadSceneImage(name).catch(() => {});
+    });
+  }
+
   function updateSceneArt(sceneName) {
     const asset = getSceneAsset(sceneName);
     const baseUrl = buildSceneAssetUrl(asset.file);
@@ -4358,6 +4425,17 @@
 
     if (loadedImages.get(baseUrl) === true) {
       applySceneImage(resolvedSceneImageUrls.get(baseUrl) || baseUrl);
+      preloadSceneImageWindow(sceneName);
+      return;
+    }
+
+    const activePreload = preloadingSceneImages.get(baseUrl);
+    if (activePreload) {
+      activePreload.then((loaded) => {
+        if (loaded && getSceneAsset(state.scene).file === asset.file) {
+          applySceneImage(resolvedSceneImageUrls.get(baseUrl) || baseUrl);
+        }
+      }).finally(() => preloadSceneImageWindow(sceneName));
       return;
     }
 
@@ -4375,6 +4453,7 @@
       clearSceneImageSource();
     }, { once: true });
     probe.src = url;
+    preloadSceneImageWindow(sceneName);
   }
 
   function renderChoiceOrbit(scene) {
@@ -4551,6 +4630,7 @@
     const isSummary = sceneName === 'summary';
     elements.contact.classList.remove('is-ready');
     elements.options.classList.remove('is-ready', 'is-exiting', 'is-contour-ready');
+    resetContactResultState();
     elements.contact.hidden = true;
     elements.options.hidden = true;
     elements.options.setAttribute('aria-hidden', 'true');
@@ -4644,6 +4724,7 @@
     elements.backButton.disabled = !state.history.length;
 
     updateProgress(state.scene);
+    preloadSceneImageWindow(state.scene);
     updateSceneArt(state.scene);
     renderServiceRail();
     renderMetrics(state.scene);
@@ -4723,19 +4804,42 @@
     if (elements.contact) elements.contact.setAttribute('aria-busy', isPending ? 'true' : 'false');
   }
 
-  function waitForMemoriaBackendCommercialHelper() {
+  function getMemoriaBackendCommercialHelper() {
     if (typeof window.memoriaBACKEND?.flujoComercialCotizacion === 'function') {
-      return Promise.resolve(window.memoriaBACKEND.flujoComercialCotizacion.bind(window.memoriaBACKEND));
+      return window.memoriaBACKEND.flujoComercialCotizacion.bind(window.memoriaBACKEND);
     }
+
+    if (typeof window.memoriaBACKEND?.enviarFormulario === 'function') {
+      return (payload) => window.memoriaBACKEND.enviarFormulario('cotizacion_hashinmy', {
+        nombre: payload?.client?.name || 'Cliente Hashinmy',
+        email: payload?.client?.email || '',
+        telefono: payload?.client?.phone || '',
+        mensaje: payload?.textoCliente || '',
+        opcionesSeleccionadas: payload?.opcionesSeleccionadas || {}
+      }, {
+        lead: true,
+        notify: true,
+        email: true,
+        alias: 'principal',
+        idempotencyKey: payload?.idempotencyKey
+      });
+    }
+
+    return null;
+  }
+
+  function waitForMemoriaBackendCommercialHelper() {
+    const helper = getMemoriaBackendCommercialHelper();
+    if (helper) return Promise.resolve(helper);
 
     return new Promise((resolve, reject) => {
       let settled = false;
-      const finish = (helper) => {
+      const finish = (nextHelper) => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timerId);
         window.removeEventListener('memoriaBACKEND:sdk-ready', handleReady);
-        resolve(helper);
+        resolve(nextHelper);
       };
       const fail = () => {
         if (settled) return;
@@ -4744,9 +4848,8 @@
         reject(new Error('memoriaBACKEND SDK no disponible'));
       };
       const handleReady = () => {
-        if (typeof window.memoriaBACKEND?.flujoComercialCotizacion === 'function') {
-          finish(window.memoriaBACKEND.flujoComercialCotizacion.bind(window.memoriaBACKEND));
-        }
+        const readyHelper = getMemoriaBackendCommercialHelper();
+        if (readyHelper) finish(readyHelper);
       };
       const timerId = window.setTimeout(fail, MEMORIA_BACKEND_COMMERCIAL_SDK_TIMEOUT_MS);
       window.addEventListener('memoriaBACKEND:sdk-ready', handleReady, { once: true });
@@ -4778,6 +4881,15 @@
     });
   }
 
+  function isCommercialSubmissionConfirmed(response) {
+    if (!response || response.ok === 0 || response.ok === false) return false;
+    if (response.quote?.id) return true;
+    if (response.submission?.id) return true;
+    if (response.lead?.id || response.leadId) return true;
+    if (response.ownerNotification?.id || response.operation?.id) return true;
+    return response.ok === 1 || response.ok === true;
+  }
+
   async function submitCommercialFlowWithSdk({ body, email, phone }) {
     const helper = await waitForMemoriaBackendCommercialHelper();
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
@@ -4795,11 +4907,96 @@
       idempotencyKey
     }));
 
-    if (!response || response.ok === 0 || response.ok === false) {
-      throw new Error(response?.err || 'memoriaBACKEND no confirmó la solicitud');
+    if (!isCommercialSubmissionConfirmed(response)) {
+      throw new Error(response?.err || 'Hashinmy no confirmó la recepción de la solicitud');
     }
 
     return response;
+  }
+
+  function buildSelectedOptionsText() {
+    const lines = state.audit.map(auditLine).filter(Boolean);
+    if (lines.length) return lines.map((line) => line.replace(/^[-•]\s*/u, '').trim()).join('; ');
+
+    const labels = getLabels();
+    const entries = getVisibleAnswerEntries().map(([key, value]) => `${labels[key] || key}: ${answerLabel(key, value)}`);
+    return entries.length ? entries.join('; ') : t('ui.directRouteRequested');
+  }
+
+  function buildWhatsappFallbackMessage() {
+    const optionsText = buildSelectedOptionsText();
+    const contact = buildContactSummaryLine();
+    const comment = elements.comment?.value.trim() || '';
+    return [
+      `Hola, estoy necesitando un software, seleccione estas opciones ${optionsText}`,
+      contact ? `Mis datos de contacto son: ${contact}` : '',
+      comment ? `Comentario adicional: ${comment}` : ''
+    ].filter(Boolean).join('\n');
+  }
+
+  function getWhatsappShareFallbackUrl(message) {
+    return `https://wa.me/?text=${encodeURIComponent(message)}`;
+  }
+
+  async function resolveWhatsappFallbackUrl(message, idempotencyKey) {
+    const fallbackUrl = getWhatsappShareFallbackUrl(message);
+    try {
+      if (typeof window.memoriaBACKEND?.crearAccionWhatsapp !== 'function') return fallbackUrl;
+      const response = await withCommercialRequestTimeout(window.memoriaBACKEND.crearAccionWhatsapp({
+        alias: COMMERCIAL_WHATSAPP_ALIAS,
+        message
+      }, {
+        idempotencyKey
+      }));
+      return response?.action?.url || fallbackUrl;
+    } catch (error) {
+      console.warn('Hashinmy: no se pudo resolver WhatsApp por alias de memoriaBACKEND; se usa enlace universal.', error);
+      return fallbackUrl;
+    }
+  }
+
+  function ensureContactResultContainer() {
+    if (!elements.contact) return null;
+    let result = elements.contact.querySelector('[data-commercial-result]');
+    if (result) return result;
+
+    result = document.createElement('section');
+    result.className = 'hm-contact-result';
+    result.dataset.commercialResult = 'true';
+    result.setAttribute('role', 'status');
+    result.setAttribute('aria-live', 'polite');
+    elements.contact.appendChild(result);
+    return result;
+  }
+
+  function resetContactResultState() {
+    if (!elements.contact) return;
+    delete elements.contact.dataset.submitResult;
+    const result = elements.contact.querySelector('[data-commercial-result]');
+    if (result) {
+      result.hidden = true;
+      result.innerHTML = '';
+    }
+  }
+
+  function setContactResultState(mode, { title, message, whatsappUrl = '', whatsappLabel = COMMERCIAL_WHATSAPP_LABEL } = {}) {
+    const result = ensureContactResultContainer();
+    if (!elements.contact || !result) return;
+
+    elements.contact.dataset.submitResult = mode;
+    result.hidden = false;
+    const safeTitle = escapeHtml(title || (mode === 'success' ? 'Solicitud enviada con éxito' : 'No se pudo enviar la solicitud'));
+    const safeMessage = escapeHtml(message || '');
+    const button = mode === 'error' && whatsappUrl
+      ? `<a class="hm-button hm-button--primary hm-contact-result__whatsapp" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(whatsappLabel)}</a>`
+      : '';
+
+    result.innerHTML = `
+      <div class="hm-contact-result__icon" aria-hidden="true">${mode === 'success' ? '✓' : '!'}</div>
+      <strong>${safeTitle}</strong>
+      <p>${safeMessage}</p>
+      ${button}
+    `;
   }
 
   async function openMailFallback(body, subject) {
@@ -4807,13 +5004,13 @@
 
     if (mailto.length > MAILTO_MAX_SAFE_LENGTH) {
       const copied = await writeClipboardText(body);
-      elements.formNote.textContent = copied ? t('ui.copySuccess') : t('ui.mailOpening');
+      if (elements.formNote) elements.formNote.textContent = copied ? t('ui.copySuccess') : t('ui.mailOpening');
       publishRouteUpdate(copied ? 'submit-mailto-too-long-copy' : 'submit-mailto-too-long-copy-failed');
       if (!copied) window.location.href = mailto;
       return;
     }
 
-    elements.formNote.textContent = t('ui.mailOpening');
+    if (elements.formNote) elements.formNote.textContent = t('ui.mailOpening');
     publishRouteUpdate('submit-mailto');
     window.location.href = mailto;
   }
@@ -4830,19 +5027,30 @@
 
     resetContactValidationState();
     const body = buildSummaryText(true);
-    const subject = isQuoteMode() ? t('ui.directQuoteSubject') : t('ui.financedSubject');
     setContactSubmitPending(true);
     setCommercialStatusDialog('loading', COMMERCIAL_LOADING_MESSAGE);
 
     try {
       await submitCommercialFlowWithSdk({ body, email, phone });
-      setCommercialStatusDialog('success', COMMERCIAL_SUCCESS_MESSAGE);
-      if (elements.formNote) elements.formNote.textContent = COMMERCIAL_SUCCESS_MESSAGE;
-      publishRouteUpdate('submit-memoriabackend-flujo-comercial');
-    } catch (error) {
-      console.warn('Hashinmy: memoriaBACKEND no confirmó la solicitud, se activa fallback de correo.', error);
       closeCommercialStatusDialog();
-      await openMailFallback(body, subject);
+      setContactResultState('success', {
+        title: 'Solicitud enviada con éxito',
+        message: 'Hashinmy confirmó que recibió tu solicitud con éxito. Revisaremos la información seleccionada y continuaremos el contacto por los datos suministrados.'
+      });
+      if (elements.formNote) elements.formNote.textContent = COMMERCIAL_SUCCESS_MESSAGE;
+      publishRouteUpdate('submit-memoriabackend-flujo-comercial-confirmado');
+    } catch (error) {
+      console.warn('Hashinmy: memoriaBACKEND no confirmó la solicitud; se activa contacto directo por WhatsApp.', error);
+      closeCommercialStatusDialog();
+      const whatsappMessage = buildWhatsappFallbackMessage();
+      const whatsappUrl = await resolveWhatsappFallbackUrl(whatsappMessage, createCommercialIdempotencyKey(email, phone));
+      setContactResultState('error', {
+        title: 'No se pudo confirmar el envío automático',
+        message: COMMERCIAL_ERROR_MESSAGE,
+        whatsappUrl
+      });
+      if (elements.formNote) elements.formNote.textContent = COMMERCIAL_ERROR_MESSAGE;
+      publishRouteUpdate('submit-memoriabackend-error-whatsapp-fallback');
     } finally {
       setContactSubmitPending(false);
     }
@@ -5370,6 +5578,7 @@
     const initialLanguageRequestToken = ++state.languageRequestToken;
     await applyLanguage(state.language, initialLanguageRequestToken);
     readStorage();
+    preloadSceneImageWindow(state.scene);
     render();
     if (initialSeoRoute) {
       const initialClassicView = isSeoClassicViewRequestedFromLocation();

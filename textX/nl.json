@@ -341,12 +341,12 @@
   "scenes": {
     "intro": {
       "eyebrow": "Nederlands",
-      "title": "Welkom bij HASHINMY",
-      "copy": "Wij bouwen maatwerksoftware voor bedrijven die actief zijn, verkopen en groeien in lokale en internationale markten. We integreren AI, automatisering, pc-programma’s, CAD-software met DXF-export, webapplicaties, cloud, SEO, chatbots, technische offertemakers, beveiliging en operationele continuïteit.\nMedellín en Colombia zijn onze oorsprong; ons commerciële en technische bereik is wereldwijd.\nWe stimuleren de technologische ontwikkeling van bedrijven met 100% gefinancierde oplossingen, zodat ze hun maximale potentieel bereiken, productiviteit verbeteren en efficiënter opschalen.",
-      "optionQuestion": "Welke optie wil je?",
+      "title": "Maatwerktechnologie met 100% financiering om te groeien zonder kapitaal uit te putten",
+      "copy": "Hashinmy zet bedrijfsprocessen om in intelligente maatwerksoftware, automatisering en toegepaste AI. We analyseren de operatie, vinden waar tijd, geld of informatie verloren gaat en bouwen technologie die volledig financierbaar kan zijn, zodat moderniseren geen grote eerste investering hoeft te vragen. We zijn geen gewone webstudio of generieke leverancier: we combineren bedrijfsstrategie, software-engineering, AI en toegankelijke financiering.",
+      "optionQuestion": "Welke eerste stap voelt het meest haalbaar voor je bedrijf?",
       "progress": "Start",
       "core": "HASHINMY",
-      "insight": "Je kunt starten met diagnose, financiering of een directe offerte; Hashinmy vertrekt vanuit het echte probleem voordat scope, betaalvorm of technologie worden bepaald.",
+      "insight": "Je kunt starten met diagnose, financiering of directe offerte; Hashinmy vertrekt vanuit het echte probleem voordat scope, betaalvorm of technologie worden bepaald.",
       "options": [
         {
           "label": "Operationele diagnose",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "route",
-      "title": "Kies · Dienst · Waarde",
-      "optionQuestion": "Kies · Dienst",
-      "copy": "In dit scherm ligt de praktische focus op Kies, Dienst, Waarde, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
-      "progress": "route",
+      "title": "Welk proces moet stoppen met improviseren?",
+      "optionQuestion": "Waar doet de operatie vandaag het meeste pijn?",
+      "copy": "Kies waar je bedrijf de meeste tijd, controle of verkoop verliest. Hashinmy begint niet met het verkopen van een losse dienst; eerst begrijpen we de operatie en daarna bepalen we een route die software, AI, automatisering en een uitvoerbare implementatievorm verbindt.",
+      "progress": "Route",
       "core": "Dienst",
-      "insight": "Ik kies de behoefte die productiviteit, commerciële flow of operationele controle het meest beïnvloedt, zodat de eerste technologische oplossing een echte pijn in het bedrijf oplost.",
+      "insight": "Ik kies de behoefte die productiviteit, commerciële flow of operationele controle het meest raakt, zodat de eerste technologische oplossing een echt bedrijfsprobleem oplost.",
       "options": [
         {
           "label": "maatwerksoftware · Product",
@@ -399,9 +399,9 @@
     },
     "buildType": {
       "eyebrow": "Product",
-      "title": "maatwerksoftware · Gebruik",
-      "optionQuestion": "Kies · web · mobiele app · PC-software",
-      "copy": "In dit scherm ligt de praktische focus op maatwerksoftware, Gebruik, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "title": "Waar moet je software geopend worden?",
+      "optionQuestion": "Waar wil je het gebruiken?",
+      "copy": "De technische basis moet de echte werkwijze van het bedrijf volgen. Het kan browser, mobiel, pc of een combinatie in fasen zijn, altijd met een architectuur die kan groeien zonder het systeem opnieuw te bouwen.",
       "progress": "Product",
       "core": "Bouw",
       "options": [
@@ -424,14 +424,14 @@
           "insight": "Gekozen richting: PC-software — desktop/local, controles."
         }
       ],
-      "insight": "Het platform moet openen waar je team al werkt, zodat technologie de operatie ordent zonder het bedrijf te dwingen zich aan te passen aan een onhandige tool."
+      "insight": "Het platform moet openen waar je team al werkt, zodat technologie de operatie ordent zonder het bedrijf te dwingen zich aan een ongemakkelijke tool aan te passen."
     },
     "automationType": {
       "eyebrow": "AI · automatisering",
-      "title": "automatisering · processen",
-      "optionQuestion": "Kies · automatisering",
-      "copy": "In dit scherm ligt de praktische focus op automatisering, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
-      "progress": "automatisering",
+      "title": "Welk deel moet het systeem voor je doen?",
+      "optionQuestion": "Wat wil je als eerste automatiseren?",
+      "copy": "AI en automatisering hebben alleen waarde wanneer ze concrete frictie oplossen: herhaalde taken, trage service, verspreide data, beslissingen zonder informatie of processen die te veel afhangen van menselijk geheugen.",
+      "progress": "Automatisering",
       "core": "AI + RPA",
       "options": [
         {
@@ -453,14 +453,14 @@
           "insight": "Gekozen richting: data, rapporten — BI, rapporten."
         }
       ],
-      "insight": "De juiste automatisering begint bij het werk dat zich het meest herhaalt, het vaakst vertraagt of de meeste menselijke fouten veroorzaakt binnen de dagelijkse operatie."
+      "insight": "De juiste automatisering begint bij het werk dat zich het meest herhaalt, het vaakst vertraagt of de meeste menselijke fouten veroorzaakt."
     },
     "modernization": {
       "eyebrow": "modernisering",
-      "title": "modernisering · processen",
-      "optionQuestion": "Kies · modernisering",
-      "copy": "In dit scherm ligt de praktische focus op modernisering, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
-      "progress": "modernisering",
+      "title": "Wat wil je achterlaten?",
+      "optionQuestion": "Wat wil je als eerste vervangen?",
+      "copy": "Moderniseren is niet van tool veranderen omdat het nieuw is; het is spreadsheets, losse berichten en oude systemen omzetten in een duidelijkere, veiligere en meetbare operatie die kan groeien met minder fouten.",
+      "progress": "Moderniseren",
       "core": "360",
       "options": [
         {
@@ -482,13 +482,13 @@
           "insight": "Gekozen richting: UX/UI, vertrouwen — ervaring, Waarde."
         }
       ],
-      "insight": "Afscheid nemen van spreadsheets, losse berichten en oude systemen maakt het mogelijk traceerbaarheid, snelheid en controle terug te winnen zonder de essentie van het bedrijf te veranderen."
+      "insight": "Door spreadsheets, losse berichten en oude systemen achter te laten, win je traceerbaarheid, snelheid en controle terug zonder de kern van het bedrijf te veranderen."
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Gebruik · processen",
-      "optionQuestion": "Kies · Gebruik",
-      "copy": "In dit scherm ligt de praktische focus op Gebruik, processen, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "title": "Hoe moet het in het echte werk gebruikt worden?",
+      "optionQuestion": "Waar moet het het beste werken?",
+      "copy": "Software moet functioneren waar het werk gebeurt: kantoor, buitendienst, verkoop, productie, support of directie. Dit antwoord bepaalt synchronisatie, rechten, backend, mobiele ervaring of lokaal beheer volgens de echte operatie.",
       "progress": "Gebruik",
       "core": "Architecture",
       "options": [
@@ -511,13 +511,13 @@
           "insight": "Gekozen richting: PC, controles — desktop/local, beveiliging."
         }
       ],
-      "insight": "De architectuur wordt bepaald vanuit het echte gebruik, zodat het systeem werkt op kantoor, in het veld, in verkoop, productie of support zonder onnodige frictie."
+      "insight": "De architectuur wordt gekozen vanuit werkelijk gebruik, zodat het systeem in kantoor, veld, verkoop, productie of support zonder onnodige frictie werkt."
     },
     "value": {
       "eyebrow": "Waarde",
-      "title": "Waarde · Kies",
-      "optionQuestion": "Kies · Waarde",
-      "copy": "In dit scherm ligt de praktische focus op Waarde, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "title": "Wat moet als eerste verbeteren?",
+      "optionQuestion": "Welk resultaat wil je als eerste merken?",
+      "copy": "Een goed platform moet vroeg nuttig voelen: cases ordenen, taken automatiseren, bruikbare data tonen en helpen beter te verkopen. De waarde wordt zo ontworpen dat het systeem zijn investering binnen de operatie begint te rechtvaardigen.",
       "progress": "Waarde",
       "core": "Waarde",
       "options": [
@@ -540,14 +540,14 @@
           "insight": "Gekozen richting: data, AI — rapporten, AI."
         }
       ],
-      "insight": "De eerste zichtbare waarde moet de investering rechtvaardigen: meer orde, minder verloren tijd, betere data, meer productiviteit of meer verkoopkansen."
+      "insight": "De eerste zichtbare waarde moet de investering onderbouwen: meer orde, minder verloren tijd, betere data, meer productiviteit of meer verkoopkansen."
     },
     "risk": {
       "eyebrow": "vertrouwen · controles",
-      "title": "beveiliging · Kies",
-      "optionQuestion": "Kies · beveiliging",
-      "copy": "In dit scherm ligt de praktische focus op beveiliging, Kies, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
-      "progress": "beveiliging",
+      "title": "Wat moet het best beschermd voelen?",
+      "optionQuestion": "Wat wil je beter beschermen?",
+      "copy": "Vertrouwen wordt vanaf de eerste module ontworpen met rollen, rechten, audit, validaties en grenzen voor AI. Zo wint het bedrijf snelheid zonder controle over data, beslissingen en kritieke processen te verliezen.",
+      "progress": "Veiligheid",
       "core": "vertrouwen",
       "options": [
         {
@@ -569,14 +569,14 @@
           "insight": "Gekozen richting: AI, menselijke controle — automatisering, controles."
         }
       ],
-      "insight": "Groei heeft controle nodig; daarom worden rechten, audit, validaties en grenzen voor AI ontworpen vóór kritieke processen worden geautomatiseerd."
+      "insight": "Groei heeft controle nodig; daarom worden rechten, audit, validaties en grenzen voor AI ontworpen voordat kritieke processen worden geautomatiseerd."
     },
     "finance": {
       "eyebrow": "beschermd kapitaal · financiering",
-      "title": "financiering · roadmap",
-      "optionQuestion": "Kies · financiering",
-      "copy": "In dit scherm ligt de praktische focus op financiering, roadmap, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
-      "progress": "financiering",
+      "title": "Hoe wil je moderniseren zonder kapitaal uit te putten?",
+      "optionQuestion": "Welke vorm maakt vooruitgang nu haalbaar?",
+      "copy": "Met Hashinmy hoeft een bedrijf niet te kiezen tussen cashflow beschermen en moderniseren. We structureren de scope, financieren 100% van de ontwikkeling wanneer de diagnose dat toelaat en bepalen beheersbare termijnen, zodat software waarde begint te genereren terwijl die wordt betaald. Financiering vervangt engineering niet; ze maakt die toegankelijk voor bedrijven die processen moeten ordenen, werk automatiseren, AI integreren en groeien zonder te decapitaliseren.",
+      "progress": "100% financiering",
       "core": "USD",
       "options": [
         {
@@ -598,13 +598,13 @@
           "insight": "Gekozen richting: contact, menselijke controle — projectsamenvatting, contact."
         }
       ],
-      "insight": "Financiering maakt het haalbaar om nu vooruit te gaan, werkkapitaal te beschermen en te betalen terwijl de technologie tijd bespaart, processen ordent of verkoop stimuleert."
+      "insight": "Financiering maakt het mogelijk nu te starten, operationeel kapitaal te beschermen en te betalen terwijl technologie tijd bespaart, processen ordent of verkoop stimuleert."
     },
     "timeline": {
       "eyebrow": "Tempo",
-      "title": "roadmap · Tempo",
-      "optionQuestion": "Kies · Tempo",
-      "copy": "In dit scherm ligt de praktische focus op roadmap, Tempo, zodat de route zakelijke en technische context behoudt. Hashinmy zet deze keuze om in een duidelijke route met scope, controles en volgende stappen, zodat het bedrijf met minder frictie kan verkopen, werken of groeien.",
+      "title": "Hoe snel moet het systeem gaan ademen?",
+      "optionQuestion": "Welk tempo past het best?",
+      "copy": "Het tempo bepaalt hoe een grote behoefte wordt omgezet in nuttige opleveringen. We kunnen beginnen met een MVP, een korte fase of een bedrijfsarchitectuur, waarbij elke stap operationele en financiële waarde behoudt.",
       "progress": "Tempo",
       "core": "roadmap",
       "options": [
@@ -627,13 +627,13 @@
           "insight": "Gekozen richting: enterprise, roadmap — beveiliging, enterprise."
         }
       ],
-      "insight": "Het juiste tempo zet een grote behoefte om in nuttige, meetbare en financierbare opleveringen zonder de visie op het volledige systeem te verliezen."
+      "insight": "Het juiste tempo vertaalt een grote behoefte naar nuttige, meetbare en financierbare leveringen zonder de visie op het volledige systeem te verliezen."
     },
     "summary": {
       "eyebrow": "route · samenvatting",
-      "title": "projectsamenvatting · samenvatting",
-      "copy": "Uw route is klaar. Voordat u verzendt, kunt u elk belangrijk detail toevoegen; het Hashinmy-team beoordeelt de projectrichting, financieringsoptie en volgende stappen met duidelijke zakelijke en technische context.",
-      "progress": "projectsamenvatting",
+      "title": "Je technologische route is klaar.",
+      "copy": "We hebben al een eerste beeld van de behoefte, de betaalvorm en de operationele prioriteit. Voeg de ontbrekende context toe zodat Hashinmy je operatie kan analyseren, een maatwerkoplossing kan voorstellen en een haalbare technische, commerciële en financiële route kan voorbereiden. Het volgende gesprek moet bedrijfsprobleem, interne kennis, systeemscope, prioriteit, verwachte waarde en betaalmodel verbinden terwijl de cashflow wordt beschermd.",
+      "progress": "Aanvraag",
       "core": "projectsamenvatting",
       "insight": "De route is klaar om behoefte, bedrijfskennis, technische scope, operationele prioriteit, verwachte waarde en betaalmodel te verbinden in een haalbaar voorstel.",
       "options": []

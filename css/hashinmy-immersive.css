@@ -6071,3 +6071,134 @@ body[data-scene="intro"] .hm-seo-entry {
 body[data-scene="intro"] .hm-intro-logo {
   font-size: clamp(1.65rem, 3.41vw, 3.41rem);
 }
+
+
+/* Solicitud directa: precarga visual estable, opciones completas y resultado comercial sin formulario. */
+.hm-option,
+.hm-option strong,
+.hm-option span {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.hm-option span,
+.hm-options.is-ready .hm-option span,
+.hm-options.is-contour-ready.is-ready .hm-option span,
+.hm-options.is-ready .hm-option[data-priority="high"] span,
+.hm-options.is-contour-ready.is-ready .hm-option[data-priority="high"] span,
+body[data-scene="intro"] .hm-option span,
+body[data-scene="intro"] .hm-options.is-ready .hm-option span,
+body[data-scene="intro"] .hm-options.is-contour-ready.is-ready .hm-option span,
+body.hm-viewport-cramped:not([data-scene="intro"]) .hm-option span,
+body.hm-viewport-cramped[data-text-density="ultra"]:not([data-scene="intro"]) .hm-option span,
+html[data-text-script="indic"] body[data-text-density="ultra"] .hm-option span,
+html[data-text-script="ethiopic"] body[data-text-density="ultra"] .hm-option span {
+  display: block !important;
+  opacity: 1;
+}
+
+.hm-option {
+  height: auto !important;
+  min-height: clamp(86px, 11.2vh, 126px) !important;
+  align-content: center;
+}
+
+body[data-scene="intro"] .hm-option {
+  min-height: clamp(84px, 10.4vh, 104px) !important;
+}
+
+body.hm-viewport-cramped:not([data-scene="intro"]) .hm-option {
+  min-height: clamp(82px, 10.6vh, 116px) !important;
+}
+
+@media (min-aspect-ratio: 4 / 3) and (min-width: 761px) and (min-height: 621px) {
+  body:not([data-scene="intro"]):not([data-scene="summary"]) .hm-card-decision-flow {
+    top: 50% !important;
+    transform: translateY(-50%);
+    align-items: center;
+  }
+
+  body:not([data-scene="intro"]):not([data-scene="summary"]) .hm-decision-zone,
+  body:not([data-scene="intro"]):not([data-scene="summary"]) .hm-options.is-ready {
+    align-self: center !important;
+  }
+}
+
+.hm-contact-result {
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 1.4vh, 16px);
+  width: 100%;
+  min-height: clamp(220px, 34vh, 360px);
+  align-content: center;
+  text-align: center;
+  border: 1px solid rgba(126, 231, 255, .34);
+  border-radius: clamp(18px, 2vw, 28px);
+  padding: clamp(18px, 2.35vw, 30px);
+  background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(228,242,249,.46));
+  box-shadow: 0 24px 70px rgba(7,19,31,.12), inset 0 0 42px rgba(255,255,255,.18);
+}
+
+.hm-contact-result[hidden] {
+  display: none !important;
+}
+
+.hm-contact-result__icon {
+  display: grid;
+  place-items: center;
+  width: clamp(54px, 6vw, 76px);
+  height: clamp(54px, 6vw, 76px);
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #07131f, #1e6672);
+  box-shadow: 0 16px 44px rgba(7,19,31,.18);
+  font-size: clamp(1.55rem, 2.8vw, 2.3rem);
+  font-weight: 950;
+}
+
+.hm-contact-result strong {
+  color: var(--hm-ink);
+  font-size: clamp(1.12rem, 2vw, 1.55rem);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+.hm-contact-result p {
+  max-width: 42ch;
+  margin: 0;
+  color: rgba(7,19,31,.68);
+  font-size: clamp(.82rem, 1.05vw, .98rem);
+  line-height: 1.44;
+}
+
+.hm-contact[data-submit-result] .hm-contact__summary,
+.hm-contact[data-submit-result] .hm-field,
+.hm-contact[data-submit-result] .hm-contact__actions,
+.hm-contact[data-submit-result] .hm-form-note {
+  display: none !important;
+}
+
+.hm-contact[data-submit-result="error"] .hm-contact-result__icon {
+  background: linear-gradient(135deg, #7f1d1d, #b45309);
+}
+
+.hm-contact-result__whatsapp {
+  width: min(100%, 320px);
+  justify-content: center;
+  text-decoration: none;
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  .hm-option {
+    min-height: clamp(76px, 10.8vh, 104px) !important;
+  }
+
+  body[data-scene="intro"] .hm-option {
+    min-height: clamp(74px, 10.2vh, 98px) !important;
+  }
+
+  body[data-scene="intro"] .hm-options {
+    border-radius: clamp(22px, 6vw, 32px);
+  }
+}

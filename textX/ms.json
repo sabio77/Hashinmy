@@ -5,14 +5,14 @@
   "htmlLang": "ms",
   "dir": "ltr",
   "meta": {
-    "title": "Hashinmy | perisian tersuai laluan",
-    "description": "Hashinmy pengalaman: perisian tersuai. AI + automasi. aplikasi mudah alih + perisian PC. pembiayaan 100% / sebut harga terus.",
-    "ogTitle": "Hashinmy | perisian tersuai",
-    "ogDescription": "laluan Pilih. perisian ringkasan projek. pembiayaan / Dapatkan sebut harga.",
+    "title": "Hashinmy | Perisian, AI dan automasi dibiayai 100%",
+    "description": "Hashinmy membangunkan perisian tersuai, AI dan automasi dengan pembiayaan 100% untuk memodenkan syarikat tanpa menghabiskan aliran tunai.",
+    "ogTitle": "Hashinmy | Teknologi perniagaan tersuai dibiayai 100%",
+    "ogDescription": "Rakan teknologi untuk membina perisian, AI dan automasi tersuai, dengan diagnosis operasi dan pembiayaan pembangunan 100%.",
     "appleTitle": "Hashinmy",
     "applicationName": "Hashinmy",
     "author": "Hashinmy",
-    "keywords": "Bahasa Melayu, Malay, Perkhidmatan, laluan, Penggunaan, Nilai, pembiayaan, keselamatan, web · perisian, aplikasi mudah alih, perisian PC, automasi, AI · integrasi, pemodenan, ringkasan projek · laluan, perisian tersuai · Produk, automasi · AI, pemodenan · proses, automasi · proses, web · laluan, aplikasi mudah alih · Penggunaan, PC · kawalan, aliran kerja · proses, automasi · cepat, data · laporan, AI · semakan manusia, UX/UI · kepercayaan, data · AI, pengguna · kebenaran, data · keselamatan, pembiayaan 100%, sebut harga terus, sebut harga terus · fasa, hubungi · semakan manusia, cepat · MVP, 1-3 · fasa, enterprise · peta jalan, Hashinmy, hashinmy.com, perisian tersuai · Produk · pembiayaan 100%, web · perisian · PWA, ecommerce · perisian tersuai · Produk, perisian tersuai · Produk · CAD/DXF, sebut harga terus · pembiayaan 100%, API, UX/UI, ecommerce · automasi · proses, AI · integrasi · enterprise · peta jalan, Industri · perisian tersuai · Produk, Biayai sekarang, API · web · laluan, sebut harga terus · perisian tersuai · Produk, web · perisian · SEO, chatbots · AI · integrasi, Colombia · Medellín · perisian tersuai · Produk, API · enterprise · peta jalan, data · keselamatan · perisian tersuai · Produk, enterprise · peta jalan · perisian tersuai · Produk, CRM · enterprise · peta jalan, ERP · perisian tersuai · Produk, web · perisian · UX/UI · kepercayaan, web · perisian · portal"
+    "keywords": "Hashinmy, hashinmy.com, perisian tersuai dibiayai 100%, teknologi perniagaan dibiayai, kejuruteraan digital untuk syarikat, kecerdasan buatan gunaan, automasi proses perniagaan, transformasi digital tanpa menghabiskan modal, pembangunan perisian dengan pembiayaan, sistem pintar untuk syarikat, perisian untuk menyusun proses, automasi jualan, automasi sebut harga, perisian inventori, AI dengan semakan manusia, diagnosis operasi, pembangunan berfasa, keselamatan digital perniagaan"
   },
   "ui": {
     "skip": "Pilih · laluan",
@@ -23,34 +23,34 @@
     "progressLabel": "laluan · Rentak",
     "languageLabel": "Bahasa",
     "languageAria": "Pilih · Bahasa",
-    "contentLabel": "pengalaman · ringkasan projek",
+    "contentLabel": "Kandungan utama adegan",
     "pathLabelAria": "laluan · ringkasan",
     "decisionZoneLabel": "Pilih · Perkhidmatan",
-    "summaryLabelAria": "ringkasan · ringkasan projek",
+    "summaryLabelAria": "Ringkasan yang dijana",
     "footerLabel": "kawalan · laluan",
-    "primaryFinance": "Biayai sekarang",
-    "primaryQuote": "Dapatkan sebut harga",
+    "primaryFinance": "Minta diagnosis",
+    "primaryQuote": "Sebut harga sistem saya",
     "back": "Kembali",
     "restart": "Mula semula",
     "contactLabel": "hubungi · Hashinmy",
     "contactPlaceholder": "Email · WhatsApp · hubungi",
     "commentLabel": "Huraikan projek anda",
-    "commentPlaceholder": "Beritahu proses yang ingin anda baik pulih, lukisan, komponen atau sistem yang diperlukan, serta sebarang butiran teknikal yang membantu menyediakan laluan yang jelas.",
+    "commentPlaceholder": "Beritahu proses apa yang ingin anda susun, automasikan atau ubah menjadi perisian: jualan, sebut harga, inventori, pengeluaran, sokongan, data, perkhidmatan pelanggan, laman web, API, chatbot atau platform. Sertakan perkara yang menyebabkan anda kehilangan masa, wang atau maklumat supaya kami boleh menyediakan laluan teknikal dan kewangan yang jelas.",
     "submitRoute": "Hantar laluan kepada Hashinmy",
     "copySummaryAction": "Salin ringkasan",
     "formNote": "Jawapan anda hanya disimpan dalam pelayar ini sehingga anda memutuskan untuk menghantarnya.",
-    "contactRequired": "Tambahkan e-mel, WhatsApp atau nama syarikat supaya Hashinmy boleh menghubungi anda dengan laluan yang telah disediakan.",
+    "contactRequired": "Tambahkan e-mel perniagaan dan WhatsApp anda supaya Hashinmy boleh mengesahkan permintaan dan menghubungi anda dengan laluan yang telah disediakan.",
     "copySuccess": "Ringkasan berjaya disalin. Anda boleh menampalnya ke WhatsApp, e-mel atau CRM.",
-    "copyFailure": "Ringkasan tidak dapat disalin; hantar laluan kepada Hashinmy melalui borang.",
-    "mailOpening": "E-mel dengan laluan yang telah disediakan sedang dibuka; semak sebelum menghantarnya kepada Hashinmy.",
-    "waitSummary": "ringkasan · ringkasan projek",
+    "copyFailure": "Ringkasan tidak dapat disalin secara automatik. Penghantaran melalui e-mel masih akan menyediakan ringkasan.",
+    "mailOpening": "Kami tidak dapat mengesahkan melalui memoriaBACKEND dalam percubaan ini. Kami akan membuka aplikasi e-mel anda dengan laluan yang telah disediakan sebagai sandaran.",
+    "waitSummary": "Menyediakan laluan teknologi",
     "preparingOptions": "Menyediakan pilihan",
     "optionFallback": "Pilih · laluan",
     "pathLabel": "laluan · ringkasan",
-    "pathEmpty": "Pilih · laluan · ringkasan projek",
+    "pathEmpty": "Setiap pilihan membina ringkasan projek anda",
     "interactionFallback": "pengalaman",
-    "summaryTitle": "Permintaan interaktif Hashinmy",
-    "projectChosen": "Produk · Pilih",
+    "summaryTitle": "Laluan teknologi yang disediakan oleh Hashinmy",
+    "projectChosen": "Projek yang dipilih",
     "expectedUse": "Penggunaan",
     "wantedValue": "Nilai",
     "prioritySecurity": "keselamatan",
@@ -61,28 +61,28 @@
     "suggestedControls": "kawalan",
     "nextStep": "peta jalan · fasa",
     "contact": "hubungi",
-    "additionalComment": "Komen pilihan",
+    "additionalComment": "Komen tambahan",
     "registeredInteractions": "laluan · ringkasan",
     "directRouteRequested": "sebut harga terus. laluan.",
     "directQuoteSubject": "Hashinmy · sebut harga terus",
     "financedSubject": "Hashinmy · perisian tersuai · pembiayaan",
-    "directQuoteAudit": "sebut harga terus. ringkasan projek. laluan.",
-    "financeAudit": "pembiayaan 100%. ringkasan projek. laluan.",
-    "directQuoteTech": "sebut harga terus · ringkasan projek",
-    "financeTech": "USD · fasa · ringkasan projek",
+    "directQuoteAudit": "Laluan melompat ke diagnosis untuk menyebut harga sistem dengan skop, nilai operasi dan cara pelaksanaan yang jelas.",
+    "financeAudit": "Laluan melompat ke diagnosis dengan pembiayaan 100% pembangunan sebagai keutamaan utama.",
+    "directQuoteTech": "diagnosis sistem + skop teknikal dan komersial",
+    "financeTech": "diagnosis + pembiayaan 100% + ansuran terkawal",
     "topActionsLabel": "Produk · Bahasa",
     "proofEntryAria": "Pengalaman Kami · Hashinmy",
     "proofOpenButton": "Pengalaman Kami",
-    "proofTitle": "Pengalaman Kami",
-    "proofLead": "Hashinmy pengalaman: perisian tersuai. AI + automasi. aplikasi mudah alih + perisian PC. pembiayaan 100% / sebut harga terus.",
+    "proofTitle": "Kejuruteraan digital yang dibiayai",
+    "proofLead": "Hashinmy bukan agensi laman web atau penyedia generik. Hashinmy ialah firma kejuruteraan digital yang menukar proses perniagaan kepada perisian, AI dan automasi tersuai, dengan pembiayaan 100% untuk memodenkan operasi tanpa menghabiskan modal.",
     "proofCloseAria": "Tutup · Pengalaman Kami",
     "proofContentAria": "Pengalaman Kami · Soalan lazim",
     "proofSummaryAria": "kepercayaan · kawalan",
-    "proofSummaryTitle": "kepercayaan · kawalan · Hashinmy",
-    "proofTrustLabel": "kepercayaan · kawalan:",
-    "proofTrustText": "Pada skrin ini, fokus praktikal ialah keselamatan, Pilih, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran. Hashinmy pengalaman: perisian tersuai. AI + automasi. aplikasi mudah alih + perisian PC. pembiayaan 100% / sebut harga terus.",
+    "proofSummaryTitle": "Teknologi tersuai dibiayai 100% untuk menyusun operasi, melindungi modal dan berkembang dengan kawalan",
+    "proofTrustLabel": "Kepercayaan teknikal:",
+    "proofTrustText": "strategi perniagaan, perisian tersuai, AI gunaan, automasi, API, saluran jualan web, chatbot, diagnosis operasi, pembiayaan 100%, ansuran terkawal, keselamatan, kebenaran, kebolehjejakan, data berguna dan kesinambungan.",
     "proofMethodLabel": "Metodologi:",
-    "proofMethodText": "Diagnosis, reka bentuk, pembangunan, ujian, penyerahan dan sokongan. Medellín dan Colombia ialah asal kami; capaian kami global.",
+    "proofMethodText": "kami menyemak operasi sebenar, mencari kehilangan masa, wang atau maklumat, mengutamakan modul dengan pulangan tertinggi, mereka bentuk penyelesaian yang tepat dan mengiringi pembiayaan, pelaksanaan, ujian, penerimaan dan evolusi.",
     "proofUseCasesLabel": "Kes penggunaan:",
     "proofUseCasesText": "Perniagaan pertukangan, jualan, inventori, sebut harga teknikal, sokongan, CRM, UX/UI · kepercayaan, e-dagang dan automasi operasi.",
     "proofBrandsTitle": "Jenama, projek dan syarikat yang berkaitan dengan kerja kami",
@@ -91,11 +91,11 @@
     "proofLogoAltTemplate": "Logo {name}",
     "proofFaqAria": "Soalan lazim · Pengalaman Kami",
     "proofFaqWhyQuestion": "Mengapa memilih Hashinmy?",
-    "proofFaqWhyAnswer": "laluan Pilih. perisian ringkasan projek. pembiayaan / Dapatkan sebut harga.",
+    "proofFaqWhyAnswer": "Kerana Hashinmy tidak menjual kod terasing atau teknologi generik: Hashinmy menukar masalah operasi yang nyata menjadi sistem yang jelas, selamat, boleh diukur dan berdaya maju dari segi kewangan.",
     "proofFaqWhoQuestion": "Untuk siapa?",
-    "proofFaqWhoAnswer": "laluan Pilih. perisian ringkasan projek. pembiayaan / Dapatkan sebut harga. Pada skrin ini, fokus praktikal ialah keselamatan, Pilih, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+    "proofFaqWhoAnswer": "Untuk syarikat kecil, sederhana atau besar yang perlu menyusun proses, mengautomasikan kerja, mengintegrasikan AI, menjual dengan lebih baik atau mencipta perisian sendiri sambil melindungi aliran tunai.",
     "proofFaqStartQuestion": "Bagaimana saya bermula?",
-    "proofFaqStartAnswer": "Laluan anda sudah sedia. Sebelum menghantarnya, anda boleh menambah sebarang butiran penting; pasukan Hashinmy akan menilai arah projek, pilihan pembiayaan dan langkah seterusnya dengan konteks perniagaan serta teknikal yang jelas. sebut harga terus. ringkasan projek. laluan.",
+    "proofFaqStartAnswer": "Minta diagnosis untuk menyemak operasi, mengesan kehilangan masa, wang atau maklumat dan menyediakan laluan teknikal, komersial serta kewangan yang jelas.",
     "proofBrandsStructuredDescription": "Jenama, projek dan syarikat yang berkaitan dengan kerja kami"
   },
   "services": [
@@ -179,7 +179,7 @@
     },
     "summary": {
       "symbol": "ringkasan",
-      "label": "ringkasan projek"
+      "label": "ringkasan projek dijana"
     }
   },
   "metricsByScene": {
@@ -208,7 +208,7 @@
       ],
       [
         "1",
-        "ringkasan projek"
+        "ringkasan aktif"
       ]
     ],
     "buildType": [
@@ -330,7 +330,7 @@
       ],
       [
         "Email",
-        "ringkasan projek"
+        "e-mel disediakan"
       ],
       [
         "semakan manusia",
@@ -342,7 +342,7 @@
     "intro": {
       "eyebrow": "Bahasa Melayu",
       "title": "Teknologi tersuai yang boleh dibiayai 100% untuk berkembang tanpa mengurangkan modal",
-      "copy": "Kami membina perisian tersuai untuk syarikat yang beroperasi, menjual dan berkembang dalam pasaran tempatan serta antarabangsa. Kami menggabungkan AI, automasi, program PC, perisian CAD dengan eksport DXF, aplikasi web, awan, SEO, chatbot, alat sebut harga teknikal, keselamatan dan kesinambungan operasi.\nMedellín dan Colombia ialah asal kami; capaian komersial dan teknikal kami bersifat global.\nKami memacu pembangunan teknologi syarikat melalui penyelesaian yang dibiayai 100%, membantu mereka mencapai potensi maksimum, meningkatkan produktiviti dan berkembang dengan lebih cekap.",
+      "copy": "Hashinmy menukar proses perniagaan kepada perisian pintar, automasi dan kecerdasan buatan tersuai. Kami menganalisis operasi, mengenal pasti tempat masa, wang atau maklumat hilang, dan membina teknologi yang boleh dibiayai 100% untuk memodenkan tanpa memerlukan pelaburan awal yang besar.\nKami bukan agensi laman web atau penyedia generik: kami ialah rakan teknologi yang menyatukan strategi perniagaan, kejuruteraan perisian, AI terapan dan pembiayaan yang mudah dicapai.\nSyarikat anda sudah mempunyai pengetahuan, pengalaman dan visi. Kami menukarnya menjadi sistem yang menyusun jualan, sebut harga, inventori, sokongan, data, proses dalaman dan saluran digital, sambil menjaga aliran tunai ketika penyelesaian mula menghasilkan nilai.",
       "optionQuestion": "Pilihan mana yang anda mahukan?",
       "progress": "Mula",
       "core": "HASHINMY",
@@ -372,7 +372,7 @@
       "eyebrow": "laluan",
       "title": "Proses mana yang perlu berhenti bergantung pada improvisasi?",
       "optionQuestion": "Pilih · Perkhidmatan",
-      "copy": "Pada skrin ini, fokus praktikal ialah Pilih, Perkhidmatan, Nilai, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Pilih di mana syarikat anda paling banyak kehilangan masa, kawalan atau jualan. Hashinmy tidak bermula dengan menjual perkhidmatan terasing: kami memahami operasi dahulu, kemudian menentukan laluan yang menghubungkan perisian, AI, automasi dan bentuk pelaksanaan yang berdaya maju.",
       "progress": "laluan",
       "core": "Perkhidmatan",
       "insight": "Saya memilih keperluan yang paling menjejaskan produktiviti, aliran komersial atau kawalan operasi supaya penyelesaian teknologi pertama menjawab masalah sebenar perniagaan.",
@@ -401,7 +401,7 @@
       "eyebrow": "Produk",
       "title": "Di mana perisian anda patut dibuka?",
       "optionQuestion": "Pilih · web · aplikasi mudah alih · perisian PC",
-      "copy": "Pada skrin ini, fokus praktikal ialah perisian tersuai, Penggunaan, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Asas teknikal mesti mengikuti cara sebenar perniagaan bekerja. Ia boleh digunakan melalui pelayar, telefon, PC atau gabungan berfasa, sentiasa dengan seni bina yang bersedia untuk berkembang tanpa membina semula sistem dari awal.",
       "progress": "Produk",
       "core": "Bina",
       "options": [
@@ -430,7 +430,7 @@
       "eyebrow": "AI · automasi",
       "title": "Bahagian mana yang patut sistem lakukan untuk anda?",
       "optionQuestion": "Pilih · automasi",
-      "copy": "Pada skrin ini, fokus praktikal ialah automasi, proses, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Kecerdasan buatan dan automasi hanya masuk akal apabila menyelesaikan geseran yang nyata: tugas berulang, respons lambat, data berselerak, keputusan tanpa maklumat atau proses yang terlalu bergantung pada ingatan manusia.",
       "progress": "automasi",
       "core": "AI + RPA",
       "options": [
@@ -459,7 +459,7 @@
       "eyebrow": "pemodenan",
       "title": "Apa yang mahu anda tinggalkan?",
       "optionQuestion": "Pilih · pemodenan",
-      "copy": "Pada skrin ini, fokus praktikal ialah pemodenan, proses, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Pemodenan bukan menukar alat kerana ikut-ikutan; ia menukar hamparan, mesej terpisah dan sistem lama menjadi operasi yang lebih jelas, selamat, boleh diukur dan bersedia untuk berkembang dengan lebih sedikit ralat.",
       "progress": "pemodenan",
       "core": "360",
       "options": [
@@ -488,7 +488,7 @@
       "eyebrow": "architecture",
       "title": "Bagaimana ia patut digunakan dalam kehidupan sebenar?",
       "optionQuestion": "Pilih · Penggunaan",
-      "copy": "Pada skrin ini, fokus praktikal ialah Penggunaan, proses, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Perisian mesti berfungsi di tempat kerja berlaku: pejabat, lapangan, jualan, produksi, sokongan atau pengurusan. Jawapan ini menentukan penyegerakan, kebenaran, backend, pengalaman mudah alih atau kawalan setempat mengikut operasi sebenar.",
       "progress": "Penggunaan",
       "core": "Architecture",
       "options": [
@@ -517,7 +517,7 @@
       "eyebrow": "Nilai",
       "title": "Apa yang perlu diperbaiki dahulu?",
       "optionQuestion": "Pilih · Nilai",
-      "copy": "Pada skrin ini, fokus praktikal ialah Nilai, Pilih, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Platform yang baik perlu terasa berguna sejak awal: menyusun kes, mengautomasikan tugas, memaparkan data yang boleh ditindaklanjuti dan membantu jualan. Nilai direka supaya sistem mula membuktikan pelaburannya dalam operasi.",
       "progress": "Nilai",
       "core": "Nilai",
       "options": [
@@ -546,7 +546,7 @@
       "eyebrow": "kepercayaan · kawalan",
       "title": "Apa yang perlu terasa paling dilindungi?",
       "optionQuestion": "Pilih · keselamatan",
-      "copy": "Pada skrin ini, fokus praktikal ialah keselamatan, Pilih, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Kepercayaan direka dari modul pertama dengan peranan, kebenaran, audit, validasi dan had untuk kecerdasan buatan. Dengan cara ini syarikat mendapat kelajuan tanpa kehilangan kawalan atas data, keputusan dan proses kritikal.",
       "progress": "keselamatan",
       "core": "kepercayaan",
       "options": [
@@ -575,7 +575,7 @@
       "eyebrow": "modal dilindungi · pembiayaan",
       "title": "Bagaimana anda mahu memodenkan diri tanpa mengurangkan modal?",
       "optionQuestion": "Pilih · pembiayaan",
-      "copy": "Pada skrin ini, fokus praktikal ialah pembiayaan, peta jalan, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Dengan Hashinmy, syarikat tidak perlu memilih antara menjaga aliran tunai atau memodenkan diri. Kami menyusun skop, membiayai 100% pembangunan apabila diagnosis membenarkannya dan menentukan ansuran terkawal supaya perisian mula menjana nilai sambil dibayar. Pembiayaan tidak menggantikan kejuruteraan: ia menjadikannya boleh dicapai untuk syarikat yang perlu menyusun proses, mengautomasikan kerja, mengintegrasikan AI dan berkembang tanpa menghabiskan modal.",
       "progress": "pembiayaan",
       "core": "USD",
       "options": [
@@ -604,7 +604,7 @@
       "eyebrow": "Rentak",
       "title": "Seberapa cepat ia perlu mula bernafas?",
       "optionQuestion": "Pilih · Rentak",
-      "copy": "Pada skrin ini, fokus praktikal ialah peta jalan, Rentak, supaya laluan mengekalkan konteks perniagaan dan teknikal. Hashinmy menukar pilihan ini menjadi laluan yang jelas dengan skop, kawalan dan langkah seterusnya, supaya perniagaan boleh menjual, beroperasi atau berkembang dengan kurang geseran.",
+      "copy": "Rentak menentukan cara menukar keperluan besar menjadi penghantaran yang berguna. Kita boleh bermula dengan MVP, fasa pendek atau seni bina perusahaan, sambil memastikan setiap kemajuan mempunyai nilai operasi dan kewangan.",
       "progress": "Rentak",
       "core": "peta jalan",
       "options": [
@@ -632,10 +632,10 @@
     "summary": {
       "eyebrow": "laluan · ringkasan",
       "title": "Laluan teknologi anda sudah sedia.",
-      "copy": "Laluan anda sudah sedia. Sebelum menghantarnya, anda boleh menambah sebarang butiran penting; pasukan Hashinmy akan menilai arah projek, pilihan pembiayaan dan langkah seterusnya dengan konteks perniagaan serta teknikal yang jelas.",
+      "copy": "Kami sudah mempunyai bacaan awal tentang keperluan, kaedah pembayaran dan keutamaan operasi. Tambahkan konteks yang masih kurang supaya Hashinmy boleh menganalisis operasi anda, mencadangkan penyelesaian tersuai dan menyediakan laluan teknikal, komersial serta kewangan yang berdaya maju.\nPerbualan seterusnya perlu menghubungkan masalah perniagaan, pengetahuan dalaman, skop sistem, keutamaan, nilai yang diharapkan dan cara pembayaran, sambil menjaga aliran tunai ketika perisian mula menghasilkan keputusan.",
       "progress": "ringkasan projek",
       "core": "ringkasan projek",
-      "insight": "Laluan ini sedia untuk menghubungkan keperluan, pengetahuan perniagaan, skop teknikal, keutamaan operasi, nilai yang dijangka dan model bayaran dalam cadangan yang berdaya maju.",
+      "insight": "Laluan sudah sedia untuk menghubungkan keperluan, pengetahuan perniagaan, skop teknikal, keutamaan operasi, nilai yang diharapkan dan model pembayaran dalam cadangan yang berdaya maju.",
       "options": []
     }
   },
@@ -682,11 +682,11 @@
   "recommendation": {
     "defaults": {
       "service": "perisian tersuai · Produk",
-      "operation": "architecture · ringkasan projek",
-      "value": "Nilai · ringkasan projek",
-      "risk": "keselamatan · ringkasan projek",
-      "financing": "pembiayaan · ringkasan projek",
-      "timeline": "Rentak · ringkasan projek",
+      "operation": "Seni bina mengikut operasi sebenar",
+      "value": "Nilai operasi untuk diutamakan",
+      "risk": "Kawalan untuk ditentukan",
+      "financing": "Mod kewangan untuk ditentukan",
+      "timeline": "Rentak untuk ditentukan",
       "technical": "perisian · architecture"
     },
     "technicalParts": {
@@ -728,8 +728,8 @@
       "sin_financiacion": "sebut harga terus"
     },
     "nextSteps": {
-      "noService": "hubungi · ringkasan projek",
-      "mvp": "MVP · ringkasan projek",
+      "noService": "Diagnosis komersial dengan konteks operasi awal",
+      "mvp": "Diagnosis eksekutif + modul nilai pertama",
       "enterprise": "enterprise · peta jalan",
       "default": "perisian · peta jalan"
     }

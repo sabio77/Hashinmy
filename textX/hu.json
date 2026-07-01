@@ -5,14 +5,14 @@
   "htmlLang": "hu",
   "dir": "ltr",
   "meta": {
-    "title": "Hashinmy | egyedi szoftver útvonal",
-    "description": "Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
-    "ogTitle": "Hashinmy | egyedi szoftver",
-    "ogDescription": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot.",
+    "title": "Hashinmy | 100%-ban finanszírozott szoftver, AI és automatizálás",
+    "description": "A Hashinmy egyedi szoftvert, AI-t és automatizálást fejleszt 100%-os finanszírozással, hogy a vállalatok a működőtőke felélése nélkül modernizálódjanak.",
+    "ogTitle": "Hashinmy | 100%-ban finanszírozott egyedi üzleti technológia",
+    "ogDescription": "Technológiai partner egyedi szoftver, AI és automatizálás létrehozásához, működési diagnózissal és a fejlesztés 100%-os finanszírozásával.",
     "appleTitle": "Hashinmy",
     "applicationName": "Hashinmy",
     "author": "Hashinmy",
-    "keywords": "Magyar, Hungarian, Szolgáltatás, útvonal, Használat, Érték, finanszírozás, biztonság, web · szoftver, mobilalkalmazás, PC szoftver, automatizálás, mesterséges intelligencia · integráció, modernizáció, projektösszefoglaló · útvonal, egyedi szoftver · Termék, automatizálás · mesterséges intelligencia, modernizáció · folyamatok, automatizálás · folyamatok, web · útvonal, mobilalkalmazás · Használat, PC · kontrollok, munkafolyamat · folyamatok, automatizálás · gyors, adatok · jelentések, mesterséges intelligencia · emberi felülvizsgálat, UX/UI · bizalom, adatok · mesterséges intelligencia, felhasználók · engedélyek, adatok · biztonság, 100% finanszírozás, közvetlen ajánlat, közvetlen ajánlat · fázisok, kapcsolat · emberi felülvizsgálat, gyors · MVP, 1-3 · fázisok, enterprise · ütemterv, Hashinmy, hashinmy.com, egyedi szoftver · Termék · 100% finanszírozás, web · szoftver · PWA, ecommerce · egyedi szoftver · Termék, egyedi szoftver · Termék · CAD/DXF, közvetlen ajánlat · 100% finanszírozás, API, UX/UI, ecommerce · automatizálás · folyamatok, mesterséges intelligencia · integráció · enterprise · ütemterv, Iparágak · egyedi szoftver · Termék, Finanszírozás most, API · web · útvonal, közvetlen ajánlat · egyedi szoftver · Termék, web · szoftver · SEO, chatbots · mesterséges intelligencia · integráció, Colombia · Medellín · egyedi szoftver · Termék, API · enterprise · ütemterv, adatok · biztonság · egyedi szoftver · Termék, enterprise · ütemterv · egyedi szoftver · Termék, CRM · enterprise · ütemterv, ERP · egyedi szoftver · Termék, web · szoftver · UX/UI · bizalom, web · szoftver · portal"
+    "keywords": "Hashinmy, hashinmy.com, 100%-ban finanszírozott egyedi szoftver, finanszírozott üzleti technológia, digitális mérnöki munka vállalatoknak, alkalmazott mesterséges intelligencia, üzleti folyamatok automatizálása, digitális átalakulás tőkevesztés nélkül, szoftverfejlesztés finanszírozással, intelligens rendszerek vállalatoknak, folyamatokat rendező szoftver, értékesítési automatizálás, ajánlatkészítés automatizálása, készletkezelő szoftver, AI emberi felügyelettel, működési diagnózis, szakaszos fejlesztés, üzleti digitális biztonság"
   },
   "ui": {
     "skip": "Válasszon · útvonal",
@@ -23,34 +23,34 @@
     "progressLabel": "útvonal · Tempó",
     "languageLabel": "Nyelv",
     "languageAria": "Válasszon · Nyelv",
-    "contentLabel": "élmény · projektösszefoglaló",
+    "contentLabel": "A jelenet fő tartalma",
     "pathLabelAria": "útvonal · összefoglaló",
     "decisionZoneLabel": "Válasszon · Szolgáltatás",
-    "summaryLabelAria": "összefoglaló · projektösszefoglaló",
+    "summaryLabelAria": "Létrehozott összefoglaló",
     "footerLabel": "kontrollok · útvonal",
-    "primaryFinance": "Finanszírozás most",
-    "primaryQuote": "Kérjen ajánlatot",
+    "primaryFinance": "Diagnózis kérése",
+    "primaryQuote": "Ajánlat a rendszeremre",
     "back": "Vissza",
     "restart": "Újrakezdés",
     "contactLabel": "kapcsolat · Hashinmy",
     "contactPlaceholder": "Email · WhatsApp · kapcsolat",
     "commentLabel": "Írja le a projektjét",
-    "commentPlaceholder": "Mondja el, melyik folyamatot szeretné javítani, milyen rajzra, alkatrészre vagy rendszerre van szüksége, és minden műszaki részletet, amely segít egy egyértelmű út előkészítésében.",
+    "commentPlaceholder": "Mondja el, melyik folyamatot szeretné rendezni, automatizálni vagy szoftverré alakítani: értékesítés, ajánlatkészítés, készlet, gyártás, támogatás, adatok, ügyfélszolgálat, weboldal, API, chatbot vagy platform. Írja le, hol veszít időt, pénzt vagy információt, hogy világos technikai és pénzügyi útvonalat készíthessünk.",
     "submitRoute": "Útvonal küldése a Hashinmynek",
     "copySummaryAction": "Összefoglaló másolása",
     "formNote": "A válaszai csak ebben a böngészőben maradnak mentve, amíg el nem dönti, hogy elküldi őket.",
-    "contactRequired": "Adjon meg e-mailt, WhatsAppot vagy cégnevet, hogy a Hashinmy felvehesse Önnel a kapcsolatot az előkészített útvonallal.",
+    "contactRequired": "Adja meg vállalati e-mail-címét és WhatsAppját, hogy a Hashinmy megerősíthesse a kérést, és felvehesse Önnel a kapcsolatot az előkészített útvonallal.",
     "copySuccess": "Az összefoglaló másolva. Beillesztheti WhatsAppba, e-mailbe vagy CRM-be.",
-    "copyFailure": "Az összefoglaló másolása nem sikerült; küldje el az útvonalat a Hashinmynek az űrlapon keresztül.",
-    "mailOpening": "Megnyílik az e-mail az előkészített útvonallal; ellenőrizze, mielőtt elküldi a Hashinmynek.",
-    "waitSummary": "összefoglaló · projektösszefoglaló",
+    "copyFailure": "Nem sikerült automatikusan másolni. Az e-mailes küldés továbbra is előkészíti az összefoglalót.",
+    "mailOpening": "Ebben a próbálkozásban nem tudtunk visszaigazolást kapni a memoriaBACKEND rendszertől. Tartalékmegoldásként megnyitjuk az e-mail alkalmazását az előkészített útvonallal.",
+    "waitSummary": "Technológiai útvonal előkészítése",
     "preparingOptions": "Opciók előkészítése",
     "optionFallback": "Válasszon · útvonal",
     "pathLabel": "útvonal · összefoglaló",
-    "pathEmpty": "Válasszon · útvonal · projektösszefoglaló",
+    "pathEmpty": "Minden választás építi a projektösszefoglalót",
     "interactionFallback": "élmény",
-    "summaryTitle": "Hashinmy interaktív kérés",
-    "projectChosen": "Termék · Válasszon",
+    "summaryTitle": "A Hashinmy által előkészített technológiai útvonal",
+    "projectChosen": "Kiválasztott projekt",
     "expectedUse": "Használat",
     "wantedValue": "Érték",
     "prioritySecurity": "biztonság",
@@ -61,28 +61,28 @@
     "suggestedControls": "kontrollok",
     "nextStep": "ütemterv · fázisok",
     "contact": "kapcsolat",
-    "additionalComment": "Opcionális megjegyzés",
+    "additionalComment": "További megjegyzés",
     "registeredInteractions": "útvonal · összefoglaló",
     "directRouteRequested": "közvetlen ajánlat. útvonal.",
     "directQuoteSubject": "Hashinmy · közvetlen ajánlat",
     "financedSubject": "Hashinmy · egyedi szoftver · finanszírozás",
-    "directQuoteAudit": "közvetlen ajánlat. projektösszefoglaló. útvonal.",
-    "financeAudit": "100% finanszírozás. projektösszefoglaló. útvonal.",
-    "directQuoteTech": "közvetlen ajánlat · projektösszefoglaló",
-    "financeTech": "USD · fázisok · projektösszefoglaló",
+    "directQuoteAudit": "Az útvonal a diagnózishoz ugrik, hogy a rendszer ajánlata világos hatókörrel, működési értékkel és megvalósítási móddal készüljön el.",
+    "financeAudit": "Az útvonal a diagnózishoz ugrik, ahol a fejlesztés 100%-os finanszírozása a fő prioritás.",
+    "directQuoteTech": "rendszerdiagnózis + technikai és kereskedelmi hatókör",
+    "financeTech": "diagnózis + 100% finanszírozás + kezelhető részletek",
     "topActionsLabel": "Termékek · Nyelv",
     "proofEntryAria": "Tapasztalatunk · Hashinmy",
     "proofOpenButton": "Tapasztalatunk",
-    "proofTitle": "Tapasztalatunk",
-    "proofLead": "Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
+    "proofTitle": "Finanszírozott digitális mérnöki munka",
+    "proofLead": "A Hashinmy nem weboldalügynökség és nem generikus szolgáltató. Digitális mérnöki cég, amely üzleti folyamatokat alakít egyedi szoftverré, AI-vá és automatizálássá, 100%-os finanszírozással, hogy a modernizáció ne élje fel a működőtőkét.",
     "proofCloseAria": "Bezárás · Tapasztalatunk",
     "proofContentAria": "Tapasztalatunk · Gyakori kérdések",
     "proofSummaryAria": "bizalom · kontrollok",
-    "proofSummaryTitle": "bizalom · kontrollok · Hashinmy",
-    "proofTrustLabel": "bizalom · kontrollok:",
-    "proofTrustText": "Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen. Hashinmy élmény: egyedi szoftver. mesterséges intelligencia + automatizálás. mobilalkalmazás + PC szoftver. 100% finanszírozás / közvetlen ajánlat.",
+    "proofSummaryTitle": "100%-ban finanszírozott, egyedi technológia a működés rendezéséhez, a tőke védelméhez és kontrollált növekedéshez",
+    "proofTrustLabel": "Technikai bizalom:",
+    "proofTrustText": "üzleti stratégia, egyedi szoftver, alkalmazott AI, automatizálás, API-k, webes értékesítési csatornák, chatbotok, működési diagnózis, 100% finanszírozás, kezelhető részletek, biztonság, jogosultságok, nyomon követhetőség, hasznos adatok és folytonosság.",
     "proofMethodLabel": "Módszertan:",
-    "proofMethodText": "Felmérés, tervezés, fejlesztés, tesztelés, átadás és támogatás. Medellín és Kolumbia a kiindulópontunk; a hatókör globális.",
+    "proofMethodText": "átvizsgáljuk a valós működést, feltárjuk az idő-, pénz- vagy információveszteséget, a legnagyobb megtérülésű modult priorizáljuk, pontos megoldást tervezünk, és kísérjük a finanszírozást, bevezetést, tesztelést, elfogadást és továbbfejlesztést.",
     "proofUseCasesLabel": "Felhasználási esetek:",
     "proofUseCasesText": "Asztalosipari vállalkozások, értékesítés, készlet, műszaki ajánlatok, támogatás, CRM, portálok, e-kereskedelem és működési automatizálás.",
     "proofBrandsTitle": "A munkánkhoz kapcsolódó márkák, projektek és vállalatok",
@@ -91,11 +91,11 @@
     "proofLogoAltTemplate": "{name} logója",
     "proofFaqAria": "Gyakori kérdések · Tapasztalatunk",
     "proofFaqWhyQuestion": "Miért válaszd a Hashinmy-t?",
-    "proofFaqWhyAnswer": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot.",
+    "proofFaqWhyAnswer": "Mert a Hashinmy nem elszigetelt kódot vagy generikus technológiát ad el: konkrét működési problémákat alakít világos, biztonságos, mérhető és pénzügyileg életképes rendszerekké.",
     "proofFaqWhoQuestion": "Kinek szól?",
-    "proofFaqWhoAnswer": "útvonal Válasszon. szoftver projektösszefoglaló. finanszírozás / Kérjen ajánlatot. Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+    "proofFaqWhoAnswer": "Kis-, közép- és nagyvállalatoknak, amelyeknek rendezniük kell a folyamataikat, automatizálniuk a munkát, AI-t integrálniuk, jobban értékesíteniük vagy saját szoftvert létrehozniuk a cash flow védelme mellett.",
     "proofFaqStartQuestion": "Hogyan kezdjem el?",
-    "proofFaqStartAnswer": "Az útvonal készen áll. Küldés előtt hozzáadhat bármilyen fontos részletet; a Hashinmy csapata egyértelmű üzleti és technikai kontextusban áttekinti a projekt irányát, a finanszírozási lehetőséget és a következő lépéseket. közvetlen ajánlat. projektösszefoglaló. útvonal.",
+    "proofFaqStartAnswer": "Kérjen diagnózist a működés áttekintéséhez, az idő-, pénz- vagy információveszteség feltárásához, valamint egy világos technikai, kereskedelmi és pénzügyi útvonal előkészítéséhez.",
     "proofBrandsStructuredDescription": "A munkánkhoz kapcsolódó márkák, projektek és vállalatok"
   },
   "services": [
@@ -179,7 +179,7 @@
     },
     "summary": {
       "symbol": "összefoglaló",
-      "label": "projektösszefoglaló"
+      "label": "projektösszefoglaló létrehozva"
     }
   },
   "metricsByScene": {
@@ -208,7 +208,7 @@
       ],
       [
         "1",
-        "projektösszefoglaló"
+        "élő projektösszefoglaló"
       ]
     ],
     "buildType": [
@@ -330,7 +330,7 @@
       ],
       [
         "Email",
-        "projektösszefoglaló"
+        "e-mail előkészítve"
       ],
       [
         "emberi felülvizsgálat",
@@ -341,8 +341,8 @@
   "scenes": {
     "intro": {
       "eyebrow": "Magyar",
-      "title": "Üdvözöljük a HASHINMY-nél",
-      "copy": "Egyedi szoftvert készítünk olyan vállalatoknak, amelyek helyi és nemzetközi piacokon működnek, értékesítenek és növekednek. Integráljuk az AI-t, az automatizálást, a PC-programokat, a DXF-exportot támogató CAD-szoftvert, a webalkalmazásokat, a felhőt, a SEO-t, a chatbotokat, a műszaki árajánlatkészítő eszközöket, a biztonságot és az üzletmenet-folytonosságot.\nMedellín és Kolumbia a kiindulópontunk; kereskedelmi és technikai elérésünk globális.\n100%-ban finanszírozott megoldásokkal ösztönözzük a vállalatok technológiai fejlődését, segítve őket a teljes potenciál elérésében, a termelékenység javításában és a hatékonyabb skálázásban.",
+      "title": "100%-ban finanszírozott egyedi technológia növekedéshez tőkevesztés nélkül",
+      "copy": "A Hashinmy az üzleti folyamatokat intelligens, egyedi szoftverré, automatizálássá és mesterséges intelligenciává alakítja. Elemezzük a működést, feltárjuk, hol vész el idő, pénz vagy információ, és 100%-ban finanszírozható technológiát építünk, hogy a modernizáció ne igényeljen nagy kezdeti beruházást.\nNem weboldalügynökség vagyunk, és nem generikus szolgáltató: technológiai partnerként üzleti stratégiát, szoftvermérnökséget, alkalmazott AI-t és elérhető finanszírozást kapcsolunk össze.\nVállalata már rendelkezik tudással, tapasztalattal és vízióval. Mi ezt olyan rendszerekké alakítjuk, amelyek rendezik az értékesítést, az ajánlatkészítést, a készletet, a támogatást, az adatokat, a belső folyamatokat és a digitális csatornákat, miközben óvják a cash flow-t, amíg a megoldás értéket kezd teremteni.",
       "optionQuestion": "Melyik lehetőséget szeretné?",
       "progress": "Kezdés",
       "core": "HASHINMY",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "útvonal",
-      "title": "Válasszon · Szolgáltatás · Érték",
+      "title": "Melyik folyamatnak kell abbahagynia az improvizálást?",
       "optionQuestion": "Válasszon · Szolgáltatás",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Válasszon, Szolgáltatás, Érték, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "Válassza ki, hol veszít a vállalat a legtöbb időt, kontrollt vagy értékesítést. A Hashinmy nem elszigetelt szolgáltatás eladásából indul ki: először megérti a működést, majd olyan útvonalat határoz meg, amely összekapcsolja a szoftvert, az AI-t, az automatizálást és az életképes megvalósítási formát.",
       "progress": "útvonal",
       "core": "Szolgáltatás",
-      "insight": "Azt az igényt választom ki, amely leginkább érinti a termelékenységet, az értékesítési folyamatot vagy a működési kontrollt, hogy az első technológiai megoldás valódi üzleti fájdalomra válaszoljon.",
+      "insight": "Azt a szükségletet választom, amely leginkább érinti a termelékenységet, a kereskedelmi folyamatot vagy a működési kontrollt, hogy az első technológiai megoldás valós üzleti fájdalomra válaszoljon.",
       "options": [
         {
           "label": "egyedi szoftver · Termék",
@@ -399,9 +399,9 @@
     },
     "buildType": {
       "eyebrow": "Termék",
-      "title": "egyedi szoftver · Használat",
+      "title": "Hol kellene megnyílnia a szoftverének?",
       "optionQuestion": "Válasszon · web · mobilalkalmazás · PC szoftver",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: egyedi szoftver, Használat, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A technikai alapnak követnie kell a vállalat valódi munkamódját. Lehet böngésző, mobil, PC vagy szakaszos kombináció, mindig olyan architektúrával, amely képes növekedni a rendszer nulláról való újraépítése nélkül.",
       "progress": "Termék",
       "core": "Fejlesztés",
       "options": [
@@ -428,9 +428,9 @@
     },
     "automationType": {
       "eyebrow": "mesterséges intelligencia · automatizálás",
-      "title": "automatizálás · folyamatok",
+      "title": "Melyik részt végezze el a rendszer Ön helyett?",
       "optionQuestion": "Válasszon · automatizálás",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: automatizálás, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A mesterséges intelligenciának és az automatizálásnak csak akkor van értelme, ha konkrét súrlódást old meg: ismétlődő feladatokat, lassú kiszolgálást, szétszórt adatokat, információ nélküli döntéseket vagy az emberi memóriától túlságosan függő folyamatokat.",
       "progress": "automatizálás",
       "core": "AI + RPA",
       "options": [
@@ -457,9 +457,9 @@
     },
     "modernization": {
       "eyebrow": "modernizáció",
-      "title": "modernizáció · folyamatok",
+      "title": "Mit szeretne maga mögött hagyni?",
       "optionQuestion": "Válasszon · modernizáció",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: modernizáció, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A modernizáció nem divatból történő eszközcsere; táblázatokat, szétszórt üzeneteket és régi rendszereket alakít át világosabb, biztonságosabb, mérhetőbb és kevesebb hibával növekedésre kész működéssé.",
       "progress": "modernizáció",
       "core": "360",
       "options": [
@@ -486,9 +486,9 @@
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Használat · folyamatok",
+      "title": "Hogyan kellene használni a való életben?",
       "optionQuestion": "Válasszon · Használat",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Használat, folyamatok, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A szoftvernek ott kell működnie, ahol a munka történik: irodában, terepen, értékesítésben, gyártásban, támogatásban vagy vezetésben. Ez a válasz a valós működés szerint határozza meg a szinkronizálást, jogosultságokat, backendet, mobilélményt vagy helyi kontrollt.",
       "progress": "Használat",
       "core": "Architecture",
       "options": [
@@ -515,9 +515,9 @@
     },
     "value": {
       "eyebrow": "Érték",
-      "title": "Érték · Válasszon",
+      "title": "Mine kellene először javulnia?",
       "optionQuestion": "Válasszon · Érték",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: Érték, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "Egy jó platformnak korán hasznosnak kell érződnie: ügyeket rendez, feladatokat automatizál, cselekvésre alkalmas adatokat mutat és segít jobban értékesíteni. Az értéket úgy tervezzük, hogy a rendszer már a működésen belül elkezdje igazolni a befektetését.",
       "progress": "Érték",
       "core": "Érték",
       "options": [
@@ -544,9 +544,9 @@
     },
     "risk": {
       "eyebrow": "bizalom · kontrollok",
-      "title": "biztonság · Válasszon",
+      "title": "Mine kell a leginkább védettnek érződnie?",
       "optionQuestion": "Válasszon · biztonság",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: biztonság, Válasszon, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A bizalom az első modultól kezdve szerepekkel, jogosultságokkal, audittal, validációkkal és AI-korlátokkal épül be. Így a vállalat gyorsabb lesz anélkül, hogy elveszítené a kontrollt az adatok, döntések és kritikus folyamatok felett.",
       "progress": "biztonság",
       "core": "bizalom",
       "options": [
@@ -573,9 +573,9 @@
     },
     "finance": {
       "eyebrow": "védett tőke · finanszírozás",
-      "title": "finanszírozás · ütemterv",
+      "title": "Hogyan szeretne modernizálódni tőkevesztés nélkül?",
       "optionQuestion": "Válasszon · finanszírozás",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: finanszírozás, ütemterv, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "A Hashinmyvel a vállalatnak nem kell választania a cash flow védelme és a modernizáció között. Strukturáljuk a hatókört, a diagnózis alapján 100%-ban finanszírozzuk a fejlesztést, és kezelhető részleteket határozunk meg, hogy a szoftver már fizetés közben értéket teremtsen. A finanszírozás nem helyettesíti a mérnöki munkát: elérhetővé teszi azoknak a vállalatoknak, amelyeknek folyamatokat kell rendezniük, munkát automatizálniuk, AI-t integrálniuk és tőkevesztés nélkül növekedniük.",
       "progress": "finanszírozás",
       "core": "USD",
       "options": [
@@ -593,18 +593,18 @@
         },
         {
           "label": "kapcsolat · emberi felülvizsgálat",
-          "hint": "projektösszefoglaló · kapcsolat",
+          "hint": "Technikai és pénzügyi iránymutatásra van szükségem",
           "tech": "emberi felülvizsgálat",
-          "insight": "Kiválasztott irány: kapcsolat, emberi felülvizsgálat — projektösszefoglaló, kapcsolat."
+          "insight": "Szeretném, hogy a Hashinmy áttekintse az esetemet, és a működés, prioritás, hatókör és fizetési forma alapján életképes útvonalat javasoljon."
         }
       ],
       "insight": "A finanszírozás lehetővé teszi az azonnali előrelépést, védi a működési tőkét, és akkor teszi kezelhetővé a fizetést, amikor a technológia időt takarít meg, folyamatokat rendez vagy értékesítést támogat."
     },
     "timeline": {
       "eyebrow": "Tempó",
-      "title": "ütemterv · Tempó",
+      "title": "Milyen gyorsan kell elkezdenie működni?",
       "optionQuestion": "Válasszon · Tempó",
-      "copy": "Ezen a képernyőn a gyakorlati fókusz a következő: ütemterv, Tempó, hogy az útvonal megőrizze az üzleti és technikai kontextust. Hashinmy ezt a választást világos útvonallá alakítja hatókörrel, kontrollokkal és következő lépésekkel, hogy a vállalkozás kevesebb súrlódással értékesítsen, működjön vagy növekedjen.",
+      "copy": "Az ütem határozza meg, hogyan válik egy nagy szükséglet hasznos szállításokká. Kezdhetünk MVP-vel, rövid szakasszal vagy vállalati architektúrával, ügyelve arra, hogy minden előrelépés működési és pénzügyi értékkel rendelkezzen.",
       "progress": "Tempó",
       "core": "ütemterv",
       "options": [
@@ -631,10 +631,10 @@
     },
     "summary": {
       "eyebrow": "útvonal · összefoglaló",
-      "title": "projektösszefoglaló · összefoglaló",
-      "copy": "Az útvonal készen áll. Küldés előtt hozzáadhat bármilyen fontos részletet; a Hashinmy csapata egyértelmű üzleti és technikai kontextusban áttekinti a projekt irányát, a finanszírozási lehetőséget és a következő lépéseket.",
-      "progress": "projektösszefoglaló",
-      "core": "projektösszefoglaló",
+      "title": "A technológiai útvonal elkészült.",
+      "copy": "Már van egy első értelmezésünk az igényről, a fizetési módról és a működési prioritásról. Adja hozzá a hiányzó kontextust, hogy a Hashinmy elemezhesse a működését, egyedi megoldást javasolhasson, és életképes technikai, kereskedelmi és pénzügyi útvonalat készíthessen.\nA következő beszélgetésnek össze kell kapcsolnia az üzleti problémát, a belső tudást, a rendszer hatókörét, a prioritást, a várt értéket és a fizetési módot, miközben védi a cash flow-t, amíg a szoftver eredményeket kezd hozni.",
+      "progress": "Összefoglaló",
+      "core": "Projektösszefoglaló",
       "insight": "Az útvonal készen áll arra, hogy az igényt, az üzleti tudást, a technikai hatókört, a működési prioritást, a várt értéket és a fizetési modellt életképes ajánlattá kapcsolja.",
       "options": []
     }
@@ -649,7 +649,7 @@
     "timeline": "Tempó"
   },
   "valueLabels": {
-    "diagnostico": "projektösszefoglaló · útvonal",
+    "diagnostico": "diagnózis · útvonal",
     "producto_digital": "egyedi szoftver · Termék",
     "automatizacion_ia": "automatizálás · mesterséges intelligencia",
     "modernizacion_operativa": "modernizáció · folyamatok",
@@ -682,11 +682,11 @@
   "recommendation": {
     "defaults": {
       "service": "egyedi szoftver · Termék",
-      "operation": "architecture · projektösszefoglaló",
-      "value": "Érték · projektösszefoglaló",
-      "risk": "biztonság · projektösszefoglaló",
-      "financing": "finanszírozás · projektösszefoglaló",
-      "timeline": "Tempó · projektösszefoglaló",
+      "operation": "Architektúra a valós működés szerint",
+      "value": "Prioritásra váró működési érték",
+      "risk": "Meghatározandó kontrollok",
+      "financing": "Meghatározandó pénzügyi mód",
+      "timeline": "Meghatározandó ütem",
       "technical": "szoftver · architecture"
     },
     "technicalParts": {
@@ -728,8 +728,8 @@
       "sin_financiacion": "közvetlen ajánlat"
     },
     "nextSteps": {
-      "noService": "kapcsolat · projektösszefoglaló",
-      "mvp": "MVP · projektösszefoglaló",
+      "noService": "Kereskedelmi diagnózis kezdeti működési kontextussal",
+      "mvp": "Vezetői diagnózis + első értékmodul",
       "enterprise": "enterprise · ütemterv",
       "default": "szoftver · ütemterv"
     }

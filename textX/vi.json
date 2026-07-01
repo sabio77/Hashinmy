@@ -64,11 +64,11 @@
     "additionalComment": "Bình luận bổ sung",
     "registeredInteractions": "Tương tác đã ghi nhận",
     "directRouteRequested": "Đã yêu cầu lộ trình trực tiếp.",
-    "directQuoteSubject": "Yêu cầu báo giá Hashinmy",
+    "directQuoteSubject": "Hashinmy · báo giá trực tiếp không tài trợ",
     "financedSubject": "Yêu cầu phần mềm được tài trợ Hashinmy",
-    "directQuoteAudit": "Lộ trình chuyển đến chẩn đoán để báo giá hệ thống với phạm vi, giá trị vận hành và cách triển khai rõ ràng.",
+    "directQuoteAudit": "Báo giá trực tiếp không tài trợ. Tóm tắt dự án. Lộ trình.",
     "financeAudit": "Lộ trình chuyển đến chẩn đoán với tài trợ 100% phát triển là ưu tiên chính.",
-    "directQuoteTech": "chẩn đoán hệ thống + phạm vi kỹ thuật và thương mại",
+    "directQuoteTech": "Báo giá trực tiếp không tài trợ · tóm tắt dự án",
     "financeTech": "chẩn đoán + tài trợ 100% + khoản trả góp dễ quản lý",
     "topActionsLabel": "Truy cập nhanh Hashinmy",
     "proofEntryAria": "Truy cập kinh nghiệm và niềm tin của Hashinmy",
@@ -586,10 +586,10 @@
           "insight": "Hướng đã chọn: tài trợ 100% — USD, giai đoạn, vốn được bảo vệ."
         },
         {
-          "label": "báo giá trực tiếp · giai đoạn",
+          "label": "Xây dựng theo giai đoạn",
           "hint": "lộ trình · giai đoạn",
           "tech": "lộ trình",
-          "insight": "Hướng đã chọn: báo giá trực tiếp, giai đoạn — lộ trình, giai đoạn."
+          "insight": "Tôi muốn ưu tiên một phiên bản đầu tiên hữu ích, xác thực kết quả và mở rộng hệ thống với kiểm soát kỹ thuật và tài chính."
         },
         {
           "label": "liên hệ · xem xét bởi con người",
@@ -672,8 +672,8 @@
     "datos_sensibles": "dữ liệu · bảo mật",
     "ia_controlada": "AI · xem xét bởi con người",
     "financiamiento_100": "tài trợ 100%",
-    "sin_financiacion": "báo giá trực tiếp",
-    "fases": "báo giá trực tiếp · giai đoạn",
+    "sin_financiacion": "Báo giá trực tiếp không tài trợ",
+    "fases": "Xây dựng theo giai đoạn",
     "contacto_directo": "liên hệ · xem xét bởi con người",
     "mvp_rapido": "nhanh · MVP",
     "1_3_meses": "1-3 · giai đoạn",
@@ -725,7 +725,7 @@
       "datos_sensibles": "dữ liệu · bảo mật",
       "ia_controlada": "xem xét bởi con người · kiểm soát",
       "financiamiento_100": "tài trợ 100%",
-      "sin_financiacion": "báo giá trực tiếp"
+      "sin_financiacion": "Báo giá trực tiếp không tài trợ"
     },
     "nextSteps": {
       "noService": "liên hệ · bản tóm tắt",

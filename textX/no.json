@@ -5,14 +5,14 @@
   "htmlLang": "no",
   "dir": "ltr",
   "meta": {
-    "title": "Hashinmy | skreddersydd programvare rute",
-    "description": "Hashinmy opplevelse: skreddersydd programvare. AI + automatisering. mobilapp + PC-programvare. 100% finansiering / direkte tilbud.",
-    "ogTitle": "Hashinmy | skreddersydd programvare",
-    "ogDescription": "rute Velg. programvare prosjektoppsummering. finansiering / Få tilbud nå.",
+    "title": "Hashinmy | Programvare, AI og automatisering finansiert 100 %",
+    "description": "Hashinmy utvikler skreddersydd programvare, AI og automatisering med 100 % finansiering for å modernisere bedrifter uten å tømme kontantstrømmen.",
+    "ogTitle": "Hashinmy | Skreddersydd forretningsteknologi finansiert 100 %",
+    "ogDescription": "Teknologipartner for å lage skreddersydd programvare, AI og automatisering, med operativ diagnose og 100 % finansiering av utviklingen.",
     "appleTitle": "Hashinmy",
     "applicationName": "Hashinmy",
     "author": "Hashinmy",
-    "keywords": "Norsk, Norwegian, Tjeneste, rute, Bruk, Verdi, finansiering, sikkerhet, web · programvare, mobilapp, PC-programvare, automatisering, AI · integrasjon, modernisering, prosjektoppsummering · rute, skreddersydd programvare · Produkt, automatisering · AI, modernisering · prosesser, automatisering · prosesser, web · rute, mobilapp · Bruk, PC · kontroller, arbeidsflyt · prosesser, automatisering · rask, data · rapporter, AI · menneskelig gjennomgang, UX/UI · tillit, data · AI, brukere · tillatelser, data · sikkerhet, 100% finansiering, direkte tilbud, direkte tilbud · faser, kontakt · menneskelig gjennomgang, rask · MVP, 1-3 · faser, enterprise · veikart, Hashinmy, hashinmy.com, skreddersydd programvare · Produkt · 100% finansiering, web · programvare · PWA, ecommerce · skreddersydd programvare · Produkt, skreddersydd programvare · Produkt · CAD/DXF, direkte tilbud · 100% finansiering, API, UX/UI, ecommerce · automatisering · prosesser, AI · integrasjon · enterprise · veikart, Bransjer · skreddersydd programvare · Produkt, Finansier nå, API · web · rute, direkte tilbud · skreddersydd programvare · Produkt, web · programvare · SEO, chatbots · AI · integrasjon, Colombia · Medellín · skreddersydd programvare · Produkt, API · enterprise · veikart, data · sikkerhet · skreddersydd programvare · Produkt, enterprise · veikart · skreddersydd programvare · Produkt, CRM · enterprise · veikart, ERP · skreddersydd programvare · Produkt, web · programvare · UX/UI · tillit, web · programvare · portal"
+    "keywords": "Hashinmy, hashinmy.com, skreddersydd programvare finansiert 100 %, finansiert forretningsteknologi, digital engineering for bedrifter, anvendt kunstig intelligens, automatisering av forretningsprosesser, digital transformasjon uten å tappe kapital, programvareutvikling med finansiering, intelligente systemer for bedrifter, programvare for å rydde opp i prosesser, salgsautomatisering, automatisering av tilbud, lagerprogramvare, AI med menneskelig gjennomgang, operativ diagnose, utvikling i faser, digital bedriftssikkerhet"
   },
   "ui": {
     "skip": "Velg · rute",
@@ -23,34 +23,34 @@
     "progressLabel": "rute · Tempo",
     "languageLabel": "Språk",
     "languageAria": "Velg · Språk",
-    "contentLabel": "opplevelse · prosjektoppsummering",
+    "contentLabel": "Hovedinnhold i scenen",
     "pathLabelAria": "rute · sammendrag",
     "decisionZoneLabel": "Velg · Tjeneste",
-    "summaryLabelAria": "sammendrag · prosjektoppsummering",
+    "summaryLabelAria": "Generert sammendrag",
     "footerLabel": "kontroller · rute",
-    "primaryFinance": "Finansier nå",
-    "primaryQuote": "Få tilbud nå",
+    "primaryFinance": "Be om diagnose",
+    "primaryQuote": "Prisvurder systemet mitt",
     "back": "Tilbake",
     "restart": "Start på nytt",
     "contactLabel": "kontakt · Hashinmy",
     "contactPlaceholder": "Email · WhatsApp · kontakt",
     "commentLabel": "Beskriv prosjektet ditt",
-    "commentPlaceholder": "Fortell hvilken prosess du vil forbedre, hvilken tegning, del eller hvilket system du trenger, og alle tekniske detaljer som hjelper oss å forberede en tydelig rute.",
-    "submitRoute": "Send ruten til Hashinmy",
+    "commentPlaceholder": "Fortell hvilken prosess du vil rydde opp i, automatisere eller gjøre om til programvare: salg, tilbud, lager, produksjon, support, data, kundeservice, nettside, API, chatbot eller plattform. Ta med hva som gjør at du mister tid, penger eller informasjon, slik at vi kan forberede en tydelig teknisk og finansiell rute.",
+    "submitRoute": "Send til Hashinmy",
     "copySummaryAction": "Kopier sammendrag",
     "formNote": "Svarene dine lagres bare i denne nettleseren til du bestemmer deg for å sende dem.",
-    "contactRequired": "Legg til e-post, WhatsApp eller firmanavn slik at Hashinmy kan kontakte deg med den forberedte ruten.",
+    "contactRequired": "Legg til bedrifts-e-posten din og WhatsApp-nummeret ditt, slik at Hashinmy kan bekrefte forespørselen og kontakte deg med den forberedte ruten.",
     "copySuccess": "Sammendraget er kopiert. Du kan lime det inn i WhatsApp, e-post eller CRM.",
-    "copyFailure": "Sammendraget kunne ikke kopieres; send ruten til Hashinmy via skjemaet.",
-    "mailOpening": "E-posten med den forberedte ruten åpnes; se gjennom den før du sender den til Hashinmy.",
-    "waitSummary": "sammendrag · prosjektoppsummering",
+    "copyFailure": "Det var ikke mulig å kopiere automatisk. E-postsendingen vil fortsatt forberede sammendraget.",
+    "mailOpening": "Vi kunne ikke bekrefte via memoriaBACKEND i dette forsøket. Vi åpner e-postappen din med den forberedte ruten som en reserve.",
+    "waitSummary": "Forbereder teknologirute",
     "preparingOptions": "Forbereder alternativer",
     "optionFallback": "Velg · rute",
     "pathLabel": "rute · sammendrag",
-    "pathEmpty": "Velg · rute · prosjektoppsummering",
+    "pathEmpty": "Hvert valg bygger prosjektsammendraget ditt",
     "interactionFallback": "opplevelse",
-    "summaryTitle": "Interaktiv forespørsel til Hashinmy",
-    "projectChosen": "Produkt · Velg",
+    "summaryTitle": "Teknologirute forberedt av Hashinmy",
+    "projectChosen": "Valgt prosjekt",
     "expectedUse": "Bruk",
     "wantedValue": "Verdi",
     "prioritySecurity": "sikkerhet",
@@ -61,28 +61,28 @@
     "suggestedControls": "kontroller",
     "nextStep": "veikart · faser",
     "contact": "kontakt",
-    "additionalComment": "Valgfri kommentar",
+    "additionalComment": "Tilleggskommentar",
     "registeredInteractions": "rute · sammendrag",
     "directRouteRequested": "direkte tilbud. rute.",
     "directQuoteSubject": "Hashinmy · direkte tilbud",
     "financedSubject": "Hashinmy · skreddersydd programvare · finansiering",
-    "directQuoteAudit": "direkte tilbud. prosjektoppsummering. rute.",
-    "financeAudit": "100% finansiering. prosjektoppsummering. rute.",
-    "directQuoteTech": "direkte tilbud · prosjektoppsummering",
-    "financeTech": "USD · faser · prosjektoppsummering",
+    "directQuoteAudit": "Ruten går til diagnose for å prise systemet med tydelig omfang, operativ verdi og implementeringsform.",
+    "financeAudit": "Ruten går til diagnose med 100 % finansiering av utviklingen som hovedprioritet.",
+    "directQuoteTech": "systemdiagnose + teknisk og kommersielt omfang",
+    "financeTech": "diagnose + 100 % finansiering + håndterbare avdrag",
     "topActionsLabel": "Produkter · Språk",
     "proofEntryAria": "Vår erfaring · Hashinmy",
     "proofOpenButton": "Vår erfaring",
-    "proofTitle": "Vår erfaring",
-    "proofLead": "Hashinmy opplevelse: skreddersydd programvare. AI + automatisering. mobilapp + PC-programvare. 100% finansiering / direkte tilbud.",
+    "proofTitle": "Finansiert digital ingeniørkunst",
+    "proofLead": "Hashinmy er ikke et webbyrå eller en generisk leverandør. Det er et digitalt ingeniørselskap som gjør forretningsprosesser om til skreddersydd programvare, AI og automatisering, med 100 % finansiering for å modernisere uten å tømme driften for kapital.",
     "proofCloseAria": "Lukk · Vår erfaring",
     "proofContentAria": "Vår erfaring · Vanlige spørsmål",
     "proofSummaryAria": "tillit · kontroller",
-    "proofSummaryTitle": "tillit · kontroller · Hashinmy",
-    "proofTrustLabel": "tillit · kontroller:",
-    "proofTrustText": "I dette skjermbildet er det praktiske fokuset sikkerhet, Velg, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon. Hashinmy opplevelse: skreddersydd programvare. AI + automatisering. mobilapp + PC-programvare. 100% finansiering / direkte tilbud.",
+    "proofSummaryTitle": "Skreddersydd teknologi finansiert 100 % for å rydde opp i driften, beskytte kapitalen og vokse med kontroll",
+    "proofTrustLabel": "Teknisk tillit:",
+    "proofTrustText": "forretningsstrategi, skreddersydd programvare, anvendt AI, automatisering, API-er, nettbaserte salgskanaler, chatboter, operativ diagnose, 100 % finansiering, håndterbare avdrag, sikkerhet, tillatelser, sporbarhet, nyttige data og kontinuitet.",
     "proofMethodLabel": "Metodikk:",
-    "proofMethodText": "Kartlegging, design, utvikling, testing, levering og støtte. Medellín og Colombia er vårt utgangspunkt; rekkevidden er global.",
+    "proofMethodText": "vi gjennomgår den reelle driften, finner tap av tid, penger eller informasjon, prioriterer modulen med størst avkastning, designer den presise løsningen og følger finansiering, implementering, testing, adopsjon og videreutvikling.",
     "proofUseCasesLabel": "Bruksområder:",
     "proofUseCasesText": "Snekkerbedrifter, salg, lager, tekniske tilbud, støtte, CRM, UX/UI · tilliter, netthandel og operasjonell automatisering.",
     "proofBrandsTitle": "Merker, prosjekter og selskaper knyttet til arbeidet vårt",
@@ -91,11 +91,11 @@
     "proofLogoAltTemplate": "{name}-logo",
     "proofFaqAria": "Vanlige spørsmål · Vår erfaring",
     "proofFaqWhyQuestion": "Hvorfor velge Hashinmy?",
-    "proofFaqWhyAnswer": "rute Velg. programvare prosjektoppsummering. finansiering / Få tilbud nå.",
+    "proofFaqWhyAnswer": "Fordi Hashinmy ikke selger isolert kode eller generisk teknologi: Hashinmy gjør konkrete driftsproblemer om til tydelige, sikre, målbare og finansielt gjennomførbare systemer.",
     "proofFaqWhoQuestion": "For hvem?",
-    "proofFaqWhoAnswer": "rute Velg. programvare prosjektoppsummering. finansiering / Få tilbud nå. I dette skjermbildet er det praktiske fokuset sikkerhet, Velg, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
+    "proofFaqWhoAnswer": "For små, mellomstore eller store bedrifter som trenger å rydde opp i prosesser, automatisere arbeid, integrere AI, selge bedre eller lage egen programvare samtidig som kontantstrømmen beskyttes.",
     "proofFaqStartQuestion": "Hvordan starter jeg?",
-    "proofFaqStartAnswer": "Ruten din er klar. Før du sender, kan du legge til viktige detaljer; Hashinmy-teamet vurderer prosjektretning, finansieringsvalg og neste steg med tydelig kommersiell og teknisk kontekst. direkte tilbud. prosjektoppsummering. rute.",
+    "proofFaqStartAnswer": "Be om en diagnose for å gjennomgå driften, oppdage tap av tid, penger eller informasjon og forberede en tydelig teknisk, kommersiell og finansiell rute.",
     "proofBrandsStructuredDescription": "Merker, prosjekter og selskaper knyttet til arbeidet vårt"
   },
   "services": [
@@ -179,7 +179,7 @@
     },
     "summary": {
       "symbol": "sammendrag",
-      "label": "prosjektoppsummering"
+      "label": "prosjektsammendrag generert"
     }
   },
   "metricsByScene": {
@@ -208,7 +208,7 @@
       ],
       [
         "1",
-        "prosjektoppsummering"
+        "levende prosjektsammendrag"
       ]
     ],
     "buildType": [
@@ -330,7 +330,7 @@
       ],
       [
         "Email",
-        "prosjektoppsummering"
+        "e-post klargjort"
       ],
       [
         "menneskelig gjennomgang",
@@ -341,9 +341,9 @@
   "scenes": {
     "intro": {
       "eyebrow": "Norsk",
-      "title": "Velkommen til HASHINMY",
-      "copy": "Vi bygger skreddersydd programvare for selskaper som driver, selger og vokser i lokale og internasjonale markeder. Vi integrerer AI, automatisering, PC-programmer, CAD-programvare med DXF-eksport, webapplikasjoner, sky, SEO, chatboter, tekniske tilbudsverktøy, sikkerhet og operasjonell kontinuitet.\nMedellín og Colombia er vårt utgangspunkt; vår kommersielle og tekniske rekkevidde er global.\nVi fremmer selskapenes teknologiske utvikling med 100% finansierte løsninger, og hjelper dem med å nå sitt fulle potensial, forbedre produktiviteten og skalere mer effektivt.",
-      "optionQuestion": "Hvilket alternativ ønsker du?",
+      "title": "Skreddersydd teknologi med 100 % finansiering for vekst uten å tappe kapital",
+      "copy": "Hashinmy gjør forretningsprosesser om til intelligent skreddersydd programvare, automatisering og anvendt AI. Vi analyserer driften, finner hvor tid, penger eller informasjon forsvinner, og bygger teknologi som kan finansieres fullt ut, slik at modernisering ikke krever en stor startinvestering. Vi er ikke et vanlig webbyrå eller en generisk leverandør; vi kombinerer forretningsstrategi, programvareteknikk, AI og tilgjengelig finansiering.",
+      "optionQuestion": "Hvilket første steg passer best for bedriften din?",
       "progress": "Start",
       "core": "HASHINMY",
       "insight": "Du kan starte med diagnose, finansiering eller direkte tilbud; Hashinmy tar utgangspunkt i det reelle problemet før omfang, betalingsform eller teknologi defineres.",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "rute",
-      "title": "Velg · Tjeneste · Verdi",
-      "optionQuestion": "Velg · Tjeneste",
-      "copy": "I dette skjermbildet er det praktiske fokuset Velg, Tjeneste, Verdi, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
-      "progress": "rute",
+      "title": "Hvilken prosess må slutte å improviseres?",
+      "optionQuestion": "Hvor gjør driften mest vondt i dag?",
+      "copy": "Velg hvor bedriften mister mest tid, kontroll eller salg. Hashinmy starter ikke med å selge en isolert tjeneste; først forstår vi driften, og deretter definerer vi en rute som kobler programvare, AI, automatisering og en gjennomførbar implementeringsform.",
+      "progress": "Rute",
       "core": "Tjeneste",
-      "insight": "Jeg velger behovet som påvirker produktivitet, kommersiell flyt eller operativ kontroll mest, slik at den første teknologiske løsningen svarer på et reelt forretningsproblem.",
+      "insight": "Jeg velger behovet som påvirker produktivitet, salgsflyt eller operativ kontroll mest, slik at den første teknologiske løsningen svarer på et reelt forretningsproblem.",
       "options": [
         {
           "label": "skreddersydd programvare · Produkt",
@@ -399,9 +399,9 @@
     },
     "buildType": {
       "eyebrow": "Produkt",
-      "title": "skreddersydd programvare · Bruk",
-      "optionQuestion": "Velg · web · mobilapp · PC-programvare",
-      "copy": "I dette skjermbildet er det praktiske fokuset skreddersydd programvare, Bruk, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
+      "title": "Hvor bør programvaren åpnes?",
+      "optionQuestion": "Hvor vil du bruke den?",
+      "copy": "Den tekniske basen må følge den virkelige måten virksomheten jobber på. Den kan være nettleser, mobil, PC eller en kombinasjon i faser, alltid med arkitektur som kan vokse uten at systemet må bygges om fra null.",
       "progress": "Produkt",
       "core": "Bygg",
       "options": [
@@ -424,14 +424,14 @@
           "insight": "Valgt retning: PC-programvare — desktop/local, kontroller."
         }
       ],
-      "insight": "Plattformen bør åpnes der teamet ditt allerede arbeider, slik at teknologien organiserer driften uten å tvinge virksomheten inn i et upraktisk verktøy."
+      "insight": "Plattformen bør åpnes der teamet allerede jobber, slik at teknologien rydder opp i driften uten å tvinge virksomheten inn i et upraktisk verktøy."
     },
     "automationType": {
       "eyebrow": "AI · automatisering",
-      "title": "automatisering · prosesser",
-      "optionQuestion": "Velg · automatisering",
-      "copy": "I dette skjermbildet er det praktiske fokuset automatisering, prosesser, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
-      "progress": "automatisering",
+      "title": "Hvilken del skal systemet gjøre for deg?",
+      "optionQuestion": "Hva vil du automatisere først?",
+      "copy": "AI og automatisering gir bare mening når de løser konkret friksjon: gjentatte oppgaver, treg kundeservice, spredte data, beslutninger uten informasjon eller prosesser som er for avhengige av menneskelig hukommelse.",
+      "progress": "Automatisering",
       "core": "AI + RPA",
       "options": [
         {
@@ -453,14 +453,14 @@
           "insight": "Valgt retning: data, rapporter — BI, rapporter."
         }
       ],
-      "insight": "Riktig automatisering starter med arbeidet som gjentas mest, blir mest forsinket eller skaper flest menneskelige feil i den daglige driften."
+      "insight": "Riktig automatisering begynner med arbeidet som gjentas mest, forsinkes mest eller skaper flest menneskelige feil."
     },
     "modernization": {
       "eyebrow": "modernisering",
-      "title": "modernisering · prosesser",
-      "optionQuestion": "Velg · modernisering",
-      "copy": "I dette skjermbildet er det praktiske fokuset modernisering, prosesser, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
-      "progress": "modernisering",
+      "title": "Hva vil du legge bak deg?",
+      "optionQuestion": "Hva vil du erstatte først?",
+      "copy": "Modernisering handler ikke om å bytte verktøy fordi det er trendy; det handler om å gjøre regneark, løse meldinger og gamle systemer om til en klarere, tryggere og målbar drift som kan vokse med færre feil.",
+      "progress": "Modernisere",
       "core": "360",
       "options": [
         {
@@ -482,13 +482,13 @@
           "insight": "Valgt retning: UX/UI, tillit — opplevelse, Verdi."
         }
       ],
-      "insight": "Å legge igjen regneark, løse meldinger og gamle systemer gjør det mulig å hente tilbake sporbarhet, fart og kontroll uten å endre virksomhetens kjerne."
+      "insight": "Når regneark, løse meldinger og gamle systemer legges bak, får virksomheten tilbake sporbarhet, fart og kontroll uten å endre selve kjernen i driften."
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Bruk · prosesser",
-      "optionQuestion": "Velg · Bruk",
-      "copy": "I dette skjermbildet er det praktiske fokuset Bruk, prosesser, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
+      "title": "Hvordan bør det brukes i virkeligheten?",
+      "optionQuestion": "Hvor må det fungere best?",
+      "copy": "Programvaren må fungere der arbeidet skjer: kontor, felt, salg, produksjon, support eller ledelse. Dette svaret definerer synkronisering, roller, backend, mobilopplevelse eller lokal kontroll etter den faktiske driften.",
       "progress": "Bruk",
       "core": "Architecture",
       "options": [
@@ -511,13 +511,13 @@
           "insight": "Valgt retning: PC, kontroller — desktop/local, sikkerhet."
         }
       ],
-      "insight": "Arkitekturen bestemmes ut fra faktisk bruk, slik at systemet fungerer på kontor, i felt, salg, produksjon eller support uten unødvendig friksjon."
+      "insight": "Arkitekturen velges ut fra reell bruk, slik at systemet fungerer på kontor, i felt, i salg, produksjon eller support uten unødvendig friksjon."
     },
     "value": {
       "eyebrow": "Verdi",
-      "title": "Verdi · Velg",
-      "optionQuestion": "Velg · Verdi",
-      "copy": "I dette skjermbildet er det praktiske fokuset Verdi, Velg, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
+      "title": "Hva bør forbedres først?",
+      "optionQuestion": "Hvilket resultat vil du merke først?",
+      "copy": "En god plattform må føles nyttig tidlig: organisere saker, automatisere oppgaver, vise handlingsklar data og hjelpe salget. Verdien utformes slik at systemet begynner å forsvare investeringen inne i driften.",
       "progress": "Verdi",
       "core": "Verdi",
       "options": [
@@ -540,14 +540,14 @@
           "insight": "Valgt retning: data, AI — rapporter, AI."
         }
       ],
-      "insight": "Den første synlige verdien må rettferdiggjøre investeringen: mer orden, mindre tapt tid, bedre data, høyere produktivitet eller flere salgsmuligheter."
+      "insight": "Den første synlige verdien bør forsvare investeringen: mer orden, mindre tapt tid, bedre data, mer produktivitet eller flere salgsmuligheter."
     },
     "risk": {
       "eyebrow": "tillit · kontroller",
-      "title": "sikkerhet · Velg",
-      "optionQuestion": "Velg · sikkerhet",
-      "copy": "I dette skjermbildet er det praktiske fokuset sikkerhet, Velg, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
-      "progress": "sikkerhet",
+      "title": "Hva må føles best beskyttet?",
+      "optionQuestion": "Hva vil du beskytte bedre?",
+      "copy": "Tillit bygges inn fra første modul med roller, tillatelser, revisjonsspor, valideringer og grenser for AI. Slik får bedriften fart uten å miste kontroll over data, beslutninger og kritiske prosesser.",
+      "progress": "Sikkerhet",
       "core": "tillit",
       "options": [
         {
@@ -569,14 +569,14 @@
           "insight": "Valgt retning: AI, menneskelig gjennomgang — automatisering, kontroller."
         }
       ],
-      "insight": "Vekst trenger kontroll; derfor utformes tillatelser, revisjon, valideringer og grenser for AI før kritiske prosesser automatiseres."
+      "insight": "Vekst trenger kontroll; derfor utformes tillatelser, revisjon, valideringer og AI-grenser før kritiske prosesser automatiseres."
     },
     "finance": {
       "eyebrow": "beskyttet kapital · finansiering",
-      "title": "finansiering · veikart",
-      "optionQuestion": "Velg · finansiering",
-      "copy": "I dette skjermbildet er det praktiske fokuset finansiering, veikart, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
-      "progress": "finansiering",
+      "title": "Hvordan vil du modernisere uten å tappe kapital?",
+      "optionQuestion": "Hvilken modell gjør det mulig å gå videre nå?",
+      "copy": "Med Hashinmy trenger ikke bedriften å velge mellom å beskytte kontantstrømmen og å modernisere. Vi strukturerer omfanget, finansierer 100 % av utviklingen når diagnosen tillater det, og definerer håndterbare avdrag slik at programvaren kan begynne å skape verdi mens den betales. Finansiering erstatter ikke ingeniørarbeidet; den gjør det tilgjengelig for bedrifter som må rydde opp i prosesser, automatisere arbeid, integrere AI og vokse uten å decapitalisere.",
+      "progress": "100 % finansiering",
       "core": "USD",
       "options": [
         {
@@ -593,18 +593,18 @@
         },
         {
           "label": "kontakt · menneskelig gjennomgang",
-          "hint": "prosjektoppsummering · kontakt",
+          "hint": "Jeg trenger teknisk og finansiell veiledning",
           "tech": "menneskelig gjennomgang",
-          "insight": "Valgt retning: kontakt, menneskelig gjennomgang — prosjektoppsummering, kontakt."
+          "insight": "Jeg vil at Hashinmy skal vurdere saken min og foreslå en gjennomførbar rute etter drift, prioritet, omfang og betalingsform."
         }
       ],
-      "insight": "Finansiering gjør det mulig å gå videre nå, beskytte driftskapital og betale mens teknologien sparer tid, organiserer prosesser eller driver salg."
+      "insight": "Finansiering gjør det mulig å starte nå, beskytte driftskapital og betale mens teknologien sparer tid, rydder prosesser eller øker salg."
     },
     "timeline": {
       "eyebrow": "Tempo",
-      "title": "veikart · Tempo",
-      "optionQuestion": "Velg · Tempo",
-      "copy": "I dette skjermbildet er det praktiske fokuset veikart, Tempo, slik at ruten beholder forretningsmessig og teknisk kontekst. Hashinmy gjør dette valget til en tydelig rute med omfang, kontroller og neste steg, slik at virksomheten kan selge, operere eller vokse med mindre friksjon.",
+      "title": "Hvor raskt må systemet begynne å puste?",
+      "optionQuestion": "Hvilket tempo passer best?",
+      "copy": "Tempoet avgjør hvordan et stort behov blir til nyttige leveranser. Vi kan starte med en MVP, en kort fase eller en bedriftsarkitektur, samtidig som hvert steg får operativ og finansiell verdi.",
       "progress": "Tempo",
       "core": "veikart",
       "options": [
@@ -627,15 +627,15 @@
           "insight": "Valgt retning: enterprise, veikart — sikkerhet, enterprise."
         }
       ],
-      "insight": "Riktig tempo gjør et stort behov om til nyttige, målbare og finansierbare leveranser uten å miste visjonen for hele systemet."
+      "insight": "Riktig tempo gjør et stort behov om til nyttige, målbare og finansierbare leveranser uten å miste visjonen om hele systemet."
     },
     "summary": {
       "eyebrow": "rute · sammendrag",
-      "title": "prosjektoppsummering · sammendrag",
-      "copy": "Ruten din er klar. Før du sender, kan du legge til viktige detaljer; Hashinmy-teamet vurderer prosjektretning, finansieringsvalg og neste steg med tydelig kommersiell og teknisk kontekst.",
-      "progress": "prosjektoppsummering",
+      "title": "Den teknologiske ruten din er klar.",
+      "copy": "Vi har allerede en første lesning av behovet, betalingsmodellen og den operative prioriteten. Legg til konteksten som mangler, slik at Hashinmy kan analysere driften, foreslå en skreddersydd løsning og forberede en gjennomførbar teknisk, kommersiell og finansiell rute. Neste samtale bør koble forretningsproblem, intern kunnskap, systemomfang, prioritet, forventet verdi og betalingsform, samtidig som kontantstrømmen beskyttes.",
+      "progress": "Forespørsel",
       "core": "prosjektoppsummering",
-      "insight": "Ruten er klar til å koble behov, forretningskunnskap, teknisk omfang, operativ prioritet, forventet verdi og betalingsmodell i et gjennomførbart forslag.",
+      "insight": "Ruten er klar til å koble behov, bedriftskunnskap, teknisk omfang, operativ prioritet, forventet verdi og betalingsmodell i et gjennomførbart forslag.",
       "options": []
     }
   },
@@ -649,7 +649,7 @@
     "timeline": "Tempo"
   },
   "valueLabels": {
-    "diagnostico": "prosjektoppsummering · rute",
+    "diagnostico": "diagnose · rute",
     "producto_digital": "skreddersydd programvare · Produkt",
     "automatizacion_ia": "automatisering · AI",
     "modernizacion_operativa": "modernisering · prosesser",
@@ -682,11 +682,11 @@
   "recommendation": {
     "defaults": {
       "service": "skreddersydd programvare · Produkt",
-      "operation": "architecture · prosjektoppsummering",
-      "value": "Verdi · prosjektoppsummering",
-      "risk": "sikkerhet · prosjektoppsummering",
-      "financing": "finansiering · prosjektoppsummering",
-      "timeline": "Tempo · prosjektoppsummering",
+      "operation": "Arkitektur etter reell drift",
+      "value": "Operativ verdi som skal prioriteres",
+      "risk": "Kontroller som skal defineres",
+      "financing": "Finansiell modell som skal defineres",
+      "timeline": "Tempo som skal defineres",
       "technical": "programvare · architecture"
     },
     "technicalParts": {
@@ -728,8 +728,8 @@
       "sin_financiacion": "direkte tilbud"
     },
     "nextSteps": {
-      "noService": "kontakt · prosjektoppsummering",
-      "mvp": "MVP · prosjektoppsummering",
+      "noService": "Kommersiell diagnose med innledende driftskontekst",
+      "mvp": "Lederdiagnose + første verdimodul",
       "enterprise": "enterprise · veikart",
       "default": "programvare · veikart"
     }

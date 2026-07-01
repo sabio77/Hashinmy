@@ -322,6 +322,49 @@ function buildPublicLanguageUrl(code = 'es') {
   return url.toString();
 }
 
+
+function collectCanonicalDirectRoutePairs(seoContent = {}, languageManifest = {}) {
+  const pairs = [];
+  const seen = new Set();
+  const languages = Array.isArray(languageManifest?.languages) ? languageManifest.languages : [];
+
+  function remember(destinationPath = '') {
+    const destination = normalizeSeoPath(destinationPath);
+    if (!destination || destination === '/') return;
+    const source = destination.replace(/\/$/u, '');
+    if (!source || source === destination || seen.has(source)) return;
+    seen.add(source);
+    pairs.push({ source, destination });
+  }
+
+  languages.forEach((language) => {
+    const code = String(language?.code || '').trim().toLowerCase();
+    if (code) remember(`/${code}/`);
+  });
+
+  Object.values(seoContent?.languages || {}).forEach((bundle) => {
+    if (!bundle || typeof bundle !== 'object') return;
+    if (bundle.hubUrl) remember(bundle.hubUrl);
+    (Array.isArray(bundle.items) ? bundle.items : []).forEach((item) => {
+      if (item?.url) remember(item.url);
+    });
+  });
+
+  return pairs;
+}
+
+function assertRenderAccessibleDirectRoutes(renderConfig = '', seoContent = {}, languageManifest = {}, sourceLabel = 'render.yaml') {
+  const routePairs = collectCanonicalDirectRoutePairs(seoContent, languageManifest);
+  const missing = routePairs.filter(({ source, destination }) => (
+    !renderConfig.includes(`source: ${source}`) || !renderConfig.includes(`destination: ${destination}`)
+  ));
+
+  assert(
+    !missing.length,
+    `${sourceLabel} debe redirigir todas las rutas públicas sin barra final a su URL canónica con slash para evitar Not Found al pegar URLs visibles directamente. Faltan: ${missing.slice(0, 12).map(({ source, destination }) => `${source} -> ${destination}`).join(', ')}.`
+  );
+}
+
 function extractLlmsLanguageSection(llmsText = '', code = '') {
   const normalized = String(code || '').trim().toLowerCase();
   if (!normalized) return '';
@@ -1553,6 +1596,7 @@ assert(
     assert(renderConfig.includes(`source: ${source}`) && renderConfig.includes(`destination: ${destination}`), `render.yaml debe redirigir ${source} hacia ${destination} con 301 para preservar autoridad SEO vieja.`);
   }
   assert(renderConfig.includes('routes:') && renderConfig.includes('type: redirect'), 'render.yaml debe declarar rutas de redirect para Render y no dejar URLs .html antiguas como páginas duplicadas.');
+  assertRenderAccessibleDirectRoutes(renderConfig, seoContent, manifest, 'dist/render.yaml');
   assert(renderConfig.includes('path: /404.html') && renderConfig.includes('X-Robots-Tag') && renderConfig.includes('noindex, nofollow, noarchive'), 'render.yaml debe enviar X-Robots-Tag noindex para 404.html.');
   assert(spanishBundle.ui?.primaryFinance === 'Solicitar diagnóstico' && spanishBundle.ui?.primaryQuote === 'Cotizar mi sistema' && spanishBundle.ui?.submitRoute === 'Enviar a Hashinmy', 'textX/es.json debe usar CTAs directos y cierre explícito: Solicitar diagnóstico, Cotizar mi sistema y Enviar a Hashinmy.');
   assert(englishBundle.ui?.primaryFinance === 'Request diagnosis' && englishBundle.ui?.primaryQuote === 'Quote my system' && englishBundle.ui?.submitRoute === 'Send to Hashinmy', 'textX/en.json debe mantener CTAs internacionales equivalentes y cierre explícito para conversión.');

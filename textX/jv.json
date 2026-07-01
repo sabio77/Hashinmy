@@ -28,17 +28,17 @@
     "decisionZoneLabel": "Pilih · Layanan",
     "summaryLabelAria": "ringkesan · ringkesan proyek",
     "footerLabel": "kontrol · rute",
-    "primaryFinance": "Biayai saiki",
-    "primaryQuote": "Entuk penawaran",
+    "primaryFinance": "Nyuwun diagnosis",
+    "primaryQuote": "Taksir rega sistemku",
     "back": "Bali",
     "restart": "Miwiti maneh",
     "contactLabel": "kontak · Hashinmy",
     "contactPlaceholder": "Email · WhatsApp · kontak",
-    "commentLabel": "Jlèntrèhaké proyek sampeyan",
-    "commentPlaceholder": "Kandhakna proses apa sing arep sampeyan apikaké, gambar, bagean utawa sistem apa sing dibutuhake, lan rincian teknis apa wae sing mbantu nyiapake rute sing cetha.",
-    "submitRoute": "Kirim rute menyang Hashinmy",
+    "commentLabel": "Terangna proyek sampeyan",
+    "commentPlaceholder": "Critakna proses apa sing pengin dirapikake, diotomatisasi utawa digawé dadi piranti lunak: dodolan, penawaran, persediaan, produksi, dhukungan, data, layanan pelanggan, kaca web, API, chatbot utawa platform. Tulisen uga ing ngendi wektu, dhuwit utawa informasi kerep ilang supaya Hashinmy bisa nyiapake rute teknis lan finansial sing cetha.",
+    "submitRoute": "Kirim menyang Hashinmy",
     "copySummaryAction": "Salin ringkesan",
-    "formNote": "Wangsulan sampeyan mung disimpen ing browser iki nganti sampeyan mutusake ngirim.",
+    "formNote": "Wangsulan sampeyan mung disimpen ing browser iki nganti sampeyan mutusake kanggo ngirim.",
     "contactRequired": "Tambahna email, WhatsApp, utawa jeneng perusahaan supaya Hashinmy bisa ngubungi panjenengan nganggo rute sing wis disiapake.",
     "copySuccess": "Ringkesan wis disalin. Sampeyan bisa nempelake ing WhatsApp, email, utawa CRM.",
     "copyFailure": "Ringkesan ora bisa disalin; kirim rute menyang Hashinmy liwat formulir.",
@@ -341,12 +341,12 @@
   "scenes": {
     "intro": {
       "eyebrow": "Basa Jawa",
-      "title": "Sugeng rawuh ing HASHINMY",
-      "copy": "Kita mbangun piranti lunak khusus kanggo perusahaan sing makarya, adol lan tuwuh ing pasar lokal lan internasional. Kita nggabungake AI, otomatisasi, program PC, piranti lunak CAD kanthi ekspor DXF, aplikasi web, cloud, SEO, chatbot, piranti pangitung rega teknis, keamanan lan kesinambungan operasional.\nMedellín lan Kolombia dadi asal-usul kita; jangkauan komersial lan teknis kita global.\nKita nyengkuyung pangembangan teknologi perusahaan nganggo solusi sing didanai 100%, mbantu perusahaan nggayuh potensi maksimal, ningkatake produktivitas lan ngembang luwih efisien.",
-      "optionQuestion": "Pilihan endi sing sampeyan karepake?",
+      "title": "Teknologi khusus kanthi pembiayaan 100% kanggo tuwuh tanpa nguras modal",
+      "copy": "Hashinmy ngowahi proses perusahaan dadi piranti lunak khusus sing cerdas, otomatisasi lan AI terapan. Kita mriksa operasi, nemokake panggonan wektu, dhuwit utawa informasi ilang, banjur mbangun teknologi sing bisa dibiayai 100% supaya modernisasi ora mbutuhake investasi awal sing gedhe. Kita dudu agensi web biasa utawa panyedhiya umum; kita nyambungake strategi bisnis, rekayasa piranti lunak, AI lan pembiayaan sing luwih gampang digayuh.",
+      "optionQuestion": "Langkah pisanan endi sing paling trep kanggo perusahaan sampeyan?",
       "progress": "Miwiti",
       "core": "HASHINMY",
-      "insight": "Sampeyan bisa miwiti saka diagnosis, pembiayaan utawa penawaran langsung; Hashinmy miwiti saka masalah nyata sadurunge nemtokake cakupan, cara pembayaran utawa teknologi.",
+      "insight": "Sampeyan bisa miwiti saka diagnosis, pembiayaan utawa penawaran langsung; Hashinmy miwiti saka masalah nyata sadurunge netepake cakupan, cara bayar utawa teknologi.",
       "options": [
         {
           "label": "Diagnosis operasional",
@@ -370,12 +370,12 @@
     },
     "serviceFamily": {
       "eyebrow": "rute",
-      "title": "Pilih · Layanan · Nilai",
-      "optionQuestion": "Pilih · Layanan",
-      "copy": "Ing layar iki, fokus praktise yaiku Pilih, Layanan, Nilai, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
-      "progress": "rute",
+      "title": "Proses endi sing kudu mandheg improvisasi?",
+      "optionQuestion": "Ing endi operasi saiki paling krasa abot?",
+      "copy": "Pilih panggonan perusahaan paling akeh kelangan wektu, kontrol utawa dodolan. Hashinmy ora miwiti saka adol layanan sing kapisah; luwih dhisik ngerti operasine, banjur nemtokake rute sing nyambungake piranti lunak, AI, otomatisasi lan cara implementasi sing bisa ditindakake.",
+      "progress": "Rute",
       "core": "Layanan",
-      "insight": "Aku milih kabutuhan sing paling mengaruhi produktivitas, alur komersial utawa kontrol operasi supaya solusi teknologi pisanan njawab masalah nyata ing bisnis.",
+      "insight": "Aku milih kabutuhan sing paling mengaruhi produktivitas, alur komersial utawa kontrol operasi supaya solusi teknologi pisanan njawab masalah bisnis nyata.",
       "options": [
         {
           "label": "piranti lunak khusus · Produk",
@@ -399,9 +399,9 @@
     },
     "buildType": {
       "eyebrow": "Produk",
-      "title": "piranti lunak khusus · Panggunaan",
-      "optionQuestion": "Pilih · web · aplikasi seluler · piranti lunak PC",
-      "copy": "Ing layar iki, fokus praktise yaiku piranti lunak khusus, Panggunaan, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
+      "title": "Piranti lunak kudu dibukak ing endi?",
+      "optionQuestion": "Sampeyan pengin nggunakake ing endi?",
+      "copy": "Dhasar teknis kudu manut cara kerja nyata ing bisnis. Bisa liwat browser, seluler, PC utawa kombinasi bertahap, kanthi arsitektur sing siap tuwuh tanpa kudu nggawe sistem maneh saka nol.",
       "progress": "Produk",
       "core": "Mbangun",
       "options": [
@@ -424,14 +424,14 @@
           "insight": "Arah sing dipilih: piranti lunak PC — desktop/local, kontrol."
         }
       ],
-      "insight": "Platform kudu dibukak ing papan tim wis kerja saben dina, supaya teknologi ngatur operasi tanpa meksa bisnis nyetel awake dhewe marang piranti sing ora trep."
+      "insight": "Platform kudu mbukak ing papan tim wis biasa makarya, supaya teknologi ngrapikake operasi tanpa meksa bisnis nganggo alat sing ora trep."
     },
     "automationType": {
       "eyebrow": "AI · otomatisasi",
-      "title": "otomatisasi · proses",
-      "optionQuestion": "Pilih · otomatisasi",
-      "copy": "Ing layar iki, fokus praktise yaiku otomatisasi, proses, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
-      "progress": "otomatisasi",
+      "title": "Bagean endi sing kudu ditindakake sistem kanggo sampeyan?",
+      "optionQuestion": "Apa sing pengin diotomatisasi dhisik?",
+      "copy": "AI lan otomatisasi mung migunani yen ngrampungake gesekan nyata: tugas bola-bali, layanan alon, data sumebar, keputusan tanpa informasi utawa proses sing kakehan gumantung marang memori manungsa.",
+      "progress": "Otomatisasi",
       "core": "AI + RPA",
       "options": [
         {
@@ -453,14 +453,14 @@
           "insight": "Arah sing dipilih: data, laporan — BI, laporan."
         }
       ],
-      "insight": "Otomatisasi sing bener diwiwiti saka kerja sing paling bola-bali, paling kerep telat utawa paling akeh nggawe kesalahan manungsa ing operasi saben dina."
+      "insight": "Otomatisasi sing bener diwiwiti saka kerja sing paling kerep diulang, paling kerep telat utawa paling akeh nyebabake kesalahan manungsa."
     },
     "modernization": {
       "eyebrow": "modernisasi",
-      "title": "modernisasi · proses",
-      "optionQuestion": "Pilih · modernisasi",
-      "copy": "Ing layar iki, fokus praktise yaiku modernisasi, proses, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
-      "progress": "modernisasi",
+      "title": "Apa sing pengin sampeyan tinggalake?",
+      "optionQuestion": "Apa sing pengin diganti dhisik?",
+      "copy": "Modernisasi dudu ganti alat amarga tren; modernisasi yaiku ngowahi spreadsheet, pesen sing sumebar lan sistem lawas dadi operasi sing luwih cetha, aman, bisa diukur lan siap tuwuh kanthi kesalahan luwih sithik.",
+      "progress": "Modernisasi",
       "core": "360",
       "options": [
         {
@@ -482,13 +482,13 @@
           "insight": "Arah sing dipilih: UX/UI, kapercayan — pengalaman, Nilai."
         }
       ],
-      "insight": "Ninggalake spreadsheet, pesen sing buyar lan sistem lawas mbantu mbalekake jejak, kacepetan lan kontrol tanpa ngganti inti bisnis."
+      "insight": "Ninggalake spreadsheet, pesen sumebar lan sistem lawas mbalekake jejak, kacepetan lan kontrol tanpa ngganti inti bisnis."
     },
     "operation": {
       "eyebrow": "architecture",
-      "title": "Panggunaan · proses",
-      "optionQuestion": "Pilih · Panggunaan",
-      "copy": "Ing layar iki, fokus praktise yaiku Panggunaan, proses, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
+      "title": "Kepiye sistem iki digunakake ing urip nyata?",
+      "optionQuestion": "Ing endi kudu paling apik mlakune?",
+      "copy": "Piranti lunak kudu mlaku ing papan kerja nyata: kantor, lapangan, dodolan, produksi, support utawa pimpinan. Jawaban iki nemtokake sinkronisasi, idin, backend, pengalaman seluler utawa kontrol lokal miturut operasi nyata.",
       "progress": "Panggunaan",
       "core": "Architecture",
       "options": [
@@ -511,13 +511,13 @@
           "insight": "Arah sing dipilih: PC, kontrol — desktop/local, keamanan."
         }
       ],
-      "insight": "Arsitektur ditemtokake saka panggunaan nyata supaya sistem bisa mlaku ing kantor, lapangan, penjualan, produksi utawa dhukungan tanpa gesekan sing ora perlu."
+      "insight": "Arsitektur dipilih saka panggunaan nyata supaya sistem bisa mlaku ing kantor, lapangan, dodolan, produksi utawa support tanpa gesekan sing ora perlu."
     },
     "value": {
       "eyebrow": "Nilai",
-      "title": "Nilai · Pilih",
-      "optionQuestion": "Pilih · Nilai",
-      "copy": "Ing layar iki, fokus praktise yaiku Nilai, Pilih, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
+      "title": "Apa sing kudu luwih apik dhisik?",
+      "optionQuestion": "Asil apa sing pengin dirasakake dhisik?",
+      "copy": "Platform sing apik kudu langsung krasa migunani: ngrapikake kasus, ngotomatisasi tugas, nuduhake data sing bisa ditindakake lan mbantu dodolan luwih apik. Nilai dirancang supaya sistem wiwit mbuktekake investasine ing operasi.",
       "progress": "Nilai",
       "core": "Nilai",
       "options": [
@@ -540,14 +540,14 @@
           "insight": "Arah sing dipilih: data, AI — laporan, AI."
         }
       ],
-      "insight": "Nilai pisanan sing katon kudu mbuktekake investasi: operasi luwih tertata, wektu ora akeh ilang, data luwih apik, produktivitas mundhak utawa kesempatan penjualan luwih akeh."
+      "insight": "Nilai pisanan sing katon kudu mbenerake investasi: luwih rapi, wektu ora kebuang, data luwih apik, produktivitas mundhak utawa kesempatan dodolan luwih akeh."
     },
     "risk": {
       "eyebrow": "kapercayan · kontrol",
-      "title": "keamanan · Pilih",
-      "optionQuestion": "Pilih · keamanan",
-      "copy": "Ing layar iki, fokus praktise yaiku keamanan, Pilih, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
-      "progress": "keamanan",
+      "title": "Apa sing kudu krasa paling dilindhungi?",
+      "optionQuestion": "Apa sing pengin luwih dilindhungi?",
+      "copy": "Kapercayan dirancang wiwit modul pisanan nganggo peran, idin, audit, validasi lan wates kanggo AI. Mangkono perusahaan bisa luwih cepet tanpa kelangan kontrol marang data, keputusan lan proses kritis.",
+      "progress": "Keamanan",
       "core": "kapercayan",
       "options": [
         {
@@ -569,14 +569,14 @@
           "insight": "Arah sing dipilih: AI, tinjauan manungsa — otomatisasi, kontrol."
         }
       ],
-      "insight": "Wutah mbutuhake kontrol; mula ijin, audit, validasi lan watesan kanggo AI dirancang sadurunge proses kritis diotomatisasi."
+      "insight": "Tuwuh butuh kontrol; mula idin, audit, validasi lan wates AI dirancang sadurunge proses kritis diotomatisasi."
     },
     "finance": {
       "eyebrow": "modal terlindungi · pembiayaan",
-      "title": "pembiayaan · peta dalan",
-      "optionQuestion": "Pilih · pembiayaan",
-      "copy": "Ing layar iki, fokus praktise yaiku pembiayaan, peta dalan, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
-      "progress": "pembiayaan",
+      "title": "Kepiye modernisasi tanpa nguras modal?",
+      "optionQuestion": "Model endi sing nggawe maju saiki bisa ditindakake?",
+      "copy": "Kanthi Hashinmy, perusahaan ora perlu milih antarane njaga arus kas utawa modernisasi. Kita nyusun cakupan, mbiayai 100% pangembangan nalika diagnosis ngidini, lan nemtokake cicilan sing bisa dikelola supaya piranti lunak wiwit menehi nilai nalika dibayar. Pembiayaan ora ngganti rekayasa; pembiayaan nggawe rekayasa luwih bisa digayuh kanggo perusahaan sing kudu ngrapikake proses, ngotomatisasi kerja, nyambungake AI lan tuwuh tanpa kelangan modal.",
+      "progress": "Pembiayaan 100%",
       "core": "USD",
       "options": [
         {
@@ -598,13 +598,13 @@
           "insight": "Arah sing dipilih: kontak, tinjauan manungsa — ringkesan proyek, kontak."
         }
       ],
-      "insight": "Pembiayaan nggawe perusahaan bisa maju saiki, nglindhungi modal operasi lan mbayar nalika teknologi ngirit wektu, ngatur proses utawa nyurung penjualan."
+      "insight": "Pembiayaan nggawe perusahaan bisa miwiti saiki, njaga modal operasi lan mbayar nalika teknologi ngirit wektu, ngrapikake proses utawa nambah dodolan."
     },
     "timeline": {
       "eyebrow": "Irama",
-      "title": "peta dalan · Irama",
-      "optionQuestion": "Pilih · Irama",
-      "copy": "Ing layar iki, fokus praktise yaiku peta dalan, Irama, supaya rute tetep nyimpen konteks bisnis lan teknis. Hashinmy ngowahi pilihan iki dadi rute sing cetha, ana cakupan, kontrol lan langkah sabanjure, supaya bisnis bisa adol, mlaku utawa tuwuh kanthi luwih sithik alangan.",
+      "title": "Sepira cepet sistem kudu wiwit mlaku?",
+      "optionQuestion": "Irama endi sing paling cocog?",
+      "copy": "Irama nemtokake carane kabutuhan gedhe diowahi dadi kiriman sing migunani. Kita bisa miwiti saka MVP, fase cekak utawa arsitektur perusahaan, kanthi njaga saben langkah nduweni nilai operasi lan finansial.",
       "progress": "Irama",
       "core": "peta dalan",
       "options": [
@@ -627,15 +627,15 @@
           "insight": "Arah sing dipilih: enterprise, peta dalan — keamanan, enterprise."
         }
       ],
-      "insight": "Ritme sing pas ngowahi kabutuhan gedhe dadi pangiriman sing migunani, bisa diukur lan bisa didanai tanpa kelangan visi sistem sakabehe."
+      "insight": "Irama sing pas ngowahi kabutuhan gedhe dadi kiriman sing migunani, bisa diukur lan bisa dibiayai tanpa kelangan gambaran sistem lengkap."
     },
     "summary": {
       "eyebrow": "rute · ringkesan",
-      "title": "ringkesan proyek · ringkesan",
-      "copy": "Rute sampeyan wis siyap. Sadurunge dikirim, sampeyan bisa nambah rincian penting; tim Hashinmy bakal mriksa arah proyek, pilihan pembiayaan lan langkah sabanjure kanthi konteks bisnis lan teknis sing cetha.",
-      "progress": "ringkesan proyek",
+      "title": "Rute teknologi sampeyan wis siyap.",
+      "copy": "Kita wis duwe gambaran awal babagan kabutuhan, cara bayar lan prioritas operasi. Tambahna konteks sing isih kurang supaya Hashinmy bisa nganalisis operasi, menehi usulan solusi khusus lan nyiapake rute teknis, komersial lan finansial sing bisa ditindakake. Obrolan sabanjure kudu nyambungake masalah bisnis, kawruh internal, cakupan sistem, prioritas, nilai sing diarepake lan model bayar, kanthi tetep njaga arus kas.",
+      "progress": "Panjaluk",
       "core": "ringkesan proyek",
-      "insight": "Rute iki wis siyap nyambungake kabutuhan, kawruh perusahaan, cakupan teknis, prioritas operasi, nilai sing dikarepake lan model pembayaran dadi proposal sing bisa ditindakake.",
+      "insight": "Rute wis siap kanggo nyambungake kabutuhan, kawruh perusahaan, cakupan teknis, prioritas operasi, nilai sing diarepake lan model bayar dadi usulan sing bisa ditindakake.",
       "options": []
     }
   },

@@ -10,8 +10,8 @@
   "closeLabel": "Isara",
   "backLabel": "Bumalik sa mga produkto",
   "openDetailLabel": "Tingnan ang solusyon",
-  "cardsLabel": "Teknikal at komersyal na nilalaman ng Hashinmy",
-  "detailLabel": "Kumpletong ficha ng Hashinmy",
+  "cardsLabel": "Teknikal at deskriptibong nilalaman ng Hashinmy",
+  "detailLabel": "Kumpletong talaan ng Hashinmy",
   "hubMetaTitle": "Hashinmy | 100% pinopondohang digital engineering",
   "hubMetaDescription": "Pasadyang software, AI at awtomasyon na may 100% pagpopondo para ayusin ang proseso, protektahan ang cash flow at palaguin ang kumpanya gamit ang malinaw na kontrol.",
   "hubMetaKeywords": [
@@ -124,7 +124,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Pasadyang software na konektado sa operasyonal na prayoridad",
-        "Pasadyang software: kasamang bahagi 7 para ordenar la operación"
+        "Pasadyang software: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -239,7 +239,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "AI para sa mga kumpanya na konektado sa operasyonal na prayoridad",
-        "AI para sa mga kumpanya: kasamang bahagi 7 para ordenar la operación"
+        "AI para sa mga kumpanya: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -342,7 +342,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Awtomasyon ng mga proseso na konektado sa operasyonal na prayoridad",
-        "Awtomasyon ng mga proseso: kasamang bahagi 7 para ordenar la operación"
+        "Awtomasyon ng mga proseso: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -607,7 +607,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Mga sistema para sa PC na konektado sa operasyonal na prayoridad",
-        "Mga sistema para sa PC: kasamang bahagi 7 para ordenar la operación"
+        "Mga sistema para sa PC: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -808,7 +808,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Mga dashboard at ulat sa BI na konektado sa operasyonal na prayoridad",
-        "Mga dashboard at ulat sa BI: kasamang bahagi 7 para ordenar la operación"
+        "Mga dashboard at ulat sa BI: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -2639,11 +2639,11 @@
       "id": "cotizador-tecnico-aprovechamiento",
       "category": "productos",
       "url": "/fil/products/technical-quoting-material-optimization/",
-      "title": "Teknikal na cotizador at paggamit ng materyal",
+      "title": "Teknikal na tagakalkula ng presyo at paggamit ng materyal",
       "eyebrow": "Mga produkto",
-      "summary": "Ang teknikal na cotizador at paggamit ng materyal ay solusyon na tumutulong sa Hashinmy na gawing malinaw, ligtas at maaaring pondohan ang totoong operasyon ng kumpanya, para maayos ang data, permiso, benta at paglago nang hindi umaasa sa karaniwang template.",
-      "simple": "Sa madaling salita, ang teknikal na cotizador at paggamit ng materyal ay nagbabawas ng manual na gawain, hiwa-hiwalay na file at mabagal na desisyon para magkaroon ang kumpanya ng mas malinaw na daloy, mas kontroladong impormasyon at mas madaling pagsukat ng resulta.",
-      "technical": "Karaniwang base para sa teknikal na cotizador at paggamit ng materyal: arkitektura sa web, database, backend, frontend, API, roles, audit trail, kaligtasan, integrasyon at admin panel ayon sa tunay na saklaw ng proyekto.",
+      "summary": "Ang teknikal na tagakalkula ng presyo at paggamit ng materyal ay solusyon na tumutulong sa Hashinmy na gawing malinaw, ligtas at maaaring pondohan ang totoong operasyon ng kumpanya, para maayos ang data, permiso, benta at paglago nang hindi umaasa sa karaniwang template.",
+      "simple": "Sa madaling salita, ang teknikal na tagakalkula ng presyo at paggamit ng materyal ay nagbabawas ng manual na gawain, hiwa-hiwalay na file at mabagal na desisyon para magkaroon ang kumpanya ng mas malinaw na daloy, mas kontroladong impormasyon at mas madaling pagsukat ng resulta.",
+      "technical": "Karaniwang base para sa teknikal na tagakalkula ng presyo at paggamit ng materyal: arkitektura sa web, database, backend, frontend, API, roles, audit trail, kaligtasan, integrasyon at admin panel ayon sa tunay na saklaw ng proyekto.",
       "who": "Para ito sa mga kumpanyang kailangang ayusin ang operasyon, bawasan ang error, ikonekta ang mga team at palaguin ang teknolohiya nang hindi nawawala ang kontrol sa budget, data o proseso.",
       "terms": [
         {
@@ -2671,11 +2671,11 @@
           "meaning": "pag-uugnay ng datos, users at proseso mula sa iba’t ibang sistema"
         }
       ],
-      "metaTitle": "Teknikal na cotizador at paggamit ng materyal para sa kumpanya | Hashinmy",
-      "metaDescription": "Teknikal na cotizador at paggamit ng materyal na maaaring pondohan nang 100% para ayusin ang proseso, data, permiso at paglago nang hindi nauubos ang cash flow ng kumpanya.",
+      "metaTitle": "Teknikal na tagakalkula ng presyo at paggamit ng materyal para sa kumpanya | Hashinmy",
+      "metaDescription": "Teknikal na tagakalkula ng presyo at paggamit ng materyal na maaaring pondohan nang 100% para ayusin ang proseso, data, permiso at paglago nang hindi nauubos ang cash flow ng kumpanya.",
       "keywords": [
-        "teknikal na cotizador at paggamit ng materyal",
-        "teknikal na cotizador at paggamit ng materyal Hashinmy",
+        "teknikal na tagakalkula ng presyo at paggamit ng materyal",
+        "teknikal na tagakalkula ng presyo at paggamit ng materyal Hashinmy",
         "Hashinmy",
         "hashinmy.com",
         "pasadyang software",
@@ -2688,22 +2688,22 @@
         "Panel para sa users, permiso at ulat",
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
-        "Teknikal na cotizador at paggamit ng materyal na konektado sa operasyonal na prayoridad",
-        "Teknikal na cotizador at paggamit ng materyal: kasamang bahagi 7 para ordenar la operación",
-        "Teknikal na cotizador at paggamit ng materyal: kasamang bahagi 8 para ordenar la operación"
+        "Teknikal na tagakalkula ng presyo at paggamit ng materyal na konektado sa operasyonal na prayoridad",
+        "Teknikal na tagakalkula ng presyo at paggamit ng materyal: kasamang bahagi 7 para ayusin ang operasyon",
+        "Teknikal na tagakalkula ng presyo at paggamit ng materyal: kasamang bahagi 8 para ayusin ang operasyon"
       ],
       "sections": [
         {
           "heading": "Problemang nilulutas",
-          "body": "Ang teknikal na cotizador at paggamit ng materyal ay tumutulong kapag ang kumpanya ay umaasa na sa manual na trabaho, hiwa-hiwalay na tools o mabagal na desisyon. Inuuna nito ang malinaw na daloy, sentralisadong data at kontroladong permiso para makita kung saan nawawala ang oras, pera o impormasyon."
+          "body": "Ang teknikal na tagakalkula ng presyo at paggamit ng materyal ay tumutulong kapag ang kumpanya ay umaasa na sa manual na trabaho, hiwa-hiwalay na tools o mabagal na desisyon. Inuuna nito ang malinaw na daloy, sentralisadong data at kontroladong permiso para makita kung saan nawawala ang oras, pera o impormasyon."
         },
         {
           "heading": "Paliwanag sa simpleng wika",
-          "body": "Sa praktikal na paggamit, ginagawang mas organisado ng teknikal na cotizador at paggamit ng materyal ang araw-araw na operasyon. Hindi nito pinipilit ang kumpanya sa karaniwang template; inaangkop nito ang proseso, users, data at report sa totoong paraan ng trabaho."
+          "body": "Sa praktikal na paggamit, ginagawang mas organisado ng teknikal na tagakalkula ng presyo at paggamit ng materyal ang araw-araw na operasyon. Hindi nito pinipilit ang kumpanya sa karaniwang template; inaangkop nito ang proseso, users, data at report sa totoong paraan ng trabaho."
         },
         {
           "heading": "Paano ito binubuo ng Hashinmy",
-          "body": "Nagsisimula ang Hashinmy sa pagsusuri ng operasyon, pagkatapos ay hinahati ang saklaw sa mga yugto. Kapag malinaw ang prayoridad, maaaring itayo ang teknikal na cotizador at paggamit ng materyal gamit ang web, app, backend, API, AI o automation depende sa pinakamalaking epekto sa negosyo."
+          "body": "Nagsisimula ang Hashinmy sa pagsusuri ng operasyon, pagkatapos ay hinahati ang saklaw sa mga yugto. Kapag malinaw ang prayoridad, maaaring itayo ang teknikal na tagakalkula ng presyo at paggamit ng materyal gamit ang web, app, backend, API, AI o automation depende sa pinakamalaking epekto sa negosyo."
         },
         {
           "heading": "Teknikal na base",
@@ -2711,7 +2711,7 @@
         },
         {
           "heading": "Kasama sa posibleng saklaw",
-          "body": "Maaaring kasama sa teknikal na cotizador at paggamit ng materyal ang mapa ng proseso, disenyo ng module, panel ng users, permiso, ulat, integrasyon, backup at dokumentasyon. Pinipili ang saklaw ayon sa return na kayang ibigay ng unang yugto sa operasyon."
+          "body": "Maaaring kasama sa teknikal na tagakalkula ng presyo at paggamit ng materyal ang mapa ng proseso, disenyo ng module, panel ng users, permiso, ulat, integrasyon, backup at dokumentasyon. Pinipili ang saklaw ayon sa return na kayang ibigay ng unang yugto sa operasyon."
         },
         {
           "heading": "Pagpopondo at pag-usad",
@@ -2719,24 +2719,24 @@
         },
         {
           "heading": "Sino ang mas makikinabang",
-          "body": "Mas kapaki-pakinabang ang teknikal na cotizador at paggamit ng materyal para sa mga kumpanyang may paulit-ulit na gawain, maraming data source, approval na mahirap sundan o team na nangangailangan ng mas malinaw na proseso. Ang resulta ay mas kaunting friction at mas mahusay na kontrol."
+          "body": "Mas kapaki-pakinabang ang teknikal na tagakalkula ng presyo at paggamit ng materyal para sa mga kumpanyang may paulit-ulit na gawain, maraming data source, approval na mahirap sundan o team na nangangailangan ng mas malinaw na proseso. Ang resulta ay mas kaunting friction at mas mahusay na kontrol."
         },
         {
           "heading": "Signal para sa SEO at AI",
-          "body": "Inilalarawan ang teknikal na cotizador at paggamit ng materyal gamit ang teknikal at komersyal na salita para madaling maunawaan ng Google, search engines at AI assistants kung kailan may tunay na pangangailangan ang kumpanya at paano tumutugon ang Hashinmy sa pangangailangang iyon."
+          "body": "Inilalarawan ang teknikal na tagakalkula ng presyo at paggamit ng materyal gamit ang teknikal at komersyal na salita para madaling maunawaan ng Google, search engines at AI assistants kung kailan may tunay na pangangailangan ang kumpanya at paano tumutugon ang Hashinmy sa pangangailangang iyon."
         }
       ],
       "faqs": [
         {
-          "question": "Ano ang Teknikal na cotizador at paggamit ng materyal sa Hashinmy?",
-          "answer": "Ang teknikal na cotizador at paggamit ng materyal ay solusyong inaangkop sa totoong operasyon ng kumpanya. Layunin nitong ayusin ang proseso, ikonekta ang data, bawasan ang error at gawing mas malinaw ang mga paulit-ulit na gawain."
+          "question": "Ano ang Teknikal na tagakalkula ng presyo at paggamit ng materyal sa Hashinmy?",
+          "answer": "Ang teknikal na tagakalkula ng presyo at paggamit ng materyal ay solusyong inaangkop sa totoong operasyon ng kumpanya. Layunin nitong ayusin ang proseso, ikonekta ang data, bawasan ang error at gawing mas malinaw ang mga paulit-ulit na gawain."
         },
         {
-          "question": "Para kanino ang Teknikal na cotizador at paggamit ng materyal?",
+          "question": "Para kanino ang Teknikal na tagakalkula ng presyo at paggamit ng materyal?",
           "answer": "Para ito sa mga kumpanyang gumagamit pa ng hiwa-hiwalay na sheets, chats, file o tools at kailangan ng mas kontroladong sistema para sa users, permiso, data, report at paglago."
         },
         {
-          "question": "Ano ang maaaring isama sa Teknikal na cotizador at paggamit ng materyal?",
+          "question": "Ano ang maaaring isama sa Teknikal na tagakalkula ng presyo at paggamit ng materyal?",
           "answer": "Maaaring isama ang proseso map, module design, backend, frontend, database, API, permiso, kaligtasan, audit trail, ulat at integrasyon. Pinipili ang saklaw ayon sa pinakamalaking operasyonal na epekto."
         },
         {
@@ -2809,8 +2809,8 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Mga web page na handa para sa SEO na konektado sa operasyonal na prayoridad",
-        "Mga web page na handa para sa SEO: kasamang bahagi 7 para ordenar la operación",
-        "Mga web page na handa para sa SEO: kasamang bahagi 8 para ordenar la operación"
+        "Mga web page na handa para sa SEO: kasamang bahagi 7 para ayusin ang operasyon",
+        "Mga web page na handa para sa SEO: kasamang bahagi 8 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -2929,8 +2929,8 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Mga chatbot para sa kumpanya na konektado sa operasyonal na prayoridad",
-        "Mga chatbot para sa kumpanya: kasamang bahagi 7 para ordenar la operación",
-        "Mga chatbot para sa kumpanya: kasamang bahagi 8 para ordenar la operación"
+        "Mga chatbot para sa kumpanya: kasamang bahagi 7 para ayusin ang operasyon",
+        "Mga chatbot para sa kumpanya: kasamang bahagi 8 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -3041,8 +3041,8 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Cloud at backup ng data na konektado sa operasyonal na prayoridad",
-        "Cloud at backup ng data: kasamang bahagi 7 para ordenar la operación",
-        "Cloud at backup ng data: kasamang bahagi 8 para ordenar la operación"
+        "Cloud at backup ng data: kasamang bahagi 7 para ayusin ang operasyon",
+        "Cloud at backup ng data: kasamang bahagi 8 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -3230,8 +3230,8 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Pagbuo sa Colombia at Medellín na konektado sa operasyonal na prayoridad",
-        "Pagbuo ng software sa Colombia at Medellín: kasamang bahagi 7 para ordenar la operación",
-        "Pagbuo ng software sa Colombia at Medellín: kasamang bahagi 8 para ordenar la operación"
+        "Pagbuo ng software sa Colombia at Medellín: kasamang bahagi 7 para ayusin ang operasyon",
+        "Pagbuo ng software sa Colombia at Medellín: kasamang bahagi 8 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -3338,7 +3338,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Pagbuo ng API para sa kumpanya na konektado sa operasyonal na prayoridad",
-        "Pagbuo ng API para sa kumpanya: kasamang bahagi 7 para ordenar la operación"
+        "Pagbuo ng API para sa kumpanya: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -3444,7 +3444,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Ligtas na software para sa kumpanya na konektado sa operasyonal na prayoridad",
-        "Ligtas na software para sa kumpanya: kasamang bahagi 7 para ordenar la operación"
+        "Ligtas na software para sa kumpanya: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
@@ -3551,7 +3551,7 @@
         "Seguridad, audit trail at malinaw na roles",
         "100% pagpopondo kapag pinapayagan ng pagsusuri",
         "Pagbabagong digital para sa kumpanya na konektado sa operasyonal na prayoridad",
-        "Pagbabagong digital para sa kumpanya: kasamang bahagi 7 para ordenar la operación"
+        "Pagbabagong digital para sa kumpanya: kasamang bahagi 7 para ayusin ang operasyon"
       ],
       "sections": [
         {
