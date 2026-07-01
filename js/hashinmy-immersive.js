@@ -11,8 +11,8 @@
   const MEMORIA_BACKEND_API_BASE_URL = `${MEMORIA_BACKEND_BASE_URL}/api/v1`;
   const MEMORIA_BACKEND_SDK_URL = `${MEMORIA_BACKEND_BASE_URL}/sdk/memoria.js?s=${encodeURIComponent(MEMORIA_BACKEND_SITE_ID)}`;
   const MEMORIA_BACKEND_COMMERCIAL_SDK_TIMEOUT_MS = 5200;
-  const MEMORIA_BACKEND_GEO_VISIT_SDK_TIMEOUT_MS = 2600;
-  const MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS = 3200;
+  const MEMORIA_BACKEND_VISIT_OPENING_SDK_TIMEOUT_MS = 2600;
+  const MEMORIA_BACKEND_VISIT_OPENING_API_TIMEOUT_MS = 3200;
   const INITIAL_LANGUAGE_DEFAULT_CODE = 'en';
   const MEMORIA_BACKEND_COMMERCIAL_REQUEST_TIMEOUT_MS = 18000;
   const COMMERCIAL_FLOW_IDEMPOTENCY_PREFIX = 'hashinmy-web-cotizacion';
@@ -84,7 +84,7 @@
   const INITIAL_CRITICAL_SCENE_NAME = 'intro';
 
   let paisORIGEN = '';
-  // No eliminar: paisORIGEN inicia en blanco y será alimentada por una futura API de memoriaBACKEND
+  // No eliminar: paisORIGEN inicia en blanco y se alimenta con la API oficial de aperturas de memoriaBACKEND
   // para conocer el país desde donde se abre la web antes de mostrar mensajes locales.
   const LOCAL_ORIGIN_COUNTRY_CODE = 'CO';
   const LOCAL_ORIGIN_LANGUAGE_CODE = 'es';
@@ -800,7 +800,7 @@
     proofWindowOpen: false,
     proofLogos: [],
     memoriaBackendSdkLoadPromise: null,
-    memoriaBackendGeoVisit: null
+    memoriaBackendVisitOpening: null
   };
 
   const elements = {};
@@ -1201,9 +1201,9 @@
     return waitForReady ? waitForMemoriaBackendSdkReady(timeoutMs) : state.memoriaBackendSdkLoadPromise;
   }
 
-  function withMemoriaBackendGeoVisitTimeout(promise, timeoutMs = MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS) {
+  function withMemoriaBackendVisitOpeningTimeout(promise, timeoutMs = MEMORIA_BACKEND_VISIT_OPENING_API_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
-      const timerId = window.setTimeout(() => reject(new Error('geoVisitApi no respondió dentro del tiempo seguro')), timeoutMs);
+      const timerId = window.setTimeout(() => reject(new Error('La API de visitas/apertura no respondió dentro del tiempo seguro')), timeoutMs);
       Promise.resolve(promise)
         .then((value) => {
           window.clearTimeout(timerId);
@@ -1227,9 +1227,11 @@
       s: MEMORIA_BACKEND_SITE_ID,
       siteId: MEMORIA_BACKEND_SITE_ID,
       path: window.location.pathname || '/',
+      url: window.location.href,
       href: window.location.href,
       hrefPath: window.location.pathname + window.location.search + window.location.hash,
       referrer: document.referrer || '',
+      title: document.title || '',
       timezone,
       timeZone: timezone,
       tz: timezone,
@@ -1248,7 +1250,7 @@
     };
   }
 
-  function getGeoVisitPayloadSources(payload) {
+  function getVisitOpeningPayloadSources(payload) {
     const sources = [];
     const push = (value) => {
       if (value && typeof value === 'object' && !sources.includes(value)) sources.push(value);
@@ -1284,8 +1286,8 @@
     return exact ? exact.toUpperCase() : '';
   }
 
-  function extractGeoVisitContext(payload) {
-    const sources = getGeoVisitPayloadSources(payload);
+  function extractVisitOpeningContext(payload) {
+    const sources = getVisitOpeningPayloadSources(payload);
     const languageKeys = ['idioma', 'language', 'lang', 'locale', 'languageCode', 'languageIso', 'idiomaIso', 'idiomaISO', 'idiomaCode', 'idiomaCodigo', 'l'];
     const countryKeys = ['isocode', 'isoCode', 'iso_code', 'pais', 'país', 'country', 'countryCode', 'country_code', 'countryIso', 'isoPais', 'paisIso', 'p'];
     let language = '';
@@ -1301,30 +1303,28 @@
     return language || countryCode ? { language, countryCode, raw: payload } : null;
   }
 
-  function getMemoriaBackendVisitSdkFunction() {
+  function getMemoriaBackendVisitOpeningSdkFunction() {
     const api = window.memoriaBACKEND;
     if (!api || typeof api !== 'object') return null;
     return [
-      api.geoVisitApi,
       api.registrarAperturaStatica,
       api.detectarPaisEIdioma,
       api.registerStaticOpen
     ].find((candidate) => typeof candidate === 'function') || null;
   }
 
-  async function requestGeoVisitApiThroughSdk() {
-    const sdkReady = await loadMemoriaBackendSdk({ waitForReady: true, timeoutMs: MEMORIA_BACKEND_GEO_VISIT_SDK_TIMEOUT_MS });
-    const visitFunction = sdkReady ? getMemoriaBackendVisitSdkFunction() : null;
-    if (!visitFunction) return extractGeoVisitContext(window.memoriaBACKENDVisit || null);
+  async function requestVisitOpeningApiThroughSdk() {
+    const sdkReady = await loadMemoriaBackendSdk({ waitForReady: true, timeoutMs: MEMORIA_BACKEND_VISIT_OPENING_SDK_TIMEOUT_MS });
+    const api = window.memoriaBACKEND;
+    const visitFunction = sdkReady ? getMemoriaBackendVisitOpeningSdkFunction() : null;
+    if (!visitFunction) return extractVisitOpeningContext(window.memoriaBACKENDVisit || null);
 
     const context = getVisitApiPayloadContext();
-    const response = await withMemoriaBackendGeoVisitTimeout(
-      visitFunction === window.memoriaBACKEND.geoVisitApi
-        ? visitFunction(context)
-        : visitFunction({ auto: true, body: context }),
-      MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS
+    const response = await withMemoriaBackendVisitOpeningTimeout(
+      visitFunction.call(api, context, { siteId: MEMORIA_BACKEND_SITE_ID }),
+      MEMORIA_BACKEND_VISIT_OPENING_API_TIMEOUT_MS
     );
-    return extractGeoVisitContext(response);
+    return extractVisitOpeningContext(response);
   }
 
   async function requestVisitOpeningApiDirectly() {
@@ -1350,66 +1350,21 @@
       };
       if (controller) {
         options.signal = controller.signal;
-        timeoutId = window.setTimeout(() => controller.abort(), MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS);
+        timeoutId = window.setTimeout(() => controller.abort(), MEMORIA_BACKEND_VISIT_OPENING_API_TIMEOUT_MS);
       }
 
       const response = await fetch(url.toString(), options);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return extractGeoVisitContext(await response.json());
+      return extractVisitOpeningContext(await response.json());
     } finally {
       if (timeoutId) window.clearTimeout(timeoutId);
     }
   }
 
-  async function requestLegacyGeoVisitApiDirectly() {
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    let timeoutId = 0;
 
-    try {
-      const url = new URL(`${MEMORIA_BACKEND_API_BASE_URL}/geoVisitApi`);
-      const context = getVisitApiPayloadContext();
-      url.searchParams.set('s', MEMORIA_BACKEND_SITE_ID);
-      url.searchParams.set('path', context.path || '/');
-      if (context.timezone) url.searchParams.set('tz', context.timezone);
-
-      const options = {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/json',
-          'X-MB-Site': MEMORIA_BACKEND_SITE_ID
-        }
-      };
-      if (controller) {
-        options.signal = controller.signal;
-        timeoutId = window.setTimeout(() => controller.abort(), MEMORIA_BACKEND_GEO_VISIT_API_TIMEOUT_MS);
-      }
-
-      const response = await fetch(url.toString(), options);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return extractGeoVisitContext(await response.json());
-    } finally {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    }
-  }
-
-  async function requestGeoVisitApiDirectly() {
-    try {
-      return await requestVisitOpeningApiDirectly();
-    } catch (primaryError) {
-      try {
-        return await requestLegacyGeoVisitApiDirectly();
-      } catch (legacyError) {
-        legacyError.primaryError = primaryError;
-        throw legacyError;
-      }
-    }
-  }
-
-  function applyGeoVisitContext(context) {
+  function applyVisitOpeningContext(context) {
     if (!context) return;
-    state.memoriaBackendGeoVisit = context;
+    state.memoriaBackendVisitOpening = context;
     if (context.countryCode) {
       paisORIGEN = context.countryCode;
       document.documentElement.dataset.visitCountry = context.countryCode;
@@ -1419,25 +1374,25 @@
     }
   }
 
-  async function resolveLanguageFromMemoriaBackendVisitApi() {
+  async function resolveLanguageFromMemoriaBackendVisitOpening() {
     try {
-      const context = await requestGeoVisitApiThroughSdk();
+      const context = await requestVisitOpeningApiThroughSdk();
       if (context?.language) {
-        applyGeoVisitContext(context);
+        applyVisitOpeningContext(context);
         return context.language;
       }
-      if (context?.countryCode) applyGeoVisitContext(context);
+      if (context?.countryCode) applyVisitOpeningContext(context);
     } catch (error) {
-      console.warn('Hashinmy: geoVisitApi desde SDK no pudo resolver idioma inicial.', error);
+      console.warn('Hashinmy: la API de visitas/apertura desde SDK no pudo resolver idioma inicial.', error);
     }
 
     try {
-      const context = await requestGeoVisitApiDirectly();
+      const context = await requestVisitOpeningApiDirectly();
       if (context?.language) {
-        applyGeoVisitContext(context);
+        applyVisitOpeningContext(context);
         return context.language;
       }
-      if (context?.countryCode) applyGeoVisitContext(context);
+      if (context?.countryCode) applyVisitOpeningContext(context);
     } catch (error) {
       console.warn('Hashinmy: /visitas/apertura directo no pudo resolver idioma inicial.', error);
     }
@@ -3696,7 +3651,7 @@
       return state.language;
     }
 
-    const apiLanguage = await resolveLanguageFromMemoriaBackendVisitApi();
+    const apiLanguage = await resolveLanguageFromMemoriaBackendVisitOpening();
     if (apiLanguage) {
       state.language = apiLanguage;
       document.documentElement.dataset.initialLanguageSource = 'memoriaBACKEND';
