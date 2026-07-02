@@ -5345,13 +5345,62 @@
     });
   }
 
+  function normalizeCommercialSubmissionResponse(response) {
+    if (!response || typeof response !== 'object') return response;
+    if (response.data && typeof response.data === 'object') return response.data;
+    if (response.result && typeof response.result === 'object') return response.result;
+    if (response.response && typeof response.response === 'object') return response.response;
+    return response;
+  }
+
+  function hasCommercialSubmissionReceptionEvidence(response) {
+    const normalized = normalizeCommercialSubmissionResponse(response);
+    if (!normalized || typeof normalized !== 'object') return false;
+
+    const status = String(normalized.status || normalized.estado || '').trim().toLowerCase();
+    const positiveStatuses = new Set(['ok', 'success', 'successful', 'received', 'recibido', 'accepted', 'aceptado', 'queued', 'enqueued', 'programado', 'created', 'creado', 'saved', 'guardado', 'duplicate', 'duplicado']);
+
+    return Boolean(
+      normalized.quote?.id ||
+      normalized.quoteId ||
+      normalized.cotizacion?.id ||
+      normalized.cotizacionId ||
+      normalized.submission?.id ||
+      normalized.submissionId ||
+      normalized.lead?.id ||
+      normalized.leadId ||
+      normalized.operation?.id ||
+      normalized.ownerNotification?.id ||
+      normalized.appNotification?.ok === 1 ||
+      normalized.appNotification?.ok === true ||
+      normalized.accepted === true ||
+      normalized.received === true ||
+      normalized.registered === true ||
+      normalized.saved === true ||
+      normalized.created === true ||
+      normalized.queued === true ||
+      normalized.enqueued === true ||
+      normalized.duplicate === true ||
+      positiveStatuses.has(status)
+    );
+  }
+
   function isCommercialSubmissionConfirmed(response) {
-    if (!response || response.ok === 0 || response.ok === false) return false;
-    if (response.quote?.id) return true;
-    if (response.submission?.id) return true;
-    if (response.lead?.id || response.leadId) return true;
-    if (response.ownerNotification?.id || response.operation?.id) return true;
-    return response.ok === 1 || response.ok === true;
+    const normalized = normalizeCommercialSubmissionResponse(response);
+    if (!normalized || typeof normalized !== 'object') return false;
+    if (normalized.ok === 0 || normalized.ok === false) {
+      return hasCommercialSubmissionReceptionEvidence(normalized);
+    }
+    if (hasCommercialSubmissionReceptionEvidence(normalized)) return true;
+    return normalized.ok === 1 || normalized.ok === true;
+  }
+
+  function buildCommercialSubmissionError(response, fallbackMessage) {
+    const normalized = normalizeCommercialSubmissionResponse(response);
+    const message = normalized?.err || normalized?.error || normalized?.message || fallbackMessage;
+    const error = new Error(message || 'Hashinmy no confirmó la recepción de la solicitud');
+    error.response = normalized;
+    return error;
   }
 
   async function requestCommercialFlowApiDirectly(payload, idempotencyKey) {
@@ -5383,10 +5432,14 @@
 
       let data = null;
       try { data = await response.json(); } catch {}
+      const normalizedData = normalizeCommercialSubmissionResponse(data);
+
       if (!response.ok) {
-        throw new Error(data?.err || `memoriaBACKEND respondió HTTP ${response.status}`);
+        if (hasCommercialSubmissionReceptionEvidence(normalizedData)) return normalizedData;
+        throw buildCommercialSubmissionError(normalizedData, `memoriaBACKEND respondió HTTP ${response.status}`);
       }
-      return data;
+
+      return normalizedData || { ok: 1, accepted: true, httpStatus: response.status };
     } finally {
       if (timeoutId) window.clearTimeout(timeoutId);
     }
@@ -5396,15 +5449,29 @@
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
     const payload = buildMemoriaBackendStrictPayload(email, phone, idempotencyKey);
     const helper = await waitForMemoriaBackendCommercialHelper().catch(() => null);
-    const response = helper
-      ? await withCommercialRequestTimeout(helper(payload, { idempotencyKey, siteId: MEMORIA_BACKEND_SITE_ID }))
-      : await requestCommercialFlowApiDirectly(payload, idempotencyKey);
+    let sdkError = null;
 
-    if (!isCommercialSubmissionConfirmed(response)) {
-      throw new Error(response?.err || 'Hashinmy no confirmó la recepción de la solicitud');
+    if (helper) {
+      try {
+        const sdkResponse = normalizeCommercialSubmissionResponse(
+          await withCommercialRequestTimeout(helper(payload, { idempotencyKey, siteId: MEMORIA_BACKEND_SITE_ID }))
+        );
+        if (isCommercialSubmissionConfirmed(sdkResponse)) return sdkResponse;
+        sdkError = buildCommercialSubmissionError(sdkResponse, 'memoriaBACKEND SDK respondió sin confirmación comercial');
+      } catch (error) {
+        sdkError = error;
+      }
+
+      console.warn('Hashinmy: el SDK no confirmó la solicitud; se reintenta por API directa con la misma idempotencia.', sdkError);
     }
 
-    return response;
+    const directResponse = await requestCommercialFlowApiDirectly(payload, idempotencyKey);
+    if (isCommercialSubmissionConfirmed(directResponse)) return directResponse;
+
+    throw buildCommercialSubmissionError(
+      directResponse,
+      sdkError?.message || 'Hashinmy no confirmó la recepción de la solicitud'
+    );
   }
 
   function buildSelectedOptionsText() {
