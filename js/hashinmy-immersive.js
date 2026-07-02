@@ -5523,7 +5523,7 @@
   }
 
   function getWhatsappShareFallbackUrl(message) {
-    return `https://wa.me/?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/573136804558?text=${encodeURIComponent(message)}`;
   }
 
   async function resolveWhatsappFallbackUrl(message, idempotencyKey) {
