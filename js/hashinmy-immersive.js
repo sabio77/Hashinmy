@@ -5010,17 +5010,17 @@
 
   function buildMemoriaBackendStrictPayload(email = getClientEmail(), phone = getClientPhone(), idempotencyKey = '') {
     const textoCliente = buildMemoriaBackendSubmissionText(email, phone);
-    const cleanIdempotencyKey = String(idempotencyKey || '').trim();
+    const opcionesSeleccionadas = buildCommercialOptionsPayload(email, phone);
     const cliente = {
       nombre: getClientName(email),
-      email: String(email || '').trim(),
-      telefono: String(phone || '').trim()
+      email,
+      telefono: phone
     };
 
     return {
       textoCliente,
-      opcionesSeleccionadas: buildCommercialOptionsPayload(email, phone),
-      idempotencyKey: cleanIdempotencyKey,
+      opcionesSeleccionadas,
+      idempotencyKey,
       s: MEMORIA_BACKEND_SITE_ID,
       cliente,
       mensaje: textoCliente,
@@ -5283,15 +5283,11 @@
   }
 
   function getMemoriaBackendCommercialHelper() {
-    const api = window.memoriaBACKEND;
-    const flowFunction = api?.flujoComercialCotizacion;
-    if (typeof flowFunction !== 'function') return null;
+    if (typeof window.memoriaBACKEND?.flujoComercialCotizacion === 'function') {
+      return (payload, options = {}) => window.memoriaBACKEND.flujoComercialCotizacion(payload, options);
+    }
 
-    return (payload) => {
-      const idempotencyKey = String(payload?.idempotencyKey || '').trim();
-      const options = idempotencyKey ? { idempotencyKey } : undefined;
-      return flowFunction.call(api, payload, options);
-    };
+    return null;
   }
 
   function waitForMemoriaBackendCommercialHelper() {
@@ -5350,21 +5346,59 @@
   }
 
   function isCommercialSubmissionConfirmed(response) {
-    const hasSuccessfulFlag = response?.ok === 1 || response?.ok === true;
-    if (!hasSuccessfulFlag) return false;
+    if (!response || response.ok === 0 || response.ok === false) return false;
     if (response.quote?.id) return true;
     if (response.submission?.id) return true;
     if (response.lead?.id || response.leadId) return true;
     if (response.ownerNotification?.id || response.operation?.id) return true;
-    if (response.appNotification?.ok === 1 || response.appNotification?.ok === true) return true;
-    return false;
+    return response.ok === 1 || response.ok === true;
   }
 
-  async function submitCommercialFlowWithSdk({ email, phone }) {
-    const helper = await waitForMemoriaBackendCommercialHelper();
+  async function requestCommercialFlowApiDirectly(payload, idempotencyKey) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let timeoutId = 0;
+
+    try {
+      const url = new URL(`${MEMORIA_BACKEND_API_BASE_URL}/flujo-comercial/cotizacion`);
+      url.searchParams.set('s', MEMORIA_BACKEND_SITE_ID);
+
+      if (controller) {
+        timeoutId = window.setTimeout(() => controller.abort(), MEMORIA_BACKEND_COMMERCIAL_REQUEST_TIMEOUT_MS);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller?.signal,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-MB-Site': MEMORIA_BACKEND_SITE_ID,
+          'X-Hashinmy-Action': 'webapp',
+          'X-MB-Idempotency-Key': idempotencyKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      let data = null;
+      try { data = await response.json(); } catch {}
+      if (!response.ok) {
+        throw new Error(data?.err || `memoriaBACKEND respondió HTTP ${response.status}`);
+      }
+      return data;
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function submitCommercialFlowWithSdk({ body, email, phone }) {
     const idempotencyKey = createCommercialIdempotencyKey(email, phone);
     const payload = buildMemoriaBackendStrictPayload(email, phone, idempotencyKey);
-    const response = await withCommercialRequestTimeout(helper(payload));
+    const helper = await waitForMemoriaBackendCommercialHelper().catch(() => null);
+    const response = helper
+      ? await withCommercialRequestTimeout(helper(payload, { idempotencyKey, siteId: MEMORIA_BACKEND_SITE_ID }))
+      : await requestCommercialFlowApiDirectly(payload, idempotencyKey);
 
     if (!isCommercialSubmissionConfirmed(response)) {
       throw new Error(response?.err || 'Hashinmy no confirmó la recepción de la solicitud');
@@ -5478,11 +5512,12 @@
     }
 
     resetContactValidationState();
+    const body = buildMemoriaBackendSubmissionText(email, phone);
     setContactSubmitPending(true);
     setCommercialStatusDialog('loading', COMMERCIAL_LOADING_MESSAGE);
 
     try {
-      await submitCommercialFlowWithSdk({ email, phone });
+      await submitCommercialFlowWithSdk({ body, email, phone });
       closeCommercialStatusDialog();
       setContactResultState('success', {
         title: 'Solicitud enviada con éxito',
