@@ -5345,54 +5345,86 @@
     });
   }
 
-  function normalizeCommercialSubmissionResponse(response) {
-    if (!response || typeof response !== 'object') return response;
-    if (response.data && typeof response.data === 'object') return response.data;
-    if (response.result && typeof response.result === 'object') return response.result;
-    if (response.response && typeof response.response === 'object') return response.response;
-    return response;
+  function collectCommercialSubmissionResponseCandidates(response, seen = new WeakSet()) {
+    if (!response || typeof response !== 'object') return [];
+    if (seen.has(response)) return [];
+    seen.add(response);
+
+    const candidates = [response];
+    ['data', 'result', 'response', 'body', 'payload', 'detail', 'details', 'error'].forEach((key) => {
+      const value = response[key];
+      if (value && typeof value === 'object') {
+        candidates.push(...collectCommercialSubmissionResponseCandidates(value, seen));
+      }
+    });
+
+    return candidates;
   }
 
-  function hasCommercialSubmissionReceptionEvidence(response) {
-    const normalized = normalizeCommercialSubmissionResponse(response);
-    if (!normalized || typeof normalized !== 'object') return false;
+  function normalizeCommercialSubmissionResponse(response) {
+    if (!response || typeof response !== 'object') return response;
+    const candidates = collectCommercialSubmissionResponseCandidates(response);
+    return candidates.find((candidate) => candidate !== response && isCommercialSubmissionConfirmedCandidate(candidate)) || response;
+  }
 
-    const status = String(normalized.status || normalized.estado || '').trim().toLowerCase();
+  function commercialSubmissionFlagIsTruthy(value) {
+    if (value === true || value === 1) return true;
+    if (typeof value !== 'string') return false;
+    return ['1', 'true', 'ok', 'yes', 'si', 'sí', 'received', 'recibido', 'accepted', 'aceptado'].includes(value.trim().toLowerCase());
+  }
+
+  function hasCommercialSubmissionReceptionEvidenceCandidate(candidate) {
+    if (!candidate || typeof candidate !== 'object') return false;
+
+    const status = String(candidate.status || candidate.estado || '').trim().toLowerCase();
     const positiveStatuses = new Set(['ok', 'success', 'successful', 'received', 'recibido', 'accepted', 'aceptado', 'queued', 'enqueued', 'programado', 'created', 'creado', 'saved', 'guardado', 'duplicate', 'duplicado']);
 
     return Boolean(
-      normalized.quote?.id ||
-      normalized.quoteId ||
-      normalized.cotizacion?.id ||
-      normalized.cotizacionId ||
-      normalized.submission?.id ||
-      normalized.submissionId ||
-      normalized.lead?.id ||
-      normalized.leadId ||
-      normalized.operation?.id ||
-      normalized.ownerNotification?.id ||
-      normalized.appNotification?.ok === 1 ||
-      normalized.appNotification?.ok === true ||
-      normalized.accepted === true ||
-      normalized.received === true ||
-      normalized.registered === true ||
-      normalized.saved === true ||
-      normalized.created === true ||
-      normalized.queued === true ||
-      normalized.enqueued === true ||
-      normalized.duplicate === true ||
+      candidate.quote?.id ||
+      candidate.quoteId ||
+      candidate.cotizacion?.id ||
+      candidate.cotizacionId ||
+      candidate.submission?.id ||
+      candidate.submissionId ||
+      candidate.lead?.id ||
+      candidate.leadId ||
+      candidate.operation?.id ||
+      candidate.ownerNotification?.id ||
+      candidate.ownerNotification?.operation?.id ||
+      candidate.appNotification?.notification?.id ||
+      candidate.notification?.id ||
+      commercialSubmissionFlagIsTruthy(candidate.appNotification?.ok) ||
+      commercialSubmissionFlagIsTruthy(candidate.appNotification?.domainInboxAdded) ||
+      commercialSubmissionFlagIsTruthy(candidate.notificationRegistered) ||
+      commercialSubmissionFlagIsTruthy(candidate.acceptedOnNotificationRegistered) ||
+      commercialSubmissionFlagIsTruthy(candidate.acceptedAfterNotification) ||
+      commercialSubmissionFlagIsTruthy(candidate.accepted) ||
+      commercialSubmissionFlagIsTruthy(candidate.received) ||
+      commercialSubmissionFlagIsTruthy(candidate.registered) ||
+      commercialSubmissionFlagIsTruthy(candidate.saved) ||
+      commercialSubmissionFlagIsTruthy(candidate.created) ||
+      commercialSubmissionFlagIsTruthy(candidate.queued) ||
+      commercialSubmissionFlagIsTruthy(candidate.enqueued) ||
+      commercialSubmissionFlagIsTruthy(candidate.duplicate) ||
       positiveStatuses.has(status)
     );
   }
 
+  function isCommercialSubmissionConfirmedCandidate(candidate) {
+    if (!candidate || typeof candidate !== 'object') return false;
+    return hasCommercialSubmissionReceptionEvidenceCandidate(candidate) || commercialSubmissionFlagIsTruthy(candidate.ok);
+  }
+
+  function getCommercialSubmissionConfirmedCandidate(response) {
+    return collectCommercialSubmissionResponseCandidates(response).find(isCommercialSubmissionConfirmedCandidate) || null;
+  }
+
+  function hasCommercialSubmissionReceptionEvidence(response) {
+    return collectCommercialSubmissionResponseCandidates(response).some(hasCommercialSubmissionReceptionEvidenceCandidate);
+  }
+
   function isCommercialSubmissionConfirmed(response) {
-    const normalized = normalizeCommercialSubmissionResponse(response);
-    if (!normalized || typeof normalized !== 'object') return false;
-    if (normalized.ok === 0 || normalized.ok === false) {
-      return hasCommercialSubmissionReceptionEvidence(normalized);
-    }
-    if (hasCommercialSubmissionReceptionEvidence(normalized)) return true;
-    return normalized.ok === 1 || normalized.ok === true;
+    return Boolean(getCommercialSubmissionConfirmedCandidate(response));
   }
 
   function buildCommercialSubmissionError(response, fallbackMessage) {
@@ -5435,7 +5467,8 @@
       const normalizedData = normalizeCommercialSubmissionResponse(data);
 
       if (!response.ok) {
-        if (hasCommercialSubmissionReceptionEvidence(normalizedData)) return normalizedData;
+        const confirmedCandidate = getCommercialSubmissionConfirmedCandidate(normalizedData);
+        if (confirmedCandidate) return confirmedCandidate;
         throw buildCommercialSubmissionError(normalizedData, `memoriaBACKEND respondió HTTP ${response.status}`);
       }
 
@@ -5459,6 +5492,8 @@
         if (isCommercialSubmissionConfirmed(sdkResponse)) return sdkResponse;
         sdkError = buildCommercialSubmissionError(sdkResponse, 'memoriaBACKEND SDK respondió sin confirmación comercial');
       } catch (error) {
+        const confirmedCandidate = getCommercialSubmissionConfirmedCandidate(error);
+        if (confirmedCandidate) return confirmedCandidate;
         sdkError = error;
       }
 
