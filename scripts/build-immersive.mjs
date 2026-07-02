@@ -505,6 +505,39 @@ function setHtmlLocale(html, bundle) {
   });
 }
 
+function escapeInlineJsonForScript(value) {
+  return JSON.stringify(value || {})
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+function shouldHydrateRuntimeTextBundle(relativePath = '') {
+  const normalized = String(relativePath || 'index.html').replace(/\\/g, '/').replace(/^\.\//, '');
+  return normalized === 'index.html' || normalized === '404.html' || /^[^/]+\/index\.html$/u.test(normalized);
+}
+
+function hydrateStaticRuntimeTextBundle(html, bundle, activeCode = 'es', relativePath = '') {
+  if (!shouldHydrateRuntimeTextBundle(relativePath) || !bundle || typeof bundle !== 'object') return html;
+  const safeCode = htmlAttributeEscape(activeCode || bundle.iso || 'es');
+  const payload = escapeInlineJsonForScript(bundle);
+  const script = `<script type="application/json" id="hmInitialTextBundle" data-language="${safeCode}">${payload}</script>`;
+
+  if (String(html || '').includes('id="hmInitialTextBundle"')) {
+    return String(html || '').replace(/<script\s+type=["']application\/json["']\s+id=["']hmInitialTextBundle["'][\s\S]*?<\/script>/i, script);
+  }
+
+  if (String(html || '').includes('<script type="application/ld+json" id="hmStructuredData">')) {
+    return String(html || '').replace('<script type="application/ld+json" id="hmStructuredData">', `${script}
+  <script type="application/ld+json" id="hmStructuredData">`);
+  }
+
+  return String(html || '').replace('</head>', `  ${script}
+</head>`);
+}
+
 function hydrateStaticInitialSceneFallback(html, bundle, languages, activeCode = 'es') {
   const intro = bundle?.scenes?.intro || {};
   const introOptions = Array.isArray(intro.options) ? intro.options : [];
@@ -929,7 +962,12 @@ function hydrateStaticHtmlFallback(html, bundle, languages, activeCode = 'es', r
     bundle
   );
 
-  return hydrateStaticEntryStructuredData(localizedHtml, bundle, languages, activeCode, resourcePrefix, proofLogos, seoContent, relativePath);
+  return hydrateStaticRuntimeTextBundle(
+    hydrateStaticEntryStructuredData(localizedHtml, bundle, languages, activeCode, resourcePrefix, proofLogos, seoContent, relativePath),
+    bundle,
+    activeCode,
+    relativePath
+  );
 }
 
 async function hydrateStaticHtmlFile(relativePath, bundle, languages, activeCode = 'es', resourcePrefix = './', seoContent = null) {
