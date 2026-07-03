@@ -1,0 +1,99 @@
+{
+  "name": "ChatER",
+  "short_name": "ChatER",
+  "description": "Chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND por correo electrónico.",
+  "id": "./?app=chater",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "portrait-primary",
+  "theme_color": "#0b141a",
+  "background_color": "#0b141a",
+  "categories": [
+    "social",
+    "productivity",
+    "communication"
+  ],
+  "lang": "es-CO",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "assets/chater-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/chater-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/chater-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Abrir chats",
+      "short_name": "Chats",
+      "description": "Abrir la lista de conversaciones de ChatER.",
+      "url": "./index.html#chats",
+      "icons": [
+        {
+          "src": "assets/chater-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Abrir llamadas",
+      "short_name": "Llamadas",
+      "description": "Abrir el historial y acciones de llamadas de ChatER.",
+      "url": "./index.html#calls",
+      "icons": [
+        {
+          "src": "assets/chater-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Abrir novedades",
+      "short_name": "Novedades",
+      "description": "Abrir estados visibles por 24 horas en ChatER.",
+      "url": "./index.html#states",
+      "icons": [
+        {
+          "src": "assets/chater-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Abrir herramientas",
+      "short_name": "Herramientas",
+      "description": "Abrir instalación, actualización y estado de memoriaBACKEND.",
+      "url": "./index.html#tools",
+      "icons": [
+        {
+          "src": "assets/chater-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
+}

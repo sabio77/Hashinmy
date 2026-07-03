@@ -1,0 +1,10 @@
+{
+  "asset": "avatar-equipo-trabajo.png",
+  "type": "avatar_image_optional",
+  "project": "ChatER",
+  "usage": "Imagen opcional de avatar en la lista de chats y cabecera de conversación. Si avatar-equipo-trabajo.png no existe dentro de assets, la interfaz muestra automáticamente un placeholder circular geométrico con iniciales.",
+  "style": "avatar circular limpio, coherente con una interfaz tipo WhatsApp, fondo simple, alto contraste, sin texto pequeño",
+  "size": "512x512",
+  "format_expected": "png",
+  "fallback": "placeholder geométrico circular generado por CSS con iniciales"
+}
