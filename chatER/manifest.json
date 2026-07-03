@@ -1,7 +1,7 @@
 {
   "name": "ChatER",
   "short_name": "ChatER",
-  "description": "Chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND por correo electrónico.",
+  "description": "Chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND con acceso Google/Gmail.",
   "id": "./?app=chater",
   "start_url": "./index.html",
   "scope": "./",

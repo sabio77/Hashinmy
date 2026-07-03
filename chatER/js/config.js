@@ -14,6 +14,18 @@ window.CHATER_CONFIG = window.CHATER_CONFIG || {
   STREME_CHANNEL: 'chater-general',
   // Registra apertura real del static site en /api/v1/visitas/apertura cuando memoriaBACKEND está configurado.
   ENABLE_STATIC_VISIT_TRACKING: true,
+  // Registra errores técnicos del navegador como eventos seguros en /api/v1/eventos/registrar.
+  ENABLE_CLIENT_TELEMETRY: true,
+  // Acceso obligatorio a ChatER mediante Google/Gmail usando AUTENTICACIONx de memoriaBACKEND.
+  // Esta bandera queda documentada para compatibilidad, pero el runtime ya no permite desactivar el requisito.
+  REQUIRE_GOOGLE_GMAIL_AUTH: true,
+  REQUIRE_GMAIL_DOMAIN: true,
+  ENABLE_GOOGLE_LOGIN_SCRIPT: true,
+  AUTOLOAD_GOOGLE_LOGIN_SCRIPT: true,
+  GOOGLE_LOGIN_BRAND_NAME: 'ChatER',
+  GOOGLE_LOGIN_THEME_COLOR: '#25d366',
+  GOOGLE_LOGIN_LOGO_URL: '',
+  GOOGLE_LOGIN_BACKGROUND_URL: '',
   // Sincroniza preferencias privadas del usuario en /api/v1/preferencias-usuario sin depender solo de localStorage.
   ENABLE_REMOTE_USER_PREFERENCES: true,
   API_TIMEOUT_MS: 15000,

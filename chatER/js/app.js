@@ -1,5 +1,12 @@
 const chaterVolatileStorage = new Map();
+const chaterVolatileSessionStorage = new Map();
+const chaterRuntimeAuth = {
+  accessToken: '',
+  refreshToken: '',
+  verifiedAt: 0
+};
 let chaterStorageWarningShown = false;
+let chaterSessionStorageWarningShown = false;
 
 function getBrowserLocalStorage() {
   try {
@@ -9,10 +16,24 @@ function getBrowserLocalStorage() {
   }
 }
 
+function getBrowserSessionStorage() {
+  try {
+    return window.sessionStorage || null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function warnStorageFallback(error) {
   if (chaterStorageWarningShown) return;
   chaterStorageWarningShown = true;
   console.warn('ChatER usa almacenamiento temporal porque el almacenamiento persistente del navegador no está disponible.', error);
+}
+
+function warnSessionStorageFallback(error) {
+  if (chaterSessionStorageWarningShown) return;
+  chaterSessionStorageWarningShown = true;
+  console.warn('ChatER conserva credenciales temporales solo en memoria de la pestaña porque sessionStorage no está disponible.', error);
 }
 
 function readStorageItem(key, fallbackValue = '') {
@@ -68,6 +89,59 @@ function removeStorageItem(key) {
   }
 }
 
+function readSessionStorageItem(key, fallbackValue = '') {
+  const storageKey = String(key || '');
+  if (!storageKey) return fallbackValue;
+
+  try {
+    const storage = getBrowserSessionStorage();
+    if (storage) {
+      const value = storage.getItem(storageKey);
+      if (value !== null && value !== undefined) return value;
+    }
+  } catch (error) {
+    warnSessionStorageFallback(error);
+  }
+
+  if (chaterVolatileSessionStorage.has(storageKey)) return chaterVolatileSessionStorage.get(storageKey);
+  return fallbackValue;
+}
+
+function writeSessionStorageItem(key, value, options = {}) {
+  const storageKey = String(key || '');
+  if (!storageKey) return false;
+
+  const serializedValue = String(value ?? '');
+  chaterVolatileSessionStorage.set(storageKey, serializedValue);
+
+  try {
+    const storage = getBrowserSessionStorage();
+    if (!storage) throw new Error('sessionStorage no está disponible.');
+    storage.setItem(storageKey, serializedValue);
+    return true;
+  } catch (error) {
+    warnSessionStorageFallback(error);
+    if (options.throwOnError) throw error;
+    return false;
+  }
+}
+
+function removeSessionStorageItem(key) {
+  const storageKey = String(key || '');
+  if (!storageKey) return false;
+
+  chaterVolatileSessionStorage.delete(storageKey);
+
+  try {
+    const storage = getBrowserSessionStorage();
+    if (storage) storage.removeItem(storageKey);
+    return true;
+  } catch (error) {
+    warnSessionStorageFallback(error);
+    return false;
+  }
+}
+
 const CHATER_CONFIG = {
   backendBaseUrl: window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || '',
   siteId: normalizeMemoriaSiteId(window.CHATER_CONFIG?.MEMORIA_SITE_ID || window.CHATER_CONFIG?.SITE_ID || 'a1'),
@@ -76,6 +150,15 @@ const CHATER_CONFIG = {
   realtimeTransport: window.CHATER_CONFIG?.STREME_TRANSPORT || 'auto',
   stremeChannel: normalizeMemoriaChannel(window.CHATER_CONFIG?.STREME_CHANNEL || 'chater-general'),
   enableStaticVisitTracking: window.CHATER_CONFIG?.ENABLE_STATIC_VISIT_TRACKING !== false,
+  enableClientTelemetry: window.CHATER_CONFIG?.ENABLE_CLIENT_TELEMETRY !== false,
+  requireGoogleGmailAuth: window.CHATER_CONFIG?.REQUIRE_GOOGLE_GMAIL_AUTH !== false,
+  requireGmailDomain: window.CHATER_CONFIG?.REQUIRE_GMAIL_DOMAIN !== false,
+  enableGoogleLoginScript: window.CHATER_CONFIG?.ENABLE_GOOGLE_LOGIN_SCRIPT !== false,
+  autoLoadGoogleLoginScript: window.CHATER_CONFIG?.AUTOLOAD_GOOGLE_LOGIN_SCRIPT !== false,
+  googleLoginBrandName: window.CHATER_CONFIG?.GOOGLE_LOGIN_BRAND_NAME || 'ChatER',
+  googleLoginThemeColor: window.CHATER_CONFIG?.GOOGLE_LOGIN_THEME_COLOR || '#25d366',
+  googleLoginLogoUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_LOGO_URL || '',
+  googleLoginBackgroundUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_BACKGROUND_URL || '',
   enableRemoteUserPreferences: window.CHATER_CONFIG?.ENABLE_REMOTE_USER_PREFERENCES !== false,
   apiTimeoutMs: resolvePositiveConfigNumber(window.CHATER_CONFIG?.API_TIMEOUT_MS, 15000),
   mediaUploadTimeoutMs: resolvePositiveConfigNumber(window.CHATER_CONFIG?.MEDIA_UPLOAD_TIMEOUT_MS, 60000),
@@ -89,6 +172,8 @@ const CHATER_CONFIG = {
   accessTokenKey: 'chater.session.accessToken',
   refreshTokenKey: 'chater.session.refreshToken',
   userIdKey: 'chater.session.userId',
+  authProviderKey: 'chater.session.authProvider',
+  backendSessionVerifiedAtKey: 'chater.session.backendVerifiedAt',
   deviceKey: 'chater.device.id',
   stremeLastEventKey: 'chater.streme.lastEventId',
   stateKey: 'chater.demo.state.v2',
@@ -422,18 +507,116 @@ function normalizeAuthPayload(payload = {}, fallbackEmail = '') {
   if (!payload || typeof payload !== 'object') return payload || {};
   const data = payload.data && typeof payload.data === 'object' ? payload.data : {};
   const session = payload.session || data.session || data.auth || data.tokens || {};
-  const user = payload.user || data.user || data.profile || data.perfil || session.user || {};
-  const accessToken = payload.accessToken || data.accessToken || session.accessToken || payload.token || data.token || session.token || '';
+  const compactUser = payload.u || data.u || session.u || {};
+  const user = payload.user || data.user || data.profile || data.perfil || session.user || compactUser || {};
+  const accessToken = payload.accessToken
+    || data.accessToken
+    || session.accessToken
+    || payload.token
+    || data.token
+    || session.token
+    || payload.tk
+    || data.tk
+    || session.tk
+    || payload.signedSession
+    || data.signedSession
+    || session.signedSession
+    || '';
   const refreshToken = payload.refreshToken || data.refreshToken || session.refreshToken || '';
+  const email = normalizeStorageIdentity(
+    user.email
+    || user.e
+    || compactUser.e
+    || payload.email
+    || payload.e
+    || data.email
+    || data.e
+    || session.email
+    || session.e
+    || fallbackEmail
+    || ''
+  );
+  const firebase = payload.firebase || data.firebase || session.firebase || user.firebase || {};
+  const claims = payload.claims || data.claims || session.claims || user.claims || {};
+  const claimsFirebase = claims.firebase || {};
+  const provider = String(
+    user.provider
+    || user.providerId
+    || user.authProvider
+    || user.signInProvider
+    || user.sign_in_provider
+    || compactUser.provider
+    || compactUser.providerId
+    || compactUser.authProvider
+    || compactUser.signInProvider
+    || compactUser.sign_in_provider
+    || compactUser.pr
+    || payload.authProvider
+    || payload.provider
+    || payload.providerId
+    || payload.signInProvider
+    || payload.sign_in_provider
+    || data.authProvider
+    || data.provider
+    || data.providerId
+    || data.signInProvider
+    || data.sign_in_provider
+    || session.authProvider
+    || session.provider
+    || session.providerId
+    || session.signInProvider
+    || session.sign_in_provider
+    || firebase.sign_in_provider
+    || firebase.signInProvider
+    || firebase.provider
+    || firebase.providerId
+    || claimsFirebase.sign_in_provider
+    || claimsFirebase.signInProvider
+    || claimsFirebase.provider
+    || ''
+  ).trim();
+
   return {
     ...payload,
     accessToken,
     refreshToken,
+    authProvider: provider,
     user: {
       ...user,
-      email: user.email || payload.email || data.email || session.email || fallbackEmail || ''
+      id: user.id || user.i || compactUser.i || user.uid || compactUser.uid || '',
+      uid: user.uid || user.i || compactUser.i || user.id || '',
+      email,
+      name: user.name || user.n || compactUser.n || user.displayName || '',
+      photoURL: user.photoURL || user.p || compactUser.p || user.avatarUrl || '',
+      provider: provider || user.provider || ''
     }
   };
+}
+
+function extractGoogleFirebaseIdTokenFromPayload(payload = {}) {
+  const visited = new Set();
+  const directKeys = ['idToken', 'id_token', 'firebaseIdToken', 'firebaseToken', 'googleIdToken', 'tokenId', 'credential'];
+  const nestedKeys = ['data', 'session', 'auth', 'tokens', 'firebase', 'credentialData', 'credential', 'user', 'claims'];
+
+  const visit = (candidate, depth = 0) => {
+    if (!candidate || typeof candidate !== 'object' || visited.has(candidate) || depth > 4) return '';
+    visited.add(candidate);
+
+    for (const key of directKeys) {
+      const value = candidate[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+
+    for (const key of nestedKeys) {
+      const nested = candidate[key];
+      const nestedToken = visit(nested, depth + 1);
+      if (nestedToken) return nestedToken;
+    }
+
+    return '';
+  };
+
+  return visit(payload);
 }
 
 function extractIdempotencyKeyFromBody(body) {
@@ -561,6 +744,15 @@ const seedState = {
     broadcasts: [],
     orders: [],
     activities: []
+  },
+  privacy: {
+    profileVisibility: 'contacts',
+    statusVisibility: 'contacts',
+    lastActivityVisibility: 'contacts',
+    publicFields: ['displayName', 'avatar'],
+    privateFields: ['email'],
+    syncStatus: '',
+    syncedAt: ''
   }
 };
 
@@ -680,6 +872,7 @@ let toastTimer = null;
 let activeSessionRuntimeId = 0;
 let activeSessionRuntimeEmail = normalizeStorageIdentity(initialSessionEmail);
 let authAttemptRuntimeId = 0;
+let activeGoogleLoginAttemptGuard = null;
 let activeModalKind = '';
 let activeEmojiMode = 'emoji';
 let activeEmojiCategoryId = 'recent';
@@ -725,6 +918,11 @@ const userPreferencesSyncState = {
   lastSyncedAt: '',
   error: '',
   remoteLoadedAt: ''
+};
+
+const clientTelemetryState = {
+  timestamps: [],
+  inFlightKeys: new Set()
 };
 
 const voiceRecorderState = {
@@ -819,12 +1017,19 @@ const apiClient = {
     }, timeoutMs);
 
     if (response.status === 401 && !skipRefresh && getRefreshToken()) {
-      await this.refreshSession();
+      try {
+        await this.refreshSession();
+      } catch (error) {
+        handleProtectedApiAuthFailure(path, error);
+        throw error;
+      }
       return this.request(path, { ...options, skipRefresh: true });
     }
 
     if (!response.ok) {
-      throw await createBackendHttpError(response);
+      const error = await createBackendHttpError(response);
+      handleProtectedApiAuthFailure(path, error);
+      throw error;
     }
 
     if (response.status === 204) {
@@ -838,42 +1043,52 @@ const apiClient = {
 
     const payload = await response.json();
     if (isMemoriaBackendErrorPayload(payload)) {
-      throw createBackendPayloadError(payload, response);
+      const error = createBackendPayloadError(payload, response);
+      handleProtectedApiAuthFailure(path, error);
+      throw error;
     }
 
     return payload;
   },
-  login(email) {
-    const clientMutationId = generateClientMutationId();
-    return this.request('/auth/email/otp/request', {
-      method: 'POST',
-      idempotencyKey: clientMutationId,
-      body: JSON.stringify(withMemoriaSitePayload({
-        email,
-        purpose: 'login',
-        clientMutationId
-      }))
-    }).then((payload) => ({ ...payload, requiresOtp: payload?.requiresOtp !== false }));
+  getAuthProviders() {
+    return this.request('/auth/providers', { skipRefresh: true });
   },
-  verifyOtp(email, otp) {
-    const clientMutationId = generateClientMutationId();
-    return this.request('/auth/email/otp/verify', {
+  checkAuth() {
+    return this.request('/auth/check', { skipRefresh: true })
+      .then((payload) => normalizeAuthPayload(payload));
+  },
+  createFirebaseSession(idToken, options = {}) {
+    const clientMutationId = options.clientMutationId || generateClientMutationId();
+    return this.request('/auth/firebase/session', {
       method: 'POST',
+      skipRefresh: true,
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
-        email,
-        code: otp,
-        otp,
+        idToken,
+        id: idToken,
+        next: options.next || getCurrentPageUrl(),
         deviceId: getDeviceId(),
         clientMutationId
       }))
-    }).then((payload) => normalizeAuthPayload(payload, email));
+    }).then((payload) => normalizeAuthPayload(payload));
+  },
+  login(email) {
+    return startGoogleGmailLogin({ fallbackEmail: email });
+  },
+  verifyOtp(email, otp) {
+    return Promise.reject(new Error('ChatER solo permite acceso con Google/Gmail mediante AUTENTICACIONx de memoriaBACKEND.'));
   },
   refreshSession() {
+    const clientMutationId = generateClientMutationId();
     return this.request('/auth/refresh', {
       method: 'POST',
       skipRefresh: true,
-      body: JSON.stringify(withMemoriaSitePayload({ refreshToken: getRefreshToken(), deviceId: getDeviceId() }))
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        refreshToken: getRefreshToken(),
+        deviceId: getDeviceId(),
+        clientMutationId
+      }))
     }).then((payload) => {
       const normalizedPayload = normalizeAuthPayload(payload, getSessionEmail());
       persistAuthTokens(normalizedPayload);
@@ -881,9 +1096,15 @@ const apiClient = {
     });
   },
   logout() {
+    const clientMutationId = generateClientMutationId();
     return this.request('/auth/logout', {
       method: 'POST',
-      body: JSON.stringify(withMemoriaSitePayload({ refreshToken: getRefreshToken(), deviceId: getDeviceId() }))
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        refreshToken: getRefreshToken(),
+        deviceId: getDeviceId(),
+        clientMutationId
+      }))
     });
   },
   getProfile() {
@@ -1040,6 +1261,76 @@ const apiClient = {
           conversationId,
           localConversationId: contact.localConversationId || '',
           reason: contact.reason || 'conversation-contact'
+        },
+        clientMutationId
+      }))
+    });
+  },
+  updatePrivacySettings(payload = {}) {
+    const clientMutationId = payload.clientMutationId || generateClientMutationId();
+    return this.request('/api/v1/privacidad-usuario', {
+      method: 'POST',
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        userId: payload.userId || getCurrentUserIdentifier(),
+        userEmail: payload.userEmail || getSessionEmail(),
+        profileVisibility: payload.profileVisibility || 'contacts',
+        statusVisibility: payload.statusVisibility || 'contacts',
+        lastActivityVisibility: payload.lastActivityVisibility || 'contacts',
+        publicFields: Array.isArray(payload.publicFields) ? payload.publicFields : ['displayName', 'avatar'],
+        privateFields: Array.isArray(payload.privateFields) ? payload.privateFields : ['email'],
+        metadata: {
+          source: 'chater-static-site',
+          ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {})
+        },
+        clientMutationId
+      }))
+    });
+  },
+  blockUser(payload = {}) {
+    const clientMutationId = payload.clientMutationId || generateClientMutationId();
+    const blockedEmail = normalizeStorageIdentity(payload.blockedUserEmail || payload.blockedEmail || payload.contactEmail || '');
+    const blockedUserId = normalizeBackendUserId(payload.blockedUserId || payload.contactUserId || '');
+    return this.request('/api/v1/bloqueos-usuario', {
+      method: 'POST',
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        blockerUserId: payload.blockerUserId || getCurrentUserIdentifier(),
+        blockerUserEmail: payload.blockerUserEmail || getSessionEmail(),
+        blockedUserId,
+        blockedUserEmail: blockedEmail,
+        blockedEmail,
+        contactEmail: blockedEmail,
+        conversationId: payload.conversationId || '',
+        reason: payload.reason || 'user-request',
+        scope: payload.scope || 'conversation',
+        status: payload.status || 'active',
+        metadata: {
+          source: 'chater-static-site',
+          displayName: payload.displayName || '',
+          ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {})
+        },
+        clientMutationId
+      }))
+    });
+  },
+  reportModeration(payload = {}) {
+    const clientMutationId = payload.clientMutationId || generateClientMutationId();
+    return this.request('/api/v1/reportes-moderacion', {
+      method: 'POST',
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        reporterUserId: payload.reporterUserId || getCurrentUserIdentifier(),
+        reporterUserEmail: payload.reporterUserEmail || getSessionEmail(),
+        entityType: payload.entityType || 'conversation',
+        entityId: payload.entityId || payload.conversationId || '',
+        conversationId: payload.conversationId || payload.entityId || '',
+        reason: payload.reason || 'other',
+        evidence: payload.evidence && typeof payload.evidence === 'object' ? payload.evidence : {},
+        status: payload.status || 'submitted',
+        metadata: {
+          source: 'chater-static-site',
+          ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {})
         },
         clientMutationId
       }))
@@ -1406,6 +1697,29 @@ const apiClient = {
       }))
     });
   },
+  unregisterDevice(payload = {}) {
+    const clientMutationId = payload.clientMutationId || generateClientMutationId();
+    const pushSubscription = payload.pushSubscription || payload.subscription || null;
+    const endpoint = String(payload.endpoint || pushSubscription?.endpoint || '').trim();
+
+    return this.request('/api/v1/push/suscripciones', {
+      method: 'DELETE',
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        userId: payload.userId || getCurrentUserIdentifier(),
+        userEmail: payload.userEmail || getSessionEmail(),
+        deviceId: payload.deviceId || getDeviceId(),
+        clientId: payload.clientId || payload.deviceId || getDeviceId(),
+        endpoint,
+        subscription: pushSubscription,
+        pushSubscription,
+        active: false,
+        status: 'revoked',
+        reason: payload.reason || 'user-disabled-notifications',
+        clientMutationId
+      }))
+    });
+  },
   sendNotificationTest(payload = {}) {
     const clientMutationId = payload.clientMutationId || generateClientMutationId();
     return this.request('/api/v1/push/enviar', {
@@ -1435,6 +1749,28 @@ const apiClient = {
       body: JSON.stringify(withMemoriaSitePayload({
         ...payload,
         idempotencyKey: clientMutationId,
+        clientMutationId
+      }))
+    });
+  },
+  registerClientTelemetry(payload = {}, clientMutationId = generateClientMutationId()) {
+    return this.request('/api/v1/eventos/registrar', {
+      method: 'POST',
+      keepalive: true,
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        type: payload.type || 'client_error',
+        name: payload.name || 'Error técnico del navegador',
+        category: payload.category || 'frontend-error',
+        path: payload.path || `${window.location.pathname || '/'}${window.location.search || ''}`,
+        value: 1,
+        visitorId: payload.visitorId || getDeviceId(),
+        sessionId: payload.sessionId || `browser-${getDeviceId()}`,
+        data: payload.data && typeof payload.data === 'object' ? payload.data : {},
+        metadata: {
+          source: 'chater-static-site',
+          ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {})
+        },
         clientMutationId
       }))
     });
@@ -1552,6 +1888,388 @@ function buildApiUrl(path, options = {}) {
     url.searchParams.set('s', getMemoriaSiteId());
   }
   return url.toString();
+}
+
+function getCurrentPageUrl() {
+  return `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function buildMemoriaGoogleLoginUrl(path = '/auth/login') {
+  const loginUrl = new URL(buildApiUrl(path, { siteScoped: true }));
+  loginUrl.searchParams.set('n', CHATER_CONFIG.googleLoginBrandName || 'ChatER');
+  loginUrl.searchParams.set('c', CHATER_CONFIG.googleLoginThemeColor || '#25d366');
+  loginUrl.searchParams.set('next', getCurrentPageUrl());
+  if (CHATER_CONFIG.googleLoginLogoUrl) loginUrl.searchParams.set('l', CHATER_CONFIG.googleLoginLogoUrl);
+  if (CHATER_CONFIG.googleLoginBackgroundUrl) loginUrl.searchParams.set('bg', CHATER_CONFIG.googleLoginBackgroundUrl);
+  return loginUrl.toString();
+}
+
+function buildMemoriaGoogleLoginScriptUrl() {
+  return buildMemoriaGoogleLoginUrl('/login.js');
+}
+
+function shouldRequireGoogleGmailAuth() {
+  // Requisito obligatorio del producto: chatER solo puede abrirse con
+  // AUTENTICACIONx validando Google/Gmail. La bandera histórica de config se
+  // conserva por compatibilidad de despliegues, pero ya no puede actuar como
+  // bypass de acceso a la interfaz protegida.
+  return true;
+}
+
+function isAllowedGmailAddress(email = '') {
+  const normalized = normalizeStorageIdentity(email);
+  if (!normalized) return false;
+  if (CHATER_CONFIG.requireGmailDomain === false) return true;
+  return normalized.endsWith('@gmail.com') || normalized.endsWith('@googlemail.com');
+}
+
+function getAuthPayloadEmail(payload = {}, fallbackEmail = '') {
+  return normalizeAuthPayload(payload, fallbackEmail)?.user?.email || normalizeStorageIdentity(fallbackEmail);
+}
+
+function getAuthProviderEvidence(payload = {}) {
+  if (!payload || typeof payload !== 'object') return '';
+
+  const normalizedPayload = normalizeAuthPayload(payload);
+  const data = normalizedPayload.data && typeof normalizedPayload.data === 'object' ? normalizedPayload.data : {};
+  const session = normalizedPayload.session || data.session || data.auth || data.tokens || {};
+  const compactUser = normalizedPayload.u || data.u || session.u || {};
+  const user = normalizedPayload.user || data.user || data.profile || data.perfil || session.user || compactUser || {};
+  const firebase = normalizedPayload.firebase || data.firebase || session.firebase || user.firebase || {};
+  const claims = normalizedPayload.claims || data.claims || session.claims || user.claims || {};
+  const claimsFirebase = claims.firebase || {};
+
+  return String(
+    normalizedPayload.authProvider
+    || normalizedPayload.provider
+    || normalizedPayload.providerId
+    || normalizedPayload.signInProvider
+    || normalizedPayload.sign_in_provider
+    || data.authProvider
+    || data.provider
+    || data.providerId
+    || data.signInProvider
+    || data.sign_in_provider
+    || session.authProvider
+    || session.provider
+    || session.providerId
+    || session.signInProvider
+    || session.sign_in_provider
+    || user.authProvider
+    || user.provider
+    || user.providerId
+    || user.signInProvider
+    || user.sign_in_provider
+    || compactUser.provider
+    || compactUser.providerId
+    || compactUser.pr
+    || firebase.sign_in_provider
+    || firebase.signInProvider
+    || firebase.provider
+    || claimsFirebase.sign_in_provider
+    || claimsFirebase.signInProvider
+    || ''
+  ).trim().toLowerCase();
+}
+
+function isGoogleProviderPayload(payload = {}) {
+  const provider = getAuthProviderEvidence(payload);
+  return provider.includes('google') || provider.includes('gmail');
+}
+
+function validateGoogleGmailAuthPayload(payload = {}, fallbackEmail = '') {
+  const normalizedPayload = normalizeAuthPayload(payload, '');
+  // La identidad autorizada debe venir del contrato real de AUTENTICACIONx
+  // (`u.e`, `user.email`, `data.user.email`, etc.). No se acepta el correo
+  // recordado en localStorage como prueba de sesión porque un static site no
+  // puede usar identidad local para abrir ChatER.
+  const backendEmail = getAuthPayloadEmail(normalizedPayload, '');
+  const fallbackIdentity = normalizeStorageIdentity(fallbackEmail);
+  const email = backendEmail || '';
+
+  if (!email) {
+    return { ok: false, message: 'memoriaBACKEND no devolvió el correo de la cuenta Google validada.' };
+  }
+
+  if (fallbackIdentity && backendEmail && fallbackIdentity !== backendEmail) {
+    return { ok: false, message: 'La sesión Google/Gmail verificada por memoriaBACKEND no coincide con la cuenta local recordada.' };
+  }
+
+  if (!isGoogleProviderPayload(normalizedPayload)) {
+    return { ok: false, message: 'memoriaBACKEND debe confirmar proveedor Google/Gmail en la sesión antes de abrir ChatER.' };
+  }
+
+  if (!isAllowedGmailAddress(email)) {
+    return { ok: false, message: 'ChatER solo permite cuentas Gmail verificadas por Google.' };
+  }
+
+  return { ok: true, email, payload: normalizedPayload };
+}
+
+function markBackendSessionVerified() {
+  const verifiedAt = Date.now();
+  chaterRuntimeAuth.verifiedAt = verifiedAt;
+  writeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey, String(verifiedAt));
+  // Limpieza de compatibilidad: versiones anteriores guardaban esta marca en localStorage.
+  removeStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
+}
+
+function isBackendSessionRecentlyVerified(maxAgeMs = 10 * 60 * 1000) {
+  const verifiedAt = Number(chaterRuntimeAuth.verifiedAt || readSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey, '0'));
+  return Number.isFinite(verifiedAt) && verifiedAt > 0 && Date.now() - verifiedAt <= maxAgeMs;
+}
+
+function persistAuthProvider(provider = 'google.com') {
+  writeStorageItem(CHATER_CONFIG.authProviderKey, provider || 'google.com');
+}
+
+function getMemoriaBackendSdk() {
+  return window.memoriaBACKEND && typeof window.memoriaBACKEND === 'object' ? window.memoriaBACKEND : null;
+}
+
+function loadMemoriaGoogleLoginScript(options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl || CHATER_CONFIG.enableGoogleLoginScript === false) {
+    return Promise.reject(new Error('Configura MEMORIA_BACKEND_URL para usar el login Google/Gmail de memoriaBACKEND.'));
+  }
+
+  const scriptUrl = buildMemoriaGoogleLoginScriptUrl();
+  const existing = document.getElementById('memoriaBackendGoogleLoginScript');
+  if (existing?.dataset.loaded === 'true' && existing.src === scriptUrl) return Promise.resolve(existing);
+  if (existing?.dataset.loading === 'true' && existing.src === scriptUrl) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve(existing), { once: true });
+      existing.addEventListener('error', () => reject(new Error('No se pudo cargar login.js desde memoriaBACKEND.')), { once: true });
+    });
+  }
+
+  // Si un intento anterior falló, quedó incompleto o pertenece a otra URL, se crea un nodo nuevo.
+  // Reusar un <script> que ya disparó error puede dejar el siguiente intento sin eventos
+  // de load/error y bloquear el acceso Google/Gmail en producción.
+  if (existing) existing.remove();
+
+  const script = document.createElement('script');
+  script.id = 'memoriaBackendGoogleLoginScript';
+  script.async = true;
+  script.dataset.loading = 'true';
+
+  return new Promise((resolve, reject) => {
+    script.onload = () => {
+      script.dataset.loading = 'false';
+      script.dataset.loaded = 'true';
+      resolve(script);
+    };
+    script.onerror = () => {
+      script.dataset.loading = 'false';
+      script.dataset.loaded = 'false';
+      script.remove();
+      reject(new Error('No se pudo cargar login.js desde memoriaBACKEND. Verifica que el dominio del static site esté autorizado en memoriaBACKEND y Firebase.'));
+    };
+
+    script.src = scriptUrl;
+    document.head.appendChild(script);
+  });
+}
+
+async function verifyMemoriaSdkSession() {
+  const sdk = getMemoriaBackendSdk();
+  const verifier = sdk?.verificarSesion || sdk?.checkSession;
+  if (typeof verifier !== 'function') return null;
+  const payload = await verifier.call(sdk);
+  if (payload?.ok === 0 || payload?.ok === false) return null;
+  return normalizeAuthPayload({ ...payload, sessionVerified: true });
+}
+
+async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmail = '', options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl) {
+    throw new Error('Configura MEMORIA_BACKEND_URL para validar la sesión Google/Gmail con memoriaBACKEND.');
+  }
+
+  const authGuard = options.authGuard || null;
+  if (authGuard && !isAuthAttemptCurrent(authGuard)) {
+    throw new Error('Intento de autenticación Google/Gmail cancelado.');
+  }
+
+  const candidatePayload = normalizeAuthPayload(payload, fallbackEmail);
+  const candidateToken = candidatePayload.accessToken || '';
+  const firebaseIdToken = extractGoogleFirebaseIdTokenFromPayload(payload) || extractGoogleFirebaseIdTokenFromPayload(candidatePayload);
+  let checkedPayload;
+
+  if (firebaseIdToken) {
+    checkedPayload = await apiClient.createFirebaseSession(firebaseIdToken, {
+      next: getCurrentPageUrl(),
+      clientMutationId: options.clientMutationId || buildDeterministicMutationId('auth-firebase-session', candidatePayload.user?.email || fallbackEmail || firebaseIdToken.slice(-24))
+    });
+  } else {
+    checkedPayload = await apiClient.request('/auth/check', {
+      skipRefresh: true,
+      headers: candidateToken ? { Authorization: `Bearer ${candidateToken}` } : {}
+    });
+  }
+
+  if (authGuard && !isAuthAttemptCurrent(authGuard)) {
+    throw new Error('Intento de autenticación Google/Gmail cancelado.');
+  }
+
+  if (checkedPayload?.ok === 0 || checkedPayload?.ok === false) {
+    throw new Error(checkedPayload?.err || 'login_requerido');
+  }
+
+  const backendProviderEvidence = getAuthProviderEvidence(checkedPayload);
+  const normalizedCheckedPayload = normalizeAuthPayload({
+    ...checkedPayload,
+    accessToken: checkedPayload.accessToken || checkedPayload.token || checkedPayload.tk || candidatePayload.accessToken || '',
+    refreshToken: checkedPayload.refreshToken || candidatePayload.refreshToken || '',
+    // La evidencia de proveedor debe venir de AUTENTICACIONx después de validar
+    // /auth/check o /auth/firebase/session. El payload local del SDK solo aporta
+    // token/candidatos, nunca reemplaza la confirmación Google/Gmail del backend.
+    authProvider: backendProviderEvidence,
+    sessionVerified: true
+  });
+  const validation = validateGoogleGmailAuthPayload(normalizedCheckedPayload, fallbackEmail);
+  if (!validation.ok) throw new Error(validation.message);
+  return validation;
+}
+
+async function restoreGoogleGmailSessionFromBackend(options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl) return false;
+
+  const authGuard = options.authGuard || null;
+  if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
+
+  try {
+    const payload = await apiClient.checkAuth();
+    if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
+
+    if (payload?.ok === 0 || payload?.ok === false) {
+      clearSession();
+      return false;
+    }
+
+    const normalizedPayload = normalizeAuthPayload({ ...payload, sessionVerified: true }, '');
+    const validation = validateGoogleGmailAuthPayload(normalizedPayload, getSessionEmail());
+    if (!validation.ok) {
+      if (!options.silent) loginFeedback.textContent = validation.message;
+      clearSession();
+      return false;
+    }
+
+    if (!completeAuthenticatedSession(validation.email, validation.payload, authGuard)) return false;
+    return true;
+  } catch (error) {
+    if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
+
+    if (isBackendAuthError(error) || shouldRequireGoogleGmailAuth()) {
+      clearSession();
+    }
+
+    if (!options.silent) {
+      loginFeedback.textContent = error?.message || 'No se pudo verificar la sesión Google/Gmail con memoriaBACKEND.';
+    }
+    return false;
+  }
+}
+
+async function startGoogleGmailLogin(options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl) {
+    throw new Error('Configura MEMORIA_BACKEND_URL para proteger ChatER con Google/Gmail desde memoriaBACKEND.');
+  }
+
+  const authGuard = options.authGuard || activeGoogleLoginAttemptGuard || captureAuthAttempt(options.fallbackEmail || 'google-gmail');
+  activeGoogleLoginAttemptGuard = authGuard;
+  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+
+  loginFeedback.textContent = 'Abriendo autenticación segura con Google...';
+  await loadMemoriaGoogleLoginScript({ interactive: true });
+  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+
+  const sdkSession = await verifyMemoriaSdkSession().catch(() => null);
+  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+
+  if (sdkSession) {
+    const validation = await verifyGoogleGmailPayloadAgainstBackend(sdkSession, options.fallbackEmail || '', { authGuard });
+    if (!completeAuthenticatedSession(validation.email, validation.payload, authGuard)) return { ok: false, staleAuthAttempt: true };
+    return validation.payload;
+  }
+
+  const sdk = getMemoriaBackendSdk();
+  const openLogin = sdk?.abrirLogin || sdk?.openLogin;
+  if (typeof openLogin === 'function') {
+    try {
+      const result = openLogin.call(sdk, { next: getCurrentPageUrl() });
+      if (result && typeof result.then === 'function') await result;
+      return { ok: true, pendingGoogleLogin: true };
+    } catch (error) {
+      if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+      console.warn('No se pudo abrir login.js directamente; se usará /auth/login.', error);
+    }
+  }
+
+  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+  window.location.assign(buildMemoriaGoogleLoginUrl('/auth/login'));
+  return { ok: true, pendingGoogleLogin: true };
+}
+
+async function handleMemoriaBackendLoginEvent(event) {
+  const authGuard = activeGoogleLoginAttemptGuard;
+  if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
+
+  const payload = normalizeAuthPayload({ ...(event?.detail || {}), sessionVerified: true });
+
+  try {
+    // El evento oficial de login.js puede llegar después de una redirección o
+    // en navegadores donde la cookie de tercero no queda disponible. En ese caso
+    // todavía no existe correo local, pero el payload/tk/idToken debe poder
+    // validarse contra AUTENTICACIONx antes de abrir ChatER.
+    const validation = await verifyGoogleGmailPayloadAgainstBackend(payload, '', { authGuard });
+    completeAuthenticatedSession(validation.email, validation.payload, authGuard);
+  } catch (error) {
+    if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
+    loginFeedback.textContent = error?.message || 'No se pudo validar la sesión Google/Gmail con memoriaBACKEND.';
+    clearSession();
+    renderShell();
+  }
+}
+
+function registerMemoriaBackendLoginListeners() {
+  window.addEventListener('memoriaBACKEND:login', handleMemoriaBackendLoginEvent);
+  window.addEventListener('memoriaBACKEND:sdk-ready', () => {
+    restoreGoogleGmailSessionFromBackend({ silent: true });
+  });
+}
+
+async function bootstrapGoogleGmailSession() {
+  renderBrandLogos();
+
+  if (!shouldRequireGoogleGmailAuth()) {
+    renderShell();
+    return;
+  }
+
+  if (!CHATER_CONFIG.backendBaseUrl) {
+    clearSession();
+    loginFeedback.textContent = 'Configura MEMORIA_BACKEND_URL para acceder a ChatER con Google/Gmail.';
+    renderShell();
+    return;
+  }
+
+  if (!getSessionEmail()) {
+    loginFeedback.textContent = 'Verificando sesión Google/Gmail...';
+  }
+
+  const restored = await restoreGoogleGmailSessionFromBackend({ silent: true });
+  if (!restored) {
+    clearSession();
+    loginFeedback.textContent = 'Ingresa con una cuenta Gmail validada por Google para continuar.';
+    renderShell();
+    if (CHATER_CONFIG.autoLoadGoogleLoginScript) {
+      loadMemoriaGoogleLoginScript({ silent: true }).catch((error) => {
+        loginFeedback.textContent = error?.message || 'No se pudo preparar el login Google/Gmail.';
+      });
+    }
+    return;
+  }
+
+  renderShell();
 }
 
 async function fetchWithTimeout(resource, options = {}, timeoutMs = CHATER_CONFIG.apiTimeoutMs) {
@@ -1691,14 +2409,17 @@ function isSessionGuardCurrent(guard) {
 
 function captureAuthAttempt(email = '') {
   authAttemptRuntimeId += 1;
-  return {
+  const guard = {
     id: authAttemptRuntimeId,
     email: normalizeStorageIdentity(email)
   };
+  activeGoogleLoginAttemptGuard = guard;
+  return guard;
 }
 
 function invalidateAuthAttempts() {
   authAttemptRuntimeId += 1;
+  activeGoogleLoginAttemptGuard = null;
 }
 
 function isAuthAttemptCurrent(guard) {
@@ -1737,7 +2458,13 @@ function persistBackendOutbox(queue, email = getSessionEmail()) {
 function enqueueBackendOperation(operation) {
   if (!CHATER_CONFIG.backendBaseUrl || !operation?.type || !operation?.payload) return null;
 
-  const queue = readBackendOutbox();
+  const ownerEmail = normalizeStorageIdentity(getSessionEmail());
+  if (shouldRequireGoogleGmailAuth() && !ownerEmail) {
+    console.warn('No se encoló la operación pendiente porque no hay una sesión Google/Gmail vigente validada por memoriaBACKEND.');
+    return null;
+  }
+
+  const queue = readBackendOutbox(ownerEmail);
   const dedupeKey = operation.dedupeKey || `${operation.type}:${operation.payload.clientMutationId || operation.payload.localId || generateClientMutationId()}`;
   const existingOperation = queue.find((item) => item.dedupeKey === dedupeKey);
   if (existingOperation) {
@@ -1747,7 +2474,7 @@ function enqueueBackendOperation(operation) {
       existingOperation.lastAttemptAt = '';
       existingOperation.lastError = '';
       existingOperation.updatedAt = new Date().toISOString();
-      persistBackendOutbox(queue);
+      persistBackendOutbox(queue, ownerEmail);
       scheduleOutboxFlush();
     }
     return existingOperation;
@@ -1759,11 +2486,12 @@ function enqueueBackendOperation(operation) {
     dedupeKey,
     payload: operation.payload,
     attempts: 0,
+    ownerEmail,
     createdAt: new Date().toISOString()
   };
 
   queue.push(queuedOperation);
-  persistBackendOutbox(queue);
+  persistBackendOutbox(queue, ownerEmail);
   scheduleOutboxFlush();
   return queuedOperation;
 }
@@ -1915,6 +2643,27 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
     return;
   }
 
+  if (operation.type === 'updatePrivacySettings') {
+    await apiClient.updatePrivacySettings(operation.payload);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    markPrivacySettingsSynced(operation.payload);
+    return;
+  }
+
+  if (operation.type === 'blockUser') {
+    await apiClient.blockUser(operation.payload);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    markConversationBlockSynced(operation.payload.conversationId, operation.payload.status !== 'revoked');
+    return;
+  }
+
+  if (operation.type === 'reportModeration') {
+    await apiClient.reportModeration(operation.payload);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    markConversationReportSynced(operation.payload.conversationId || operation.payload.entityId, operation.payload.reason);
+    return;
+  }
+
   if (operation.type === 'markChatRead') {
     await apiClient.markConversationRead(
       operation.payload.conversationId,
@@ -2019,6 +2768,13 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
     return;
   }
 
+  if (operation.type === 'unregisterDevice') {
+    await apiClient.unregisterDevice(operation.payload);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    markNotificationRegistrationRevokedSynced(operation.payload);
+    return;
+  }
+
   if (operation.type === 'saveUserPreferences') {
     await apiClient.saveUserPreferences(operation.payload, operation.payload.clientMutationId);
     return;
@@ -2097,6 +2853,157 @@ function markQueuedConversationSynced(localConversationId, payload = {}) {
 
   persistState();
   renderCurrentSection();
+}
+
+function buildConversationBlockPayload(conversation = getActiveConversation(), blocked = true, options = {}) {
+  if (!conversation) return null;
+  const participants = normalizeConversationParticipantsForApi(conversation.participants, conversation.email || conversation.contactEmail, conversation.name || conversation.displayName);
+  const remoteParticipant = getPrimaryRemoteParticipant(participants) || {};
+  const blockedEmail = normalizeStorageIdentity(remoteParticipant.email || remoteParticipant.userEmail || conversation.email || conversation.contactEmail || '');
+  const blockedUserId = normalizeBackendUserId(remoteParticipant.userId || conversation.contactUserId || conversation.userId || '');
+  const clientMutationId = options.clientMutationId || buildDeterministicMutationId('block-user', conversation.id, blocked ? 'active' : 'revoked');
+
+  return {
+    blockerUserId: getCurrentUserIdentifier(),
+    blockerUserEmail: getSessionEmail(),
+    blockedUserId,
+    blockedUserEmail: blockedEmail,
+    blockedEmail,
+    contactEmail: blockedEmail,
+    conversationId: conversation.id,
+    displayName: conversation.name || blockedEmail,
+    reason: options.reason || (blocked ? 'user-blocked-contact' : 'user-unblocked-contact'),
+    scope: 'conversation',
+    status: blocked ? 'active' : 'revoked',
+    metadata: {
+      source: 'chater-static-site',
+      conversationName: conversation.name || '',
+      previousBlocked: Boolean(conversation.blocked)
+    },
+    clientMutationId
+  };
+}
+
+function markConversationBlockSynced(conversationId = '', blocked = true) {
+  const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || ''));
+  if (!conversation) return;
+  conversation.blocked = Boolean(blocked);
+  conversation.blockSyncStatus = 'synced';
+  conversation.blockSyncedAt = new Date().toISOString();
+  conversation.status = blocked ? 'Contacto bloqueado' : 'Contacto desbloqueado';
+  persistState();
+  renderCurrentSection();
+  renderConversation();
+}
+
+async function toggleConversationBlock(conversation = getActiveConversation()) {
+  if (!conversation) return;
+  const nextBlocked = !conversation.blocked;
+  const payload = buildConversationBlockPayload(conversation, nextBlocked);
+  if (!payload) return;
+
+  const previousBlocked = Boolean(conversation.blocked);
+  conversation.blocked = nextBlocked;
+  conversation.blockSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
+  conversation.status = nextBlocked ? 'Contacto bloqueado' : 'Contacto desbloqueado';
+  persistState();
+  renderCurrentSection();
+  renderConversation();
+  showToast(nextBlocked ? 'Contacto bloqueado.' : 'Contacto desbloqueado.');
+
+  if (!CHATER_CONFIG.backendBaseUrl) return;
+
+  try {
+    await apiClient.blockUser(payload);
+    markConversationBlockSynced(conversation.id, nextBlocked);
+  } catch (error) {
+    const stillSameState = Boolean(conversation.blocked) === nextBlocked;
+    conversation.blockSyncStatus = stillSameState ? 'pending' : conversation.blockSyncStatus;
+    if (!stillSameState) conversation.blocked = previousBlocked;
+    enqueueBackendOperation({
+      type: 'blockUser',
+      dedupeKey: `block-user:${conversation.id}`,
+      replaceExisting: true,
+      payload
+    });
+    persistState();
+    showToast('Cambio de bloqueo guardado en cola de sincronización.');
+  }
+}
+
+function buildModerationReportPayload(conversation = getActiveConversation(), reason = 'other', details = '') {
+  if (!conversation) return null;
+  const lastMessage = conversation.messages?.at?.(-1) || null;
+  const participants = normalizeConversationParticipantsForApi(conversation.participants, conversation.email || conversation.contactEmail, conversation.name || conversation.displayName);
+  const contact = getPrimaryRemoteParticipant(participants) || {};
+  const clientMutationId = buildDeterministicMutationId('report-moderation', conversation.id, reason, Date.now());
+
+  return {
+    reporterUserId: getCurrentUserIdentifier(),
+    reporterUserEmail: getSessionEmail(),
+    entityType: 'conversation',
+    entityId: conversation.id,
+    conversationId: conversation.id,
+    reason: String(reason || 'other').trim() || 'other',
+    evidence: {
+      contactEmail: normalizeStorageIdentity(contact.email || contact.userEmail || conversation.email || conversation.contactEmail || ''),
+      contactUserId: normalizeBackendUserId(contact.userId || ''),
+      displayName: conversation.name || '',
+      lastMessageId: lastMessage?.id || '',
+      lastMessagePreview: String(lastMessage?.text || lastMessage?.attachmentName || '').slice(0, 240),
+      details: String(details || '').trim().slice(0, 600),
+      reportedAt: new Date().toISOString()
+    },
+    status: 'submitted',
+    metadata: {
+      source: 'chater-static-site',
+      localOnlyUntilBackendAccepts: !CHATER_CONFIG.backendBaseUrl
+    },
+    clientMutationId
+  };
+}
+
+function markConversationReportSynced(conversationId = '', reason = '') {
+  const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || ''));
+  if (!conversation) return;
+  conversation.reportSyncStatus = 'synced';
+  conversation.reportSyncedAt = new Date().toISOString();
+  conversation.lastReportReason = reason || conversation.lastReportReason || 'other';
+  persistState();
+  renderCurrentSection();
+}
+
+async function submitConversationReport(conversation = getActiveConversation(), reason = 'other', details = '') {
+  if (!conversation) return;
+  const payload = buildModerationReportPayload(conversation, reason, details);
+  if (!payload) return;
+
+  conversation.reportSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
+  conversation.lastReportReason = payload.reason;
+  persistState();
+
+  if (!CHATER_CONFIG.backendBaseUrl) {
+    conversation.reportSyncStatus = 'local';
+    conversation.reportSyncedAt = new Date().toISOString();
+    persistState();
+    showToast('Reporte guardado localmente. Configura memoriaBACKEND para sincronizarlo.');
+    return;
+  }
+
+  try {
+    await apiClient.reportModeration(payload);
+    markConversationReportSynced(conversation.id, payload.reason);
+    showToast('Reporte enviado a moderación.');
+  } catch (error) {
+    conversation.reportSyncStatus = 'pending';
+    enqueueBackendOperation({
+      type: 'reportModeration',
+      dedupeKey: `report:${payload.clientMutationId}`,
+      payload
+    });
+    persistState();
+    showToast('Reporte guardado en cola de sincronización.');
+  }
 }
 
 function markQueuedConversationPatchSynced(conversationId, patch = {}) {
@@ -2574,7 +3481,8 @@ function normalizeLoadedState(saved) {
     conversations: Array.isArray(saved.conversations) ? saved.conversations : [],
     states: Array.isArray(saved.states) ? saved.states : [],
     calls: Array.isArray(saved.calls) ? saved.calls : [],
-    business: normalizeBusinessState(saved.business)
+    business: normalizeBusinessState(saved.business),
+    privacy: normalizePrivacyState(saved.privacy)
   };
 
   state.conversations.forEach((conversation) => {
@@ -2587,6 +3495,12 @@ function normalizeLoadedState(saved) {
     conversation.pinSyncedAt = conversation.pinSyncedAt || '';
     conversation.archiveSyncStatus = conversation.archiveSyncStatus || '';
     conversation.archiveSyncedAt = conversation.archiveSyncedAt || '';
+    conversation.blocked = Boolean(conversation.blocked || conversation.isBlocked);
+    conversation.blockSyncStatus = conversation.blockSyncStatus || '';
+    conversation.blockSyncedAt = conversation.blockSyncedAt || '';
+    conversation.reportSyncStatus = conversation.reportSyncStatus || '';
+    conversation.reportSyncedAt = conversation.reportSyncedAt || '';
+    conversation.lastReportReason = conversation.lastReportReason || '';
     conversation.unread = Number(conversation.unread || 0);
     conversation.participants = normalizeConversationParticipantsForApi(conversation.participants, conversation.email || conversation.contactEmail, conversation.name || conversation.displayName);
     conversation.messagesHydrated = Boolean(conversation.messagesHydrated);
@@ -2617,6 +3531,125 @@ function normalizeLoadedState(saved) {
   });
 
   return state;
+}
+
+function normalizePrivacyVisibility(value = 'contacts') {
+  const normalized = String(value || 'contacts').trim().toLowerCase();
+  if (['public', 'everyone', 'todos'].includes(normalized)) return 'public';
+  if (['nobody', 'none', 'nadie', 'private'].includes(normalized)) return 'nobody';
+  return 'contacts';
+}
+
+function normalizePrivacyFieldList(value = [], fallback = []) {
+  const source = Array.isArray(value) ? value : fallback;
+  const seen = new Set();
+  return source
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function normalizePrivacyState(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  return {
+    profileVisibility: normalizePrivacyVisibility(source.profileVisibility),
+    statusVisibility: normalizePrivacyVisibility(source.statusVisibility),
+    lastActivityVisibility: normalizePrivacyVisibility(source.lastActivityVisibility),
+    publicFields: normalizePrivacyFieldList(source.publicFields, ['displayName', 'avatar']),
+    privateFields: normalizePrivacyFieldList(source.privateFields, ['email']),
+    syncStatus: source.syncStatus || '',
+    syncedAt: source.syncedAt || '',
+    lastError: source.lastError || ''
+  };
+}
+
+function ensurePrivacyState() {
+  const current = appState.privacy && typeof appState.privacy === 'object' ? appState.privacy : null;
+  const normalized = normalizePrivacyState(current || {});
+
+  if (current) {
+    Object.keys(current).forEach((key) => { delete current[key]; });
+    Object.assign(current, normalized);
+    appState.privacy = current;
+    return current;
+  }
+
+  appState.privacy = normalized;
+  return appState.privacy;
+}
+
+function buildPrivacySettingsPayload(privacy = ensurePrivacyState(), options = {}) {
+  const normalized = normalizePrivacyState(privacy);
+  return {
+    ...normalized,
+    userId: options.userId || getCurrentUserIdentifier(),
+    userEmail: options.userEmail || getSessionEmail(),
+    metadata: {
+      source: 'chater-static-site',
+      reason: options.reason || 'privacy-settings'
+    },
+    clientMutationId: options.clientMutationId || generateClientMutationId()
+  };
+}
+
+function enqueuePrivacySettingsSync(payload = {}) {
+  return enqueueBackendOperation({
+    type: 'updatePrivacySettings',
+    dedupeKey: `privacy:${getCurrentUserIdentifier()}`,
+    replaceExisting: true,
+    payload
+  });
+}
+
+function markPrivacySettingsSynced(payload = {}) {
+  const privacy = ensurePrivacyState();
+  Object.assign(privacy, normalizePrivacyState(payload), {
+    syncStatus: 'synced',
+    syncedAt: new Date().toISOString(),
+    lastError: ''
+  });
+  persistState();
+}
+
+async function persistPrivacySettings(options = {}) {
+  const privacy = ensurePrivacyState();
+  const payload = buildPrivacySettingsPayload(privacy, options);
+  privacy.syncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
+  privacy.lastError = '';
+  persistState();
+
+  if (!CHATER_CONFIG.backendBaseUrl) {
+    privacy.syncStatus = 'local';
+    persistState();
+    showToast('Privacidad guardada localmente. Configura memoriaBACKEND para sincronizarla.');
+    return null;
+  }
+
+  try {
+    const response = await apiClient.updatePrivacySettings(payload);
+    markPrivacySettingsSynced(payload);
+    showToast('Privacidad sincronizada con memoriaBACKEND.');
+    return response;
+  } catch (error) {
+    privacy.syncStatus = 'pending';
+    privacy.lastError = error?.message || 'Pendiente de sincronizar privacidad.';
+    enqueuePrivacySettingsSync(payload);
+    persistState();
+    showToast('Privacidad guardada y en cola de sincronización.');
+    return null;
+  }
+}
+
+function getPrivacyVisibilityLabel(value = 'contacts') {
+  const normalized = normalizePrivacyVisibility(value);
+  if (normalized === 'public') return 'Todos';
+  if (normalized === 'nobody') return 'Nadie';
+  return 'Mis contactos';
 }
 
 function normalizeBusinessState(raw = {}) {
@@ -2836,7 +3869,7 @@ function enqueueUserPreferencesSync(payload = {}) {
 
 function getUserPreferencesStatusLabel() {
   if (!CHATER_CONFIG.enableRemoteUserPreferences) return 'Desactivadas por configuración.';
-  if (!CHATER_CONFIG.backendBaseUrl) return 'Modo local: se guardan por correo en este navegador.';
+  if (!CHATER_CONFIG.backendBaseUrl) return 'Pendientes: configura memoriaBACKEND para sincronizar preferencias protegidas.';
   if (userPreferencesSyncState.inFlight) return 'Sincronizando con PREFERENCIASusuarioX…';
   if (userPreferencesSyncState.error) return `Pendientes: ${userPreferencesSyncState.error}`;
   if (userPreferencesSyncState.lastSyncedAt) return `Sincronizadas ${formatScheduledCallTime(userPreferencesSyncState.lastSyncedAt)}.`;
@@ -2976,35 +4009,109 @@ function setSessionEmail(email) {
 }
 
 function getAccessToken() {
-  return readStorageItem(CHATER_CONFIG.accessTokenKey, '');
+  return chaterRuntimeAuth.accessToken || readSessionStorageItem(CHATER_CONFIG.accessTokenKey, '');
 }
 
 function getRefreshToken() {
-  return readStorageItem(CHATER_CONFIG.refreshTokenKey, '');
+  return chaterRuntimeAuth.refreshToken || readSessionStorageItem(CHATER_CONFIG.refreshTokenKey, '');
 }
 
 function persistAuthTokens(payload = {}) {
-  if (payload.accessToken) {
-    writeStorageItem(CHATER_CONFIG.accessTokenKey, payload.accessToken);
+  const normalizedPayload = normalizeAuthPayload(payload);
+
+  // AUTENTICACIONx emite cookie HttpOnly como sesión principal. Cuando entrega tk/token
+  // para navegadores que bloquean cookies, el contrato de memoriaBACKEND exige que sea
+  // temporal por pestaña, nunca persistente en localStorage.
+  if (normalizedPayload.accessToken) {
+    chaterRuntimeAuth.accessToken = normalizedPayload.accessToken;
+    writeSessionStorageItem(CHATER_CONFIG.accessTokenKey, normalizedPayload.accessToken);
   }
 
-  if (payload.refreshToken) {
-    writeStorageItem(CHATER_CONFIG.refreshTokenKey, payload.refreshToken);
+  if (normalizedPayload.refreshToken) {
+    chaterRuntimeAuth.refreshToken = normalizedPayload.refreshToken;
+    writeSessionStorageItem(CHATER_CONFIG.refreshTokenKey, normalizedPayload.refreshToken);
   }
 
-  persistBackendUserIdFromPayload(payload);
+  removeStorageItem(CHATER_CONFIG.accessTokenKey);
+  removeStorageItem(CHATER_CONFIG.refreshTokenKey);
+
+  if (normalizedPayload.authProvider || normalizedPayload.user?.provider) {
+    persistAuthProvider(normalizedPayload.authProvider || normalizedPayload.user.provider);
+  }
+
+  if (normalizedPayload.sessionVerified || normalizedPayload.ok === 1 || normalizedPayload.accessToken || normalizedPayload.refreshToken) {
+    markBackendSessionVerified();
+  }
+
+  persistBackendUserIdFromPayload(normalizedPayload);
 }
 
 function hasBackendSessionCredentials() {
-  if (!CHATER_CONFIG.backendBaseUrl) return true;
-  return Boolean(getAccessToken() || getRefreshToken());
+  if (!CHATER_CONFIG.backendBaseUrl) return !shouldRequireGoogleGmailAuth();
+  return Boolean(getAccessToken() || getRefreshToken() || isBackendSessionRecentlyVerified());
+}
+
+function getBackendErrorCode(error = {}) {
+  return String(
+    error.code
+    || error.payload?.err
+    || error.payload?.code
+    || error.payload?.error?.code
+    || error.payload?.metadata?.err
+    || error.payload?.message
+    || error.message
+    || ''
+  ).trim().toLowerCase();
 }
 
 function isBackendAuthError(error = {}) {
-  return [401, 403].includes(Number(error.status || error.responseStatus || 0));
+  const status = Number(error.status || error.responseStatus || error.payload?.statusCode || error.payload?.metadata?.statusCode || 0);
+  if ([401, 403].includes(status)) return true;
+
+  const code = getBackendErrorCode(error);
+  return /(login|auth|sesion|session|token|cookie|credencial|credential).*(requerid|required|invalid|inval|expired|expir|revoked|revoc|denied|forbidden|unauthorized|no autorizado)|^(login_requerido|unauthorized|forbidden|invalid_session|session_required|auth_required|token_expired)$/.test(code);
 }
 
-function requireFreshBackendLogin(email = '', message = 'Vuelve a ingresar para que memoriaBACKEND valide tu correo.') {
+
+function isProtectedChatERMemoriaApiPath(path = '') {
+  const pathname = String(path || '').split('?')[0].replace(/\/+$/, '') || '/';
+  const protectedPrefixes = [
+    '/api/v1/perfil-usuario',
+    '/api/v1/preferencias-usuario',
+    '/api/v1/conversaciones',
+    '/api/v1/mensajes',
+    '/api/v1/relaciones-usuario',
+    '/api/v1/privacidad-usuario',
+    '/api/v1/bloqueos-usuario',
+    '/api/v1/reportes-moderacion',
+    '/api/v1/senales-efimeras',
+    '/api/v1/presencia-usuario',
+    '/api/v1/media-firmada',
+    '/api/v1/imagenes-r2x',
+    '/api/v1/publicaciones-efimeras',
+    '/api/v1/vistas-contenido',
+    '/api/v1/sesiones-comunicacion',
+    '/api/v1/signaling-tiempo-real',
+    '/api/v1/streme/eventos',
+    '/api/v1/push',
+    '/api/v1/reconciliacion-ids',
+    '/api/v1/cursor-sincronizacion',
+    '/api/v1/busqueda'
+  ];
+
+  return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function handleProtectedApiAuthFailure(path = '', error = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl || !shouldRequireGoogleGmailAuth()) return false;
+  if (!getSessionEmail() || !isProtectedChatERMemoriaApiPath(path) || !isBackendAuthError(error)) return false;
+
+  requireFreshBackendLogin(getSessionEmail(), 'Tu sesión Google/Gmail ya no fue aceptada por memoriaBACKEND. Ingresa nuevamente para sincronizar ChatER.');
+  renderShell();
+  return true;
+}
+
+function requireFreshBackendLogin(email = '', message = 'Vuelve a ingresar con Google/Gmail para que memoriaBACKEND valide tu sesión.') {
   const rememberedEmail = normalizeStorageIdentity(email || getSessionEmail());
   clearSession();
   if (rememberedEmail) emailInput.value = rememberedEmail;
@@ -3012,9 +4119,18 @@ function requireFreshBackendLogin(email = '', message = 'Vuelve a ingresar para 
 }
 
 function clearAuthTokens(email = getSessionEmail()) {
+  chaterRuntimeAuth.accessToken = '';
+  chaterRuntimeAuth.refreshToken = '';
+  chaterRuntimeAuth.verifiedAt = 0;
+  removeSessionStorageItem(CHATER_CONFIG.accessTokenKey);
+  removeSessionStorageItem(CHATER_CONFIG.refreshTokenKey);
+  removeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
+  // Limpia credenciales legadas si una versión anterior las dejó persistidas.
   removeStorageItem(CHATER_CONFIG.accessTokenKey);
   removeStorageItem(CHATER_CONFIG.refreshTokenKey);
   removeStorageItem(CHATER_CONFIG.userIdKey);
+  removeStorageItem(CHATER_CONFIG.authProviderKey);
+  removeStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
   removeStorageItem(getStremeLastEventStorageKey(email));
   removeStorageItem(CHATER_CONFIG.stremeLastEventKey);
 }
@@ -3059,6 +4175,119 @@ function buildDeterministicMutationId(prefix = 'client', ...parts) {
     .map((part) => part.replace(/[^a-zA-Z0-9._:-]/g, '-').slice(0, 48));
   const body = safeParts.join('-').replace(/-+/g, '-').slice(0, 120);
   return `${prefix}-${body || generateClientMutationId()}`.slice(0, 160);
+}
+
+function sanitizeTelemetryText(value = '', maxLength = 260) {
+  const normalized = String(value || '')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[correo]')
+    .replace(/(bearer|token|idToken|refreshToken|signedSession|authorization)\s*[:=]\s*[^\s&]+/gi, '$1=[redactado]')
+    .replace(/([?&](?:token|tk|idToken|refreshToken|signedSession|code|credential)=)[^&\s]+/gi, '$1[redactado]')
+    .replace(/https?:\/\/[^\s?#]+([^\s]*)/gi, (match) => {
+      try {
+        const url = new URL(match);
+        return `${url.origin}${url.pathname}`;
+      } catch (error) {
+        return '[url]';
+      }
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+}
+
+function sanitizeTelemetryStack(value = '') {
+  return String(value || '')
+    .split('\n')
+    .slice(0, 8)
+    .map((line) => sanitizeTelemetryText(line, 220))
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 1200);
+}
+
+function getSafeTelemetryUserId() {
+  const userId = normalizeBackendUserId(getSessionUserId());
+  if (userId && !userId.includes('@')) return userId;
+  return '';
+}
+
+function canSendClientTelemetry(key = '') {
+  if (!CHATER_CONFIG.backendBaseUrl || !CHATER_CONFIG.enableClientTelemetry) return false;
+  const now = Date.now();
+  clientTelemetryState.timestamps = clientTelemetryState.timestamps.filter((timestamp) => now - timestamp < 60000);
+  if (clientTelemetryState.timestamps.length >= 8) return false;
+  if (key && clientTelemetryState.inFlightKeys.has(key)) return false;
+  clientTelemetryState.timestamps.push(now);
+  if (key) clientTelemetryState.inFlightKeys.add(key);
+  return true;
+}
+
+function buildClientTelemetryPayload(kind = 'client_error', details = {}) {
+  const error = details.error || details.reason || {};
+  const rawMessage = details.message || error.message || String(error || 'Error técnico del navegador');
+  const rawStack = details.stack || error.stack || '';
+  const safeMessage = sanitizeTelemetryText(rawMessage, 240) || 'Error técnico del navegador';
+  const safeSource = sanitizeTelemetryText(details.source || details.filename || window.location.pathname || '/', 180);
+  const safeStack = sanitizeTelemetryStack(rawStack);
+  const userId = getSafeTelemetryUserId();
+
+  return {
+    type: kind,
+    name: kind === 'unhandled_rejection' ? 'Promesa rechazada en navegador' : 'Error técnico del navegador',
+    category: 'frontend-error',
+    path: `${window.location.pathname || '/'}${window.location.search || ''}`.slice(0, 240),
+    data: {
+      level: 'error',
+      message: safeMessage,
+      source: safeSource,
+      line: Number(details.lineno || details.line || 0) || 0,
+      column: Number(details.colno || details.column || 0) || 0,
+      stack: safeStack,
+      browser: sanitizeTelemetryText(navigator.userAgent || '', 180),
+      userId,
+      hasAuthenticatedSession: Boolean(getSessionEmail()),
+      appVersion: typeof APP_VERSION !== 'undefined' ? APP_VERSION : '',
+      serviceWorkerVersion: '2026-07-03-memoriabackend-login-script-retry-81',
+      occurredAt: new Date().toISOString()
+    }
+  };
+}
+
+function reportClientTelemetry(kind = 'client_error', details = {}) {
+  const message = sanitizeTelemetryText(details.message || details.error?.message || details.reason?.message || String(details.reason || ''), 160);
+  const source = sanitizeTelemetryText(details.source || details.filename || '', 120);
+  const dedupeKey = buildDeterministicMutationId('client-telemetry', kind, message, source);
+  if (!canSendClientTelemetry(dedupeKey)) return;
+
+  apiClient.registerClientTelemetry(buildClientTelemetryPayload(kind, details), dedupeKey)
+    .catch(() => null)
+    .finally(() => {
+      clientTelemetryState.inFlightKeys.delete(dedupeKey);
+    });
+}
+
+function registerClientTelemetryListeners() {
+  if (!CHATER_CONFIG.enableClientTelemetry) return;
+
+  window.addEventListener('error', (event) => {
+    reportClientTelemetry('client_error', {
+      message: event.message,
+      error: event.error,
+      source: event.filename,
+      lineno: event.lineno,
+      colno: event.colno
+    });
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    reportClientTelemetry('unhandled_rejection', {
+      reason: event.reason,
+      message: event.reason?.message || String(event.reason || 'Promesa rechazada sin manejar'),
+      stack: event.reason?.stack || ''
+    });
+  });
 }
 
 function getActiveConversation() {
@@ -3256,7 +4485,7 @@ function setModal(title, contentNodeOrHtml, modalKind = '') {
 }
 
 function closeModal() {
-  if (activeModalKind === 'otp-auth') {
+  if (activeModalKind === 'otp-auth' || activeModalKind === 'google-auth') {
     invalidateAuthAttempts();
   }
   activeModalKind = '';
@@ -3289,16 +4518,24 @@ function closeTransientUiForSessionEnd() {
 function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
 
-  const normalizedPayload = normalizeAuthPayload(payload, email);
+  const normalizedPayload = normalizeAuthPayload(payload, '');
+  const resolvedEmail = normalizedPayload.user?.email || normalizeStorageIdentity(email);
 
-  if (CHATER_CONFIG.backendBaseUrl && !normalizedPayload?.accessToken && !normalizedPayload?.refreshToken) {
-    loginFeedback.textContent = 'memoriaBACKEND no devolvió credenciales de sesión. Inténtalo nuevamente.';
+  if (shouldRequireGoogleGmailAuth()) {
+    const validation = validateGoogleGmailAuthPayload(normalizedPayload, resolvedEmail);
+    if (!validation.ok) {
+      loginFeedback.textContent = validation.message;
+      return false;
+    }
+  }
+
+  if (CHATER_CONFIG.backendBaseUrl && !normalizedPayload?.accessToken && !normalizedPayload?.refreshToken && !normalizedPayload?.sessionVerified) {
+    loginFeedback.textContent = 'memoriaBACKEND no confirmó credenciales ni cookie de sesión Google/Gmail. Inténtalo nuevamente.';
     return false;
   }
 
   invalidateAuthAttempts();
-  const resolvedEmail = normalizedPayload.user?.email || email;
-  persistAuthTokens(normalizedPayload);
+  persistAuthTokens({ ...normalizedPayload, sessionVerified: true });
   setSessionEmail(resolvedEmail);
   advanceSessionRuntime(resolvedEmail);
   activateSessionState(resolvedEmail, true);
@@ -3311,40 +4548,30 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
 function openOtpModal(email, authGuard) {
   const form = document.createElement('form');
   form.innerHTML = `
-    <p class="modal-copy">Enviamos un código al correo <strong>${escapeHTML(email)}</strong>. Escríbelo para entrar a ChatER.</p>
-    <label for="otpInput">Código de verificación</label>
-    <input id="otpInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" required />
+    <p class="modal-copy">ChatER ya no usa códigos OTP. Para continuar debes iniciar sesión con una cuenta Gmail validada por Google en memoriaBACKEND.</p>
     <p class="form-feedback" data-feedback role="status" aria-live="polite"></p>
-    <button class="primary-button" type="submit">Verificar y entrar</button>
+    <button class="primary-button" type="submit">Continuar con Google</button>
   `;
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!isAuthAttemptCurrent(authGuard)) return;
+    if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
 
-    const otp = form.querySelector('#otpInput').value.trim();
     const feedback = form.querySelector('[data-feedback]');
     const submitButton = form.querySelector('button[type="submit"]');
-    if (!otp) return;
-
-    feedback.textContent = 'Verificando código...';
+    feedback.textContent = 'Abriendo autenticación Google/Gmail...';
     submitButton.disabled = true;
-    submitButton.textContent = 'Verificando...';
 
     try {
-      const payload = await apiClient.verifyOtp(email, otp);
-      if (!isAuthAttemptCurrent(authGuard)) return;
-      completeAuthenticatedSession(email, payload, authGuard);
+      await startGoogleGmailLogin({ fallbackEmail: email, authGuard });
     } catch (error) {
-      if (!isAuthAttemptCurrent(authGuard)) return;
-      feedback.textContent = 'No se pudo verificar el código. Inténtalo nuevamente.';
+      feedback.textContent = error?.message || 'No se pudo abrir Google/Gmail desde memoriaBACKEND.';
       submitButton.disabled = false;
-      submitButton.textContent = 'Verificar y entrar';
     }
   });
 
-  setModal('Verificación por correo', form, 'otp-auth');
-  form.querySelector('#otpInput').focus();
+  setModal('Acceso Google/Gmail', form, 'google-auth');
+  form.querySelector('button[type="submit"]')?.focus();
 }
 
 function renderShell() {
@@ -3352,10 +4579,18 @@ function renderShell() {
   const email = getSessionEmail();
 
   if (email && CHATER_CONFIG.backendBaseUrl && !hasBackendSessionCredentials()) {
-    requireFreshBackendLogin(email, 'Tu sesión local anterior necesita validarse con memoriaBACKEND. Ingresa nuevamente con tu correo.');
+    requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse con Google/Gmail en memoriaBACKEND.');
     loginView.hidden = false;
     chatView.hidden = true;
-    emailInput.focus();
+    loginForm.querySelector('button[type="submit"]')?.focus();
+    return;
+  }
+
+  if (email && shouldRequireGoogleGmailAuth() && !isAllowedGmailAddress(email)) {
+    requireFreshBackendLogin(email, 'ChatER solo permite cuentas Gmail verificadas por Google.');
+    loginView.hidden = false;
+    chatView.hidden = true;
+    loginForm.querySelector('button[type="submit"]')?.focus();
     return;
   }
 
@@ -3363,7 +4598,7 @@ function renderShell() {
   chatView.hidden = !email;
 
   if (!email) {
-    emailInput.focus();
+    loginForm.querySelector('button[type="submit"]')?.focus();
     return;
   }
 
@@ -4453,14 +5688,27 @@ function normalizeR2xImagePolicyPayload(payload = {}, context = 'chat-message') 
   };
 }
 
-function createR2xPolicyUnavailableError(message = 'ImagenesCloudflareR2x no está disponible para este contexto.') {
+function createR2xPolicyUnavailableError(message = 'ImagenesCloudflareR2x no está disponible para este contexto.', cause = null) {
   const error = new Error(message);
   error.code = 'R2X_POLICY_UNAVAILABLE';
+  if (cause) error.cause = cause;
   return error;
 }
 
 function isR2xPolicyUnavailableError(error) {
   return String(error?.code || '').toUpperCase() === 'R2X_POLICY_UNAVAILABLE';
+}
+
+function isRecoverableR2xBackendError(error = {}) {
+  const status = Number(error.status || error.responseStatus || error.payload?.statusCode || error.payload?.metadata?.statusCode || 0);
+  const code = String(error.code || error.payload?.err || error.payload?.code || error.payload?.error?.code || error.payload?.metadata?.err || '').trim().toUpperCase();
+  const message = String(error.message || error.payload?.message || error.payload?.error?.message || '').trim().toUpperCase();
+
+  if ([404, 405, 410, 501, 503].includes(status)) return true;
+  if (code && /(R2X|IMAGENES_R2X|IMAGE_R2X|R2|STORAGE|ROUTE|ENDPOINT).*(NOT_FOUND|UNAVAILABLE|NOT_CONFIGURED|DISABLED|MISSING)/.test(code)) return true;
+  if (code && /(NOT_FOUND|ROUTE_NOT_FOUND|ENDPOINT_NOT_FOUND|NOT_IMPLEMENTED|STORAGE_NOT_CONFIGURED|R2_NOT_CONFIGURED)/.test(code)) return true;
+  if (message && /(IMAGENES-R2X|IMAGENES R2X|IMAGENES_R2X|R2X|CLOUDFLARE R2).*(NO EST|NOT FOUND|UNAVAILABLE|NO DISPONIBLE|NOT CONFIGURED|SIN CONFIGURAR|DISABLED|DESACTIV)/.test(message)) return true;
+  return false;
 }
 
 async function loadR2xImagePolicy(context = 'chat-message', options = {}) {
@@ -4477,9 +5725,15 @@ async function loadR2xImagePolicy(context = 'chat-message', options = {}) {
       return policy;
     })
     .catch((error) => {
-      const fallbackPolicy = getDefaultR2xImagePolicy(normalizedContext);
-      r2xImagePolicyCache.set(normalizedContext, { policy: fallbackPolicy, checkedAt: Date.now(), error: error?.message || 'config no disponible' });
-      console.warn('No se pudo leer /api/v1/imagenes-r2x/config; ChatER conserva la política local segura para no interrumpir el flujo.', error);
+      if (isBackendAuthError(error)) throw error;
+      const fallbackPolicy = {
+        ...getDefaultR2xImagePolicy(normalizedContext),
+        enabled: false,
+        source: 'memoriaBACKEND-unavailable',
+        error: error?.message || 'config no disponible'
+      };
+      r2xImagePolicyCache.set(normalizedContext, { policy: fallbackPolicy, checkedAt: Date.now(), error: fallbackPolicy.error });
+      console.warn('No se pudo leer /api/v1/imagenes-r2x/config; ChatER usará MEDIAfirmadaX como respaldo canónico para no bloquear adjuntos.', error);
       return fallbackPolicy;
     })
     .finally(() => {
@@ -4652,32 +5906,42 @@ async function prepareR2xTemporaryImageForBackend(file, options = {}) {
     maxDimension: policy.maxDimension
   });
 
-  const intentPayload = await apiClient.createR2xImageIntent(converted.file, {
-    context,
-    entityType: options.entityType || 'mensaje',
-    entityId: options.entityId || clientMutationId,
-    conversationId: options.conversationId || '',
-    width: converted.width,
-    height: converted.height,
-    sha256: converted.sha256,
-    originalFilename: converted.originalFileName,
-    originalMimeType: converted.originalMimeType
-  }, `${clientMutationId}:r2x-intent`);
+  let preparedUpload = null;
 
-  let preparedUpload = normalizeR2xImageUploadPreparation(intentPayload);
-  if (!preparedUpload.uploadUrl || !preparedUpload.imageId) {
-    throw new Error('memoriaBACKEND no devolvió una intención válida de imagen temporal.');
+  try {
+    const intentPayload = await apiClient.createR2xImageIntent(converted.file, {
+      context,
+      entityType: options.entityType || 'mensaje',
+      entityId: options.entityId || clientMutationId,
+      conversationId: options.conversationId || '',
+      width: converted.width,
+      height: converted.height,
+      sha256: converted.sha256,
+      originalFilename: converted.originalFileName,
+      originalMimeType: converted.originalMimeType
+    }, `${clientMutationId}:r2x-intent`);
+
+    preparedUpload = normalizeR2xImageUploadPreparation(intentPayload);
+    if (!preparedUpload.uploadUrl || !preparedUpload.imageId) {
+      throw createR2xPolicyUnavailableError('memoriaBACKEND no devolvió una intención válida de imagen temporal.');
+    }
+
+    await uploadMediaFileToSignedUrl(converted.file, preparedUpload);
+
+    const confirmationPayload = await apiClient.confirmR2xImage(preparedUpload.imageId, {
+      entityType: options.entityType || 'mensaje',
+      entityId: options.entityId || clientMutationId,
+      conversationId: options.conversationId || ''
+    }, `${clientMutationId}:r2x-confirm`);
+
+    preparedUpload = normalizeR2xImageReadPayload(confirmationPayload, preparedUpload);
+  } catch (error) {
+    if (isBackendAuthError(error)) throw error;
+    if (isR2xPolicyUnavailableError(error) || isRecoverableR2xBackendError(error)) {
+      throw createR2xPolicyUnavailableError('ImagenesCloudflareR2x no respondió como API disponible; se debe usar MEDIAfirmadaX como respaldo.', error);
+    }
+    throw error;
   }
-
-  await uploadMediaFileToSignedUrl(converted.file, preparedUpload);
-
-  const confirmationPayload = await apiClient.confirmR2xImage(preparedUpload.imageId, {
-    entityType: options.entityType || 'mensaje',
-    entityId: options.entityId || clientMutationId,
-    conversationId: options.conversationId || ''
-  }, `${clientMutationId}:r2x-confirm`);
-
-  preparedUpload = normalizeR2xImageReadPayload(confirmationPayload, preparedUpload);
 
   if (!preparedUpload.publicUrl) {
     try {
@@ -4887,7 +6151,9 @@ function renderConversation() {
   }
 
   activeName.textContent = conversation.name;
-  activeStatus.textContent = conversation.archived ? `${conversation.status || 'Archivado'} · En Archivados` : conversation.status;
+  activeStatus.textContent = conversation.blocked
+    ? 'Contacto bloqueado · No recibirás ni enviarás mensajes aquí'
+    : (conversation.archived ? `${conversation.status || 'Archivado'} · En Archivados` : conversation.status);
   renderAvatarInPlace(activeAvatar, conversation);
   if (pinConversationButton) {
     pinConversationButton.disabled = false;
@@ -4907,7 +6173,7 @@ function renderConversation() {
     conversationMenuButton.setAttribute('aria-label', `Abrir opciones de conversación con ${conversation.name}`);
     conversationMenuButton.title = 'Opciones de conversación';
   }
-  setComposerEnabled(!conversation.archived);
+  setComposerEnabled(!conversation.archived && !conversation.blocked);
 
   messagesContainer.innerHTML = '';
   conversation.messages.forEach((message) => {
@@ -5198,6 +6464,10 @@ async function sendMessage(text) {
   const sessionGuard = captureSessionGuard();
   const conversation = getActiveConversation();
   if (!conversation) return;
+  if (conversation.blocked) {
+    showToast('Desbloquea este contacto para enviar mensajes.');
+    return;
+  }
 
   const clientMessageId = generateClientMutationId();
   const outgoing = {
@@ -5343,6 +6613,18 @@ function getConversationMenuActions(conversation = getActiveConversation()) {
       icon: conversation.archived ? '↥' : '⇩',
       title: conversation.archived ? 'Restaurar conversación' : 'Archivar conversación',
       description: conversation.archived ? 'Devolver este chat a la lista principal.' : 'Mover este chat a Archivados sin borrar mensajes.'
+    },
+    {
+      id: 'block',
+      icon: conversation.blocked ? '✓' : '⊘',
+      title: conversation.blocked ? 'Desbloquear contacto' : 'Bloquear contacto',
+      description: conversation.blocked ? 'Permitir nuevamente mensajes y llamadas en este chat.' : 'Impedir mensajes y llamadas desde esta conversación.'
+    },
+    {
+      id: 'report',
+      icon: '!',
+      title: 'Reportar conversación',
+      description: 'Enviar un reporte de moderación a memoriaBACKEND con evidencia mínima.'
     }
   ];
 }
@@ -5396,10 +6678,67 @@ function openConversationMenuModal() {
       if (restoringArchivedConversation || activeConversationId === conversation.id) {
         openConversationMenuModal();
       }
+      return;
+    }
+
+    if (action === 'block') {
+      await toggleConversationBlock(conversation);
+      closeModal();
+      if (activeConversationId === conversation.id) openConversationMenuModal();
+      return;
+    }
+
+    if (action === 'report') {
+      openReportConversationModal(conversation);
     }
   });
 
   setModal('Opciones de conversación', container, 'conversation-menu');
+}
+
+function openReportConversationModal(conversation = getActiveConversation()) {
+  if (!conversation) {
+    showToast('Selecciona un chat para reportarlo.');
+    return;
+  }
+
+  const container = document.createElement('form');
+  container.innerHTML = `
+    <p class="modal-copy">El reporte se sincroniza con <code>/api/v1/reportes-moderacion</code>. Incluye solo evidencia mínima del chat y no sustituye una revisión humana.</p>
+    <label for="reportReasonSelect">Motivo</label>
+    <select id="reportReasonSelect" required>
+      <option value="spam">Spam o promoción abusiva</option>
+      <option value="abuse">Acoso o conducta abusiva</option>
+      <option value="fraud">Posible fraude o suplantación</option>
+      <option value="illegal_content">Contenido ilegal o peligroso</option>
+      <option value="other">Otro motivo</option>
+    </select>
+    <label for="reportDetailsInput">Detalle opcional</label>
+    <textarea id="reportDetailsInput" rows="3" maxlength="600" placeholder="Describe brevemente qué ocurre"></textarea>
+    <div class="quick-action-grid">
+      <button class="primary-button" type="submit">Enviar reporte</button>
+      <button class="secondary-button" type="button" data-report-action="back">Volver</button>
+    </div>
+  `;
+
+  container.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-report-action="back"]');
+    if (!button) return;
+    event.preventDefault();
+    openConversationMenuModal();
+  });
+
+  container.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = container.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    const reason = container.querySelector('#reportReasonSelect')?.value || 'other';
+    const details = container.querySelector('#reportDetailsInput')?.value || '';
+    await submitConversationReport(conversation, reason, details);
+    closeModal();
+  });
+
+  setModal('Reportar conversación', container, 'report-conversation');
 }
 
 function openConversationInfoModal(conversation = getActiveConversation()) {
@@ -5418,6 +6757,8 @@ function openConversationInfoModal(conversation = getActiveConversation()) {
       <div><strong>Mensajes locales</strong><span>${conversation.messages.length}</span></div>
       <div><strong>No leídos</strong><span>${Number(conversation.unread || 0)}</span></div>
       <div><strong>Fijado</strong><span>${conversation.pinned ? 'Sí' : 'No'}</span></div>
+      <div><strong>Bloqueo</strong><span>${escapeHTML(conversation.blocked ? `Activo · ${conversation.blockSyncStatus || 'local'}` : (conversation.blockSyncStatus ? `Inactivo · ${conversation.blockSyncStatus}` : 'No bloqueado'))}</span></div>
+      <div><strong>Moderación</strong><span>${escapeHTML(conversation.reportSyncStatus ? `Reporte ${conversation.reportSyncStatus}` : 'Sin reportes locales')}</span></div>
       <div><strong>Historial memoriaBACKEND</strong><span>${conversation.messagesHydrated ? 'Cargado o en modo local' : 'Pendiente de cargar al abrir el chat'}</span></div>
       <div><strong>Último mensaje</strong><span>${escapeHTML(lastMessage ? `${lastMessage.time || 'sin hora'} · ${lastMessage.text || lastMessage.attachmentName || 'mensaje'}` : 'Sin mensajes')}</span></div>
     </div>
@@ -6424,7 +7765,7 @@ function openToolsModal() {
 }
 
 const MEMORIA_BACKEND_REQUIRED_CAPABILITIES = [
-  { label: 'Autenticación por correo', tokens: ['AUTENTICACIONx', '/auth', 'auth/email/otp'] },
+  { label: 'Autenticación Google/Gmail', tokens: ['AUTENTICACIONx', '/auth', '/auth/firebase/session', '/login.js', 'google'] },
   { label: 'Perfil de usuario', tokens: ['PERFILusuarioX', '/api/v1/perfil-usuario', 'perfil-usuario'] },
   { label: 'Preferencias de usuario', tokens: ['PREFERENCIASusuarioX', '/api/v1/preferencias-usuario', 'preferencias-usuario'] },
   { label: 'Conversaciones', tokens: ['CONVERSACIONESx', '/api/v1/conversaciones', 'conversaciones'] },
@@ -6455,16 +7796,16 @@ let memoriaBlocksSyncCache = null;
 let memoriaBlocksSyncInFlight = null;
 
 function openApiStatusModal() {
-  const backendStatus = CHATER_CONFIG.backendBaseUrl ? 'Configurado' : 'Modo demo local';
+  const backendStatus = CHATER_CONFIG.backendBaseUrl ? 'Configurado' : 'Falta MEMORIA_BACKEND_URL';
   const realtimeStatus = getStremeConnectionStatusLabel();
   const pendingOutboxCount = getPendingOutboxCount();
-  const storageIdentity = normalizeStorageIdentity(getSessionEmail()) || 'sesión local';
+  const storageIdentity = normalizeStorageIdentity(getSessionEmail()) || 'sesión Google/Gmail pendiente';
   const manifestInitialLabel = CHATER_CONFIG.backendBaseUrl
     ? getCachedApiManifestSummaryLabel()
-    : 'No se consulta en modo demo local.';
+    : 'No se consulta hasta configurar MEMORIA_BACKEND_URL.';
   const blocksSyncInitialLabel = CHATER_CONFIG.backendBaseUrl
     ? getCachedBlocksSyncSummaryLabel()
-    : 'No se consulta en modo demo local.';
+    : 'No se consulta hasta configurar MEMORIA_BACKEND_URL.';
   const container = document.createElement('div');
   container.innerHTML = `
     <div class="api-status-grid">
@@ -6473,7 +7814,7 @@ function openApiStatusModal() {
       <div><strong>Cursor de sincronización</strong><span>${escapeHTML(getSyncCursorStatusLabel())}</span></div>
       <div><strong>Transporte streme</strong><span>${escapeHTML(getStremeTransportLabel())}</span></div>
       <div><strong>Tiempo máximo API</strong><span>${Math.round(CHATER_CONFIG.apiTimeoutMs / 1000)} s API · ${Math.round(CHATER_CONFIG.mediaUploadTimeoutMs / 1000)} s adjuntos</span></div>
-      <div><strong>Sesión</strong><span>${getAccessToken() ? 'Token activo' : 'Sesión local por correo'}</span></div>
+      <div><strong>Sesión</strong><span>${getAccessToken() ? 'Token Google/Gmail temporal de pestaña' : (isBackendSessionRecentlyVerified() ? 'Cookie Google/Gmail verificada' : 'Pendiente de Google/Gmail')}</span></div>
       <div><strong>Sin polling</strong><span>Los eventos nuevos se reciben por WebSocket o SSE streme cuando está configurado.</span></div>
       <div><strong>Acciones pendientes</strong><span>${pendingOutboxCount ? `${pendingOutboxCount} operación(es) esperando memoriaBACKEND` : 'No hay operaciones pendientes'}</span></div>
       <div><strong>App instalada</strong><span>${escapeHTML(getPwaStatusLabel())}</span></div>
@@ -6802,13 +8143,88 @@ function sanitizeApiStatusError(error) {
 
 function openProfileModal() {
   closeTransientPanels();
-  setModal('Perfil', `
+  const privacy = ensurePrivacyState();
+  const container = document.createElement('div');
+  container.innerHTML = `
     <p><strong>Correo:</strong> ${escapeHTML(getSessionEmail())}</p>
-    <p><strong>Acceso:</strong> correo electrónico, sin número telefónico.</p>
+    <p><strong>Acceso:</strong> Google/Gmail validado por memoriaBACKEND, sin número telefónico.</p>
     <p><strong>Modo visual:</strong> claro de ${CHATER_CONFIG.lightStartsAt}:00 a ${CHATER_CONFIG.darkStartsAt}:00 y oscuro durante la noche.</p>
     <p><strong>Datos locales:</strong> conversaciones y cola de sincronización aisladas para este correo.</p>
     <p><strong>Notificaciones:</strong> ${escapeHTML(getNotificationPermissionLabel())}.</p>
-  `);
+    <p><strong>Privacidad:</strong> perfil ${escapeHTML(getPrivacyVisibilityLabel(privacy.profileVisibility))}, estados ${escapeHTML(getPrivacyVisibilityLabel(privacy.statusVisibility))}.</p>
+    <div class="quick-action-grid">
+      <button class="primary-button" type="button" data-profile-action="privacy">Configurar privacidad</button>
+      <button class="secondary-button" type="button" data-profile-action="notifications">Notificaciones</button>
+    </div>
+  `;
+
+  container.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-profile-action]');
+    if (!button) return;
+    if (button.dataset.profileAction === 'privacy') openPrivacySettingsModal();
+    if (button.dataset.profileAction === 'notifications') openNotificationSettingsModal();
+  });
+
+  setModal('Perfil', container, 'profile');
+}
+
+function openPrivacySettingsModal() {
+  closeTransientPanels();
+  const privacy = ensurePrivacyState();
+  const container = document.createElement('form');
+  container.innerHTML = `
+    <p class="modal-copy">ChatER sincroniza estas preferencias con <code>/api/v1/privacidad-usuario</code> cuando memoriaBACKEND está configurado. En modo demo quedan locales.</p>
+    <label for="profileVisibilitySelect">Quién puede ver tu perfil</label>
+    <select id="profileVisibilitySelect">
+      <option value="contacts">Mis contactos</option>
+      <option value="public">Todos</option>
+      <option value="nobody">Nadie</option>
+    </select>
+    <label for="statusVisibilitySelect">Quién puede ver tus estados</label>
+    <select id="statusVisibilitySelect">
+      <option value="contacts">Mis contactos</option>
+      <option value="public">Todos</option>
+      <option value="nobody">Nadie</option>
+    </select>
+    <label for="lastActivityVisibilitySelect">Quién puede ver tu última actividad</label>
+    <select id="lastActivityVisibilitySelect">
+      <option value="contacts">Mis contactos</option>
+      <option value="public">Todos</option>
+      <option value="nobody">Nadie</option>
+    </select>
+    <div class="api-status-grid">
+      <div><strong>Sincronización</strong><span>${escapeHTML(privacy.syncStatus || (CHATER_CONFIG.backendBaseUrl ? 'Pendiente' : 'Modo local'))}</span></div>
+      <div><strong>Última sincronización</strong><span>${escapeHTML(privacy.syncedAt || 'Sin registro')}</span></div>
+    </div>
+    <div class="quick-action-grid">
+      <button class="primary-button" type="submit">Guardar privacidad</button>
+      <button class="secondary-button" type="button" data-privacy-action="back">Volver al perfil</button>
+    </div>
+  `;
+
+  container.querySelector('#profileVisibilitySelect').value = normalizePrivacyVisibility(privacy.profileVisibility);
+  container.querySelector('#statusVisibilitySelect').value = normalizePrivacyVisibility(privacy.statusVisibility);
+  container.querySelector('#lastActivityVisibilitySelect').value = normalizePrivacyVisibility(privacy.lastActivityVisibility);
+
+  container.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-privacy-action="back"]');
+    if (!button) return;
+    event.preventDefault();
+    openProfileModal();
+  });
+
+  container.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = container.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    privacy.profileVisibility = normalizePrivacyVisibility(container.querySelector('#profileVisibilitySelect')?.value);
+    privacy.statusVisibility = normalizePrivacyVisibility(container.querySelector('#statusVisibilitySelect')?.value);
+    privacy.lastActivityVisibility = normalizePrivacyVisibility(container.querySelector('#lastActivityVisibilitySelect')?.value);
+    await persistPrivacySettings({ reason: 'profile-modal' });
+    openProfileModal();
+  });
+
+  setModal('Privacidad', container, 'privacy-settings');
 }
 
 function getNotificationPermissionStatus() {
@@ -6822,6 +8238,8 @@ function getNotificationPermissionLabel() {
 
   if (permission === 'unsupported') return 'No compatibles en este navegador';
   if (permission === 'granted') {
+    if (savedRegistration?.syncStatus === 'pending_revoke') return 'Desactivación pendiente con memoriaBACKEND';
+    if (savedRegistration?.syncStatus === 'revoked' || savedRegistration?.syncStatus === 'revoked_local') return 'Desactivadas para este dispositivo';
     if (savedRegistration?.syncStatus === 'pending') return 'Permitidas · registro pendiente con memoriaBACKEND';
     if (savedRegistration?.registeredAt) return 'Permitidas y registradas para esta sesión';
     return 'Permitidas en el navegador';
@@ -6830,9 +8248,20 @@ function getNotificationPermissionLabel() {
   return 'Sin activar';
 }
 
+function getNotificationRegistrationLabel(registration = readNotificationRegistration()) {
+  if (!registration) return 'Aún no registrado';
+  if (registration.syncStatus === 'pending_revoke') return 'Baja pendiente con memoriaBACKEND';
+  if (registration.syncStatus === 'revoked' || registration.syncStatus === 'revoked_local') {
+    return registration.revokedAt ? `Dado de baja ${formatScheduledCallTime(registration.revokedAt)}` : 'Dado de baja en este dispositivo';
+  }
+  if (registration.syncStatus === 'pending') return 'Registro pendiente con memoriaBACKEND';
+  if (registration.registeredAt) return `Actualizado ${formatScheduledCallTime(registration.registeredAt)}`;
+  return 'Aún no registrado';
+}
+
 function getNotificationToolDescription() {
   const label = getNotificationPermissionLabel();
-  if (CHATER_CONFIG.backendBaseUrl) return `${label}. Registra este dispositivo con memoriaBACKEND para avisos push.`;
+  if (CHATER_CONFIG.backendBaseUrl) return `${label}. Registra o da de baja este dispositivo con memoriaBACKEND para avisos push.`;
   return `${label}. En demo local muestra pruebas del navegador y deja listo el contrato push.`;
 }
 
@@ -6864,6 +8293,23 @@ function markNotificationRegistrationSynced(payload = {}) {
     ...payload,
     syncStatus: 'synced',
     registeredAt: new Date().toISOString(),
+    revokedAt: '',
+    lastError: ''
+  });
+}
+
+function markNotificationRegistrationRevokedSynced(payload = {}) {
+  persistNotificationRegistration({
+    ...readNotificationRegistration(),
+    ...payload,
+    pushEnabled: false,
+    active: false,
+    subscription: null,
+    pushSubscription: null,
+    token: '',
+    syncStatus: CHATER_CONFIG.backendBaseUrl ? 'revoked' : 'revoked_local',
+    registeredAt: '',
+    revokedAt: new Date().toISOString(),
     lastError: ''
   });
 }
@@ -6877,13 +8323,14 @@ function openNotificationSettingsModal() {
     <div class="api-status-grid">
       <div><strong>Permiso del navegador</strong><span>${escapeHTML(getNotificationPermissionLabel())}</span></div>
       <div><strong>Push en segundo plano</strong><span>${escapeHTML(pushCapability)}</span></div>
-      <div><strong>Registro local</strong><span>${escapeHTML(savedRegistration?.registeredAt ? `Actualizado ${formatScheduledCallTime(savedRegistration.registeredAt)}` : 'Aún no registrado')}</span></div>
-      <div><strong>memoriaBACKEND</strong><span>${escapeHTML(CHATER_CONFIG.backendBaseUrl ? 'Registrará /api/v1/push/suscripciones al activar.' : 'Modo demo local hasta configurar MEMORIA_BACKEND_URL.')}</span></div>
+      <div><strong>Registro local</strong><span>${escapeHTML(getNotificationRegistrationLabel(savedRegistration))}</span></div>
+      <div><strong>memoriaBACKEND</strong><span>${escapeHTML(CHATER_CONFIG.backendBaseUrl ? 'Usa /api/v1/push/suscripciones para activar o dar de baja.' : 'Modo demo local hasta configurar MEMORIA_BACKEND_URL.')}</span></div>
     </div>
     <p class="modal-copy">Activa notificaciones para recibir mensajes, llamadas y estados cuando ChatER esté instalada o abierta. Si el navegador no permite push, la app conserva una prueba local y el registro queda pendiente para memoriaBACKEND.</p>
     <div class="quick-action-grid">
       <button class="primary-button" type="button" data-notification-action="activate">Activar notificaciones</button>
       <button class="secondary-button" type="button" data-notification-action="test">Enviar prueba</button>
+      <button class="secondary-button" type="button" data-notification-action="deactivate">Desactivar en este dispositivo</button>
     </div>
   `;
 
@@ -6901,6 +8348,14 @@ function openNotificationSettingsModal() {
 
     if (button.dataset.notificationAction === 'test') {
       const result = await sendNotificationTest();
+      showToast(result.message);
+      closeModal();
+      openNotificationSettingsModal();
+      return;
+    }
+
+    if (button.dataset.notificationAction === 'deactivate') {
+      const result = await deactivateNotificationsForDevice();
       showToast(result.message);
       closeModal();
       openNotificationSettingsModal();
@@ -7034,6 +8489,87 @@ async function activateNotificationsForDevice() {
 
   await showLocalNotificationPreview('ChatER', 'Notificaciones activas para mensajes, llamadas y estados.');
   return { ok: true, message: pushSubscription ? 'Notificaciones push activadas y registradas.' : 'Notificaciones activadas; falta clave pública VAPID en memoriaBACKEND o en config local para push en segundo plano real.' };
+}
+
+async function deactivateNotificationsForDevice() {
+  const savedRegistration = readNotificationRegistration() || {};
+  const registration = await getReadyServiceWorkerRegistration();
+  let pushSubscription = savedRegistration.pushSubscription || savedRegistration.subscription || null;
+  let endpoint = String(savedRegistration.endpoint || pushSubscription?.endpoint || '').trim();
+
+  if (registration?.pushManager) {
+    try {
+      const activeSubscription = await registration.pushManager.getSubscription();
+      if (activeSubscription) {
+        const subscriptionJson = typeof activeSubscription.toJSON === 'function' ? activeSubscription.toJSON() : activeSubscription;
+        pushSubscription = subscriptionJson || pushSubscription;
+        endpoint = String(subscriptionJson?.endpoint || activeSubscription.endpoint || endpoint || '').trim();
+        await activeSubscription.unsubscribe();
+      }
+    } catch (error) {
+      console.warn('No se pudo cancelar la suscripción push local.', error);
+    }
+  }
+
+  const clientMutationId = generateClientMutationId();
+  const payload = {
+    ...savedRegistration,
+    deviceId: savedRegistration.deviceId || getDeviceId(),
+    clientId: savedRegistration.clientId || savedRegistration.deviceId || getDeviceId(),
+    endpoint,
+    pushSubscription,
+    subscription: pushSubscription,
+    permission: getNotificationPermissionStatus(),
+    userAgent: navigator.userAgent || '',
+    locale: navigator.language || 'es-CO',
+    active: false,
+    reason: 'user-disabled-notifications',
+    clientMutationId
+  };
+
+  persistNotificationRegistration({
+    ...payload,
+    pushEnabled: false,
+    active: false,
+    subscription: null,
+    pushSubscription: null,
+    token: '',
+    syncStatus: CHATER_CONFIG.backendBaseUrl ? 'pending_revoke' : 'revoked_local',
+    registeredAt: '',
+    revokedAt: new Date().toISOString(),
+    lastError: ''
+  });
+
+  if (CHATER_CONFIG.backendBaseUrl) {
+    try {
+      await apiClient.unregisterDevice(payload);
+      markNotificationRegistrationRevokedSynced(payload);
+      return { ok: true, message: 'Notificaciones desactivadas y baja sincronizada con memoriaBACKEND.' };
+    } catch (error) {
+      persistNotificationRegistration({
+        ...payload,
+        pushEnabled: false,
+        active: false,
+        subscription: null,
+        pushSubscription: null,
+        token: '',
+        syncStatus: 'pending_revoke',
+        registeredAt: '',
+        revokedAt: new Date().toISOString(),
+        lastError: error?.message || 'Baja pendiente con memoriaBACKEND'
+      });
+      enqueueBackendOperation({
+        type: 'unregisterDevice',
+        dedupeKey: `device:${payload.deviceId}:notifications-revoke`,
+        payload,
+        replaceExisting: true
+      });
+      return { ok: true, message: 'Notificaciones desactivadas en este navegador. La baja en memoriaBACKEND quedó en cola.' };
+    }
+  }
+
+  markNotificationRegistrationRevokedSynced(payload);
+  return { ok: true, message: 'Notificaciones desactivadas en este dispositivo.' };
 }
 
 async function sendNotificationTest() {
@@ -8719,7 +10255,7 @@ function getStaticVisitPayloadData(payload = {}) {
 
 function getStaticVisitStatusLabel() {
   if (!CHATER_CONFIG.enableStaticVisitTracking) return 'Desactivado por configuración.';
-  if (!CHATER_CONFIG.backendBaseUrl) return 'Modo demo local: no se registra /api/v1/visitas/apertura.';
+  if (!CHATER_CONFIG.backendBaseUrl) return 'No configurado: falta MEMORIA_BACKEND_URL para registrar /api/v1/visitas/apertura.';
   if (staticVisitState.inFlight) return 'Registrando apertura con VISITASstaticSITEx…';
   if (staticVisitState.error) return `Último registro falló: ${staticVisitState.error}`;
   if (staticVisitState.payload) {
@@ -8776,7 +10312,7 @@ async function syncInitialDataFromBackend() {
 
     if ((profileResult.status === 'rejected' && isBackendAuthError(profileResult.reason))
       || (preferencesResult.status === 'rejected' && isBackendAuthError(preferencesResult.reason))) {
-      requireFreshBackendLogin(sessionGuard.email, 'Tu sesión venció o no fue aceptada por memoriaBACKEND. Ingresa nuevamente con tu correo.');
+      requireFreshBackendLogin(sessionGuard.email, 'Tu sesión venció o no fue aceptada por memoriaBACKEND. Ingresa nuevamente con Google/Gmail.');
       renderShell();
       return;
     }
@@ -9050,6 +10586,12 @@ function normalizeConversationFromApi(raw = {}) {
     pinSyncedAt: raw.pinSyncedAt || '',
     archiveSyncStatus: raw.archiveSyncStatus || '',
     archiveSyncedAt: raw.archiveSyncedAt || '',
+    blocked: Boolean(raw.blocked || raw.isBlocked),
+    blockSyncStatus: raw.blockSyncStatus || '',
+    blockSyncedAt: raw.blockSyncedAt || '',
+    reportSyncStatus: raw.reportSyncStatus || '',
+    reportSyncedAt: raw.reportSyncedAt || '',
+    lastReportReason: raw.lastReportReason || '',
     unread: Number(raw.unread || raw.unreadCount || 0),
     messages,
     messagesHydrated: Boolean(hasEmbeddedMessages || raw.messagesHydrated || raw.historyLoaded),
@@ -9773,46 +11315,25 @@ async function logoutCurrentSession() {
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const email = emailInput.value.trim().toLowerCase();
 
-  if (!emailInput.checkValidity()) {
-    loginFeedback.textContent = 'Escribe un correo electrónico válido.';
-    return;
-  }
-
-  const authGuard = captureAuthAttempt(email);
+  const authGuard = captureAuthAttempt('google-gmail');
   const submitButton = loginForm.querySelector('button[type="submit"]');
-  loginFeedback.textContent = 'Validando acceso...';
+  loginFeedback.textContent = 'Preparando acceso con Google...';
   submitButton.disabled = true;
-  submitButton.textContent = 'Entrando...';
+  submitButton.textContent = 'Abriendo Google...';
 
   try {
-    const payload = await apiClient.login(email);
-    if (!isAuthAttemptCurrent(authGuard)) return;
+    const restored = await restoreGoogleGmailSessionFromBackend({ silent: true, authGuard });
+    if (restored || getSessionEmail()) return;
 
-    if (payload?.requiresOtp && CHATER_CONFIG.backendBaseUrl) {
-      loginFeedback.textContent = 'Revisa tu correo para continuar.';
-      submitButton.disabled = false;
-      submitButton.textContent = 'Entrar a ChatER';
-      openOtpModal(email, authGuard);
-      return;
-    }
-
-    completeAuthenticatedSession(email, payload, authGuard);
+    await startGoogleGmailLogin({ authGuard });
   } catch (error) {
     if (!isAuthAttemptCurrent(authGuard)) return;
-
-    if (!CHATER_CONFIG.backendBaseUrl) {
-      completeAuthenticatedSession(email, {}, authGuard);
-      loginFeedback.textContent = 'Entraste en modo local. memoriaBACKEND podrá validar la sesión cuando esté disponible.';
-      return;
-    }
-
-    loginFeedback.textContent = 'No se pudo validar el acceso con memoriaBACKEND. Inténtalo nuevamente cuando la conexión esté disponible.';
+    loginFeedback.textContent = error?.message || 'No se pudo abrir la autenticación Google/Gmail de memoriaBACKEND.';
   } finally {
     if (isAuthAttemptCurrent(authGuard)) {
       submitButton.disabled = false;
-      submitButton.textContent = 'Entrar a ChatER';
+      submitButton.textContent = 'Continuar con Google';
     }
   }
 });
@@ -9935,5 +11456,7 @@ setInterval(() => {
 }, STATE_EXPIRY_SWEEP_INTERVAL_MS);
 renderEmojiPanel();
 updateComposerActionState();
+registerMemoriaBackendLoginListeners();
+registerClientTelemetryListeners();
 registerStaticSiteOpening();
-renderShell();
+bootstrapGoogleGmailSession();

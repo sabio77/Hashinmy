@@ -1,7 +1,0 @@
-{
-  "version": "2026-07-03-memoriabackend-streme-call-invite-outbox-67",
-  "buildTime": "2026-07-03T10:12:00-05:00",
-  "channel": "render-static-site",
-  "app": "ChatER",
-  "description": "Encola la publicación STREMEx call.incoming y la señal invite si fallan después de crear una llamada en memoriaBACKEND."
-}

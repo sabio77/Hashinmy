@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-03-memoriabackend-streme-call-invite-outbox-67';
+const CHATER_SW_VERSION = '2026-07-03-memoriabackend-sw-canonical-runtime-prefixes-84';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -281,33 +281,15 @@ function isRuntimeBackendRequest(request, url) {
 
   if (acceptHeader.includes('text/event-stream')) return true;
 
+  // Solo se omiten de cache los montajes canónicos publicados por memoriaBACKEND.
+  // No se mantienen prefijos heredados como /chats, /messages, /devices,
+  // /notifications, /search, /reports o /privacy para que la PWA no trate
+  // contratos antiguos como APIs vigentes del proyecto estático.
   const backendPrefixes = [
-    '/api',
+    '/api/v1',
     '/auth',
-    '/me',
-    '/contacts',
-    '/chats',
-    '/messages',
-    '/states',
-    '/calls',
-    '/media',
-    '/presence',
-    '/streme',
-    '/devices',
-    '/notifications',
-    '/tools',
-    '/business',
-    '/catalog',
-    '/ads',
-    '/broadcasts',
-    '/orders',
-    '/search',
-    '/users',
-    '/reports',
-    '/privacy',
-    '/health',
-    '/client-errors',
-    '/version'
+    '/login.js',
+    '/sdk'
   ];
 
   return backendPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

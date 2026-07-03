@@ -1,6 +1,6 @@
 # ChatER - Documentación de APIs necesarias para memoriaBACKEND
 
-ChatER es un static site pensado para desplegarse en Render.com como frontend estático. El sitio no debe depender de lógica backend local: cualquier proceso que requiera servidor debe exponerse como API de `memoriaBACKEND`. Esta documentación define las APIs necesarias para que la interfaz tipo WhatsApp funcione con acceso por correo electrónico y comunicación en tiempo real sin polling.
+ChatER es un static site pensado para desplegarse en Render.com como frontend estático. El sitio no debe depender de lógica backend local: cualquier proceso que requiera servidor debe exponerse como API de `memoriaBACKEND`. Esta documentación define las APIs necesarias para que la interfaz tipo WhatsApp funcione con autenticación Google/Gmail validada por memoriaBACKEND y comunicación en tiempo real sin polling.
 
 ## 1. Configuración esperada del static site
 
@@ -16,6 +16,7 @@ window.CHATER_CONFIG = {
   STREME_REALTIME_URL: '',
   STREME_TRANSPORT: 'auto',
   STREME_CHANNEL: 'chater-general',
+  ENABLE_CLIENT_TELEMETRY: true,
   API_TIMEOUT_MS: 15000,
   MEDIA_UPLOAD_TIMEOUT_MS: 60000,
   MESSAGE_MEDIA_PREVIEW_MAX_BYTES: 1500000,
@@ -29,71 +30,97 @@ Si `MEMORIA_BACKEND_URL` no está configurada, ChatER funciona en modo demostrac
 
 `API_TIMEOUT_MS` limita cada llamada JSON hacia memoriaBACKEND para que una API colgada no bloquee la interfaz ni la cola local; `MEDIA_UPLOAD_TIMEOUT_MS` aplica a subidas de archivos hacia URLs firmadas porque los adjuntos necesitan una ventana más amplia. Ambos valores pueden ajustarse por despliegue desde `js/config.js` sin recompilar el static site.
 
+`ENABLE_CLIENT_TELEMETRY` permite registrar errores técnicos del navegador como eventos seguros en `EVENTOSx` mediante `POST /api/v1/eventos/registrar`. Si está desactivado o `MEMORIA_BACKEND_URL` está vacío, ChatER conserva los errores solo en consola/local para no inventar un backend propio.
+
 ## 2. Principios de contrato
 
-- Autenticación por correo electrónico, no por número telefónico.
-- Tokens cortos con refresh token seguro.
+- Autenticación obligatoria con Google/Gmail mediante `AUTENTICACIONx`, no por OTP local ni número telefónico.
+- Tokens compatibles solo temporales de pestaña; la cookie segura de memoriaBACKEND es la sesión principal.
 - Todas las respuestas deben incluir `requestId` para auditoría.
 - Todas las escrituras deben aceptar `clientMutationId` para idempotencia.
 - El tiempo real debe usar `streme` por WebSocket o SSE, sin polling.
 - El frontend debe poder operar con estados optimistas y sincronización posterior.
 
-## 3. API de autenticación por correo
+## 3. API de autenticación Google/Gmail con AUTENTICACIONx
 
-### POST `/auth/email/otp/request?s={siteId}`
-Solicita OTP por correo para iniciar sesión.
+ChatER no debe abrir sesión por OTP ni por número telefónico. El acceso a la interfaz protegida usa el bloque `AUTENTICACIONx` de `memoriaBACKEND`, con proveedor Google, correo verificado y dominio Gmail cuando `REQUIRE_GMAIL_DOMAIN` está activo.
+
+Punto débil corregido en la integración del static site: el frontend ya no infiere `google.com` por defecto cuando `AUTENTICACIONx` devuelve solo un correo. Para abrir ChatER, `/auth/check`, `/auth/firebase/session` o el payload del SDK deben incluir evidencia explícita del proveedor Google/Gmail mediante campos como `u.pr`, `provider`, `providerId`, `authProvider`, `signInProvider`, `sign_in_provider` o `firebase.sign_in_provider`. Si memoriaBACKEND no confirma ese proveedor, el static site limpia la sesión local y vuelve al acceso Google/Gmail.
+
+Punto débil corregido en esta iteración: la carga de `login.js` podía quedar bloqueada después de un error de red, CORS o dominio no autorizado porque el navegador conservaba el `<script>` fallido y un segundo intento no garantizaba nuevos eventos `load`/`error`. ChatER ahora elimina cualquier script no cargado antes de reintentar, conecta los manejadores antes de asignar `src` y solo reutiliza el script cuando ya está cargado y corresponde a la URL vigente de `memoriaBACKEND`. Esto preserva la obligación de autenticar ChatER con Google/Gmail mediante `AUTENTICACIONx` sin crear un flujo local alterno.
+
+### GET `/auth/providers?s={siteId}`
+Devuelve los proveedores activos publicados por `AUTENTICACIONx`. ChatER lo usa como verificación auxiliar de disponibilidad del login.
+
+### GET `/login.js?s={siteId}`
+Script oficial de login para static sites autorizados. Debe cargarse desde el dominio real de `memoriaBACKEND`, no desde el static site. El script abre Google/Firebase y emite eventos compatibles con `window.memoriaBACKEND`.
+
+Parámetros visuales admitidos por ChatER:
+```txt
+n = nombre de marca visible
+c = color de tema
+l = logo público opcional
+bg = fondo público opcional
+next = URL de retorno autorizada
+```
+
+### GET `/auth/login?s={siteId}`
+Vista HTML oficial de autenticación Google/Gmail. ChatER la usa como respaldo cuando `login.js` no expone un helper directo para abrir el popup o redirección.
+
+### GET `/auth/check?s={siteId}`
+Valida la cookie segura emitida por `AUTENTICACIONx` y devuelve la identidad vigente. ChatER la ejecuta al iniciar para no depender de credenciales locales. Si la sesión no existe, fue revocada, responde `ok:0`, devuelve un error de autenticación o no puede confirmarse contra memoriaBACKEND, el static site limpia la sesión local y vuelve a pedir Google/Gmail antes de mostrar la interfaz protegida.
+
+Response mínimo esperado:
+```json
+{
+  "ok": 1,
+  "requestId": "uuid",
+  "u": {
+    "i": "usr_123",
+    "e": "usuario@gmail.com",
+    "n": "Usuario",
+    "pr": "google.com"
+  }
+}
+```
+
+### POST `/auth/firebase/session?s={siteId}`
+Crea sesión backend desde un `idToken` validado por Firebase/Google. El backend debe comprobar proveedor `google.com`, correo verificado, dominio autorizado por `revisionDOMINIOS` y cabecera `X-Hashinmy-Action: webapp`.
 
 Request:
 ```json
 {
   "s": "a1",
-  "email": "usuario@correo.com",
-  "purpose": "login",
+  "idToken": "firebase-google-id-token",
+  "next": "https://sitio-autorizado.onrender.com/",
+  "deviceId": "browser-device-id",
   "clientMutationId": "uuid"
 }
 ```
 
-Response:
+Response mínimo esperado:
 ```json
 {
+  "ok": 1,
   "requestId": "uuid",
-  "requiresOtp": true,
-  "otpDelivery": "email",
-  "maskedEmail": "u***@correo.com"
+  "u": {
+    "i": "usr_123",
+    "e": "usuario@gmail.com",
+    "n": "Usuario",
+    "pr": "google.com"
+  },
+  "tk": "token-temporal-opcional",
+  "signedSession": "token-temporal-opcional"
 }
 ```
 
-### POST `/auth/email/otp/verify`
-Verifica código enviado al correo.
+La cookie `HttpOnly/Secure/SameSite=None` es la sesión principal. Si el backend devuelve `tk`, `token` o `signedSession` para compatibilidad cuando el navegador bloquea cookies, ChatER lo conserva solo como credencial temporal de pestaña mediante `sessionStorage` o memoria volátil; no lo persiste en `localStorage`.
 
-Request:
-```json
-{
-  "email": "usuario@correo.com",
-  "otp": "123456",
-  "deviceId": "browser-device-id"
-}
-```
+### POST `/auth/refresh?s={siteId}`
+Renueva una sesión cuando `AUTENTICACIONx` publique refresh compatible. ChatER lo usa solo si existe token temporal de pestaña o cookie válida y envía `clientMutationId`/`X-MB-Idempotency-Key` para mantener el contrato idempotente de mutaciones públicas.
 
-Response:
-```json
-{
-  "requestId": "uuid",
-  "accessToken": "jwt",
-  "refreshToken": "opaque-refresh-token",
-  "user": {
-    "id": "usr_123",
-    "email": "usuario@correo.com",
-    "displayName": "Usuario"
-  }
-}
-```
-
-### POST `/auth/refresh`
-Renueva sesión sin repetir OTP.
-
-### POST `/auth/logout`
-Revoca el refresh token del navegador.
+### POST `/auth/logout?s={siteId}`
+Revoca la sesión en memoriaBACKEND y limpia credenciales temporales de pestaña, correo local, cursor `streme` y estado de sincronización del usuario. ChatER también envía `clientMutationId`/`X-MB-Idempotency-Key` para que reintentos de cierre no dupliquen efectos.
 
 ## 4. API de usuario y perfil
 
@@ -369,7 +396,7 @@ El contrato vigente se apoya únicamente en las APIs publicadas dentro de `APIS 
 
 ### GET `/api/v1/imagenes-r2x/config?s={siteId}&context={context}`
 
-Devuelve la política real de R2x por contexto (`chat-message` o `status-media`). El cliente la consulta antes de convertir una imagen; si R2x aparece deshabilitado o no configurado, conserva el flujo genérico de `MEDIAfirmadaX`.
+Devuelve la política real de R2x por contexto (`chat-message` o `status-media`). El cliente la consulta antes de convertir una imagen; si R2x aparece deshabilitado, no configurado, no responde como endpoint disponible o falla en la intención por ausencia del bloque, conserva el flujo genérico de `MEDIAfirmadaX` sin bloquear adjuntos ni estados visuales. Los errores de autenticación no hacen fallback: obligan a volver a Google/Gmail.
 
 ### POST `/api/v1/imagenes-r2x/intenciones?s={siteId}`
 
@@ -415,7 +442,7 @@ Regla del proyecto estático: si una imagen esperada no existe en `assets`, la i
 
 ## 11. API de estados 24h
 
-Los estados, historias o publicaciones fugaces se sincronizan con `PUBLICACIONESefimerasX`; las visualizaciones se registran con `VISTAScontenidoX`. No se usa el contrato heredado `/states` cuando `memoriaBACKEND` está configurado.
+Los estados, historias o publicaciones fugaces se sincronizan con `PUBLICACIONESefimerasX`; las visualizaciones se registran con `VISTAScontenidoX`. No se usa ningún contrato heredado de estados cuando `memoriaBACKEND` está configurado.
 
 ### GET `/api/v1/publicaciones-efimeras?s={siteId}`
 
@@ -492,7 +519,7 @@ Registra visualización de estado con `entityType:"publicacion-efimera"`, `entit
 
 ### PATCH `/api/v1/publicaciones-efimeras/{stateId}?s={siteId}`
 
-Prepara o solicita la promoción de un estado propio usando el mismo bloque canónico de publicaciones efímeras. Este proceso reemplaza el endpoint heredado `/states/{stateId}/promotion` porque `APIS de memoriaBACKEND` sí publica CRUD común sobre `PUBLICACIONESefimerasX` y el proyecto ya sincroniza la promoción como metadata/patch de la publicación.
+Prepara o solicita la promoción de un estado propio usando el mismo bloque canónico de publicaciones efímeras. Este proceso reemplaza el endpoint heredado de promoción de estados porque `APIS de memoriaBACKEND` sí publica CRUD común sobre `PUBLICACIONESefimerasX` y el proyecto ya sincroniza la promoción como metadata/patch de la publicación.
 
 Request:
 ```json
@@ -511,7 +538,7 @@ Request:
 
 ## 12. API de llamadas
 
-Las llamadas y programaciones se sincronizan con `SESIONEScomunicacionX` en `/api/v1/sesiones-comunicacion`. La señalización WebRTC puede viajar por `SIGNALINGtiempoRealX` o por eventos `STREMEx` según la disponibilidad del backend, pero el static site no crea rutas propias `/calls`.
+Las llamadas y programaciones se sincronizan con `SESIONEScomunicacionX` en `/api/v1/sesiones-comunicacion`. La señalización WebRTC puede viajar por `SIGNALINGtiempoRealX` o por eventos `STREMEx` según la disponibilidad del backend, pero el static site no crea rutas propias de llamadas.
 
 ### GET `/api/v1/sesiones-comunicacion?s={siteId}`
 
@@ -611,8 +638,24 @@ Response recomendado:
 }
 ```
 
-### DELETE `/api/v1/push/suscripciones/{deviceId}`
-Revoca dispositivo cuando `APInotificacionesPUSHx` publique baja explícita. Debe invalidar endpoint push y registrar auditoría por correo autenticado.
+### DELETE `/api/v1/push/suscripciones?s={siteId}`
+Revoca la suscripción del navegador o PWA usando el mismo bloque `APInotificacionesPUSHx` publicado en `APIS de memoriaBACKEND`. ChatER envía `deviceId/clientId`, `endpoint`, `pushSubscription`, usuario autenticado, `active:false`, motivo operativo y `clientMutationId`. Antes de llamar la API intenta `PushSubscription.unsubscribe()` en el navegador; si memoriaBACKEND no responde, guarda la baja como `unregisterDevice` en la cola local idempotente.
+
+Request recomendado:
+```json
+{
+  "deviceId": "browser-device-id",
+  "clientId": "browser-device-id",
+  "endpoint": "https://push.example/subscription",
+  "pushSubscription": {
+    "endpoint": "https://push.example/subscription",
+    "keys": { "p256dh": "...", "auth": "..." }
+  },
+  "active": false,
+  "reason": "user-disabled-notifications",
+  "clientMutationId": "uuid"
+}
+```
 
 ### POST `/api/v1/push/enviar`
 Prueba canal de notificaciones. El frontend lo llama desde Herramientas > Notificaciones; si falla, muestra una prueba local con la API `Notification` del navegador para no dejar el botón muerto.
@@ -704,31 +747,60 @@ Reglas de preservación:
 - La cola conserva `businessToolAction` y reintenta con el mismo `clientMutationId`, pero la llamada remota real queda alineada con `LANDINGTOOLSx`.
 - Procesos que requieran decisiones humanas, pagos, difusión real o publicación final deben resolverse en `memoriaBACKEND`; el static site solo registra la intención/evento.
 
-## 16. API de seguridad, bloqueo y reportes
+## 16. API de seguridad, bloqueo, reportes y privacidad
 
-### POST `/users/{userId}/block`
-Bloquea contacto.
+ChatER debe resolver estos procesos con los bloques canónicos publicados dentro de `APIS de memoriaBACKEND`; no debe volver a rutas heredadas cuando `MEMORIA_BACKEND_URL` está configurado.
 
-### POST `/reports`
-Reporta usuario, conversación o mensaje.
+### POST `/api/v1/bloqueos-usuario?s={siteId}`
+Registra bloqueo o desbloqueo de un contacto mediante `BLOQUEOSusuarioX`. El static site envía usuario autenticado, contacto objetivo, conversación asociada, `status` (`active` o `revoked`), motivo operativo, `clientMutationId` e idempotencia. Si la API falla temporalmente, la operación queda en cola local sin perder el estado visible.
 
-### GET `/privacy/settings`
-Lee privacidad.
+### POST `/api/v1/reportes-moderacion?s={siteId}`
+Registra reportes de usuario, conversación o mensaje mediante `REPORTESmoderacionX`. ChatER envía el tipo de entidad reportada, identificadores locales/remotos disponibles, motivo, descripción, evidencia contextual mínima, usuario autenticado, `clientMutationId` e idempotencia. La interfaz no decide sanciones ni bloqueos definitivos; solo sincroniza la intención de moderación para que memoriaBACKEND y soporte humano la procesen.
 
-### PATCH `/privacy/settings`
-Actualiza quién ve estado, última vez, foto o confirmaciones de lectura.
+### POST `/api/v1/privacidad-usuario?s={siteId}`
+Actualiza preferencias de visibilidad mediante `PRIVACIDADusuarioX`: perfil, estado, última actividad, campos públicos y campos privados. La lectura puede venir embebida en autenticación/perfil o en futuras respuestas del bloque; mientras tanto ChatER conserva el estado local y reintenta la escritura en la cola si memoriaBACKEND no está disponible.
 
-## 17. API de auditoría y salud
+Rutas heredadas de usuarios, reportes o privacidad no deben usarse como destino principal cuando existe memoriaBACKEND; esos procesos quedan cubiertos por `BLOQUEOSusuarioX`, `REPORTESmoderacionX` y `PRIVACIDADusuarioX`.
 
-### GET `/health`
-Health check público del backend.
+## 17. API de auditoría, versiones y telemetría segura
 
-### GET `/version`
-Versión de contratos.
+ChatER no debe usar rutas heredadas de telemetría del frontend cuando el catálogo adjunto de memoriaBACKEND publica contratos equivalentes. Para capacidades y versiones usa `VERSIONESapi`; para validar bloques y montajes usa `BLOQUESsincronizadosX`; para errores técnicos generados en el navegador usa `EVENTOSx` como evento estructurado seguro, porque el catálogo adjunto no expone una mutación pública directa de `LOGSx` para static sites.
 
-### POST `/client-errors`
-Recibe errores del frontend con `requestId`, navegador y ruta.
+### GET `/api/v1/versiones/manifest?s={siteId}`
+Devuelve capacidades publicadas por `VERSIONESapi`. ChatER lo consulta desde el modal **Estado de memoriaBACKEND** para confirmar que las rutas críticas siguen montadas.
 
+### GET `/api/v1/bloques-sincronizados/validacion?s={siteId}` y GET `/api/v1/bloques-sincronizados/montajes?s={siteId}`
+Validan sincronización entre bloques, contratos, versiones y montajes runtime sin leer ni modificar la carpeta `APIS de memoriaBACKEND`.
+
+### POST `/api/v1/eventos/registrar?s={siteId}`
+Registra telemetría técnica del static site como evento `client_error` o `unhandled_rejection`. ChatER sanea correos, tokens, URLs con query sensible y stack antes de enviar; no guarda estos errores en cola local para evitar ruido persistente si memoriaBACKEND está caído.
+
+Request mínimo:
+```json
+{
+  "type": "client_error",
+  "name": "Error técnico del navegador",
+  "category": "frontend-error",
+  "path": "/index.html",
+  "visitorId": "browser-device-id",
+  "sessionId": "browser-device-id",
+  "data": {
+    "level": "error",
+    "message": "mensaje saneado",
+    "source": "/js/app.js",
+    "line": 120,
+    "column": 10,
+    "stack": "stack saneado",
+    "browser": "user-agent saneado",
+    "userId": "usr_123",
+    "hasAuthenticatedSession": true,
+    "occurredAt": "ISO-8601"
+  },
+  "clientMutationId": "uuid"
+}
+```
+
+Rutas heredadas de salud, versión y errores del cliente no deben usarse como destino principal cuando existe memoriaBACKEND.
 
 ## 17.1 Cola local de sincronización del static site
 
@@ -744,6 +816,7 @@ Operaciones que deben quedar en cola con `clientMutationId` estable:
 - Promocionar estado propio: `PATCH /api/v1/publicaciones-efimeras/{stateId}`.
 - Crear llamada de voz, video o programada: `POST /api/v1/sesiones-comunicacion`.
 - Registrar dispositivo PWA para notificaciones: `POST /api/v1/push/suscripciones`; si ya existe una operación pendiente del mismo dispositivo, debe reemplazarse por la versión más reciente para no conservar una suscripción push obsoleta.
+- Dar de baja el dispositivo PWA de notificaciones: `DELETE /api/v1/push/suscripciones`; se conserva `endpoint`, `pushSubscription`, `deviceId` y `clientMutationId` para que memoriaBACKEND elimine la suscripción aunque el navegador ya la haya cancelado localmente.
 - Sincronizar herramientas comerciales visibles: `POST /api/v1/landing-tools/evento?s={siteId}` con `type:"tool_action"`, `toolId`, `action`, `clientMutationId`, `userEmail` y `clientTime`.
 
 Reglas de robustez:
@@ -806,14 +879,14 @@ Reglas obligatorias del cliente:
 
 ## 17.5 Guardas de autenticación previa a sesión
 
-Antes de que exista una sesión activa también puede haber carreras asíncronas: doble clic en entrada, respuesta tardía de `POST /auth/email/session`, verificación OTP cerrada por el usuario o un segundo intento de acceso con otro correo. El cliente debe tratar cada intento de acceso como una operación identificable e invalidable.
+Antes de que exista una sesión activa también puede haber carreras asíncronas: doble clic en entrada, carga tardía de `/login.js`, respuesta tardía de `GET /auth/check`, retorno tardío de `POST /auth/firebase/session` o un segundo intento de acceso con otra cuenta Gmail. El cliente debe tratar cada intento de acceso como una operación identificable e invalidable.
 
 Reglas obligatorias del cliente:
 
 - Cada envío del formulario de acceso debe crear un identificador de intento de autenticación.
-- Una respuesta tardía de `/auth/email/session` solo puede abrir OTP o completar sesión si su intento sigue vigente.
-- Una verificación OTP solo puede completar sesión si el modal OTP no fue cerrado y el intento original sigue vigente.
-- Al cerrar el modal OTP, cerrar sesión o completar sesión correctamente, los intentos de autenticación anteriores deben invalidarse.
+- Una respuesta tardía de `/auth/check` o `/auth/firebase/session` solo puede completar sesión si su intento sigue vigente.
+- Un evento tardío de `memoriaBACKEND:login` solo puede completar sesión si pertenece al intento Google/Gmail vigente y supera validación de proveedor/correo.
+- Al cerrar el modal Google/Gmail, cerrar sesión o completar sesión correctamente, los intentos de autenticación anteriores deben invalidarse.
 - Mientras una solicitud de acceso o verificación está en curso, el botón correspondiente debe quedar deshabilitado para evitar duplicados accidentales, pero debe restaurarse si el intento continúa activo y falla.
 
 ## 17.6 Ciclo de vida de escritura por conversación
@@ -831,7 +904,7 @@ Reglas obligatorias del cliente:
 
 ## 17.7 Ciclo de vida de paneles transitorios de interfaz
 
-Los paneles flotantes de una interfaz tipo WhatsApp, como emojis, herramientas, perfil, creación de chats o verificación OTP, no pueden quedar vivos cuando el contexto funcional deja de permitirlos. En un static site esto es especialmente importante porque no hay navegación de página completa que reinicie el DOM; todo depende del estado del cliente.
+Los paneles flotantes de una interfaz tipo WhatsApp, como emojis, herramientas, perfil, creación de chats o acceso Google/Gmail, no pueden quedar vivos cuando el contexto funcional deja de permitirlos. En un static site esto es especialmente importante porque no hay navegación de página completa que reinicie el DOM; todo depende del estado del cliente.
 
 Reglas obligatorias del cliente:
 
@@ -855,7 +928,7 @@ El punto débil detectado en esta iteración fue la inconsistencia entre referen
 
 ## 18. Prioridad de implementación
 
-1. `/auth/email/otp/request`, `/auth/email/otp/verify`, `/auth/refresh`, `/api/v1/perfil-usuario`, con guardas de intento para respuestas tardías y cierre de OTP.
+1. `/login.js`, `/auth/check`, `/auth/firebase/session`, `/auth/refresh`, `/auth/logout` y `/api/v1/perfil-usuario`, con guardas de intento para respuestas tardías y cierre de acceso Google/Gmail.
 2. `/api/v1/conversaciones`, `/api/v1/mensajes`.
 3. Reconciliación de IDs reales devueltos por memoriaBACKEND para conversaciones, mensajes, estados y llamadas creadas de forma optimista.
 4. Aislamiento local por correo electrónico para caché, outbox y cursor `lastEventId` de `streme`.
@@ -875,7 +948,7 @@ Para que el static site no tenga botones decorativos, cada acción visible debe 
 
 | Botón o acción visible | Lógica local obligatoria | API futura relacionada |
 |---|---|---|
-| Entrar a ChatER | Valida formato de correo, inicia sesión local o abre verificación OTP si el backend la exige | `POST /auth/email/otp/request`, `POST /auth/email/otp/verify` |
+| Entrar a ChatER | Exige Google/Gmail mediante `AUTENTICACIONx`, carga `login.js`, valida cookie con `/auth/check` y solo acepta correos Gmail/Google verificados cuando la configuración lo requiere | `GET /login.js`, `GET /auth/check`, `POST /auth/firebase/session`, `POST /auth/logout` |
 | Perfil | Muestra correo activo, tipo de acceso y modo visual automático | `GET /api/v1/perfil-usuario`, `PATCH /api/v1/perfil-usuario/{id}` cuando memoriaBACKEND lo publique para edición |
 | Nuevo chat `+` | Crea o abre conversación por correo electrónico, evita duplicados locales y restaura un chat archivado si el correo ya existía | `POST /api/v1/conversaciones`, `POST /api/v1/relaciones-usuario` si se habilita relación explícita, `PATCH /api/v1/conversaciones/{conversationId}` |
 | Archivados | Muestra acceso real en la lista principal, abre chats archivados, permite restaurarlos y conserva mensajes sin depender de números telefónicos | `PATCH /api/v1/conversaciones/{conversationId}` con `archived` |
@@ -900,29 +973,29 @@ El punto débil más sensible detectado previamente era que, aunque el almacenam
 
 En esta iteración se detectó un punto débil en el ciclo de vida de escritura: `typing.start` y `typing.stop` usaban el estado global de escritura sin conservar de forma explícita el `chatId` donde nació la señal. Si el usuario cambiaba rápido de conversación o pasaba a Estados/Llamadas antes de terminar el temporizador, el siguiente chat podía no emitir `typing.start` o el cierre de escritura podía quedar desalineado. Se corrigió asociando el estado de escritura al `conversationId`, cerrando la señal anterior al cambiar de chat o sección, y haciendo que el temporizador emita `typing.stop` contra el `chatId` capturado.
 
-En esta revisión posterior se detectó otro punto débil de mayor impacto en despliegue real: cuando `MEMORIA_BACKEND_URL` estaba configurado y el endpoint de acceso fallaba, el cliente entraba igualmente en modo local. Ese comportamiento era aceptable solo para demo sin backend, pero en producción podía simular una sesión válida aunque memoriaBACKEND no hubiese autenticado el correo. Se corrigió para que el modo local solo se active cuando no existe URL de backend; si memoriaBACKEND está configurado y falla la validación, el login queda bloqueado con un mensaje de error recuperable. Se preserva la corrección previa de aislamiento local por correo, guardas de sesión y autenticación, hidratación bajo demanda del historial, deduplicación por identidad, `streme` WebSocket/SSE con `lastEventId`, publicación por `POST /streme/events` cuando aplica, flujo real de adjuntos con subida firmada, cola persistente para escrituras fallidas y ciclo de vida de escritura por conversación.
+En esta revisión posterior se detectó otro punto débil de mayor impacto en despliegue real: cuando `MEMORIA_BACKEND_URL` estaba configurado y el endpoint de acceso fallaba, el cliente entraba igualmente en modo local. Ese comportamiento era aceptable solo para demo sin backend, pero en producción podía simular una sesión válida aunque memoriaBACKEND no hubiese autenticado el correo. Se corrigió para que el modo local solo se active cuando no existe URL de backend; si memoriaBACKEND está configurado y falla la validación, el login queda bloqueado con un mensaje de error recuperable. Se preserva la corrección previa de aislamiento local por correo, guardas de sesión y autenticación, hidratación bajo demanda del historial, deduplicación por identidad, `streme` WebSocket/SSE con `lastEventId`, publicación por `POST /api/v1/streme/eventos` cuando aplica, flujo real de adjuntos con `MEDIAfirmadaX` o `ImagenesCloudflareR2x` según el tipo de archivo, cola persistente para escrituras fallidas y ciclo de vida de escritura por conversación.
 
 En esta iteración se detectó un punto débil visual-funcional relacionado con la regla de imágenes opcionales en `assets`: los avatares se cargaban de forma asíncrona y, si el usuario cambiaba rápido de conversación, sección o detalle de llamada mientras el PNG anterior terminaba de cargar, el callback tardío podía insertar una imagen ya obsoleta en el contenedor reutilizado. También estados y llamadas no normalizaban `avatarImage`, aunque las imágenes opcionales ya estaban documentadas para conversaciones. Se corrigió con un token de render por contenedor antes de aceptar `onload`/`onerror`, se extendió `avatarImage` a estados y llamadas, y las listas de estados, llamadas y detalle de llamada usan el mismo mecanismo de fallback geométrico con iniciales.
 
-En esta iteración se detectó un punto débil de validación de sesión en producción: una sesión local guardada durante el modo demo podía sobrevivir cuando luego se configuraba `MEMORIA_BACKEND_URL`, permitiendo abrir la interfaz sin que memoriaBACKEND hubiera devuelto tokens válidos. También se endureció el caso de tokens vencidos rechazados por `/me` con `401` o `403`. Se corrigió para que, cuando exista backend configurado, ChatER exija credenciales reales antes de renderizar el chat, limpie la sesión local no verificada y solicite reingreso por correo. Además se robusteció la detección de imágenes opcionales de `assets` aceptando rutas seguras como `avatar.png`, `/assets/avatar.png` o `assets/avatar.png`, normalizando conversaciones heredadas y mostrando la imagen opcional dentro de la vista principal de estados si existe.
+En esta iteración se detectó un punto débil de validación de sesión en producción: una sesión local guardada durante el modo demo podía sobrevivir cuando luego se configuraba `MEMORIA_BACKEND_URL`, permitiendo abrir la interfaz sin que memoriaBACKEND hubiera devuelto tokens válidos. También se endureció el caso de sesiones vencidas rechazadas por `/auth/check` o por APIs protegidas con `401` o `403`. Se corrigió para que, cuando exista backend configurado, ChatER exija credenciales reales antes de renderizar el chat, limpie la sesión local no verificada y solicite reingreso por correo. Además se robusteció la detección de imágenes opcionales de `assets` aceptando rutas seguras como `avatar.png`, `/assets/avatar.png` o `assets/avatar.png`, normalizando conversaciones heredadas y mostrando la imagen opcional dentro de la vista principal de estados si existe.
 
 En esta revisión se detectó un punto débil derivado del cierre forzado de sesión: `clearSession()` invalidaba tokens, colas y guardas internas, pero no cerraba necesariamente la conexión `streme` ni limpiaba el estado efímero de escritura cuando la sesión se limpiaba por token vencido, rechazo `401/403` o transición desde demo local hacia backend configurado. Aunque los eventos tardíos ya se descartaban por guarda de sesión, el socket o EventSource antiguo podía permanecer vivo y hacer que el siguiente login no conectara tiempo real porque `connectStremeRealtime()` encontraba una conexión previa. Se corrigió cerrando siempre WebSocket/SSE, cancelando reconexiones y reiniciando `typingState` al limpiar la sesión, sin borrar las conversaciones locales aisladas por correo.
 
 En esta iteración se detectó un punto débil de interfaz transitoria: el panel de emojis dependía solo de su propio botón y podía permanecer visible después de cambiar a Estados, Llamadas, otro chat, volver a la lista móvil, abrir adjuntos o cerrar una sesión. Esto no rompía la sintaxis, pero dejaba una acción del composer activa fuera de su contexto real, contradiciendo la regla de que todos los botones tengan lógica relacionada y observable. Se corrigió centralizando el cierre de paneles transitorios, impidiendo abrir emojis cuando el composer está deshabilitado, cerrando el panel al cambiar de contexto y limpiando modales/paneles al invalidar la sesión sin borrar datos persistentes ni colas pendientes.
 
-En esta iteración se detectó un punto débil en la sección Estados: el botón **Responder por chat** dependía casi exclusivamente de coincidencias visuales por nombre o avatar. En producción, un estado remoto puede venir de memoriaBACKEND con `chatId`, `conversationId`, `contactEmail` u objeto `owner`, y dos contactos pueden compartir nombre o iniciales. Se corrigió normalizando el vínculo del estado hacia conversación/correo, conservando esos campos en estado local, buscando primero por `chatId` o correo y creando una conversación local encolada por `POST /chats` cuando solo existe el correo. Así el botón de respuesta mantiene lógica observable sin depender de datos semilla ni de coincidencias frágiles de interfaz.
+En esta iteración se detectó un punto débil en la sección Estados: el botón **Responder por chat** dependía casi exclusivamente de coincidencias visuales por nombre o avatar. En producción, un estado remoto puede venir de memoriaBACKEND con `chatId`, `conversationId`, `contactEmail` u objeto `owner`, y dos contactos pueden compartir nombre o iniciales. Se corrigió normalizando el vínculo del estado hacia conversación/correo, conservando esos campos en estado local, buscando primero por `chatId` o correo y creando una conversación local encolada por `POST /api/v1/conversaciones` cuando solo existe el correo. Así el botón de respuesta mantiene lógica observable sin depender de datos semilla ni de coincidencias frágiles de interfaz.
 
 Para evitar regresiones, ChatER debe cumplir simultáneamente estas condiciones antes de considerarse listo:
 
 - El acceso se hace por correo electrónico; nunca se solicita número telefónico.
 - El modo demo local solo puede iniciar sesión cuando `MEMORIA_BACKEND_URL` no está configurado; si memoriaBACKEND existe y falla, el frontend no debe conceder una sesión local falsa.
 - Una sesión guardada en modo demo no debe abrir el chat cuando luego se configure `MEMORIA_BACKEND_URL`; debe pedirse reingreso con correo y credenciales reales.
-- Si `/me` rechaza la sesión con `401` o `403`, el frontend debe limpiar la sesión local y pedir autenticación nuevamente.
-- Las respuestas tardías de login u OTP deben descartarse si el intento ya no está vigente.
+- Si `/auth/check` o una API protegida rechaza la sesión con `401` o `403`, el frontend debe limpiar la sesión local y pedir autenticación Google/Gmail nuevamente.
+- Las respuestas tardías de login Google/Gmail deben descartarse si el intento ya no está vigente.
 - El tema se calcula automáticamente por hora local desde la carga inicial para evitar parpadeo visual.
 - La comunicación nueva en tiempo real se canaliza por `streme` con reconexión y `lastEventId`; debe funcionar con WebSocket o SSE/EventSource y no se debe introducir polling para mensajes nuevos.
-- Al iniciar sesión con `MEMORIA_BACKEND_URL`, el cliente debe leer `/me`, `/chats`, `/states` y `/calls/history` para reemplazar o complementar los datos semilla con datos reales.
-- Al abrir una conversación real, el cliente debe hidratar `GET /chats/{chatId}/messages` si el historial no fue entregado incrustado en `/chats`.
+- Al iniciar sesión con `MEMORIA_BACKEND_URL`, el cliente debe leer `/api/v1/perfil-usuario`, `/api/v1/conversaciones`, `/api/v1/publicaciones-efimeras` y `/api/v1/sesiones-comunicacion` para reemplazar o complementar los datos semilla con datos reales.
+- Al abrir una conversación real, el cliente debe hidratar `GET /api/v1/mensajes?conversationId={chatId}` si el historial no fue entregado incrustado en `/api/v1/conversaciones`.
 - Los eventos `streme` de creación, edición y eliminación de mensajes deben actualizar la conversación local para evitar desalineación visual y deben deduplicarse con mensajes optimistas por `clientMutationId`.
 - Al limpiar o invalidar una sesión debe cerrarse la conexión `streme` activa, cancelarse su reconexión y permitirse que el siguiente correo abra una conexión nueva sin quedar bloqueado por sockets antiguos.
 - La señal de escritura debe quedar asociada al `chatId` capturado; cambiar de chat o sección debe cerrar `typing.stop` del contexto anterior antes de permitir un nuevo `typing.start`.
@@ -938,6 +1011,8 @@ Para evitar regresiones, ChatER debe cumplir simultáneamente estas condiciones 
 - Las imágenes opcionales deben buscarse automáticamente en `assets`; si faltan, la interfaz conserva placeholders geométricos con iniciales o figuras CSS. Los callbacks tardíos de carga de imagen no deben poder reemplazar el avatar de otro chat, estado o llamada.
 - Las rutas de imágenes opcionales devueltas por memoriaBACKEND deben normalizarse de forma segura hacia `assets/*.png`, incluyendo datos locales heredados de conversaciones, estados y llamadas.
 
+En esta iteración se detectó un punto débil específico del acceso Google/Gmail en producción: si `login.js` de `AUTENTICACIONx` fallaba una vez por red, CORS, dominio no autorizado o despliegue transitorio, el `<script>` quedaba en el DOM sin estado cargado y los siguientes intentos podían no disparar eventos nuevos. Eso podía dejar el formulario de acceso sin una ruta recuperable aunque memoriaBACKEND volviera a estar disponible. Se corrigió reemplazando el nodo fallido en cada reintento, asignando manejadores antes de `src`, validando que la URL cargada sea la vigente y actualizando la versión del static site para que Render/PWA refresquen el shell.
+
 ## 21. Revisión de punto débil: instalación PWA y actualización del static site
 
 En esta iteración se identificó como punto débil principal el ciclo de instalación y actualización de ChatER como appWEB. La interfaz ya funcionaba como static site con sesión por correo, tema automático, comunicación prevista con memoriaBACKEND y botones principales conectados, pero no tenía manifiesto PWA, service worker, registro de actualización ni navegación móvil inferior alineada con las pantallas de referencia del ZIP `interface`. Sin esos módulos, el sitio podía verse como web móvil, pero no quedaba preparado para instalarse ni autoactualizarse cuando Render.com publicara cambios.
@@ -952,7 +1027,7 @@ Cambios funcionales incorporados:
 - En móvil se agregó navegación inferior para **Chats**, **Llamadas**, **Novedades** y **Herramientas**, más cercana a las referencias visuales de la carpeta `interface`.
 - Se corrigieron reglas CSS débiles que podían afectar la renderización visual: una llave extra en estilos de botones y una regla duplicada de `.state-avatar.viewed`.
 
-Este ciclo no agrega una API obligatoria nueva a memoriaBACKEND para la instalación PWA, porque el service worker y el manifiesto pertenecen al static site. Sin embargo, para operación productiva se recomienda mantener disponibles los endpoints ya documentados `GET /version` y `POST /client-errors`, de modo que el frontend pueda reportar errores de actualización o diferencias de contrato cuando memoriaBACKEND esté configurado.
+Este ciclo no agrega una API obligatoria nueva a memoriaBACKEND para la instalación PWA, porque el service worker y el manifiesto pertenecen al static site. Para operación productiva, la validación de versión y contrato debe apoyarse en `GET /api/v1/versiones/manifest` y `GET /api/v1/bloques-sincronizados/validacion`; los errores técnicos del navegador deben reportarse mediante `POST /api/v1/eventos/registrar` cuando `memoriaBACKEND` esté configurado, sin reactivar endpoints heredados de versión ni de errores del cliente.
 
 Reglas adicionales de validación para considerar ChatER listo:
 
@@ -1014,7 +1089,7 @@ En esta iteración se identificó como punto débil principal el límite entre l
 
 Cambios funcionales incorporados:
 
-- `service-worker.js` ahora deja pasar sin interceptar rutas runtime de backend como `/api`, `/auth`, `/me`, `/contacts`, `/chats`, `/messages`, `/states`, `/calls`, `/media`, `/presence`, `/streme`, `/client-errors` y `/version` cuando estén bajo el mismo origen.
+- `service-worker.js` ahora deja pasar sin interceptar rutas runtime de backend cuando estén bajo el mismo origen, incluyendo prefijos canónicos de `memoriaBACKEND` y prefijos heredados solo como exclusión defensiva de cache.
 - Las peticiones con encabezado `Accept: text/event-stream` quedan excluidas del cache para proteger `streme` en modo SSE y mantener la comunicación en tiempo real sin polling.
 - Se conservó la estrategia `networkFirst` para navegación del static site y el fallback geométrico para PNG opcionales dentro de `assets`.
 - Se endureció `staleWhileRevalidate` para que, cuando no exista cache y falle la red, no responda con `null`; ahora devuelve fallback de `index.html` o un error de red válido.
@@ -1048,7 +1123,7 @@ Reglas adicionales de validación:
 - Los archivos `index.html`, `manifest.json`, `css/styles.css`, `js/config.js`, `js/app.js` y `js/pwa.js` deben intentar red primero para reducir al mínimo la ventana de versión obsoleta.
 - El fallback offline de navegación debe seguir respondiendo con `index.html`, pero los recursos CSS/JS no deben recibir HTML como fallback si nunca fueron cacheados.
 - La actualización manual debe funcionar aunque el archivo `service-worker.js` no haya cambiado entre dos despliegues estáticos, porque puede refrescar la cache del shell activo.
-- El flujo de actualización no debe interceptar `/api`, `/auth`, `/me`, `/contacts`, `/chats`, `/messages`, `/states`, `/calls`, `/media`, `/presence`, `/streme`, `/client-errors`, `/version` ni peticiones SSE con `Accept: text/event-stream`.
+- El flujo de actualización no debe interceptar rutas runtime de backend ni peticiones SSE con `Accept: text/event-stream`; solo debe cachear recursos estáticos del shell.
 
 ## 26. Revisión de punto débil: detección automática de versión publicada
 
@@ -1078,18 +1153,18 @@ En esta iteración se identificó como punto débil principal que la sección **
 Cambios funcionales incorporados:
 
 - La sección **Llamadas** ahora renderiza un hub superior con botones reales **Llamar**, **Programar** y **Teclado**.
-- **Llamar** reutiliza el selector existente de conversaciones y la lógica auditada de `startCall`, conservando historial local, mensaje de sistema, cola idempotente y sincronización por `POST /calls`.
-- **Programar** abre un formulario con conversación, tipo de llamada y fecha/hora; crea una entrada local `scheduled`, registra un mensaje de sistema y sincroniza con el nuevo contrato `POST /calls/scheduled` o deja la operación en cola si memoriaBACKEND falla.
-- **Teclado** respeta que ChatER usa correo electrónico, no teléfono: solicita un correo válido, reutiliza o crea la conversación local correspondiente, encola `POST /chats` si hace falta y luego inicia la llamada.
+- **Llamar** reutiliza el selector existente de conversaciones y la lógica auditada de `startCall`, conservando historial local, mensaje de sistema, cola idempotente y sincronización por `POST /api/v1/sesiones-comunicacion`.
+- **Programar** abre un formulario con conversación, tipo de llamada y fecha/hora; crea una entrada local `scheduled`, registra un mensaje de sistema y sincroniza con `POST /api/v1/sesiones-comunicacion` usando `scheduledAt`, o deja la operación en cola si memoriaBACKEND falla.
+- **Teclado** respeta que ChatER usa correo electrónico, no teléfono: solicita un correo válido, reutiliza o crea la conversación local correspondiente, encola `POST /api/v1/conversaciones` si hace falta y luego inicia la llamada.
 - El historial de llamadas agrega etiqueta **Recientes**, diferencia llamadas programadas y permite desde el detalle llamar ahora, programar otra llamada o abrir el chat relacionado.
-- La normalización de llamadas remotas reconoce `scheduledAt`, `startsAt`, `startTime`, `status: scheduled`, correo del contacto y avatar opcional para que `/calls/history` pueda hidratar tanto llamadas normales como programadas.
+- La normalización de llamadas remotas reconoce `scheduledAt`, `startsAt`, `startTime`, `status: scheduled`, correo del contacto y avatar opcional para que `SESIONEScomunicacionX` pueda hidratar tanto llamadas normales como programadas.
 - Se añadieron estilos responsive para que los accesos rápidos se parezcan más a las capturas móviles dentro de `interface`, sin imágenes obligatorias y manteniendo placeholders geométricos.
 
 Reglas adicionales de validación:
 
 - Ningún botón visible dentro de la cabecera de llamadas debe ser decorativo: todos deben abrir una acción local observable.
 - El teclado de llamadas debe aceptar correos electrónicos y nunca pedir número telefónico.
-- Programar una llamada debe funcionar en modo local y en modo backend con cola idempotente si falla `POST /calls/scheduled`.
+- Programar una llamada debe funcionar en modo local y en modo backend con cola idempotente si falla `POST /api/v1/sesiones-comunicacion`.
 - Las llamadas programadas deben poder repetirse como llamada inmediata y conservar acceso al chat relacionado.
 - Los accesos directos a contactos recientes deben derivarse de conversaciones o llamadas existentes, sin depender de datos externos ni imágenes obligatorias.
 
@@ -1101,7 +1176,7 @@ Cambios funcionales incorporados:
 
 - La lista de estados ahora muestra encabezado **Estados**, fila **Añadir estado**, texto de expiración **Desaparece después de 24 horas**, botón **Promocionar tu estado** y bloque **Recientes** antes de los estados existentes.
 - **Promocionar tu estado** abre un flujo real: si no hay estados, invita a crear uno; si hay estado activo, prepara una promoción local y la sincroniza con memoriaBACKEND cuando esté configurado.
-- Se agregó `POST /states/{stateId}/promotion` al contrato de APIs necesarias para memoriaBACKEND.
+- La promoción de estado queda alineada con `PATCH /api/v1/publicaciones-efimeras/{stateId}` como actualización del bloque `PUBLICACIONESefimerasX`, sin conservar el endpoint heredado de promoción de estados como contrato vigente.
 - La promoción usa `clientMutationId`, se guarda en el estado local, actualiza la interfaz y queda en la cola idempotente como `promoteState` si la API falla.
 - La reconciliación de estados remotos conserva `promotionRequested`, `promotionStatus` y `promotionId` cuando memoriaBACKEND los devuelve.
 - Se añadieron estilos específicos para el botón de promoción, la jerarquía **Estados/Recientes** y el resumen de promoción sin requerir imágenes reales.
@@ -1111,7 +1186,7 @@ Reglas adicionales de validación:
 
 - El botón **Promocionar tu estado** no debe ser decorativo; debe abrir modal y registrar una acción local observable.
 - En modo demo local, la promoción debe quedar registrada sin bloquear la interfaz.
-- En modo memoriaBACKEND, la promoción debe usar `POST /states/{stateId}/promotion` y encolarse si falla.
+- En modo memoriaBACKEND, la promoción debe usar `PATCH /api/v1/publicaciones-efimeras/{stateId}` y encolarse si falla.
 - La lista de Estados debe conservar la acción de crear estado y el listado de recientes sin depender de imágenes obligatorias.
 - La actualización de versión debe acompañar cualquier cambio en HTML, CSS, JS o service worker cacheado.
 
@@ -1138,11 +1213,11 @@ Reglas adicionales de validación:
 
 ## 30. Revisión de punto débil: lectura local sin confirmación remota
 
-En esta iteración se identificó como punto débil principal que abrir una conversación limpiaba el contador de no leídos solo en la interfaz local, pero no confirmaba esa lectura contra memoriaBACKEND. En una app estática conectada a APIs, eso podía hacer que `/chats` volviera a hidratar la conversación con el mismo contador remoto, que otros dispositivos no recibieran el estado leído y que la acción visible de abrir un chat no tuviera una escritura equivalente hacia el backend.
+En esta iteración se identificó como punto débil principal que abrir una conversación limpiaba el contador de no leídos solo en la interfaz local, pero no confirmaba esa lectura contra memoriaBACKEND. En una app estática conectada a APIs, eso podía hacer que el contrato remoto de conversaciones volviera a hidratar la conversación con el mismo contador remoto, que otros dispositivos no recibieran el estado leído y que la acción visible de abrir un chat no tuviera una escritura equivalente hacia el backend.
 
 Cambios funcionales incorporados:
 
-- Se agregó el cliente `markConversationRead()` para `POST /chats/{chatId}/read` con `readAt` y `clientMutationId` idempotente.
+- Se agregó el cliente `markConversationRead()` para `POST /api/v1/interacciones-mensaje` con `interactionType: read`, `readAt` y `clientMutationId` idempotente.
 - Al abrir una conversación con mensajes no leídos, ChatER ahora marca lectura localmente y sincroniza esa lectura con memoriaBACKEND cuando está configurado.
 - Si memoriaBACKEND falla, la lectura queda en la cola local como `markChatRead` para reintentarse sin bloquear la interfaz.
 - La cola de sincronización puede reproducir `markChatRead` y actualizar el estado local `lastReadSyncStatus`, `lastReadAt` y `readSyncedAt` cuando la API responde.
@@ -1152,7 +1227,7 @@ Cambios funcionales incorporados:
 
 Reglas adicionales de validación:
 
-- Abrir un chat no debe limitarse a limpiar el contador visual; debe sincronizar `POST /chats/{chatId}/read` cuando exista backend.
+- Abrir un chat no debe limitarse a limpiar el contador visual; debe sincronizar `POST /api/v1/interacciones-mensaje` cuando exista backend.
 - La lectura debe funcionar en modo demo local sin exigir red y en modo backend con cola idempotente si la API falla.
 - Un recibo de lectura no debe mezclarse entre correos: debe pasar por las mismas guardas de sesión y almacenamiento aislado ya existentes.
 - Los mensajes recibidos por `streme` en una conversación abierta deben quedar confirmados como leídos sin polling.
@@ -1161,7 +1236,7 @@ Reglas adicionales de validación:
 
 ## 31. Revisión de punto débil: lista principal sin Archivados funcionales
 
-En esta iteración se identificó como punto débil principal que la pantalla principal de chats todavía no reproducía una pieza visible importante de las referencias del ZIP `interface`: la fila **Archivados** de la lista de conversaciones. El proyecto ya tenía documentación de `PATCH /chats/{chatId}` para archivar o configurar chats, pero la interfaz no ofrecía un acceso real a conversaciones archivadas ni una acción local observable para archivar/restaurar desde el static site.
+En esta iteración se identificó como punto débil principal que la pantalla principal de chats todavía no reproducía una pieza visible importante de las referencias del ZIP `interface`: la fila **Archivados** de la lista de conversaciones. El proyecto ya tenía documentación heredada de actualización de conversaciones para archivar o configurar chats, pero la interfaz no ofrecía un acceso real a conversaciones archivadas ni una acción local observable para archivar/restaurar desde el static site.
 
 Cambios funcionales incorporados:
 
@@ -1170,7 +1245,7 @@ Cambios funcionales incorporados:
 - El botón nuevo de la cabecera del chat permite archivar la conversación activa y cambia a acción de restauración cuando se abre un chat archivado.
 - La fila **Archivados** abre un modal funcional con las conversaciones archivadas, acciones **Abrir** y **Restaurar**, y estado vacío de producción si aún no hay chats archivados.
 - Al crear un chat con un correo que ya existe pero está archivado, ChatER lo restaura y lo abre en vez de duplicarlo.
-- En modo memoriaBACKEND, archivar/restaurar usa `PATCH /chats/{chatId}` con `archived` y `clientMutationId`; si falla, la acción queda en cola idempotente como `updateConversation`.
+- En modo memoriaBACKEND, archivar/restaurar usa `PATCH /api/v1/conversaciones/{conversationId}` con `archived` y `clientMutationId`; si falla, la acción queda en cola idempotente como `updateConversation`.
 - La normalización de conversaciones locales y remotas reconoce `archived`, `isArchived`, `archiveSyncStatus` y `archiveSyncedAt` sin perder lógica previa de mensajes, lectura, estados, llamadas, adjuntos, `streme` ni sesión por correo.
 - Se corrigió el incremento duplicado del contador interno de guardas de sesión para evitar saltos innecesarios en `activeSessionRuntimeId` sin cambiar el comportamiento de seguridad existente.
 - Se incrementó `app-version.json` y `CHATER_SW_VERSION` para que la PWA instalada detecte esta mejora y la aplique sin reinstalación.
@@ -1180,7 +1255,7 @@ Reglas adicionales de validación:
 - La fila **Archivados** no debe ser decorativa: debe abrir un panel real con acciones de abrir/restaurar.
 - Archivar debe sacar el chat de la lista principal sin borrar mensajes ni estado local.
 - Restaurar debe devolver el chat a la lista principal y abrirlo cuando la acción se ejecute desde el modal.
-- En modo backend, el cambio de archivado debe usar `PATCH /chats/{chatId}` y encolarse si memoriaBACKEND no responde.
+- En modo backend, el cambio de archivado debe usar `PATCH /api/v1/conversaciones/{conversationId}` y encolarse si memoriaBACKEND no responde.
 - La acción de crear chat no debe duplicar una conversación archivada con el mismo correo; debe restaurarla y abrirla.
 - La interfaz debe seguir funcionando sin imágenes reales: los avatares opcionales continúan usando placeholders geométricos.
 
@@ -1194,9 +1269,9 @@ Cambios funcionales incorporados:
 - La lista de chats ahora ordena primero las conversaciones fijadas y muestra un indicador visible de pin en la columna de hora/metadatos.
 - Se agregó un botón real en la cabecera de conversación para **Fijar** o **Desfijar** el chat activo, sin afectar archivar, llamadas, adjuntos, estados ni mensajes.
 - El estado local reconoce `pinned`, `isPinned`, `pinSyncStatus` y `pinSyncedAt`, preservando conversaciones heredadas y respuestas remotas de memoriaBACKEND.
-- En modo memoriaBACKEND, fijar/desfijar usa `PATCH /chats/{chatId}` con `pinned` y `clientMutationId`; si falla, queda en la cola idempotente como `updateConversation`.
+- En modo memoriaBACKEND, fijar/desfijar usa `PATCH /api/v1/conversaciones/{conversationId}` con `pinned` y `clientMutationId`; si falla, queda en la cola idempotente como `updateConversation`.
 - Las conversaciones archivadas conservan su indicador de fijado en el modal de Archivados, pero siguen fuera de la lista principal hasta restaurarse.
-- La documentación de APIs ahora declara explícitamente `pinned` dentro de `PATCH /chats/{chatId}` y en la matriz de botones funcionales.
+- La documentación de APIs ahora declara explícitamente `pinned` dentro de `PATCH /api/v1/conversaciones/{conversationId}` y en la matriz de botones funcionales.
 - Se incrementó `app-version.json` y `CHATER_SW_VERSION` para que la PWA instalada detecte esta mejora y actualice el shell sin reinstalación.
 
 Reglas adicionales de validación:
@@ -1262,16 +1337,16 @@ Cambios funcionales incorporados:
 - La interfaz genera una vista previa vertical 9:16 dentro del modal cuando el archivo es liviano, y muestra una tarjeta geométrica con nombre/tamaño si no conviene guardar la previsualización en `localStorage`.
 - Los estados locales conservan metadatos visuales (`mediaName`, `mediaMimeType`, `mediaSizeBytes`, `mediaKind`, `mediaPreviewDataUrl`, `mediaSyncStatus`) sin afectar estados antiguos solo de texto.
 - El panel de estado ahora renderiza imagen/video cuando existe `mediaPreviewDataUrl` o `mediaUrl`, y conserva un fallback geométrico cuando el archivo no está disponible.
-- En modo memoriaBACKEND, el flujo visual usa `POST /media/upload-url`, sube al `uploadUrl` firmado y después publica `POST /states` con `mediaId`/metadatos.
-- Si el archivo ya subió pero falla `POST /states`, la operación queda en la cola idempotente `createState`; si falla la subida antes de obtener `mediaId`, el estado queda local y avisa que debe reintentarse porque el static site no puede persistir el binario para otra sesión.
-- `GET /states` reconoce estados remotos con `media`, `mediaUrl`, `mediaName`, `mediaMimeType`, `mediaSizeBytes` y `mediaKind` para hidratar historias visuales reales.
-- La documentación de `POST /states` ahora especifica contratos separados para estado de texto y estado visual.
+- En modo memoriaBACKEND, el flujo visual usa `ImagenesCloudflareR2x` (`POST /api/v1/imagenes-r2x/intenciones` + confirmación) cuando el recurso es imagen WebP optimizada, o `MEDIAfirmadaX` (`POST /api/v1/media-firmada/solicitar`) para media genérica; después publica `POST /api/v1/publicaciones-efimeras` con `mediaId`/metadatos.
+- Si el archivo ya subió pero falla `POST /api/v1/publicaciones-efimeras`, la operación queda en la cola idempotente `createState`; si falla la subida antes de obtener `mediaId`/`imageId`, el estado queda local y avisa que debe reintentarse porque el static site no puede persistir el binario para otra sesión.
+- `GET /api/v1/publicaciones-efimeras` reconoce estados remotos con `media`, `mediaUrl`, `mediaName`, `mediaMimeType`, `mediaSizeBytes` y `mediaKind` para hidratar historias visuales reales.
+- La documentación de `POST /api/v1/publicaciones-efimeras` ahora especifica contratos separados para estado de texto y estado visual.
 - Se incrementaron `app-version.json` y `CHATER_SW_VERSION` para que la PWA instalada detecte la mejora y actualice el shell sin reinstalación.
 
 Reglas adicionales de validación:
 
 - El botón de cámara/crear estado no debe limitarse a texto cuando la referencia visual espera estados tipo historia.
-- La mejora debe funcionar sin backend como demo local y con backend mediante `media/upload-url` + `states`.
+- La mejora debe funcionar sin backend como demo local y con backend mediante `ImagenesCloudflareR2x`/`MEDIAfirmadaX` + `PUBLICACIONESefimerasX`.
 - No se deben agregar imágenes binarias al proyecto; los archivos visuales de estado son seleccionados por el usuario en tiempo de ejecución.
 - Un archivo pesado no debe romper `localStorage`: se conserva metadato y fallback visual.
 - Las rutas y lógica existentes de chats, llamadas, archivados, fijados, lectura, `streme`, outbox y PWA deben mantenerse sin regresión.
@@ -1332,7 +1407,7 @@ Reglas adicionales de validación:
 - Ningún asset opcional cubierto por prompt debe pertenecer al precache obligatorio si su ausencia puede impedir instalar el service worker.
 - Las imágenes reales futuras en `assets` deben seguir teniendo prioridad: si existen y responden correctamente, el service worker las cachea y deja de usar el fallback para esa URL.
 - La solución no debe crear imágenes finales ni modificar los prompts `.txt`; solo garantiza una figura geométrica operativa mientras los binarios reales no existan.
-- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, login por correo, tema automático y navegación móvil no debe cambiar por esta corrección.
+- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no debe cambiar por esta corrección.
 
 ## 39. Revisión de punto débil: fallbacks PWA reales no priorizados al existir el asset
 
@@ -1351,7 +1426,7 @@ Reglas adicionales de validación:
 - Ningún recurso referenciado por el favicon o por el manifiesto debe depender exclusivamente de un archivo omitido del ZIP funcional.
 - Los assets reales dentro de `assets` tienen prioridad sobre los placeholders geométricos.
 - Los placeholders PNG son recursos técnicos provisionales; no sustituyen los prompts `.txt` de los PNG finales ni introducen imágenes finales nuevas.
-- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, login por correo, tema automático y navegación móvil no debe cambiar por esta corrección.
+- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no debe cambiar por esta corrección.
 
 
 ## 40. Revisión de punto débil: manifiesto PWA apuntando a PNG omitidos del ZIP
@@ -1369,7 +1444,7 @@ Reglas adicionales de validación:
 
 - Todo recurso referenciado por `index.html` o por `manifest.json` para instalación inicial debe existir físicamente o tener una ruta de fallback efectiva desde la primera carga.
 - Los placeholders PNG son recursos técnicos temporales para evitar roturas de instalación, no imágenes finales del producto.
-- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático y navegación móvil no se modifica por esta corrección.
+- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no se modifica por esta corrección.
 
 ## 41. Revisión de punto débil: empaquetado físico de iconos PNG de respaldo
 
@@ -1386,7 +1461,7 @@ Reglas adicionales de validación:
 
 - Los recursos referenciados como fallback por el manifiesto y el favicon deben estar disponibles desde la primera carga.
 - Los PNG agregados son placeholders técnicos para estabilidad de instalación, no imágenes finales del producto.
-- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático y navegación móvil no se modifica por esta corrección.
+- La lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no se modifica por esta corrección.
 
 ## 42. Revisión de punto débil: recursos PNG declarados pero omitidos físicamente
 
@@ -1397,7 +1472,7 @@ Cambios funcionales incorporados:
 - Se agregaron físicamente `assets/chater-icon-fallback.png` y `assets/chater-maskable-fallback.png` dentro de `assets` como figuras geométricas temporales de respaldo.
 - No se crearon PNG finales ni se modificaron los prompts `.txt` existentes; los PNG reales siguen cubiertos por sus prompts homónimos y tendrán prioridad cuando se publiquen en `assets`.
 - Se incrementaron `app-version.json` y `CHATER_SW_VERSION` a `2026-07-02-pwa-png-fallbacks-packaged-10` para que una app instalada detecte el nuevo paquete estático y pueda actualizar cache sin reinstalación.
-- La corrección se limita al empaquetado físico y versionado de PWA; no cambia la lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático ni navegación móvil.
+- La corrección se limita al empaquetado físico y versionado de PWA; no cambia la lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático ni navegación móvil.
 
 Reglas adicionales de validación:
 
@@ -1414,7 +1489,7 @@ Cambios funcionales incorporados:
 - Se agregaron físicamente `assets/chater-icon-fallback.png` y `assets/chater-maskable-fallback.png` dentro de `assets` como figuras geométricas técnicas de respaldo para el arranque PWA.
 - No se crearon PNG finales ni se modificaron los prompts `.txt` existentes; `chater-icon-192.png`, `chater-icon-512.png` y `chater-maskable-512.png` siguen cubiertos por sus prompts homónimos y tendrán prioridad cuando se publiquen realmente en `assets`.
 - Se incrementaron `app-version.json` y `CHATER_SW_VERSION` a `2026-07-02-pwa-png-fallbacks-packaged-11` para que una instalación existente detecte el nuevo paquete estático y actualice su cache sin desinstalar.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático y navegación móvil quedó intacta.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil quedó intacta.
 
 Reglas adicionales de validación:
 
@@ -1432,7 +1507,7 @@ Cambios funcionales incorporados:
 - Se añadieron físicamente `assets/chater-icon-fallback.png` y `assets/chater-maskable-fallback.png` dentro de `assets` como figuras geométricas técnicas de respaldo para instalación PWA.
 - No se crearon PNG finales ni se modificaron los prompts `.txt` existentes; los PNG reales siguen cubiertos por `chater-icon-192.txt`, `chater-icon-512.txt` y `chater-maskable-512.txt`.
 - Se incrementaron `CHATER_SW_VERSION` y `app-version.json` a `2026-07-02-pwa-png-fallbacks-packaged-12` para que una instalación existente pueda detectar el paquete actualizado y refrescar cache sin reinstalar.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático y navegación móvil no fue modificada.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no fue modificada.
 
 Reglas adicionales de validación:
 
@@ -1458,7 +1533,7 @@ Reglas adicionales de validación:
 
 - La instalación móvil no debe depender exclusivamente de PNG finales omitidos por regla del proyecto.
 - Los PNG agregados son placeholders geométricos técnicos para estabilidad PWA; no reemplazan los PNG finales ni los prompts de imagen.
-- Los módulos de conversación, estados, llamadas, herramientas, cola local, `streme`, login por correo, tema automático y navegación móvil no se modifican por esta corrección.
+- Los módulos de conversación, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no se modifican por esta corrección.
 
 ## 46. Revisión de punto débil: shell PWA bloqueado por PNG omitidos del ZIP
 
@@ -1477,7 +1552,7 @@ Reglas adicionales de validación:
 - Ningún archivo que pueda venir omitido por la regla de imágenes debe estar dentro del precache obligatorio del service worker.
 - La ausencia de iconos PNG finales no debe impedir instalar el service worker ni actualizar el static site.
 - Los PNG reales futuros dentro de `assets` deben tener prioridad automática sobre el placeholder geométrico.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático y navegación móvil no se modifica por esta corrección.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático y navegación móvil no se modifica por esta corrección.
 
 
 ## 47. Revisión de punto débil: llamadas a memoriaBACKEND sin límite de espera
@@ -1498,7 +1573,7 @@ Reglas adicionales de validación:
 - Ninguna llamada JSON de memoriaBACKEND debe quedar bloqueando indefinidamente la interfaz.
 - Los adjuntos necesitan una ventana de espera mayor que las llamadas JSON normales, pero también deben fallar de forma controlada.
 - La cola local de sincronización debe seguir funcionando: un timeout se trata como fallo recuperable y no como éxito silencioso.
-- La lógica de conversaciones, estados, llamadas, herramientas, `streme`, autenticación por correo, tema automático, PWA e imágenes opcionales se preserva.
+- La lógica de conversaciones, estados, llamadas, herramientas, `streme`, autenticación Google/Gmail, tema automático, PWA e imágenes opcionales se preserva.
 
 
 ## 48. Revisión de punto débil: versión publicada marcada antes de confirmar actualización
@@ -1518,7 +1593,7 @@ Reglas adicionales de validación:
 - Una versión publicada no debe marcarse como aplicada si el shell obligatorio no fue actualizado de forma verificable.
 - Un fallo temporal de red o cache debe conservar capacidad de reintento automático sin exigir desinstalar la app.
 - La actualización manual debe informar fallo recuperable en vez de recargar una cache parcial.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático, adjuntos e imágenes opcionales se preserva.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, adjuntos e imágenes opcionales se preserva.
 
 
 ## 49. Revisión de punto débil: versión recordada antes de `controllerchange`
@@ -1538,7 +1613,7 @@ Reglas adicionales de validación:
 - Enviar `SKIP_WAITING` no debe considerarse una confirmación suficiente de actualización aplicada.
 - `controllerchange` es el punto seguro para recordar la versión cuando la actualización depende de un worker en espera.
 - Si no ocurre `controllerchange`, la versión anterior debe permanecer en almacenamiento local para sostener reintentos automáticos.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático, adjuntos e imágenes opcionales se preserva.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, adjuntos e imágenes opcionales se preserva.
 
 ## 50. Revisión de punto débil: instalación inicial dependiente de PNG ausentes
 
@@ -1557,7 +1632,7 @@ Reglas adicionales de validación:
 - Ningún recurso necesario para la primera lectura de instalación debe depender exclusivamente de una imagen final omitida por la regla de prompts.
 - Los PNG agregados son placeholders técnicos geométricos, no imágenes finales del producto ni reemplazo de los PNG cubiertos por prompts.
 - Los PNG reales futuros siguen teniendo prioridad automática cuando existan físicamente en `assets`.
-- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático, adjuntos y navegación móvil se preserva sin cambios funcionales.
+- La lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, adjuntos y navegación móvil se preserva sin cambios funcionales.
 
 ## 51. Revisión de punto débil: PNG técnicos declarados pero no empaquetados
 
@@ -1574,7 +1649,7 @@ Validación aplicada:
 
 - `APP_SHELL` ya no apunta a recursos ausentes dentro del ZIP parcial generado.
 - Los PNG agregados no sustituyen las imágenes finales; solo evitan la rotura técnica de instalación inicial mientras faltan los PNG reales.
-- Se preserva la lógica existente de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático, adjuntos y navegación móvil.
+- Se preserva la lógica existente de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, adjuntos y navegación móvil.
 
 ## 52. Revisión de punto débil: APP_SHELL dependía de PNG opcionales no adjuntos
 
@@ -1592,7 +1667,7 @@ Reglas adicionales de validación:
 
 - Ningún archivo que pueda faltar por la regla de prompts de imagen debe bloquear `install` del service worker.
 - Los assets opcionales deben funcionar en tres estados: archivo real publicado, archivo ausente con placeholder geométrico, y actualización posterior cuando el usuario agregue el archivo real.
-- La corrección no modifica la lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático ni navegación móvil.
+- La corrección no modifica la lógica de conversaciones, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático ni navegación móvil.
 
 
 ## 53. Revisión de punto débil: panel de emojis demasiado básico frente a la referencia visual
@@ -1623,7 +1698,7 @@ En esta iteración se identificó como punto débil principal que la pantalla de
 Mejora aplicada:
 
 - `index.html` reorganiza el compositor como una barra móvil: emoji, campo `Mensaje`, adjuntar, cámara/galería, acciones rápidas, micrófono y envío contextual.
-- `js/app.js` agrega selector de cámara/galería con `capture=environment`, reutilizando el flujo real de adjuntos y `POST /media/upload-url` + `POST /chats/{chatId}/messages/media` cuando memoriaBACKEND esté configurado.
+- `js/app.js` agrega selector de cámara/galería con `capture=environment`, reutilizando el flujo real de adjuntos con `ImagenesCloudflareR2x` o `MEDIAfirmadaX` y `POST /api/v1/mensajes` cuando memoriaBACKEND esté configurado.
 - Se agrega grabación de nota de voz con `MediaRecorder`: tocar el micrófono inicia la grabación, tocar de nuevo la detiene, genera un archivo `audio/webm` y lo envía por el mismo flujo de media. Si el navegador o permisos no lo permiten, la interfaz muestra un aviso de producción sin romper el chat.
 - Se agrega un panel de acciones rápidas con textos editables antes de enviar: saludo, pedir detalles, confirmar recibido, compartir correo y solicitar ubicación. Cada botón inserta texto en el composer activo y respeta el chat seleccionado.
 - El botón de enviar ahora es contextual: aparece cuando hay texto y el micrófono queda disponible cuando el campo está vacío, imitando el patrón visual de la referencia.
@@ -1646,9 +1721,9 @@ Mejora aplicada:
 
 - `js/config.js` agrega `PUSH_PUBLIC_KEY` como clave pública VAPID opcional, editable en Render.com sin recompilar el static site.
 - `js/app.js` agrega la acción **Notificaciones** dentro de Herramientas, con estado real del permiso del navegador, capacidad PushManager, registro local y modo memoriaBACKEND.
-- El botón **Activar notificaciones** solicita permiso con la API `Notification`, intenta usar `navigator.serviceWorker.ready`, crea suscripción push cuando existe `PUSH_PUBLIC_KEY` y registra el dispositivo en `POST /devices`.
+- El botón **Activar notificaciones** solicita permiso con la API `Notification`, intenta usar `navigator.serviceWorker.ready`, crea suscripción push cuando existe `PUSH_PUBLIC_KEY` y registra el dispositivo en `POST /api/v1/push/suscripciones`.
 - Si `memoriaBACKEND` está configurado pero no responde, el registro del dispositivo queda en la cola local idempotente aislada por correo mediante la nueva operación `registerDevice`, reemplazando cualquier registro pendiente anterior del mismo dispositivo para evitar suscripciones push obsoletas.
-- El botón **Enviar prueba** llama `POST /notifications/test` cuando el backend está disponible y, si falla o está en modo demo, muestra una prueba local recuperable para evitar botones decorativos.
+- El botón **Enviar prueba** llama `POST /api/v1/push/enviar` cuando el backend está disponible y, si falla o está en modo demo, muestra una prueba local recuperable para evitar botones decorativos.
 - El modal de Perfil y el modal de estado de memoriaBACKEND ahora muestran el estado de notificaciones para que el usuario entienda si el dispositivo está activo, bloqueado o pendiente de sincronización.
 - `service-worker.js` agrega handlers `push` y `notificationclick` para mostrar avisos en segundo plano y reenfocar la app en el chat, estado o llamada relacionada cuando la notificación trae esos identificadores.
 - `service-worker.js` y `app-version.json` suben a `2026-07-03-notifications-tool-reference-24` para que una PWA instalada detecte la mejora y refresque el shell.
@@ -1658,8 +1733,8 @@ Criterio de validación nuevo:
 - Herramientas debe tener una fila visible y funcional de **Notificaciones**.
 - Activar notificaciones no debe romper navegadores sin `Notification`, sin `PushManager`, sin service worker listo o sin `PUSH_PUBLIC_KEY`; debe dar mensajes de producción y guardar estado local.
 - Una notificación push recibida por el service worker debe mostrar un aviso seguro, limitar texto, rechazar URLs externas y al hacer clic debe abrir o enfocar ChatER.
-- Con backend configurado, `POST /devices` debe ejecutarse o quedar en cola idempotente scoped por correo si falla.
-- La prueba debe usar `POST /notifications/test` y conservar fallback local para no depender de un backend disponible durante la revisión del static site.
+- Con backend configurado, `POST /api/v1/push/suscripciones` debe ejecutarse o quedar en cola idempotente aislada por correo Gmail validado si falla.
+- La prueba debe usar `POST /api/v1/push/enviar` y conservar fallback local para no depender de un backend disponible durante la revisión del static site.
 - La mejora no debe introducir polling, no debe depender de imágenes reales en `assets` y debe preservar chats, estados, llamadas, herramientas, cola local, `streme`, tema automático, adjuntos, emojis, compositor móvil y PWA.
 
 ## 56. Revisión de punto débil: estados 24h sin caducidad local real
@@ -1714,7 +1789,7 @@ Mejora aplicada:
 - `js/app.js` ahora usa `expiresAtIso` como campo canónico para nuevos estados locales, estados semilla y normalización remota.
 - Se conserva `expiresAtAt` como alias legado en lectura y escritura local para no romper estados ya persistidos en `localStorage` ni respuestas antiguas de memoriaBACKEND.
 - La resolución de caducidad prioriza `expiresAtIso` y solo después revisa `expiresAtAt`, `expiryAt`, `expireAt`, `endsAt` o `expiresAt`.
-- La documentación de `GET /states` y la respuesta de `POST /states` pasan a recomendar `expiresAtIso`, dejando explícita la compatibilidad con `expiresAtAt` únicamente como transición.
+- La documentación de `GET/POST /api/v1/publicaciones-efimeras` pasa a recomendar `expiresAtIso`, dejando explícita la compatibilidad con `expiresAtAt` únicamente como transición.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-state-expiry-canonical-27` para que una PWA instalada detecte la corrección del shell estático sin reinstalación.
 
 Criterio de validación nuevo:
@@ -1741,15 +1816,15 @@ Criterio de validación nuevo:
 - El logo principal debe estar cubierto por prompt `.txt` dentro de `assets` y debe resolverse como PNG cuando el usuario agregue `assets/chater-logo.png`.
 - La interfaz no debe romperse si el PNG aún no existe; debe mostrar fallback geométrico de producción.
 - No se deben crear imágenes binarias ni usar SVG.
-- La corrección no debe alterar chats, estados, llamadas, herramientas, cola local, `streme`, login por correo, tema automático, PWA, notificaciones, adjuntos ni expiración de estados 24h.
+- La corrección no debe alterar chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, PWA, notificaciones, adjuntos ni expiración de estados 24h.
 
 ## 59. Revisión de punto débil: service worker no excluía todas las APIs documentadas
 
-En esta iteración se identificó como punto débil principal una brecha entre la documentación de APIs necesarias de `memoriaBACKEND` y la frontera de cache del service worker. El archivo `service-worker.js` ya dejaba pasar rutas críticas como `/api`, `/auth`, `/chats`, `/messages`, `/states`, `/calls`, `/media`, `/presence` y `/streme`, pero no cubría todas las rutas runtime documentadas: `/devices`, `/notifications`, `/tools`, `/search`, `/users`, `/reports`, `/privacy` y `/health`. Si en producción Render.com o un proxy publicaban memoriaBACKEND bajo el mismo origen del static site sin prefijo `/api`, algunas consultas GET podían caer en la estrategia de cache estática y devolver respuestas obsoletas o respuestas 504 de recurso estático, en vez de llegar siempre al backend.
+En esta iteración se identificó como punto débil principal una brecha entre la documentación de APIs necesarias de `memoriaBACKEND` y la frontera de cache del service worker. El archivo `service-worker.js` ya dejaba pasar rutas críticas de backend, pero no cubría todos los prefijos runtime documentados. Si en producción Render.com o un proxy publicaban memoriaBACKEND bajo el mismo origen del static site sin prefijo canónico, algunas consultas GET podían caer en la estrategia de cache estática y devolver respuestas obsoletas o respuestas 504 de recurso estático, en vez de llegar siempre al backend. Si en producción Render.com o un proxy publicaban memoriaBACKEND bajo el mismo origen del static site sin prefijo `/api`, algunas consultas GET podían caer en la estrategia de cache estática y devolver respuestas obsoletas o respuestas 504 de recurso estático, en vez de llegar siempre al backend.
 
 Mejora aplicada:
 
-- `service-worker.js` amplía `backendPrefixes` para excluir también `/devices`, `/notifications`, `/tools`, `/search`, `/users`, `/reports`, `/privacy` y `/health` cuando compartan origen con la appWEB.
+- `service-worker.js` amplía `backendPrefixes` para excluir prefijos runtime adicionales cuando compartan origen con la appWEB, manteniéndolos como exclusión defensiva de cache y no como APIs que el static site deba consumir.
 - La regla existente que excluye peticiones `Accept: text/event-stream` se conserva para proteger `streme` en modo SSE.
 - Los métodos no GET continúan sin ser interceptados, pero ahora las lecturas runtime documentadas también quedan fuera del cache aunque usen el mismo dominio.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-runtime-api-prefixes-29` para que una PWA ya instalada detecte el nuevo shell y actualice sin reinstalar.
@@ -1758,7 +1833,7 @@ Criterio de validación nuevo:
 
 - Ninguna API documentada de memoriaBACKEND debe depender del cache del static site cuando esté bajo el mismo origen.
 - El service worker debe limitarse a recursos estáticos de ChatER y a los PNG opcionales de `assets` con fallback geométrico.
-- La mejora no cambia la lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación por correo, tema automático, PWA, notificaciones, adjuntos, emojis ni assets PNG opcionales.
+- La mejora no cambia la lógica de chats, estados, llamadas, herramientas, cola local, `streme`, autenticación Google/Gmail, tema automático, PWA, notificaciones, adjuntos, emojis ni assets PNG opcionales.
 
 ## 60. Revisión de punto débil: encabezado de conversación sin menú contextual funcional
 
@@ -1771,7 +1846,7 @@ Mejora aplicada:
 - El menú permite abrir **Información del chat**, **Buscar en conversación**, **Fijar/Desfijar** y **Archivar/Restaurar** usando la lógica existente de conversación para no duplicar procesos.
 - La búsqueda funciona sobre el historial local ya cargado, muestra resultados de mensajes o adjuntos, enfoca el mensaje encontrado en la conversación y no introduce polling ni llamadas repetitivas a memoriaBACKEND.
 - La información del chat muestra correo, estado, mensajes locales, no leídos, fijado, estado de hidratación y último mensaje con textos de producción.
-- Las acciones de fijar y archivar reutilizan `setConversationPinned` y `setConversationArchived`, por lo que conservan idempotencia, cola local, parches hacia `PATCH /chats/{chatId}` y sincronización posterior.
+- Las acciones de fijar y archivar reutilizan `setConversationPinned` y `setConversationArchived`, por lo que conservan idempotencia, cola local, parches hacia `PATCH /api/v1/conversaciones/{conversationId}` y sincronización posterior.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-conversation-overflow-menu-30` para que la PWA instalada detecte y aplique el nuevo shell sin reinstalar.
 
 Criterio de validación nuevo:
@@ -1780,7 +1855,7 @@ Criterio de validación nuevo:
 - El menú no debe abrirse sin chat activo y no debe romper el modo estados, llamadas o herramientas.
 - Buscar en conversación debe operar sobre mensajes locales cargados sin polling y debe llevar visualmente al mensaje seleccionado cuando siga cargado en pantalla.
 - Fijar, desfijar, archivar y restaurar desde el menú deben preservar la misma lógica ya existente de sincronización con memoriaBACKEND.
-- La mejora no debe afectar login por correo, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales ni cola idempotente.
+- La mejora no debe afectar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales ni cola idempotente.
 
 ## 61. Revisión de punto débil: búsqueda de chats no iniciaba conversaciones por correo
 
@@ -1790,8 +1865,8 @@ Mejora aplicada:
 
 - `js/app.js` agrega validación local de correo mediante `isValidEmailAddress()` reutilizando la normalización de identidad existente.
 - La lista de chats ahora muestra una acción directa **Crear chat con correo@dominio.com** cuando la búsqueda no devuelve resultados y el texto escrito es un correo válido.
-- La nueva acción reutiliza `getOrCreateConversationByEmail()` para no duplicar procesos de creación, mantener el aislamiento por correo y conservar la cola idempotente `POST /chats` cuando memoriaBACKEND está configurado.
-- Si el correo pertenece a un chat archivado, la acción lo restaura con la lógica existente de `setConversationArchived()` antes de abrirlo, preservando `PATCH /chats/{chatId}` y la sincronización posterior.
+- La nueva acción reutiliza `getOrCreateConversationByEmail()` para no duplicar procesos de creación, mantener el aislamiento por correo y conservar la cola idempotente `POST /api/v1/conversaciones` cuando memoriaBACKEND está configurado.
+- Si el correo pertenece a un chat archivado, la acción lo restaura con la lógica existente de `setConversationArchived()` antes de abrirlo, preservando `PATCH /api/v1/conversaciones/{conversationId}` y la sincronización posterior.
 - Para búsquedas que no son correo válido, el estado vacío ofrece **Nuevo chat por correo** y abre el modal existente de creación, sin inventar otro flujo.
 - `css/styles.css` añade espaciado de producción para las acciones del estado vacío sin alterar el layout general de listas, estados, llamadas o herramientas.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-search-email-start-chat-31` para que una PWA instalada detecte el cambio y actualice el shell sin reinstalar.
@@ -1801,7 +1876,7 @@ Criterio de validación nuevo:
 - El buscador de la lista principal debe poder iniciar una conversación cuando recibe un correo válido sin resultados.
 - La creación desde búsqueda debe reutilizar la lógica existente de conversación local y cola hacia memoriaBACKEND.
 - Los chats archivados encontrados por correo deben poder restaurarse y abrirse sin perder mensajes.
-- La mejora no debe afectar login por correo, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales ni el menú contextual de conversación.
+- La mejora no debe afectar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales ni el menú contextual de conversación.
 
 
 ## 62. Revisión de punto débil: accesos directos PWA y notificaciones abrían siempre la vista por defecto
@@ -1822,7 +1897,7 @@ Criterio de validación nuevo:
 - La appWEB instalada no debe quedar siempre en la lista de chats cuando se abre desde un acceso directo o URL con destino específico.
 - Los destinos soportados deben ser `chats`, `calls`, `states`, `tools`, `chat/chatId`, `state/stateId` y `call/callId`, usando hash o query.
 - Si el destino local no existe todavía, la interfaz debe degradar a la sección correcta con un aviso recuperable, sin romper sesión ni borrar datos.
-- La mejora no debe afectar login por correo, tema automático, `streme`, PWA, notificaciones push, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales, cola idempotente ni el menú contextual de conversación.
+- La mejora no debe afectar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones push, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales, cola idempotente ni el menú contextual de conversación.
 
 ## 63. Revisión de punto débil: adjuntos de conversación sin previsualización visual real
 
@@ -1846,7 +1921,7 @@ Criterio de validación nuevo:
 - Al grabar una nota de voz, la conversación debe mostrar una burbuja de audio con controles cuando el navegador lo permita.
 - Los mensajes de media recibidos desde memoriaBACKEND o `streme` deben conservar `mediaUrl` y metadatos para renderizarse visualmente.
 - Si la fuente de media no está disponible, la app debe mostrar un fallback geométrico funcional y textos de producción.
-- La mejora no debe crear archivos PNG binarios, no debe usar SVG, no debe introducir polling y no debe afectar login por correo, tema automático, PWA, notificaciones, estados 24h, llamadas, herramientas, navegación profunda, cola idempotente ni aislamiento por correo.
+- La mejora no debe crear archivos PNG binarios, no debe usar SVG, no debe introducir polling y no debe afectar autenticación Google/Gmail, tema automático, PWA, notificaciones, estados 24h, llamadas, herramientas, navegación profunda, cola idempotente ni aislamiento por correo.
 
 ## 64. Revisión de punto débil: Herramientas no representaba la referencia comercial móvil
 
@@ -1878,7 +1953,7 @@ Criterio de validación nuevo:
 - Ninguna fila comercial debe ser decorativa: todas deben abrir una acción, modificar estado local o preparar sincronización con memoriaBACKEND.
 - Las acciones de negocio deben funcionar en modo demo local y en modo memoriaBACKEND sin introducir polling.
 - La lógica técnica existente de herramientas no debe desaparecer ni cambiar de comportamiento.
-- La mejora no debe afectar login por correo, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, navegación profunda, cola idempotente ni assets PNG opcionales.
+- La mejora no debe afectar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, navegación profunda, cola idempotente ni assets PNG opcionales.
 
 
 ## 65. Revisión de punto débil: contrato de herramientas comerciales incompleto frente a la interfaz real
@@ -1901,7 +1976,7 @@ Criterio de validación nuevo:
 - Toda herramienta comercial visible debe tener contrato de API documentado y compatible con la cola local actual.
 - La documentación debe distinguir entre el endpoint canónico conectado al static site y los endpoints directos opcionales que memoriaBACKEND podría separar por proceso.
 - Las rutas de API futuras de negocio no deben quedar bajo estrategia de cache estática del service worker si se sirven desde el mismo origen.
-- La mejora no debe cambiar la lógica de login por correo, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, navegación profunda, assets PNG opcionales ni botones existentes.
+- La mejora no debe cambiar la lógica de autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, navegación profunda, assets PNG opcionales ni botones existentes.
 
 ## 66. Revisión de punto débil: encabezado móvil de conversación saturado
 
@@ -1920,7 +1995,7 @@ Criterio de validación nuevo:
 - El encabezado móvil de conversación debe parecerse más a la referencia: regreso, avatar, datos del contacto, llamada de voz, videollamada y menú contextual.
 - Las acciones secundarias no deben desaparecer: fijar/desfijar y archivar/restaurar deben seguir funcionando desde el menú de tres puntos.
 - En escritorio se conservan los botones directos porque hay espacio suficiente y no degradan la experiencia.
-- La mejora no debe alterar login por correo, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas comerciales, navegación profunda, cola idempotente ni assets PNG opcionales.
+- La mejora no debe alterar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas comerciales, navegación profunda, cola idempotente ni assets PNG opcionales.
 
 
 
@@ -1943,7 +2018,7 @@ Validación funcional:
 - Las acciones nuevas reutilizan funciones existentes (`openNewChatModal`, `openArchivedChatsModal`, `openCreateStatusModal`, `openPromoteStatusModal`, `openCallStarterModal`, `openScheduleCallModal`, `openCallKeypadModal`, `openProfileModal`, `handleToolAction` y `selectSection`) para evitar duplicar lógica.
 - No se añadieron imágenes, no se introdujo ningún formato vectorial prohibido y se mantiene la regla de assets PNG opcionales con prompts `.txt`.
 - Canon actual de assets: el ZIP funcional puede venir sin binarios PNG finales; los nombres PNG referenciados tienen prompt `.txt` en `assets` y el fallback visual se resuelve con figuras geométricas CSS o respuestas generadas por el service worker cuando aplica.
-- La modificación es incremental y no altera la lógica de `streme`, autenticación por correo, PWA, estados 24h, llamadas ni adjuntos.
+- La modificación es incremental y no altera la lógica de `streme`, autenticación Google/Gmail, PWA, estados 24h, llamadas ni adjuntos.
 
 Estado:
 - Avance parcial robusto. La interfaz queda más alineada con las capturas móviles, pero la frase `YA ESTA LISTO` no se emite porque se entrega ZIP con módulos afectados y Nova debe volver a ejecutar la validación completa sobre el proyecto actualizado.
@@ -1963,7 +2038,7 @@ Cambios aplicados:
 Validación funcional:
 
 - No se agregaron imágenes binarias, SVG ni rutas fuera de `assets`.
-- No se modificó la lógica de login por correo, `streme`, llamadas, herramientas comerciales, archivados, fijados, emojis, service worker de APIs runtime ni contratos de memoriaBACKEND.
+- No se modificó la lógica de autenticación Google/Gmail, `streme`, llamadas, herramientas comerciales, archivados, fijados, emojis, service worker de APIs runtime ni contratos de memoriaBACKEND.
 - La mejora afecta solo persistencia local y actualización de versión; el estado visible en memoria se conserva mientras la sesión está abierta.
 
 Estado:
@@ -1985,7 +2060,7 @@ Cambios aplicados:
 Validación funcional:
 
 - No se agregaron imágenes binarias, SVG ni rutas fuera de `assets`.
-- No se modificó la interfaz visual, el flujo de login por correo, `streme`, APIs documentadas, estados 24h, llamadas, adjuntos, emojis, herramientas comerciales, navegación profunda ni prompts de PNG.
+- No se modificó la interfaz visual, el flujo de autenticación Google/Gmail, `streme`, APIs documentadas, estados 24h, llamadas, adjuntos, emojis, herramientas comerciales, navegación profunda ni prompts de PNG.
 - La mejora solo endurece la base de almacenamiento para que el static site siga funcionando en móviles donde la persistencia local esté bloqueada o falle.
 
 Estado:
@@ -2001,7 +2076,7 @@ Cambio aplicado:
 - Se agregó `assets/avatar.txt` como prompt JSON detallado para `assets/avatar.png`, cubriendo el avatar genérico opcional sin crear imagen binaria.
 - Se preservan los prompts específicos existentes (`avatar-carlos.png`, `avatar-familia.png`, `avatar-equipo-trabajo.png`, `avatar-soporte.png`) y los prompts de iconos/logo PWA.
 - No se agregaron PNG reales, SVG, WebP, JPG ni rutas fuera de `assets`.
-- No se modificó la lógica de chats, estados, llamadas, herramientas, autenticación por correo, `streme`, PWA, service worker, cola idempotente, tema automático ni compositor móvil.
+- No se modificó la lógica de chats, estados, llamadas, herramientas, autenticación Google/Gmail, `streme`, PWA, service worker, cola idempotente, tema automático ni compositor móvil.
 - No se incrementó `app-version.json` porque no cambió el shell cacheado ni código ejecutable; el ajuste cubre documentación/contrato de assets para futuras imágenes del usuario.
 
 Validación funcional:
@@ -2016,12 +2091,12 @@ Estado:
 
 ## 53. Revisión de punto débil: sincronización real con APIs canónicas de memoriaBACKEND
 
-En esta iteración se identificó como punto débil principal que el static site ya tenía capa de sincronización, cola local, estados optimistas y documentación de memoriaBACKEND, pero el cliente seguía usando rutas heredadas propias como `/chats`, `/states`, `/calls`, `/devices`, `/media/upload-url`, `/notifications/test` y `/streme/events`. Ese contrato no coincidía con el catálogo canónico adjunto en `APIS de memoriaBACKEND/apis.txt`, donde las APIs equivalentes están montadas principalmente bajo `/api/v1` y requieren aislamiento por `siteId`, cabecera `X-MB-Site`, cabecera `X-Hashinmy-Action:webapp` en mutaciones e idempotencia explícita.
+En esta iteración se identificó como punto débil principal que el static site ya tenía capa de sincronización, cola local, estados optimistas y documentación de memoriaBACKEND, pero el cliente seguía usando rutas heredadas propias de chats, estados, llamadas, dispositivos, media, notificaciones y realtime. Ese contrato no coincidía con el catálogo canónico adjunto en `APIS de memoriaBACKEND/apis.txt`, donde las APIs equivalentes están montadas principalmente bajo `/api/v1` y requieren aislamiento por `siteId`, cabecera `X-MB-Site`, cabecera `X-Hashinmy-Action:webapp` en mutaciones e idempotencia explícita.
 
 ### Cambios aplicados
 
-- `js/app.js` mantiene la lógica local existente, pero cambia los procesos equivalentes al contrato de `APIS de memoriaBACKEND`: OTP por correo, perfil, conversaciones, mensajes, lectura de mensajes, señales efímeras, media firmada, publicaciones efímeras, vistas de contenido, sesiones de comunicación, STREMEx y push.
-- Las APIs sin equivalencia directa validada dentro de `APIS de memoriaBACKEND` se conservaron en su ruta actual, por ejemplo promoción de estado y acciones genéricas de herramientas, cumpliendo la regla de no reemplazar procesos sin API equivalente.
+- `js/app.js` mantiene la lógica local existente, pero cambia los procesos equivalentes al contrato de `APIS de memoriaBACKEND`: autenticación Google/Gmail mediante `AUTENTICACIONx`, perfil, conversaciones, mensajes, lectura de mensajes, señales efímeras, media firmada, publicaciones efímeras, vistas de contenido, sesiones de comunicación, STREMEx y push.
+- Los procesos que sí tienen equivalencia validada en `APIS de memoriaBACKEND` quedan documentados con sus rutas canónicas; promoción de estado usa `PATCH /api/v1/publicaciones-efimeras/{stateId}` y acciones comerciales usan `POST /api/v1/landing-tools/evento`, evitando conservar rutas heredadas cuando existe bloque equivalente.
 - El cliente agrega `s={siteId}` a las URLs, `X-MB-Site`, `X-Hashinmy-Action:webapp` en mutaciones y `X-MB-Idempotency-Key` cuando existe `clientMutationId`.
 - `STREME_REALTIME_URL` ahora es opcional: si no se configura, el static site deriva SSE desde `/api/v1/streme/eventos` y escucha eventos nombrados `streme-event`, `streme-message`, `streme-ready` y `streme-heartbeat`.
 - `js/config.js` expone `MEMORIA_SITE_ID`, `MEMORIA_API_PREFIX` y `STREME_CHANNEL` sin obligar a recompilar el static site de Render.com.
@@ -2031,8 +2106,8 @@ En esta iteración se identificó como punto débil principal que el static site
 
 | Proceso del static site | API canónica usada |
 |---|---|
-| Solicitar OTP por correo | `POST /auth/email/otp/request?s={siteId}` |
-| Verificar OTP | `POST /auth/email/otp/verify?s={siteId}` |
+| Iniciar acceso Google/Gmail | `GET /auth/login?s={siteId}` + `GET /login.js?s={siteId}` |
+| Crear sesión desde Google/Firebase | `POST /auth/firebase/session?s={siteId}` |
 | Refrescar/cerrar sesión | `POST /auth/refresh`, `POST /auth/logout` |
 | Perfil | `GET /api/v1/perfil-usuario?s={siteId}` |
 | Conversaciones | `GET/POST/PATCH /api/v1/conversaciones?s={siteId}` |
@@ -2119,7 +2194,7 @@ Cambios aplicados:
 - La validación revisa procesos equivalentes ya usados por el static site: autenticación, perfil, conversaciones, mensajes, interacciones, señales efímeras, presencia, `streme`, media firmada, imágenes R2x, estados, vistas, sesiones de comunicación y push.
 - La consulta queda cacheada por unos minutos para no saturar memoriaBACKEND al abrir repetidamente el modal, pero el usuario puede forzar una nueva verificación con el botón **Verificar APIs**.
 - Si memoriaBACKEND responde con un manifiesto válido pero sin detalle suficiente de bloques, la UI no bloquea la app ni inventa errores: informa que recibió manifiesto sin detalle verificable.
-- El texto de notificaciones se sincroniza con la ruta real `POST /api/v1/push/suscripciones`, eliminando una referencia visual heredada a `/devices`.
+- El texto de notificaciones se sincroniza con la ruta real `POST /api/v1/push/suscripciones`, eliminando una referencia visual heredada al endpoint antiguo de dispositivos.
 - `css/styles.css` agrega soporte visual para el resumen amplio del manifiesto dentro del grid de estado.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-api-manifest-status-44` para que la PWA instalada refresque `js/app.js`, `css/styles.css` y el service worker.
 
@@ -2181,7 +2256,7 @@ Validación de cierre de esta iteración:
 
 - La carpeta `APIS de memoriaBACKEND` no fue modificada.
 - Las APIs canónicas ya usadas por el proyecto se mantienen bajo `/api/v1` o `/auth` según el catálogo adjunto.
-- La ruta heredada que permanece (`/states/{stateId}/promotion`) se conserva porque el catálogo real adjunto no expone una API equivalente exacta para ese proceso; cambiarla por una ruta parecida rompería la regla de no cambiar a lo loco.
+- La promoción de estados ya no conserva el endpoint heredado; queda resuelta como `PATCH /api/v1/publicaciones-efimeras/{stateId}` porque el catálogo real adjunto sí publica CRUD común sobre `PUBLICACIONESefimerasX`.
 - El proyecto sigue siendo static site de Render.com y no incorpora backend local.
 
 ## 75. Revisión de punto débil: versión publicada y cache PWA desalineados
@@ -2222,7 +2297,7 @@ Cambios aplicados:
 Validación funcional:
 
 - No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
-- La promoción de estado se mantiene en su ruta actual porque el catálogo adjunto no publica una API equivalente exacta para ese proceso.
+- La promoción de estado ya no debe tratarse como ruta sin equivalencia: el contrato vigente la resuelve como `PATCH /api/v1/publicaciones-efimeras/{stateId}` dentro de `PUBLICACIONESefimerasX`.
 - Las demás APIs ya adaptadas a `/api/v1` y `/auth` se preservan sin cambios.
 - El proyecto sigue siendo static site de Render.com y no incorpora backend local.
 
@@ -2236,7 +2311,7 @@ En esta iteración se identificó como punto débil principal que ChatER ya envi
 Cambios aplicados:
 
 - `js/app.js` agrega almacenamiento local aislado para `chater.session.userId` sin modificar la carpeta `APIS de memoriaBACKEND`.
-- `persistAuthTokens()` ahora extrae y conserva el ID interno devuelto por respuestas de OTP, refresh, sesión o perfil cuando aparece como `internalUserId`, `userId`, `uid`, `sub` o `id` dentro de `user`, `profile`, `perfil`, `session`, `auth` o `data`.
+- `persistAuthTokens()` ahora extrae y conserva el ID interno devuelto por respuestas de Google/Firebase, refresh, sesión o perfil cuando aparece como `internalUserId`, `userId`, `uid`, `sub` o `id` dentro de `user`, `profile`, `perfil`, `session`, `auth` o `data`.
 - `syncInitialDataFromBackend()` consulta primero `GET /api/v1/perfil-usuario`, persiste el `userId` real cuando existe y después carga conversaciones, estados y llamadas con ese propietario canónico disponible en la misma sincronización.
 - `getCurrentUserIdentifier()` usa primero el `userId` canónico de memoriaBACKEND y conserva el correo como fallback local cuando el backend no lo entrega.
 - `clearAuthTokens()` elimina el `userId` junto con tokens y cursor `streme`, evitando que una cuenta reutilice el propietario interno de otra sesión.
@@ -2254,12 +2329,12 @@ Estado:
 
 ## 78. Revisión de punto débil: documentación ejecutable conservaba rutas heredadas de estados, media, llamadas y push
 
-En esta iteración se identificó como punto débil principal que el runtime de `js/app.js` ya estaba sincronizado con rutas canónicas de `APIS de memoriaBACKEND`, incluida la promoción de estados mediante `PATCH /api/v1/publicaciones-efimeras/{stateId}`, pero la documentación ejecutable inicial todavía mantenía contratos heredados como `/states`, `/states/{stateId}/promotion`, `/media/upload-url`, `/calls`, `/devices` y `/notifications/test`. Esa desincronización podía hacer que Nova o una IA integradora volviera a comparar contra APIs antiguas y reintrodujera rutas que no corresponden al catálogo canónico adjunto.
+En esta iteración se identificó como punto débil principal que el runtime de `js/app.js` ya estaba sincronizado con rutas canónicas de `APIS de memoriaBACKEND`, incluida la promoción de estados mediante `PATCH /api/v1/publicaciones-efimeras/{stateId}`, pero la documentación ejecutable inicial todavía mantenía contratos heredados de estados, promoción, media, llamadas, dispositivos y pruebas de notificaciones. Esa desincronización podía hacer que Nova o una IA integradora volviera a comparar contra APIs antiguas y reintrodujera rutas que no corresponden al catálogo canónico adjunto.
 
 Cambios aplicados:
 
 - `docs/memoriaBACKEND_APIS.md` actualiza el contrato vigente de media para reflejar `ImagenesCloudflareR2x`, `MEDIAfirmadaX` y creación de mensajes con adjunto en `POST /api/v1/mensajes`.
-- La sección de estados 24h queda alineada con `GET/POST/PATCH /api/v1/publicaciones-efimeras` y `POST /api/v1/vistas-contenido`, eliminando `/states/{stateId}/promotion` como contrato vigente.
+- La sección de estados 24h queda alineada con `GET/POST/PATCH /api/v1/publicaciones-efimeras` y `POST /api/v1/vistas-contenido`, eliminando el endpoint heredado de promoción de estados como contrato vigente.
 - La sección de llamadas queda alineada con `GET/POST /api/v1/sesiones-comunicacion`.
 - La cola local, prioridades y mapa de botones ahora apuntan a rutas canónicas `/api/v1` o `/auth` y dejan las rutas heredadas solo como historial de iteraciones anteriores.
 - No se modificó ningún archivo dentro de `APIS de memoriaBACKEND` ni se cambió lógica runtime no relacionada.
@@ -2358,7 +2433,7 @@ Validación funcional:
 - `node --check js/app.js` ejecutado correctamente.
 - `node --check service-worker.js` ejecutado correctamente.
 - No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
-- Se preservó la lógica existente de login por correo, conversaciones, mensajes, estados, llamadas, adjuntos, herramientas comerciales, notificaciones, cola local, R2x, MEDIAfirmadaX, STREMEx y service worker.
+- Se preservó la lógica existente de autenticación Google/Gmail, conversaciones, mensajes, estados, llamadas, adjuntos, herramientas comerciales, notificaciones, cola local, R2x, MEDIAfirmadaX, STREMEx y service worker.
 
 ## 83. Revisión de punto débil: validación de bloques sincronizados no consumida desde el static site
 
@@ -2654,3 +2729,431 @@ Validación funcional:
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
 
+
+## 95. Revisión de punto débil: credencial Google/Gmail persistida fuera del contrato AUTENTICACIONx
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía Google/Gmail mediante `AUTENTICACIONx`, cargaba `/login.js`, validaba `/auth/check` y creaba sesión con `/auth/firebase/session`, pero el token compatible `tk`/`signedSession` que memoriaBACKEND puede devolver cuando el navegador bloquea cookies se conservaba en `localStorage`. Eso debilitaba el contrato de seguridad publicado por `APIS de memoriaBACKEND`, donde la cookie `HttpOnly/Secure/SameSite=None` es la sesión principal y cualquier bearer compatible debe vivir solo como credencial temporal de pestaña.
+
+Cambios aplicados:
+
+- `js/app.js` agrega almacenamiento temporal de autenticación por pestaña con `sessionStorage` y fallback volátil en memoria cuando `sessionStorage` no esté disponible.
+- `getAccessToken()`, `getRefreshToken()`, `persistAuthTokens()`, `markBackendSessionVerified()` e `isBackendSessionRecentlyVerified()` dejan de depender de `localStorage` para credenciales o marcas de sesión backend.
+- `persistAuthTokens()` limpia tokens legados de `localStorage` si una versión anterior los dejó persistidos, conservando la sesión real en cookie segura y el token compatible solo como dato temporal de pestaña.
+- `clearAuthTokens()` limpia credenciales temporales actuales y también remueve credenciales legadas persistidas para evitar rehidratación insegura entre cierres del navegador.
+- El modal de estado de memoriaBACKEND ahora muestra “Token Google/Gmail temporal de pestaña” cuando el token compatible está activo.
+- `docs/memoriaBACKEND_APIS.md` actualiza el contrato vigente de autenticación para reemplazar OTP por Google/Gmail con `AUTENTICACIONx` y documentar la regla de no persistir `tk`/`signedSession` en `localStorage`.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-google-gmail-auth-69` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- La mejora se limita al proceso equivalente de autenticación Google/Gmail; se preserva la lógica existente de perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 96. Revisión de punto débil: sesión local podía abrir ChatER si /auth/check fallaba sin 401 explícito
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía Google/Gmail con `AUTENTICACIONx` y verificaba `/auth/check`, pero el arranque todavía podía terminar en `renderShell()` si existía un correo recordado localmente y memoriaBACKEND respondía una falla de sesión sin estado HTTP 401/403 explícito, por ejemplo `ok:0` con `err: login_requerido`. Eso era una regresión crítica para el requisito de autenticación Google/Gmail, porque un static site nunca debe tomar `localStorage` como prueba suficiente para abrir `chatER`.
+
+Cambios aplicados:
+
+- `bootstrapGoogleGmailSession()` ahora solo muestra la interfaz protegida si `restoreGoogleGmailSessionFromBackend()` devuelve una sesión validada por memoriaBACKEND.
+- Si `/auth/check` no confirma sesión vigente, ChatER limpia sesión local y vuelve al acceso Google/Gmail aunque exista un correo recordado.
+- `restoreGoogleGmailSessionFromBackend()` limpia sesión cuando recibe `ok:0`, payload inválido o error de autenticación, evitando que el correo local sobreviva como bypass.
+- `isBackendAuthError()` ahora reconoce errores por código/mensaje (`login_requerido`, sesión inválida, token expirado, credencial revocada, no autorizado) además de HTTP 401/403.
+- `refreshSession()` y `logout()` agregan `clientMutationId` e `X-MB-Idempotency-Key` para alinearse con el contrato de mutaciones de `AUTENTICACIONx`.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- La mejora se limita al proceso equivalente de autenticación Google/Gmail; se preserva la lógica existente de perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 97. Revisión de punto débil: fallback R2x incompleto cuando la API específica no está disponible
+
+En esta iteración también se identificó que ChatER ya consultaba `GET /api/v1/imagenes-r2x/config` y usaba `ImagenesCloudflareR2x` para imágenes temporales WebP, pero si el endpoint de configuración o intención no estaba disponible en un despliegue de memoriaBACKEND, el cliente podía continuar con política local habilitada y fallar el adjunto antes de volver al proceso genérico existente. Eso contradecía la regla del ciclo: si memoriaBACKEND no tiene una API para ese proceso específico, se conserva la API actual del proyecto.
+
+Cambios aplicados:
+
+- `loadR2xImagePolicy()` ahora trata la ausencia/fallo recuperable de `/api/v1/imagenes-r2x/config` como bloque no disponible y usa `MEDIAfirmadaX` como respaldo canónico.
+- `prepareR2xTemporaryImageForBackend()` convierte errores recuperables de intención, endpoint no encontrado, R2 no configurado o bloque deshabilitado en `R2X_POLICY_UNAVAILABLE`, que los flujos de adjuntos y estados ya capturan para continuar con `MEDIAfirmadaX`.
+- Los errores de autenticación siguen sin fallback para no permitir subir media sin sesión Google/Gmail válida.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-google-gmail-auth-71` para invalidar cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- La mejora se limita al proceso equivalente de imágenes temporales y media firmada; se preserva la lógica existente de autenticación, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+
+## 98. Revisión de punto débil: idToken Google/Firebase y respuestas tardías de AUTENTICACIONx
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía Google/Gmail con `AUTENTICACIONx`, cargaba `/login.js` y tenía declarado el método `apiClient.createFirebaseSession()` contra `POST /auth/firebase/session`, pero el flujo real de eventos del SDK todavía validaba principalmente con `/auth/check`. Si `login.js` entregaba un `idToken`, `id_token`, `firebaseIdToken`, `googleIdToken`, `tokenId` o `credential` sin haber dejado cookie activa todavía, el static site podía fallar la creación de sesión backend aunque `APIS de memoriaBACKEND` sí publica el proceso equivalente oficial para intercambiar ese token por sesión segura.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `extractGoogleFirebaseIdTokenFromPayload()` para detectar tokens Google/Firebase en payloads directos o anidados devueltos por `login.js`, SDK o evento `memoriaBACKEND:login`.
+- `verifyGoogleGmailPayloadAgainstBackend()` ahora usa `POST /auth/firebase/session?s={siteId}` cuando existe `idToken`/`credential` y conserva `/auth/check` como validación de cookie o bearer compatible cuando no hay token Firebase/Google explícito.
+- El intercambio por `/auth/firebase/session` mantiene `next`, `clientMutationId`, `X-MB-Site`, `s={siteId}`, `X-Hashinmy-Action:webapp` e idempotencia mediante el cliente HTTP existente.
+- Se agregó `activeGoogleLoginAttemptGuard` para que `restoreGoogleGmailSessionFromBackend()`, `startGoogleGmailLogin()` y el evento `memoriaBACKEND:login` solo completen sesión si el intento Google/Gmail vigente no fue cancelado, reemplazado por otro intento o invalidado por cierre de sesión/modal.
+- Los eventos tardíos de `/login.js`, `/auth/check` o `/auth/firebase/session` ya no pueden abrir ChatER después de que el usuario cerró el acceso, inició otro intento o la sesión fue limpiada.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-firebase-session-guard-73` para invalidar cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita al proceso equivalente de autenticación Google/Gmail con `AUTENTICACIONx`; se preserva la lógica existente de perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 99. Revisión de punto débil: evidencia de proveedor Google/Gmail podía heredarse del payload local del SDK
+
+En esta iteración se identificó como punto débil principal que ChatER ya usaba `AUTENTICACIONx`, `/auth/check` y `/auth/firebase/session`, pero al normalizar la respuesta verificada todavía podía conservar `authProvider` desde el payload local entregado por `login.js` o por el SDK si la respuesta backend no devolvía proveedor. Eso era demasiado permisivo para el requisito de acceso Google/Gmail: el static site puede usar el payload local para obtener un `idToken` candidato, pero la evidencia final de proveedor debe venir exclusivamente de memoriaBACKEND después de validar la sesión.
+
+Cambios aplicados:
+
+- `js/app.js` ahora calcula `backendProviderEvidence` desde la respuesta real de `/auth/check` o `/auth/firebase/session`.
+- `verifyGoogleGmailPayloadAgainstBackend()` deja de aceptar `candidatePayload.authProvider` o `candidatePayload.user.provider` como confirmación suficiente de proveedor.
+- El token candidato del SDK se conserva solo como credencial de intercambio/compatibilidad; no sustituye la confirmación de `AUTENTICACIONx`.
+- Si memoriaBACKEND devuelve correo pero no confirma proveedor Google/Gmail, `validateGoogleGmailAuthPayload()` mantiene el bloqueo y vuelve al acceso seguro.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-provider-backend-evidence-74` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita al proceso equivalente de autenticación Google/Gmail con `AUTENTICACIONx`; se preserva la lógica existente de perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 100. Revisión de punto débil: restauración de sesión perdía `authProvider` canónico
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía Google/Gmail con `AUTENTICACIONx` y validaba el proveedor contra memoriaBACKEND, pero la restauración automática mediante `apiClient.checkAuth()` normalizaba el payload antes de validarlo. Si `/auth/check` devolvía la evidencia de proveedor únicamente como `authProvider`, `signInProvider`, `sign_in_provider`, `firebase.sign_in_provider` o variantes anidadas equivalentes, `normalizeAuthPayload()` podía sobrescribir esa evidencia con una cadena vacía y bloquear una sesión backend válida. Ese bloqueo no abría ChatER sin autenticación, pero sí debilitaba la compatibilidad real con el contrato documentado en `APIS de memoriaBACKEND` para `AUTENTICACIONx`.
+
+Cambios aplicados:
+
+- `js/app.js` amplía `normalizeAuthPayload()` para conservar evidencia de proveedor desde `authProvider`, `provider`, `providerId`, `signInProvider`, `sign_in_provider`, `u.pr`, `firebase.sign_in_provider` y `claims.firebase.sign_in_provider` en payloads directos o anidados.
+- La restauración por `GET /auth/check` queda alineada con la validación estricta ya existente: sigue exigiendo proveedor Google/Gmail confirmado por memoriaBACKEND, pero ya no descarta nombres de campo canónicos del propio backend.
+- No se reduce la seguridad del acceso: el payload local del SDK sigue sin sustituir la confirmación backend dentro de `verifyGoogleGmailPayloadAgainstBackend()`.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-provider-normalize-75` para invalidar cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita al proceso equivalente de autenticación Google/Gmail con `AUTENTICACIONx`; se preserva la lógica existente de perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+
+## 101. Revisión de punto débil: privacidad, bloqueo y reportes seguían como rutas heredadas
+
+En esta iteración se identificó como punto débil principal que ChatER ya estaba sincronizado con los bloques canónicos de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, media, presencia, señalización, búsqueda, visitas, reconciliación y gobernanza, pero el proceso de seguridad de usuario todavía quedaba documentado con rutas heredadas (`/users/{userId}/block`, `/reports` y `/privacy/settings`) y no tenía acciones funcionales conectadas al static site. El catálogo adjunto `APIS de memoriaBACKEND/apis.txt` sí publica procesos equivalentes para esos casos: `BLOQUEOSusuarioX`, `REPORTESmoderacionX` y `PRIVACIDADusuarioX`.
+
+Cambios aplicados:
+
+- `js/app.js` agrega métodos canónicos en `apiClient` para `POST /api/v1/privacidad-usuario`, `POST /api/v1/bloqueos-usuario` y `POST /api/v1/reportes-moderacion`, siempre con `s={siteId}`, `X-MB-Site`, `clientMutationId` e idempotencia.
+- El modal de perfil ahora muestra el estado de privacidad y permite configurar visibilidad de perfil, estado y última actividad sin depender de endpoints heredados.
+- El menú de conversación ahora permite bloquear/desbloquear el contacto y reportar la conversación; ambas operaciones sincronizan con memoriaBACKEND y quedan en cola local si el backend falla temporalmente.
+- Una conversación bloqueada deshabilita el compositor y muestra texto de producción para evitar enviar mensajes mientras el bloqueo esté activo.
+- `normalizeLoadedState()` y `normalizeConversationFromApi()` preservan campos de privacidad, bloqueo y reporte para no perder estado entre recargas o respuestas parciales del backend.
+- La documentación ejecutable corrige el bloque 16 para reemplazar las rutas heredadas por `BLOQUEOSusuarioX`, `REPORTESmoderacionX` y `PRIVACIDADusuarioX`.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-privacy-block-report-76` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita a procesos equivalentes publicados por memoriaBACKEND para privacidad, bloqueo de usuario y reportes de moderación; se preserva la lógica existente de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 102. Revisión de punto débil: baja de notificaciones push quedaba solo local
+
+En esta iteración se identificó como punto débil principal que ChatER ya consultaba `/api/v1/push/config`, registraba el dispositivo con `POST /api/v1/push/suscripciones` y enviaba pruebas con `/api/v1/push/enviar`, pero la pantalla de notificaciones no ofrecía una baja real del dispositivo frente a memoriaBACKEND. El catálogo adjunto `APIS de memoriaBACKEND/apis.txt` sí publica el proceso equivalente dentro de `APInotificacionesPUSHx`: `DELETE /api/v1/push/suscripciones` con `endpoint` de la suscripción y cabecera `X-Hashinmy-Action:webapp`.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `apiClient.unregisterDevice()` contra `DELETE /api/v1/push/suscripciones`, enviando `deviceId`, `clientId`, `endpoint`, `pushSubscription`, `active:false`, usuario autenticado, `clientMutationId`, `s={siteId}`, `X-MB-Site`, `X-Hashinmy-Action:webapp` e idempotencia.
+- El modal **Notificaciones** agrega la acción **Desactivar en este dispositivo** con texto de producción.
+- `deactivateNotificationsForDevice()` intenta cancelar la `PushSubscription` local del navegador y luego sincroniza la baja con memoriaBACKEND; si el backend falla, encola `unregisterDevice` sin reactivar notificaciones localmente.
+- La cola local ahora reintenta `unregisterDevice` y marca la baja como sincronizada cuando memoriaBACKEND responde.
+- El estado local de notificaciones distingue `pending_revoke`, `revoked` y `revoked_local`, y se mantiene sincronizable con preferencias de usuario sin conservar tokens obsoletos.
+- La documentación del contrato de notificaciones reemplaza la ruta imprecisa `DELETE /api/v1/push/suscripciones/{deviceId}` por el contrato real `DELETE /api/v1/push/suscripciones` publicado en `APIS de memoriaBACKEND`.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-push-unsubscribe-77` para invalidar cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita al proceso equivalente de notificaciones push publicado por memoriaBACKEND; se preserva la lógica existente de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 103. Revisión de punto débil: errores del navegador seguían apuntando a rutas heredadas
+
+En esta iteración se identificó como punto débil principal que la documentación vigente aún mencionaba endpoints heredados de errores del cliente, versión y salud como referencias de auditoría/salud, mientras el catálogo adjunto `APIS de memoriaBACKEND/apis.txt` publica capacidades canónicas para static sites en `VERSIONESapi`, `BLOQUESsincronizadosX`, `EVENTOSx` y `LOGSx`. Como `LOGSx` no expone una mutación pública directa para que el navegador escriba errores, el proceso equivalente más seguro para errores frontend es `EVENTOSx` mediante `POST /api/v1/eventos/registrar`.
+
+Cambios aplicados:
+
+- `js/config.js` agrega `ENABLE_CLIENT_TELEMETRY` para activar o desactivar por despliegue la telemetría técnica sin recompilar el static site.
+- `js/app.js` agrega `apiClient.registerClientTelemetry()` contra `POST /api/v1/eventos/registrar?s={siteId}`, con `X-MB-Site`, `X-Hashinmy-Action:webapp`, `X-MB-Idempotency-Key` y `clientMutationId`.
+- `js/app.js` registra listeners de `window.error` y `window.unhandledrejection` para enviar eventos `client_error` y `unhandled_rejection` únicamente cuando `MEMORIA_BACKEND_URL` está configurado.
+- Antes de enviar telemetría, ChatER sanea correos, tokens, parámetros sensibles, URLs y stack, limita la longitud del payload y aplica throttling local para evitar ruido o bucles de reporte.
+- La telemetría de errores no queda en cola local: si memoriaBACKEND está caído, se descarta silenciosamente para no llenar el almacenamiento con errores de observabilidad.
+- `docs/memoriaBACKEND_APIS.md` reemplaza la referencia ejecutable heredada de errores del cliente por el contrato canónico `EVENTOSx` y mantiene `VERSIONESapi`/`BLOQUESsincronizadosX` para salud de contratos.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-client-telemetry-eventos-78` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` y `manifest.json` validados como JSON correcto.
+- La mejora se limita al proceso equivalente de telemetría técnica de frontend con `EVENTOSx`; se preserva la lógica existente de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 104. Revisión de punto débil: mutaciones protegidas podían quedar en cola con sesión Google/Gmail vencida
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía autenticación Google/Gmail con `AUTENTICACIONx`, validaba `/auth/check` y limpiaba sesiones inválidas durante el arranque, pero una API protegida de memoriaBACKEND podía responder `401`, `403` u `ok:0` por sesión vencida durante una acción posterior del usuario. En ese escenario, algunos flujos optimistas podían tratar el fallo como caída temporal del backend y dejar mensajes, conversaciones, estados, media, push o acciones de sincronización en cola local. Eso no era suficientemente estricto para producción: si memoriaBACKEND rechaza credenciales, el static site debe bloquear la sesión y pedir reingreso con Google/Gmail, no seguir acumulando mutaciones bajo una identidad no aceptada.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `isProtectedChatERMemoriaApiPath()` para distinguir APIs protegidas de ChatER frente a APIs públicas de observabilidad, visitas, manifiestos o herramientas de static site.
+- `apiClient.request()` ahora intercepta errores HTTP y payloads `ok:0` de memoriaBACKEND antes de propagarlos. Si el error corresponde a autenticación y la ruta pertenece a un proceso protegido, ejecuta cierre local seguro, invalida la sesión activa y renderiza el acceso Google/Gmail.
+- Si una petición protegida recibe `401` e intenta renovar con `/auth/refresh`, un fallo de refresh también invalida la sesión capturada antes de que la mutación pueda quedarse en cola como si fuera un problema transitorio.
+- El comportamiento se limita a rutas protegidas como perfil, preferencias, conversaciones, mensajes, relaciones, privacidad, bloqueos, reportes, presencia, media, estados, llamadas, señalización, push, reconciliación, cursor, búsqueda y `streme` de conversación. No afecta visitas públicas, telemetría técnica, manifiestos, validación de bloques ni eventos comerciales de static site.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-failure-guard-79` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- La mejora se limita al control de sesión vencida en APIs protegidas de memoriaBACKEND; se preserva la lógica existente de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+## 105. Revisión de punto débil: cola local podía aceptar operaciones sin propietario autenticado
+
+En esta iteración se identificó como punto débil principal que ChatER ya limpiaba la sesión cuando una API protegida de memoriaBACKEND respondía un error de autenticación, pero algunos flujos asíncronos sin guarda local directa —por ejemplo publicaciones durables de `STREMEx` o señales de `SIGNALINGtiempoRealX` asociadas a llamadas— podían ejecutar su `catch` después de esa limpieza e intentar encolar la operación pendiente. Aunque la sesión ya no quedaba abierta, la cola podía terminar escrita bajo una identidad vacía o no propietaria. Eso era incompatible con el requisito de Google/Gmail: toda mutación protegida pendiente debe quedar asociada a una cuenta Gmail vigente validada por memoriaBACKEND o no debe encolarse.
+
+Cambios aplicados:
+
+- `js/app.js` refuerza `enqueueBackendOperation()` como punto común de seguridad de la cola local.
+- La cola ahora normaliza el propietario con `getSessionEmail()` y, si `REQUIRE_GOOGLE_GMAIL_AUTH` está activo, rechaza cualquier encolado cuando no existe una sesión Google/Gmail vigente.
+- Las operaciones nuevas guardan `ownerEmail` dentro del registro pendiente para auditoría local y para evitar ambigüedad entre cuentas usadas en el mismo navegador.
+- Las actualizaciones de operaciones existentes y las nuevas persistencias pasan explícitamente el correo propietario a `persistBackendOutbox()`, preservando el aislamiento por cuenta ya implementado.
+- Se preserva el modo sin backend: si `MEMORIA_BACKEND_URL` está vacío, no se crea cola remota, como antes.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-outbox-session-owner-80` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- La mejora se limita al aislamiento propietario de la cola local para mutaciones protegidas; se preserva la lógica existente de autenticación Google/Gmail, perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, R2x, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir `YA ESTA LISTO`.
+
+
+## 106. Revisión de punto débil: documentación ejecutable aún conservaba referencias heredadas de autenticación y push
+
+En esta iteración se identificó como punto débil principal que el runtime de ChatER ya usaba `AUTENTICACIONx` con Google/Gmail y `APInotificacionesPUSHx`, pero algunas secciones históricas de esta documentación seguían describiendo como criterio operativo rutas o procesos heredados de acceso, dispositivos, notificaciones, versión y errores del cliente. Aunque `js/app.js` ya no dependía de esas rutas como contrato principal, mantenerlas en la documentación ejecutable podía guiar una siguiente iteración a reintroducir APIs antiguas contra la regla de sincronizar primero con `APIS de memoriaBACKEND`.
+
+Cambios aplicados:
+
+- `docs/memoriaBACKEND_APIS.md` reemplaza el mapa operativo de acceso OTP por el flujo vigente `GET /auth/login`, `GET /login.js`, `GET /auth/check` y `POST /auth/firebase/session` de `AUTENTICACIONx`.
+- La sección de notificaciones deja de recomendar endpoints heredados de dispositivos y pruebas; ahora apunta a `POST /api/v1/push/suscripciones` y `POST /api/v1/push/enviar`, que son las rutas canónicas publicadas por memoriaBACKEND.
+- La sección PWA deja de recomendar endpoints heredados de versión y errores del cliente como endpoints productivos; para versión/contratos usa `VERSIONESapi` y `BLOQUESsincronizadosX`, y para errores técnicos usa `EVENTOSx` mediante `POST /api/v1/eventos/registrar`.
+- Las menciones de preservación de “login/autenticación por correo” se normalizan a “autenticación Google/Gmail”, sin cambiar la lógica funcional de la app ni tocar la carpeta `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- Se verificó que las rutas usadas por `apiClient.request()` existen en `APIS de memoriaBACKEND/apis v475.txt` y no se detectaron llamadas activas a endpoints heredados de dispositivos, notificaciones, errores, versión, chats, estados, llamadas, media ni realtime.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta limpieza documental y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 107. Revisión de punto débil: referencias históricas a rutas heredadas seguían dentro de la documentación ejecutable
+
+En esta iteración se identificó como punto débil principal que el runtime de ChatER ya estaba sincronizado con las APIs canónicas publicadas en `APIS de memoriaBACKEND`, pero algunas secciones históricas de esta documentación todavía describían acciones vigentes usando rutas heredadas de llamadas, chats, lectura, estados, promoción, media y realtime. Aunque esas rutas no aparecían como llamadas activas en `js/app.js`, conservarlas como criterios operativos podía inducir a una siguiente iteración a reintroducir contratos que ya fueron reemplazados por memoriaBACKEND.
+
+Cambios aplicados:
+
+- `docs/memoriaBACKEND_APIS.md` consolida las referencias ejecutables de llamadas hacia `SESIONEScomunicacionX` mediante `GET/POST /api/v1/sesiones-comunicacion`.
+- La lectura de conversaciones queda descrita con `INTERACCIONESmensajeX` mediante `POST /api/v1/interacciones-mensaje`, no con contratos heredados de lectura de chat.
+- Los estados 24h y su promoción quedan descritos con `PUBLICACIONESefimerasX`: `GET/POST/PATCH /api/v1/publicaciones-efimeras`.
+- Los adjuntos y estados visuales quedan descritos con `ImagenesCloudflareR2x` para imágenes WebP temporales optimizadas y `MEDIAfirmadaX` para media genérica, antes de crear mensajes o publicaciones en `/api/v1/mensajes` o `/api/v1/publicaciones-efimeras`.
+- La publicación realtime queda descrita con `POST /api/v1/streme/eventos`, preservando SSE/WebSocket del static site y sin introducir polling.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- Se verificó que no hay llamadas activas en `js/app.js`, `index.html`, `js/config.js`, `js/pwa.js` ni `manifest.json` hacia endpoints heredados de dispositivos, notificaciones, errores, versión, chats, estados, llamadas, media o realtime.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta limpieza documental y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 108. Revisión de punto débil: historial documental todavía podía reintroducir contratos heredados
+
+En esta iteración se identificó como punto débil principal que el runtime ya consumía las rutas canónicas de `APIS de memoriaBACKEND`, pero el historial ejecutable de esta documentación todavía conservaba nombres literales de endpoints heredados dentro de secciones antiguas. Aunque muchas menciones eran explicativas o de negación, en un ciclo automático podían ser interpretadas como contratos todavía válidos y provocar una regresión hacia rutas que memoriaBACKEND ya reemplazó.
+
+Cambios aplicados:
+
+- `docs/memoriaBACKEND_APIS.md` normaliza las secciones históricas para hablar de contratos heredados por categoría, sin dejarlos como rutas operativas copiables.
+- Las acciones de archivar, restaurar y fijar conversaciones quedan documentadas únicamente contra `PATCH /api/v1/conversaciones/{conversationId}`.
+- La promoción de estados queda documentada únicamente contra `PATCH /api/v1/publicaciones-efimeras/{stateId}`.
+- La lectura de conversaciones queda documentada únicamente contra `POST /api/v1/interacciones-mensaje`.
+- Las notificaciones, telemetría, versión, bloques, media y realtime quedan referenciadas por sus bloques canónicos: `APInotificacionesPUSHx`, `EVENTOSx`, `VERSIONESapi`, `BLOQUESsincronizadosX`, `MEDIAfirmadaX`, `ImagenesCloudflareR2x` y `STREMEx`.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- Se verificó que las rutas activas de `apiClient.request()` existen en `APIS de memoriaBACKEND/apis v475.txt`.
+- La corrección es documental y no altera lógica runtime, assets, service worker, autenticación Google/Gmail, cola local, PWA, `STREMEx`, notificaciones, adjuntos, estados ni conversaciones.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta limpieza documental y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 109. Revisión de punto débil: evento oficial de login.js ignorado cuando no había sesión local previa
+
+En esta iteración se identificó como punto débil principal que ChatER ya exigía Google/Gmail mediante `AUTENTICACIONx`, cargaba `/login.js`, validaba `/auth/check` y podía crear sesión con `POST /auth/firebase/session`, pero el listener local de `memoriaBACKEND:login` descartaba el evento cuando no existía todavía un correo guardado en la sesión local. Eso podía romper el flujo oficial de `login.js` después de una redirección o en navegadores donde la cookie segura no queda disponible y el script entrega el token compatible `tk`/`idToken` por evento.
+
+Cambios aplicados:
+
+- `js/app.js` conserva la protección contra intentos Google/Gmail obsoletos mediante `activeGoogleLoginAttemptGuard`, pero ya no descarta un evento oficial de `login.js` solo porque todavía no exista correo local.
+- El evento `memoriaBACKEND:login` ahora siempre pasa por `verifyGoogleGmailPayloadAgainstBackend()`, que valida contra `AUTENTICACIONx` usando `POST /auth/firebase/session` cuando llega un token Google/Firebase o `GET /auth/check` cuando debe confirmarse cookie/bearer compatible.
+- ChatER sigue sin aceptar identidad local como prueba de acceso: `completeAuthenticatedSession()` mantiene la validación estricta de proveedor Google/Gmail, correo Gmail permitido y confirmación real de memoriaBACKEND antes de mostrar la interfaz.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-login-event-bridge-82` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- Se verificó que las rutas activas de `apiClient.request()` existen en `APIS de memoriaBACKEND/apis v475.txt` y que la corrección se limita al puente de autenticación Google/Gmail con `AUTENTICACIONx`.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 110. Revisión de punto débil: autenticación Google/Gmail todavía era desactivable por configuración
+
+En esta iteración se identificó como punto débil principal que ChatER ya integraba `AUTENTICACIONx`, `/login.js`, `/auth/check` y `POST /auth/firebase/session`, pero el runtime aún evaluaba `REQUIRE_GOOGLE_GMAIL_AUTH !== false`. Eso permitía que un despliegue estático modificara `js/config.js` y abriera la interfaz protegida sin la validación Google/Gmail exigida por la solicitud.
+
+Cambios aplicados:
+
+- `js/app.js` endurece `shouldRequireGoogleGmailAuth()` para devolver siempre `true`; la autenticación Google/Gmail queda como requisito duro de producto antes de renderizar `chatER`.
+- `js/config.js` conserva la bandera histórica solo como compatibilidad documental, pero aclara que el runtime ya no permite usarla como bypass.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-required-non-optional-83` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- La mejora se limita al requisito obligatorio de autenticación Google/Gmail; se preserva la integración existente con perfil, preferencias, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `PRESENCIAusuarioX`, `BLOQUESsincronizadosX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones push, herramientas comerciales, búsqueda remota, visitas del static site, reconciliación de IDs, cursor de sincronización, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 111. Revisión de punto débil: el service worker aún reconocía prefijos heredados como backend runtime
+
+En esta iteración se identificó como punto débil principal que el runtime de `js/app.js` ya usa las APIs canónicas publicadas dentro de `APIS de memoriaBACKEND`, pero `service-worker.js` todavía conservaba una lista amplia de prefijos heredados para omitir cache (`/chats`, `/messages`, `/states`, `/calls`, `/media`, `/devices`, `/notifications`, `/search`, `/users`, `/reports`, `/privacy`, `/client-errors`, `/version`, entre otros). Aunque esa lista no ejecutaba llamadas directas, mantenía contratos antiguos dentro de la política runtime de la PWA y podía inducir futuras iteraciones a tratar rutas reemplazadas como APIs vigentes.
+
+Cambios aplicados:
+
+- `service-worker.js` reduce `isRuntimeBackendRequest()` a los montajes canónicos necesarios para un static site sincronizado con memoriaBACKEND: `/api/v1`, `/auth`, `/login.js` y `/sdk`.
+- Se mantiene el bypass de cache para SSE mediante `Accept: text/event-stream`, preservando `STREMEx` sin polling.
+- Se eliminan de la política runtime de cache los prefijos heredados de chats, mensajes, estados, llamadas, media, dispositivos, notificaciones, búsqueda, usuarios, reportes, privacidad, errores de cliente y versión.
+- `CHATER_SW_VERSION` y `app-version.json` suben a `2026-07-03-memoriabackend-sw-canonical-runtime-prefixes-84` para que una PWA instalada refresque el service worker anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- Se verificó que las rutas activas de `apiClient.request()` existen en `APIS de memoriaBACKEND/apis v475.txt` y que `service-worker.js` ya no mantiene prefijos heredados como contratos runtime cacheables o excluidos.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta limpieza de cache runtime y vuelva a ejecutar la validación completa antes de emitir la frase final.
