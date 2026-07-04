@@ -143,8 +143,9 @@ function removeSessionStorageItem(key) {
 }
 
 const CHATER_CONFIG = {
-  backendBaseUrl: normalizeMemoriaBackendBaseUrl(window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || 'https://memoriabackend.onrender.com'),
-  siteId: normalizeMemoriaSiteId(window.CHATER_CONFIG?.MEMORIA_SITE_ID || window.CHATER_CONFIG?.SITE_ID || 'a1'),
+  backendBaseUrl: normalizeMemoriaBackendBaseUrl(window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || ''),
+  siteId: normalizeMemoriaSiteId(window.CHATER_CONFIG?.MEMORIA_SITE_ID || window.CHATER_CONFIG?.SITE_ID || ''),
+  projectOrigin: normalizeMemoriaProjectOrigin(window.CHATER_CONFIG?.MEMORIA_PROJECT_ORIGIN || window.CHATER_CONFIG?.ORIGEN_PROYECTO || window.CHATER_CONFIG?.PROJECT_ORIGIN || ''),
   apiPrefix: normalizeMemoriaApiPrefix(window.CHATER_CONFIG?.MEMORIA_API_PREFIX || '/api/v1'),
   realtimeUrl: window.CHATER_CONFIG?.STREME_REALTIME_URL || '',
   realtimeTransport: window.CHATER_CONFIG?.STREME_TRANSPORT || 'auto',
@@ -199,7 +200,19 @@ function resolvePositiveConfigNumber(value, fallback) {
 
 function normalizeMemoriaSiteId(value = '') {
   const normalized = String(value || '').trim();
-  return normalized || 'a1';
+  return normalized;
+}
+
+function normalizeMemoriaProjectOrigin(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw, window.location.origin);
+    return url.origin.replace(/\/+$/, '');
+  } catch (error) {
+    return raw.replace(/\/+$/, '');
+  }
 }
 
 function normalizeMemoriaApiPrefix(value = '/api/v1') {
@@ -226,7 +239,7 @@ function normalizeMemoriaChannel(value = 'chater-general') {
 }
 
 function getMemoriaSiteId() {
-  return CHATER_CONFIG.siteId || 'a1';
+  return CHATER_CONFIG.siteId || '';
 }
 
 function withMemoriaSitePayload(payload = {}) {
@@ -1903,8 +1916,14 @@ function buildApiUrl(path, options = {}) {
   return url.toString();
 }
 
+function getCurrentProjectOrigin() {
+  return CHATER_CONFIG.projectOrigin || window.location.origin || '';
+}
+
 function getCurrentPageUrl() {
-  return `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const origin = getCurrentProjectOrigin();
+  if (!origin) return `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return `${origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
 
 function decorateMemoriaGoogleLoginUrl(rawUrl, options = {}) {
@@ -2113,7 +2132,7 @@ function loadMemoriaGoogleLoginScript(options = {}) {
 
     const tryNextScript = () => {
       if (currentIndex >= loginScriptUrls.length) {
-        const currentOrigin = window.location.origin || 'dominio_actual_no_disponible';
+        const currentOrigin = getCurrentProjectOrigin() || 'dominio_actual_no_disponible';
         const detail = lastError?.message ? `${lastError.message} ` : '';
         reject(new Error(`${detail}El bloqueo ocurre antes de Firebase: autoriza ${currentOrigin} en los origins del site ${getMemoriaSiteId()} dentro de memoriaBACKEND y confirma también el dominio en Firebase Authentication.`));
         return;
@@ -4342,7 +4361,7 @@ function buildClientTelemetryPayload(kind = 'client_error', details = {}) {
       userId,
       hasAuthenticatedSession: Boolean(getSessionEmail()),
       appVersion: typeof APP_VERSION !== 'undefined' ? APP_VERSION : '',
-      serviceWorkerVersion: '2026-07-03-memoriabackend-login-script-retry-81',
+      serviceWorkerVersion: '2026-07-03-config-json-memoriabackend-88',
       occurredAt: new Date().toISOString()
     }
   };

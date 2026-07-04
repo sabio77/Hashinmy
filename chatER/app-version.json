@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-google-login-next-origin-fallback-87",
-  "buildTime": "2026-07-03T20:20:00-05:00",
+  "version": "2026-07-03-config-json-memoriabackend-88",
+  "buildTime": "2026-07-03T20:34:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER carga login.js con next dinámico, prueba candidatos canónicos de memoriaBACKEND sin async y deja diagnóstico claro cuando el dominio falta en origins del backend antes de Firebase."
+  "description": "ChatER carga ORIGEN_PROYECTO, MEMORIA_BACKEND_URL y MEMORIA_SITE_ID desde js/CONFIGmemoriaBACKEND.json y deriva login.js/API desde esa configuración runtime."
 }

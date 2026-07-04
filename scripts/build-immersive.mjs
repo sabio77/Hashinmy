@@ -1,10 +1,13 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getLlmsHomeLabel, getLlmsHubLabel } from './llms-i18n-labels.mjs';
+import { getConfiguredPublicHost, loadMemoriaBackendProjectConfig } from './memoria-backend-config.mjs';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
-const PUBLIC_SITE_URL = 'https://hashinmy.com/';
+const MEMORIA_BACKEND_CONFIG = await loadMemoriaBackendProjectConfig(root);
+const PUBLIC_SITE_URL = MEMORIA_BACKEND_CONFIG.ORIGEN_PROYECTO;
+const PUBLIC_SITE_HOST = getConfiguredPublicHost(MEMORIA_BACKEND_CONFIG);
 const LANGUAGE_PATH_PREFIX = 'l';
 const SEO_MODERN_ROUTE_QUERY = 'seo';
 const REQUIRED_SEO_UI_LABEL_KEYS = ['productsLabel', 'allLabel', 'closeLabel', 'backToProductsLabel', 'viewSolutionLabel', 'classicViewLabel', 'classicViewAriaLabel', 'modernViewLabel', 'modernViewAriaLabel', 'categoryNavLabel', 'simpleLabel', 'whoLabel', 'technicalLabel', 'includesLabel', 'glossaryLabel', 'guideLabel', 'faqLabel', 'detailTitle', 'detailLead', 'scopeCatalogLabel', 'glossarySetLabel'];
@@ -1138,7 +1141,7 @@ async function buildLlmsTxtFromSeoContent(seoContent) {
       '',
       `- Sitemap: ${new URL('/sitemap.xml', PUBLIC_SITE_URL).toString()}`,
       `- Robots: ${new URL('/robots.txt', PUBLIC_SITE_URL).toString()}`,
-      '- hashinmy.com',
+      `- ${PUBLIC_SITE_HOST}`,
       '- Hashinmy'
     );
   }
@@ -1840,7 +1843,7 @@ function buildSeoPrimaryEntity(item, pageUrl, bundle, definedTerms = []) {
     serviceType: item.eyebrow || 'Hashinmy service',
     category: item.category || undefined,
     description: item.metaDescription || item.summary,
-    provider: { '@id': 'https://hashinmy.com/#organization' },
+    provider: { '@id': `${PUBLIC_SITE_URL}#organization` },
     url: pageUrl,
     areaServed: 'Global',
     audience: item.who ? { '@type': 'BusinessAudience', audienceType: item.who } : undefined,
@@ -1873,7 +1876,7 @@ function buildSeoGuideEntity(item, pageUrl, bundle, definedTerms = []) {
     articleBody: buildSeoArticleBody(item),
     keywords: Array.isArray(item.keywords) ? item.keywords.join(', ') : undefined,
     inLanguage: bundle?.htmlLang || bundle?.code || 'es',
-    publisher: { '@id': 'https://hashinmy.com/#organization' },
+    publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
     mainEntityOfPage: { '@id': `${pageUrl}#webpage` },
     about: [{ '@id': getSeoPrimaryEntityId(item, pageUrl) }, ...definedTerms.map((entry) => ({ '@id': entry['@id'] }))]
   };
@@ -1907,17 +1910,17 @@ function buildSeoJsonLd({ pageUrl, title, description, bundle, item }) {
   const graph = [
     {
       '@type': 'Organization',
-      '@id': 'https://hashinmy.com/#organization',
+      '@id': `${PUBLIC_SITE_URL}#organization`,
       name: 'Hashinmy',
-      url: 'https://hashinmy.com/',
-      logo: 'https://hashinmy.com/assets/hashinmy-logo-emblem.png'
+      url: PUBLIC_SITE_URL,
+      logo: `${PUBLIC_SITE_URL}assets/hashinmy-logo-emblem.png`
     },
     {
       '@type': 'WebSite',
-      '@id': 'https://hashinmy.com/#website',
+      '@id': `${PUBLIC_SITE_URL}#website`,
       name: 'Hashinmy',
-      url: 'https://hashinmy.com/',
-      publisher: { '@id': 'https://hashinmy.com/#organization' },
+      url: PUBLIC_SITE_URL,
+      publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
       inLanguage: [bundle?.htmlLang || bundle?.code || 'es']
     },
     {
@@ -1926,8 +1929,8 @@ function buildSeoJsonLd({ pageUrl, title, description, bundle, item }) {
       url: pageUrl,
       name: title,
       description,
-      isPartOf: { '@id': 'https://hashinmy.com/#website' },
-      publisher: { '@id': 'https://hashinmy.com/#organization' },
+      isPartOf: { '@id': `${PUBLIC_SITE_URL}#website` },
+      publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
       inLanguage: bundle?.htmlLang || bundle?.code || 'es',
       breadcrumb: { '@id': `${pageUrl}#breadcrumb` },
       mainEntity: { '@id': primaryEntityId }

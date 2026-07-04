@@ -6,10 +6,13 @@
   const LEGACY_STORAGE_KEYS = ['hashinmy_immersive_route_v5', 'hashinmy_immersive_route_v4', 'hashinmy_immersive_route_v3', 'hashinmy_immersive_route_v2', 'hashinmy_immersive_route_v1'];
   const CONTACT_EMAIL = 'sales@hashinmy.com';
   const MAILTO_MAX_SAFE_LENGTH = 1800;
-  const MEMORIA_BACKEND_SITE_ID = 'de966e921416';
-  const MEMORIA_BACKEND_BASE_URL = 'https://mapsx.app';
-  const MEMORIA_BACKEND_API_BASE_URL = `${MEMORIA_BACKEND_BASE_URL}/api/v1`;
-  const MEMORIA_BACKEND_SDK_URL = `${MEMORIA_BACKEND_BASE_URL}/sdk/memoria.js?s=${encodeURIComponent(MEMORIA_BACKEND_SITE_ID)}`;
+  let memoriaBackendRuntimeConfigPromise = null;
+  let memoriaBackendRuntimeConfig = null;
+  let MEMORIA_BACKEND_SITE_ID = '';
+  let MEMORIA_BACKEND_BASE_URL = '';
+  let MEMORIA_BACKEND_API_BASE_URL = '';
+  let MEMORIA_BACKEND_SDK_URL = '';
+  let PUBLIC_SITE_URL = '';
   const MEMORIA_BACKEND_COMMERCIAL_SDK_TIMEOUT_MS = 5200;
   const MEMORIA_BACKEND_VISIT_OPENING_SDK_TIMEOUT_MS = 2600;
   const MEMORIA_BACKEND_VISIT_OPENING_API_TIMEOUT_MS = 3200;
@@ -32,7 +35,6 @@
     'Contacto'
   ]);
   const MAX_OPTIONS_PER_SCENE = 3;
-  const PUBLIC_SITE_URL = 'https://hashinmy.com/';
   const LANGUAGE_PATH_PREFIX = 'l';
   const APP_BASE_URL = (() => {
     try {
@@ -48,6 +50,67 @@
     } catch {
       return String(relativePath || '');
     }
+  }
+
+  const MEMORIA_BACKEND_CONFIG_PATH = appUrl('js/CONFIGmemoriaBACKEND.json');
+
+  function normalizeConfiguredPublicOrigin(value = '') {
+    try {
+      const url = new URL(String(value || '').trim());
+      url.hash = '';
+      url.search = '';
+      url.pathname = '/';
+      return url.toString();
+    } catch {
+      return '';
+    }
+  }
+
+  function normalizeConfiguredBackendUrl(value = '') {
+    try {
+      const url = new URL(String(value || '').trim());
+      url.hash = '';
+      url.search = '';
+      url.pathname = url.pathname.replace(/\/+$/u, '') || '';
+      return url.toString().replace(/\/+$/u, '');
+    } catch {
+      return '';
+    }
+  }
+
+  function applyMemoriaBackendRuntimeConfig(config = {}) {
+    const origenProyecto = normalizeConfiguredPublicOrigin(config.ORIGEN_PROYECTO);
+    const memoriaBackendUrl = normalizeConfiguredBackendUrl(config.MEMORIA_BACKEND_URL);
+    const memoriaSiteId = String(config.MEMORIA_SITE_ID || '').trim();
+
+    if (!origenProyecto || !memoriaBackendUrl || !memoriaSiteId) {
+      throw new Error('CONFIGmemoriaBACKEND.json debe definir ORIGEN_PROYECTO, MEMORIA_BACKEND_URL y MEMORIA_SITE_ID con valores válidos.');
+    }
+
+    PUBLIC_SITE_URL = origenProyecto;
+    MEMORIA_BACKEND_BASE_URL = memoriaBackendUrl;
+    MEMORIA_BACKEND_SITE_ID = memoriaSiteId;
+    MEMORIA_BACKEND_API_BASE_URL = `${MEMORIA_BACKEND_BASE_URL}/api/v1`;
+    MEMORIA_BACKEND_SDK_URL = `${MEMORIA_BACKEND_BASE_URL}/sdk/memoria.js?s=${encodeURIComponent(MEMORIA_BACKEND_SITE_ID)}`;
+    memoriaBackendRuntimeConfig = Object.freeze({
+      ORIGEN_PROYECTO: PUBLIC_SITE_URL,
+      MEMORIA_BACKEND_URL: MEMORIA_BACKEND_BASE_URL,
+      MEMORIA_SITE_ID: MEMORIA_BACKEND_SITE_ID
+    });
+    document.documentElement.dataset.memoriaBackendConfig = 'loaded';
+    return memoriaBackendRuntimeConfig;
+  }
+
+  async function loadMemoriaBackendRuntimeConfig() {
+    if (memoriaBackendRuntimeConfig) return memoriaBackendRuntimeConfig;
+    if (!memoriaBackendRuntimeConfigPromise) {
+      memoriaBackendRuntimeConfigPromise = (async () => {
+        const response = await fetch(MEMORIA_BACKEND_CONFIG_PATH, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return applyMemoriaBackendRuntimeConfig(await response.json());
+      })();
+    }
+    return memoriaBackendRuntimeConfigPromise;
   }
   const ASSET_BASE = appUrl('assets/');
   const PROOF_LOGO_DIRECTORY = 'assets/clientes/';
@@ -2023,7 +2086,7 @@
       serviceType: item.eyebrow || 'Hashinmy service',
       category: item.category || undefined,
       description: item.metaDescription || item.summary,
-      provider: { '@id': 'https://hashinmy.com/#organization' },
+      provider: { '@id': `${PUBLIC_SITE_URL}#organization` },
       url: pageUrl,
       areaServed: 'Global',
       audience: item.who ? { '@type': 'BusinessAudience', audienceType: item.who } : undefined,
@@ -2056,7 +2119,7 @@
       articleBody: buildSeoArticleBody(item),
       keywords: Array.isArray(item.keywords) ? item.keywords.join(', ') : undefined,
       inLanguage: bundle?.htmlLang || getSeoLanguage(),
-      publisher: { '@id': 'https://hashinmy.com/#organization' },
+      publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
       mainEntityOfPage: { '@id': `${pageUrl}#webpage` },
       about: [{ '@id': getSeoPrimaryEntityId(item, pageUrl) }, ...definedTerms.map((entry) => ({ '@id': entry['@id'] }))]
     };
@@ -2326,10 +2389,10 @@
   function buildBrandOrganizationStructuredData(bundle = getSeoBundle()) {
     return {
       '@type': 'Organization',
-      '@id': 'https://hashinmy.com/#organization',
+      '@id': `${PUBLIC_SITE_URL}#organization`,
       name: 'Hashinmy',
-      url: 'https://hashinmy.com/',
-      logo: 'https://hashinmy.com/assets/hashinmy-logo-emblem.png',
+      url: PUBLIC_SITE_URL,
+      logo: `${PUBLIC_SITE_URL}assets/hashinmy-logo-emblem.png`,
       description: getBrandStructuredDescription(bundle),
       slogan: getBrandStructuredSlogan(bundle),
       areaServed: 'Global',
@@ -2343,7 +2406,7 @@
     const fallbackServices = Array.isArray(textBundle?.services) ? textBundle.services : [];
     return {
       '@type': 'OfferCatalog',
-      '@id': 'https://hashinmy.com/#offer-catalog',
+      '@id': `${PUBLIC_SITE_URL}#offer-catalog`,
       name: bundle?.hubTitle || t('meta.ogTitle', 'Hashinmy'),
       description: bundle?.hubLead || getBrandStructuredDescription(bundle),
       itemListElement: BRAND_HOME_SCHEMA_SERVICE_MAP.map(([itemId, schemaId], index) => {
@@ -2356,11 +2419,11 @@
           position: index + 1,
           itemOffered: {
             '@type': 'Service',
-            '@id': `https://hashinmy.com/#${schemaId}`,
+            '@id': `${PUBLIC_SITE_URL}#${schemaId}`,
             name,
             serviceType: item?.eyebrow || item?.category || fallback.tech || name,
             description,
-            provider: { '@id': 'https://hashinmy.com/#organization' },
+            provider: { '@id': `${PUBLIC_SITE_URL}#organization` },
             areaServed: 'Global'
           }
         };
@@ -2434,10 +2497,10 @@
       buildBrandOrganizationStructuredData(bundle),
       {
         '@type': 'WebSite',
-        '@id': 'https://hashinmy.com/#website',
+        '@id': `${PUBLIC_SITE_URL}#website`,
         name: 'Hashinmy',
-        url: 'https://hashinmy.com/',
-        publisher: { '@id': 'https://hashinmy.com/#organization' },
+        url: PUBLIC_SITE_URL,
+        publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
         inLanguage: getSeoBundles().map((seoBundle) => seoBundle.htmlLang || seoBundle.code || 'es')
       },
       {
@@ -2446,8 +2509,8 @@
         url: pageUrl,
         name: pageTitle,
         description: pageDescription,
-        isPartOf: { '@id': 'https://hashinmy.com/#website' },
-        publisher: { '@id': 'https://hashinmy.com/#organization' },
+        isPartOf: { '@id': `${PUBLIC_SITE_URL}#website` },
+        publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
         inLanguage: bundle?.htmlLang || getSeoLanguage(),
         breadcrumb: { '@id': `${pageUrl}#breadcrumb` },
         mainEntity: { '@id': primaryEntityId },
@@ -3658,9 +3721,12 @@
       return state.language;
     }
 
-    const browserLanguage = detectBrowserLanguage();
-    state.language = browserLanguage || getDefaultInitialLanguage();
-    document.documentElement.dataset.initialLanguageSource = browserLanguage ? 'browser' : 'default-en';
+    const routeLanguage = readStoredRouteLanguage();
+    let stored = '';
+    try { stored = localStorage.getItem(LANGUAGE_STORAGE_KEY) || ''; } catch {}
+    const storedLanguage = routeLanguage || (stored ? normalizeLanguageCode(stored) : detectPreferredLanguage());
+    state.language = storedLanguage;
+    document.documentElement.dataset.initialLanguageSource = routeLanguage ? 'stored-route' : stored ? 'stored' : (detectBrowserLanguage() ? 'browser' : 'default-en');
     return state.language;
   }
 
@@ -6323,6 +6389,7 @@
   }
 
   async function init() {
+    await loadMemoriaBackendRuntimeConfig();
     bindElements();
     renderProofLogos();
     validateSceneMap();

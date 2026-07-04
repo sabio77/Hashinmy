@@ -1,13 +1,16 @@
 import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getLlmsHomeLabel, getLlmsHubLabel } from './llms-i18n-labels.mjs';
+import { getConfiguredPublicHost, loadMemoriaBackendProjectConfig } from './memoria-backend-config.mjs';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
 const failures = [];
 let REQUIRED_LANGUAGE_COUNT = 0;
 const REQUIRED_SCENES = ['intro', 'serviceFamily', 'buildType', 'automationType', 'modernization', 'operation', 'value', 'risk', 'finance', 'timeline', 'summary'];
-const PUBLIC_SITE_URL = 'https://hashinmy.com/';
+const MEMORIA_BACKEND_CONFIG = await loadMemoriaBackendProjectConfig(root);
+const PUBLIC_SITE_URL = MEMORIA_BACKEND_CONFIG.ORIGEN_PROYECTO;
+const PUBLIC_SITE_HOST = getConfiguredPublicHost(MEMORIA_BACKEND_CONFIG);
 const REQUIRED_SEO_UI_LABEL_KEYS = ['productsLabel', 'allLabel', 'closeLabel', 'backToProductsLabel', 'viewSolutionLabel', 'classicViewLabel', 'classicViewAriaLabel', 'modernViewLabel', 'modernViewAriaLabel', 'categoryNavLabel', 'simpleLabel', 'whoLabel', 'technicalLabel', 'includesLabel', 'glossaryLabel', 'guideLabel', 'faqLabel', 'detailTitle', 'detailLead', 'scopeCatalogLabel', 'glossarySetLabel'];
 const LANGUAGE_PATH_PREFIX = 'l';
 
@@ -1612,12 +1615,12 @@ assert(
   assert(buildScript.includes('function discoverProofClientLogos') && buildScript.includes('clientes-manifest.json') && buildScript.includes('PROOF_LOGO_IMAGE_EXTENSIONS') && buildScript.includes('hydrateStaticProofLogosFallback'), 'El build debe generar el manifiesto SEO de logos detectando automáticamente formatos de imagen dentro de assets/clientes.');
   assertProofLogoDisplayNames(await readJson('assets/clientes/clientes-manifest.json'), jsText, buildScript, 'dist/assets/clientes/clientes-manifest.json');
   assert(!indexHtml.includes('./assets/logo_clean_MAX.jpg') && !jsText.includes("{ name: 'CleanMAX', file: 'logo_clean_MAX.jpg' }"), 'La sección Nuestra Experiencia no debe depender de logos manuales en assets raíz; debe usar assets/clientes.');
-  assert(indexHtml.includes('\"@type\": \"OfferCatalog\"') && indexHtml.includes('https://hashinmy.com/#offer-catalog') && indexHtml.includes('https://hashinmy.com/#service-custom-software') && indexHtml.includes('https://hashinmy.com/#service-ai-automation') && indexHtml.includes('https://hashinmy.com/#service-web-seo-chatbots') && indexHtml.includes('https://hashinmy.com/#service-technical-quoter'), 'La home debe publicar OfferCatalog y servicios principales en JSON-LD para que la portada también comunique productos, no solo las fichas internas.');
-  assert(indexHtml.includes('https://hashinmy.com/#service-financed-development') && indexHtml.includes('Tecnología empresarial a la medida financiada al 100%') && !indexHtml.includes('Software a medida, IA, CAD DXF, nube, PC, SEO'), 'dist debe posicionar el JSON-LD de la home desde la promesa madre de ingeniería digital financiada al 100%, no desde el catálogo viejo centrado en CAD/SEO/cotizadores.');
+  assert(indexHtml.includes('\"@type\": \"OfferCatalog\"') && indexHtml.includes(`${PUBLIC_SITE_URL}#offer-catalog`) && indexHtml.includes(`${PUBLIC_SITE_URL}#service-custom-software`) && indexHtml.includes(`${PUBLIC_SITE_URL}#service-ai-automation`) && indexHtml.includes(`${PUBLIC_SITE_URL}#service-web-seo-chatbots`) && indexHtml.includes(`${PUBLIC_SITE_URL}#service-technical-quoter`), 'La home debe publicar OfferCatalog y servicios principales en JSON-LD para que la portada también comunique productos, no solo las fichas internas.');
+  assert(indexHtml.includes(`${PUBLIC_SITE_URL}#service-financed-development`) && indexHtml.includes('Tecnología empresarial a la medida financiada al 100%') && !indexHtml.includes('Software a medida, IA, CAD DXF, nube, PC, SEO'), 'dist debe posicionar el JSON-LD de la home desde la promesa madre de ingeniería digital financiada al 100%, no desde el catálogo viejo centrado en CAD/SEO/cotizadores.');
   assert(jsText.includes('function buildBrandOrganizationStructuredData') && jsText.includes('function buildBrandOfferCatalogStructuredData') && jsText.includes('function buildHomeFaqStructuredData') && jsText.includes('service-financed-development'), 'El runtime en dist debe preservar organización enriquecida, OfferCatalog estratégico, FAQ de portada y financiación del 100% después de cambiar idioma o vista.');
   assert(buildScript.includes('function buildStaticBrandKnowsAbout') && buildScript.includes('function buildStaticBrandOfferCatalogJsonLd') && buildScript.includes('service-financed-development'), 'El build usado por dist debe generar JSON-LD de marca desde textX/textX/seo con financiación 100% y alcance estratégico localizado.');
-  assert(indexHtml.includes('\"@type\": \"FAQPage\"') && indexHtml.includes('https://hashinmy.com/#faq') && indexHtml.includes(spanishBundle.ui.proofFaqWhyQuestion) && indexHtml.includes(spanishBundle.ui.proofFaqWhoQuestion) && indexHtml.includes(spanishBundle.ui.proofFaqStartQuestion), 'La home debe mantener FAQPage estructurado alineado con el FAQ rápido visible y localizado desde textX/es.json.');
-  assert(indexHtml.includes('\"@type\": \"BreadcrumbList\"') && indexHtml.includes('https://hashinmy.com/#breadcrumb') && indexHtml.includes('\"name\": \"Inicio\"'), 'La home debe mantener BreadcrumbList estructurado aunque sea la ruta raíz.');
+  assert(indexHtml.includes('\"@type\": \"FAQPage\"') && indexHtml.includes(`${PUBLIC_SITE_URL}#faq`) && indexHtml.includes(spanishBundle.ui.proofFaqWhyQuestion) && indexHtml.includes(spanishBundle.ui.proofFaqWhoQuestion) && indexHtml.includes(spanishBundle.ui.proofFaqStartQuestion), 'La home debe mantener FAQPage estructurado alineado con el FAQ rápido visible y localizado desde textX/es.json.');
+  assert(indexHtml.includes('\"@type\": \"BreadcrumbList\"') && indexHtml.includes(`${PUBLIC_SITE_URL}#breadcrumb`) && indexHtml.includes('\"name\": \"Inicio\"'), 'La home debe mantener BreadcrumbList estructurado aunque sea la ruta raíz.');
 
   assertSeoContentDepth(seoContent);
   assert(buildScript.includes("hydrateStaticHtmlFallback(templateHtml, textBundle, languages, bundle?.code || 'es', '/', proofLogos, seoContent)"), 'El build de páginas SEO estáticas debe pasar seoContent al hidratador global para que el chrome del hub (cerrar, categorías y vista clásica) salga en el idioma activo y no caiga al fallback español.');
@@ -1667,7 +1670,7 @@ assert(
   assert(indexHtml.includes('./js/hashinmy-immersive.js'), 'dist/index.html debe apuntar al JS inmersivo.');
   assert(indexHtml.includes('<html lang="es" dir="ltr" data-language="es" data-text-script="latin"'), 'dist/index.html debe salir con atributos de idioma y perfil tipográfico estáticos para activar CSS i18n antes del runtime.');
   assert(indexHtml.includes('rel="canonical"'), 'dist/index.html debe conservar canonical base para SEO.');
-  assert(indexHtml.includes('type="text/plain" title="Hashinmy llms.txt" href="https://hashinmy.com/llms.txt"'), 'dist/index.html debe exponer llms.txt desde el head como señal directa para rastreadores de IA.');
+  assert(indexHtml.includes(`type="text/plain" title="Hashinmy llms.txt" href="${PUBLIC_SITE_URL}llms.txt"`), 'dist/index.html debe exponer llms.txt desde el head como señal directa para rastreadores de IA.');
   assert(indexHtml.includes(`<title>${spanishBundle.meta.title}</title>`) && indexHtml.includes(`content="${spanishBundle.meta.description}"`), 'dist/index.html debe salir del build con title y description españoles hidratados desde textX/es.json para SEO sin JS.');
   assert(indexHtml.includes(`content="${spanishBundle.meta.ogTitle}"`) && indexHtml.includes(`content="${spanishBundle.meta.ogDescription}"`), 'dist/index.html debe publicar OG title/description estáticos desde textX/es.json para previews sociales sin JS.');
   assert((indexHtml.match(/data-hashinmy-hreflang="static"/g) || []).length >= REQUIRED_LANGUAGE_COUNT + 1 && indexHtml.includes('hreflang="x-default"') && indexHtml.includes('/en/'), 'dist/index.html debe incluir hreflang estáticos del build para los idiomas detectados y x-default usando entradas HTML localizadas, no solo query params con HTML español.');
@@ -1773,8 +1776,8 @@ assert(
   assert([...detectedLanguageCodes].every((code) => textFiles.includes(`${code}.json`)), 'dist/textX debe contener todos los bundles de idioma detectados dinámicamente.');
   assertProfessionalFallbackLanguageCatalog(jsText, manifest.languages, 'dist/js/hashinmy-immersive.js');
   assert(sitemapXml.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"') && sitemapXml.includes('hreflang="x-default"'), 'dist/sitemap.xml debe incluir alternates hreflang/x-default para despliegue internacional.');
-  assert(robotsTxt.includes('Sitemap: https://hashinmy.com/sitemap.xml'), 'dist/robots.txt debe apuntar al sitemap absoluto de hashinmy.com para rastreadores y asistentes de IA.');
-  const localizedSitemapLanguages = new Set((sitemapXml.match(/https:\/\/hashinmy\.com\/[a-z]{2,3}\//g) || []).map((entry) => entry.replace('https://hashinmy.com/', '').replace('/', '')));
+  assert(robotsTxt.includes(`Sitemap: ${PUBLIC_SITE_URL}sitemap.xml`), 'dist/robots.txt debe apuntar al sitemap absoluto de hashinmy.com para rastreadores y asistentes de IA.');
+  const localizedSitemapLanguages = new Set((sitemapXml.match(new RegExp(`${PUBLIC_SITE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[a-z]{2,3}/`, 'g')) || []).map((entry) => entry.replace(PUBLIC_SITE_URL, '').replace('/', '')));
   assert(localizedSitemapLanguages.size >= REQUIRED_LANGUAGE_COUNT && localizedSitemapLanguages.has('es') && localizedSitemapLanguages.has('en') && !sitemapXml.includes('?lang='), 'dist/sitemap.xml debe publicar URLs localizadas como /<isocode>/ para cada idioma detectado, sin query params.');
 
   const notLocalized404Html = await readDist('404.html');
