@@ -1003,11 +1003,16 @@ const voiceRecorderState = {
   startedAt: 0
 };
 
-const loginView = document.getElementById('loginView');
 const chatView = document.getElementById('chatView');
-const loginForm = document.getElementById('loginForm');
-const emailInput = document.getElementById('emailInput');
-const loginFeedback = document.getElementById('loginFeedback');
+const authFeedbackState = { message: '' };
+
+function setAuthFeedback(message = '') {
+  authFeedbackState.message = String(message || '');
+}
+
+function getAuthFeedback() {
+  return authFeedbackState.message;
+}
 const userEmailLabel = document.getElementById('userEmailLabel');
 const profileButton = document.getElementById('profileButton');
 const newChatButton = document.getElementById('newChatButton');
@@ -2193,7 +2198,6 @@ function isMemoriaBackendAuthOwnerActive() {
 
 function keepLocalLoginHiddenForMemoriaBackend() {
   if (!isMemoriaBackendAuthOwnerActive()) return false;
-  if (loginView) loginView.hidden = true;
   if (chatView && !getSessionEmail()) chatView.hidden = true;
   return true;
 }
@@ -2309,7 +2313,7 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
 
     const validation = validateGoogleGmailAuthPayload(payload, getSessionEmail());
     if (!validation.ok) {
-      if (!options.silent) loginFeedback.textContent = validation.message;
+      if (!options.silent) setAuthFeedback(validation.message);
       return false;
     }
 
@@ -2319,7 +2323,7 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
     if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
 
     if (!options.silent) {
-      loginFeedback.textContent = error?.message || 'No se pudo verificar la sesión Google con memoriaBACKEND.';
+      setAuthFeedback(error?.message || 'No se pudo verificar la sesión Google con memoriaBACKEND.');
     }
     return false;
   }
@@ -2339,7 +2343,7 @@ async function startGoogleGmailLogin(options = {}) {
     throw new Error('auth-gate.js debe ser quien cargue login.js y exponga la API oficial de memoriaBACKEND.');
   }
 
-  loginFeedback.textContent = 'Validando acceso con Google desde memoriaBACKEND...';
+  setAuthFeedback('Validando acceso con Google desde memoriaBACKEND...');
   try {
     const completed = await completePlatformAuthGateSession({ authGuard, fallbackEmail: options.fallbackEmail || '' });
     if (completed || getSessionEmail()) return buildAuthPayloadFromMemoriaBackendSdk() || { ok: true };
@@ -2375,7 +2379,7 @@ async function handleMemoriaBackendLoginEvent(event) {
     completeAuthenticatedSession(validation.email, validation.payload, authGuard);
   } catch (error) {
     if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
-    loginFeedback.textContent = error?.message || 'No se pudo leer la sesión Google expuesta por memoriaBACKEND.';
+    setAuthFeedback(error?.message || 'No se pudo leer la sesión Google expuesta por memoriaBACKEND.');
   }
 }
 
@@ -2396,20 +2400,20 @@ async function bootstrapGoogleGmailSession() {
 
   if (!CHATER_CONFIG.backendBaseUrl) {
     clearSession();
-    loginFeedback.textContent = 'Configura MEMORIA_BACKEND_URL para acceder a ChatER con Google desde memoriaBACKEND.';
+    setAuthFeedback('Configura MEMORIA_BACKEND_URL para acceder a ChatER con Google desde memoriaBACKEND.');
     renderShell();
     return;
   }
 
   if (!getSessionEmail()) {
-    loginFeedback.textContent = 'Esperando autenticación Google de memoriaBACKEND...';
+    setAuthFeedback('Esperando autenticación Google de memoriaBACKEND...');
     keepLocalLoginHiddenForMemoriaBackend();
   }
 
   const platformGate = getPlatformAuthGate();
   if (!platformGate) {
     clearSession();
-    loginFeedback.textContent = 'auth-gate.js no está disponible para cargar login.js de memoriaBACKEND.';
+    setAuthFeedback('auth-gate.js no está disponible para cargar login.js de memoriaBACKEND.');
     renderShell();
     return;
   }
@@ -2420,12 +2424,12 @@ async function bootstrapGoogleGmailSession() {
     const completed = await completePlatformAuthGateSession({ silent: true });
     if (completed || getSessionEmail()) return;
     clearSession();
-    loginFeedback.textContent = 'La autenticación debe completarse en memoriaBACKEND para abrir ChatER.';
+    setAuthFeedback('La autenticación debe completarse en memoriaBACKEND para abrir ChatER.');
     keepLocalLoginHiddenForMemoriaBackend();
   } catch (error) {
     clearSession();
-    loginFeedback.textContent = error?.message || 'No se pudo validar la sesión Google con memoriaBACKEND.';
-    platformGate.showError?.(loginFeedback.textContent);
+    setAuthFeedback(error?.message || 'No se pudo validar la sesión Google con memoriaBACKEND.');
+    platformGate.showError?.(getAuthFeedback());
     keepLocalLoginHiddenForMemoriaBackend();
   }
 }
@@ -4270,10 +4274,8 @@ function handleProtectedApiAuthFailure(path = '', error = {}) {
 }
 
 function requireFreshBackendLogin(email = '', message = 'Vuelve a ingresar con Google/Gmail para que memoriaBACKEND valide tu sesión.') {
-  const rememberedEmail = normalizeStorageIdentity(email || getSessionEmail());
   clearSession();
-  if (rememberedEmail) emailInput.value = rememberedEmail;
-  loginFeedback.textContent = message;
+  setAuthFeedback(message);
 }
 
 function clearAuthTokens(email = getSessionEmail()) {
@@ -4682,7 +4684,7 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   if (shouldRequireGoogleGmailAuth()) {
     const validation = validateGoogleGmailAuthPayload(authoritativePayload, resolvedEmail);
     if (!validation.ok) {
-      loginFeedback.textContent = validation.message;
+      setAuthFeedback(validation.message);
       return false;
     }
 
@@ -4707,7 +4709,7 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   }
 
   if (CHATER_CONFIG.backendBaseUrl && !authoritativePayload?.accessToken && !authoritativePayload?.refreshToken && !authoritativePayload?.sessionVerified) {
-    loginFeedback.textContent = 'memoriaBACKEND no confirmó la sesión Google/Gmail desde su API oficial. Inténtalo nuevamente.';
+    setAuthFeedback('memoriaBACKEND no confirmó la sesión Google/Gmail desde su API oficial. Inténtalo nuevamente.');
     return false;
   }
 
@@ -4716,39 +4718,10 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   setSessionEmail(resolvedEmail);
   advanceSessionRuntime(resolvedEmail);
   activateSessionState(resolvedEmail, true);
-  loginFeedback.textContent = '';
+  setAuthFeedback('');
   closeModal();
   renderShell();
   return true;
-}
-
-function openOtpModal(email, authGuard) {
-  const form = document.createElement('form');
-  form.innerHTML = `
-    <p class="modal-copy">ChatER no tiene autenticación propia: la sesión se abre únicamente cuando memoriaBACKEND confirma Google desde su API oficial.</p>
-    <p class="form-feedback" data-feedback role="status" aria-live="polite"></p>
-    <button class="primary-button" type="submit">Esperar memoriaBACKEND</button>
-  `;
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
-
-    const feedback = form.querySelector('[data-feedback]');
-    const submitButton = form.querySelector('button[type="submit"]');
-    feedback.textContent = 'Esperando confirmación de memoriaBACKEND...';
-    submitButton.disabled = true;
-
-    try {
-      await startGoogleGmailLogin({ fallbackEmail: email, authGuard });
-    } catch (error) {
-      feedback.textContent = error?.message || 'No se pudo abrir Google/Gmail desde memoriaBACKEND.';
-      submitButton.disabled = false;
-    }
-  });
-
-  setModal('Acceso Google/Gmail', form, 'google-auth');
-  form.querySelector('button[type="submit"]')?.focus();
 }
 
 function renderShell() {
@@ -4762,32 +4735,20 @@ function renderShell() {
   if (email && CHATER_CONFIG.backendBaseUrl && !hasBackendSessionCredentials()) {
     requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse con Google/Gmail en memoriaBACKEND.');
     keepLocalLoginHiddenForMemoriaBackend();
-    if (!isMemoriaBackendAuthOwnerActive()) {
-      loginView.hidden = false;
-      loginForm.querySelector('button[type="submit"]')?.focus();
-    }
-    chatView.hidden = true;
+    if (chatView) chatView.hidden = true;
     return;
   }
 
   if (email && shouldRequireGoogleGmailAuth() && !isAllowedGmailAddress(email)) {
-    requireFreshBackendLogin(email, 'ChatER solo permite cuentas Gmail verificadas por Google.');
+    requireFreshBackendLogin(email, 'ChatER solo permite cuentas verificadas por memoriaBACKEND.');
     keepLocalLoginHiddenForMemoriaBackend();
-    if (!isMemoriaBackendAuthOwnerActive()) {
-      loginView.hidden = false;
-      loginForm.querySelector('button[type="submit"]')?.focus();
-    }
-    chatView.hidden = true;
+    if (chatView) chatView.hidden = true;
     return;
   }
 
-  loginView.hidden = Boolean(email) || isMemoriaBackendAuthOwnerActive();
-  chatView.hidden = !email;
+  if (chatView) chatView.hidden = !email;
 
-  if (!email) {
-    if (!isMemoriaBackendAuthOwnerActive()) loginForm.querySelector('button[type="submit"]')?.focus();
-    return;
-  }
+  if (!email) return;
 
   const initials = getInitials(email.split('@')[0].replace(/[._-]/g, ' '));
   userEmailLabel.textContent = email;
@@ -11505,28 +11466,6 @@ async function logoutCurrentSession() {
     renderShell();
   }
 }
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  const submitButton = loginForm.querySelector('button[type="submit"]');
-  loginFeedback.textContent = 'La autenticación se gestiona únicamente desde memoriaBACKEND.';
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = 'Esperando memoriaBACKEND...';
-  }
-
-  try {
-    await bootstrapGoogleGmailSession();
-  } catch (error) {
-    loginFeedback.textContent = error?.message || 'No se pudo validar la autenticación de memoriaBACKEND.';
-  } finally {
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent = 'Esperar memoriaBACKEND';
-    }
-  }
-});
 
 searchInput.addEventListener('input', () => {
   renderCurrentSection();
