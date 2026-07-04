@@ -2234,20 +2234,39 @@ function loadMemoriaGoogleLoginScript() {
 
 async function verifyMemoriaSdkSession(sdk = getMemoriaBackendSdk()) {
   const directPayload = buildAuthPayloadFromMemoriaBackendSdk(sdk);
-  if (directPayload?.user?.email) return directPayload;
+  if (directPayload) {
+    const identity = directPayload.user?.email || buildMemoriaBackendSessionIdentity(directPayload);
+    return normalizeAuthPayload({
+      ...directPayload,
+      sessionVerified: true,
+      __memoriaBackendOfficialApi: true,
+      user: {
+        ...(directPayload.user && typeof directPayload.user === 'object' ? directPayload.user : {}),
+        email: identity
+      }
+    }, identity);
+  }
 
   const verifier = sdk?.verificarSesion || sdk?.checkSession;
-  if (typeof verifier !== 'function') return directPayload || null;
+  if (typeof verifier !== 'function') return null;
 
   const payload = await verifier.call(sdk);
-  if (payload?.ok === 0 || payload?.ok === false) return directPayload || null;
+  if (payload?.ok === 0 || payload?.ok === false) return null;
 
-  return normalizeAuthPayload({
-    ...(directPayload && typeof directPayload === 'object' ? directPayload : {}),
+  const normalizedPayload = normalizeAuthPayload({
     ...(payload && typeof payload === 'object' ? payload : {}),
     sessionVerified: true,
     __memoriaBackendOfficialApi: true
-  }, directPayload?.user?.email || '');
+  }, '');
+  const identity = normalizedPayload.user?.email || buildMemoriaBackendSessionIdentity(normalizedPayload);
+
+  return normalizeAuthPayload({
+    ...normalizedPayload,
+    user: {
+      ...(normalizedPayload.user && typeof normalizedPayload.user === 'object' ? normalizedPayload.user : {}),
+      email: identity
+    }
+  }, identity);
 }
 
 async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmail = '', options = {}) {
@@ -4657,24 +4676,43 @@ function closeTransientUiForSessionEnd() {
 function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
 
-  const normalizedPayload = normalizeAuthPayload(payload, '');
-  const resolvedEmail = normalizedPayload.user?.email || normalizeStorageIdentity(email);
+  let authoritativePayload = normalizeAuthPayload(payload, '');
+  let resolvedEmail = authoritativePayload.user?.email || normalizeStorageIdentity(email);
 
   if (shouldRequireGoogleGmailAuth()) {
-    const validation = validateGoogleGmailAuthPayload(normalizedPayload, resolvedEmail);
+    const validation = validateGoogleGmailAuthPayload(authoritativePayload, resolvedEmail);
     if (!validation.ok) {
       loginFeedback.textContent = validation.message;
       return false;
     }
+
+    // La API oficial de memoriaBACKEND es la única autoridad. Si login.js no
+    // publica un correo visible, validateGoogleGmailAuthPayload crea una
+    // identidad local estable para abrir la interfaz sin pedir otro login.
+    authoritativePayload = normalizeAuthPayload(validation.payload || authoritativePayload, validation.email || resolvedEmail);
+    resolvedEmail = validation.email || authoritativePayload.user?.email || resolvedEmail;
   }
 
-  if (CHATER_CONFIG.backendBaseUrl && !normalizedPayload?.accessToken && !normalizedPayload?.refreshToken && !normalizedPayload?.sessionVerified) {
-    loginFeedback.textContent = 'memoriaBACKEND no confirmó credenciales ni cookie de sesión Google/Gmail. Inténtalo nuevamente.';
+  if (!resolvedEmail) {
+    resolvedEmail = buildMemoriaBackendSessionIdentity(authoritativePayload);
+    authoritativePayload = normalizeAuthPayload({
+      ...authoritativePayload,
+      user: {
+        ...(authoritativePayload.user && typeof authoritativePayload.user === 'object' ? authoritativePayload.user : {}),
+        email: resolvedEmail
+      },
+      sessionVerified: true,
+      __memoriaBackendOfficialApi: true
+    }, resolvedEmail);
+  }
+
+  if (CHATER_CONFIG.backendBaseUrl && !authoritativePayload?.accessToken && !authoritativePayload?.refreshToken && !authoritativePayload?.sessionVerified) {
+    loginFeedback.textContent = 'memoriaBACKEND no confirmó la sesión Google/Gmail desde su API oficial. Inténtalo nuevamente.';
     return false;
   }
 
   invalidateAuthAttempts();
-  persistAuthTokens({ ...normalizedPayload, sessionVerified: true });
+  persistAuthTokens({ ...authoritativePayload, sessionVerified: true });
   setSessionEmail(resolvedEmail);
   advanceSessionRuntime(resolvedEmail);
   activateSessionState(resolvedEmail, true);
@@ -4687,9 +4725,9 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
 function openOtpModal(email, authGuard) {
   const form = document.createElement('form');
   form.innerHTML = `
-    <p class="modal-copy">ChatER ya no usa códigos OTP. Para continuar debes iniciar sesión con una cuenta Gmail validada por Google en memoriaBACKEND.</p>
+    <p class="modal-copy">ChatER no tiene autenticación propia: la sesión se abre únicamente cuando memoriaBACKEND confirma Google desde su API oficial.</p>
     <p class="form-feedback" data-feedback role="status" aria-live="polite"></p>
-    <button class="primary-button" type="submit">Continuar con Google</button>
+    <button class="primary-button" type="submit">Esperar memoriaBACKEND</button>
   `;
 
   form.addEventListener('submit', async (event) => {
@@ -4698,7 +4736,7 @@ function openOtpModal(email, authGuard) {
 
     const feedback = form.querySelector('[data-feedback]');
     const submitButton = form.querySelector('button[type="submit"]');
-    feedback.textContent = 'Abriendo autenticación Google/Gmail...';
+    feedback.textContent = 'Esperando confirmación de memoriaBACKEND...';
     submitButton.disabled = true;
 
     try {
@@ -11485,7 +11523,7 @@ loginForm.addEventListener('submit', async (event) => {
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = 'Continuar con Google';
+      submitButton.textContent = 'Esperar memoriaBACKEND';
     }
   }
 });

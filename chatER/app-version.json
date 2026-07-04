@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-memoriabackend-auth-only-91",
-  "buildTime": "2026-07-03T22:00:00-05:00",
+  "version": "2026-07-03-memoriabackend-auth-only-92",
+  "buildTime": "2026-07-03T22:20:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER delega la autenticación Google exclusivamente a auth-gate.js y a la API oficial window.memoriaBACKEND, sin cargar ni validar login.js desde js/app.js."
+  "description": "ChatER abre la interfaz principal apenas auth-gate.js confirma window.memoriaBACKEND como API oficial autenticada, sin exigir una segunda autenticación local ni revalidar Google desde js/app.js."
 }
