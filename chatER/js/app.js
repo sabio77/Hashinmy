@@ -143,7 +143,7 @@ function removeSessionStorageItem(key) {
 }
 
 const CHATER_CONFIG = {
-  backendBaseUrl: window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || 'https://mapsx.app',
+  backendBaseUrl: normalizeMemoriaBackendBaseUrl(window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || 'https://memoriabackend.onrender.com'),
   siteId: normalizeMemoriaSiteId(window.CHATER_CONFIG?.MEMORIA_SITE_ID || window.CHATER_CONFIG?.SITE_ID || 'a1'),
   apiPrefix: normalizeMemoriaApiPrefix(window.CHATER_CONFIG?.MEMORIA_API_PREFIX || '/api/v1'),
   realtimeUrl: window.CHATER_CONFIG?.STREME_REALTIME_URL || '',
@@ -155,6 +155,7 @@ const CHATER_CONFIG = {
   requireGmailDomain: window.CHATER_CONFIG?.REQUIRE_GMAIL_DOMAIN !== false,
   enableGoogleLoginScript: window.CHATER_CONFIG?.ENABLE_GOOGLE_LOGIN_SCRIPT !== false,
   autoLoadGoogleLoginScript: window.CHATER_CONFIG?.AUTOLOAD_GOOGLE_LOGIN_SCRIPT !== false,
+  googleLoginScriptUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_SCRIPT_URL || '',
   googleLoginBrandName: window.CHATER_CONFIG?.GOOGLE_LOGIN_BRAND_NAME || 'ChatER',
   googleLoginThemeColor: window.CHATER_CONFIG?.GOOGLE_LOGIN_THEME_COLOR || '#25d366',
   googleLoginLogoUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_LOGO_URL || '',
@@ -205,6 +206,18 @@ function normalizeMemoriaApiPrefix(value = '/api/v1') {
   const normalized = String(value || '/api/v1').trim().replace(/\/+$/, '');
   if (!normalized) return '/api/v1';
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function normalizeMemoriaBackendBaseUrl(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw, window.location.origin);
+    return url.origin.replace(/\/+$/, '');
+  } catch (error) {
+    return raw.replace(/\/+$/, '');
+  }
 }
 
 function normalizeMemoriaChannel(value = 'chater-general') {
@@ -1905,7 +1918,35 @@ function buildMemoriaGoogleLoginUrl(path = '/auth/login') {
 }
 
 function buildMemoriaGoogleLoginScriptUrl() {
+  const configuredScriptUrl = String(CHATER_CONFIG.googleLoginScriptUrl || '').trim();
+
+  if (configuredScriptUrl) {
+    try {
+      const loginUrl = new URL(configuredScriptUrl, window.location.origin);
+      if (getMemoriaSiteId() && !loginUrl.searchParams.has('s')) loginUrl.searchParams.set('s', getMemoriaSiteId());
+      if (!loginUrl.searchParams.has('n')) loginUrl.searchParams.set('n', CHATER_CONFIG.googleLoginBrandName || 'ChatER');
+      if (!loginUrl.searchParams.has('c')) loginUrl.searchParams.set('c', CHATER_CONFIG.googleLoginThemeColor || '#25d366');
+      return loginUrl.toString();
+    } catch (error) {
+      console.warn('GOOGLE_LOGIN_SCRIPT_URL no es una URL válida; se usará la URL calculada desde MEMORIA_BACKEND_URL.', error);
+    }
+  }
+
   return buildMemoriaGoogleLoginUrl('/login.js');
+}
+
+function buildRuntimeMemoriaGoogleLoginScriptUrl() {
+  const loginScriptUrl = buildMemoriaGoogleLoginScriptUrl();
+  if (!loginScriptUrl) return '';
+
+  try {
+    const runtimeUrl = new URL(loginScriptUrl, window.location.origin);
+    runtimeUrl.searchParams.set('_chaterAuth', String(Date.now()));
+    return runtimeUrl.toString();
+  } catch (error) {
+    const separator = loginScriptUrl.includes('?') ? '&' : '?';
+    return `${loginScriptUrl}${separator}_chaterAuth=${Date.now()}`;
+  }
 }
 
 function shouldRequireGoogleGmailAuth() {
@@ -2032,9 +2073,10 @@ function loadMemoriaGoogleLoginScript(options = {}) {
     return Promise.reject(new Error('Configura MEMORIA_BACKEND_URL para usar el login Google/Gmail de memoriaBACKEND.'));
   }
 
-  const scriptUrl = buildMemoriaGoogleLoginScriptUrl();
   const existing = document.getElementById('memoriaBackendGoogleLoginScript');
-  if (existing?.dataset.loaded === 'true' && existing.src === scriptUrl) return Promise.resolve(existing);
+  if (getMemoriaBackendSdk() && existing?.dataset.loaded === 'true') return Promise.resolve(existing);
+
+  const scriptUrl = buildRuntimeMemoriaGoogleLoginScriptUrl();
   if (existing?.dataset.loading === 'true' && existing.src === scriptUrl) {
     return new Promise((resolve, reject) => {
       existing.addEventListener('load', () => resolve(existing), { once: true });
@@ -2062,7 +2104,7 @@ function loadMemoriaGoogleLoginScript(options = {}) {
       script.dataset.loading = 'false';
       script.dataset.loaded = 'false';
       script.remove();
-      reject(new Error('No se pudo cargar login.js desde memoriaBACKEND. Verifica que el dominio del static site esté autorizado en memoriaBACKEND y Firebase.'));
+      reject(new Error('No se pudo cargar login.js desde memoriaBACKEND. Verifica que MEMORIA_BACKEND_URL y GOOGLE_LOGIN_SCRIPT_URL apunten al backend autorizado y que el dominio del static site esté permitido en memoriaBACKEND y Firebase.'));
     };
 
     script.src = scriptUrl;
@@ -2179,7 +2221,14 @@ async function startGoogleGmailLogin(options = {}) {
   if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
 
   loginFeedback.textContent = 'Abriendo autenticación segura con Google...';
-  await loadMemoriaGoogleLoginScript({ interactive: true });
+  try {
+    await loadMemoriaGoogleLoginScript({ interactive: true });
+  } catch (error) {
+    if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+    console.warn('No se pudo cargar login.js directamente; se usará /auth/login como respaldo.', error);
+    window.location.assign(buildMemoriaGoogleLoginUrl('/auth/login'));
+    return { ok: true, pendingGoogleLogin: true, fallbackRedirect: true };
+  }
   if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
 
   const sdkSession = await verifyMemoriaSdkSession().catch(() => null);
@@ -2263,7 +2312,10 @@ async function bootstrapGoogleGmailSession() {
     renderShell();
     if (CHATER_CONFIG.autoLoadGoogleLoginScript) {
       loadMemoriaGoogleLoginScript({ silent: true }).catch((error) => {
-        loginFeedback.textContent = error?.message || 'No se pudo preparar el login Google/Gmail.';
+        console.warn('No se pudo precargar login.js desde memoriaBACKEND; se reintentará al tocar Continuar con Google.', error);
+        if (!getSessionEmail()) {
+          loginFeedback.textContent = 'Ingresa con una cuenta Gmail validada por Google para continuar.';
+        }
       });
     }
     return;

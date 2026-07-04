@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-memoriabackend-sw-canonical-runtime-prefixes-84",
-  "buildTime": "2026-07-03T16:45:00-05:00",
+  "version": "2026-07-03-google-login-fallback-86",
+  "buildTime": "2026-07-03T20:05:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "El service worker de ChatER solo excluye de cache los montajes canónicos de memoriaBACKEND y ya no conserva prefijos heredados como contratos runtime."
+  "description": "ChatER precarga login.js sin bloquear la pantalla, agrega nonce runtime y redirige a /auth/login si el script no puede cargarse directamente."
 }
