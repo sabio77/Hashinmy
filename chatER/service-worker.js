@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-04-chat-floating-options-117';
+const CHATER_SW_VERSION = '2026-07-04-webp-policy-capped-visual-v22-141';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -12,8 +12,12 @@ const APP_SHELL = [
   './js/config.js',
   './auth-gate.js',
   './js/CONFIGmemoriaBACKEND.json',
-  './js/image-webp-compressor-lego.js',
-  './js/qr-code-lego.js',
+  './IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js',
+  './IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js',
+  './QRcodigosX/BLOQUE/qr-core.js',
+  './QRcodigosX/conexion/qr-codigosx.js',
+  './PERMISOSx/BLOQUE/permisos-core.js',
+  './PERMISOSx/conexion/permisosx.js',
   './js/app.js',
   './js/pwa.js'
 ];

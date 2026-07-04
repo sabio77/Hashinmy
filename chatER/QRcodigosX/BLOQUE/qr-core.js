@@ -1,5 +1,6 @@
-// Bloque tipo lego: generación y lectura de códigos QR de perfil para ChatER.
-// Contrato público del bloque: window.ChatERQRCodeLego
+// BLOQUE principal de QRcodigosX: generación y lectura de códigos QR de perfil para ChatER.
+// Contrato interno del bloque: window.QRcodigosXBloque
+// La conexión pública con la app se realiza solo desde QRcodigosX/conexion.
 (function () {
   'use strict';
 
@@ -293,10 +294,72 @@
     return { payload: payload, matrix: matrix };
   }
 
+  function createQrDetector() {
+    if (!('BarcodeDetector' in window)) throw new Error('Este navegador no tiene lector QR nativo.');
+    return new BarcodeDetector({ formats: ['qr_code'] });
+  }
+
+  async function detectContactPayloadFromSource(source, options) {
+    options = options || {};
+    var detector = createQrDetector();
+    var codes = await detector.detect(source);
+    var rawValue = codes && codes[0] && codes[0].rawValue;
+    if (!rawValue) throw new Error(options.emptyMessage || 'No se detectó un QR de contacto en la imagen.');
+    var contact = parsePayload(rawValue);
+    if (!contact) throw new Error(options.invalidMessage || 'El QR detectado no pertenece a un perfil ChatER válido.');
+    return { contact: contact, rawValue: rawValue };
+  }
+
+  function loadImageElementFromFile(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) {
+        reject(new Error('Selecciona una imagen del QR.'));
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      var image = new Image();
+      image.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('No se pudo abrir la imagen seleccionada.'));
+      };
+      image.src = url;
+    });
+  }
+
+  function isImageBlobLike(value) {
+    if (!value) return false;
+    if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
+    return typeof File !== 'undefined' && value instanceof File;
+  }
+
+  async function scanFromImage(imageSource, options) {
+    options = options || {};
+    if (!imageSource) throw new Error('Selecciona una imagen del QR.');
+
+    var bitmap = null;
+    try {
+      if (isImageBlobLike(imageSource) && typeof createImageBitmap === 'function') {
+        bitmap = await createImageBitmap(imageSource);
+        return await detectContactPayloadFromSource(bitmap, options);
+      }
+
+      if (isImageBlobLike(imageSource)) {
+        var image = await loadImageElementFromFile(imageSource);
+        return await detectContactPayloadFromSource(image, options);
+      }
+
+      return await detectContactPayloadFromSource(imageSource, options);
+    } finally {
+      if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+    }
+  }
+
   async function scanFromVideo(video, onDetected, options) {
     options = options || {};
-    if (!('BarcodeDetector' in window)) throw new Error('Este navegador no tiene lector QR nativo.');
-    var detector = new BarcodeDetector({ formats: ['qr_code'] });
     var stopped = false;
     var detecting = false;
     var lastScanAt = 0;
@@ -304,7 +367,7 @@
 
     async function tick(now) {
       if (stopped) return;
-      var timestamp = Number(now || performance.now?.() || Date.now());
+      var timestamp = Number(now || (performance.now ? performance.now() : Date.now()));
       if (detecting || timestamp - lastScanAt < intervalMs) {
         requestAnimationFrame(tick);
         return;
@@ -313,15 +376,11 @@
       detecting = true;
       lastScanAt = timestamp;
       try {
-        var codes = await detector.detect(video);
-        var rawValue = codes && codes[0] && codes[0].rawValue;
-        if (rawValue) {
-          var contact = parsePayload(rawValue);
-          if (contact) {
-            onDetected(contact, rawValue);
-            stopped = true;
-            return;
-          }
+        var result = await scanFromImage(video, options);
+        if (result && result.contact) {
+          onDetected(result.contact, result.rawValue);
+          stopped = true;
+          return;
         }
       } catch (error) {
         if (options.onError) options.onError(error);
@@ -331,18 +390,20 @@
       if (!stopped) requestAnimationFrame(tick);
     }
 
+    createQrDetector();
     requestAnimationFrame(tick);
     return function stop() { stopped = true; };
   }
 
-  window.ChatERQRCodeLego = {
-    version: '1.1.0',
+  window.QRcodigosXBloque = {
+    version: '1.2.0',
     maxPayloadBytes: MAX_PAYLOAD_BYTES,
     buildProfilePayload: buildProfilePayload,
     parsePayload: parsePayload,
     generateMatrix: generateMatrix,
     matrixToSvg: matrixToSvg,
     renderProfileQr: renderProfileQr,
+    scanFromImage: scanFromImage,
     scanFromVideo: scanFromVideo
   };
 }());

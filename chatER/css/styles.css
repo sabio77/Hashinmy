@@ -2284,7 +2284,12 @@ button {
 .archived-modal-list,
 .call-starter-list,
 .business-summary-list,
-.chat-floating-menu-list {
+.chat-floating-menu-list,
+.section-menu-grid,
+.quick-action-grid,
+.api-status-grid,
+.call-action-grid,
+.tools-metric-grid {
   min-height: 0;
 }
 
@@ -2296,7 +2301,12 @@ button {
 .archived-modal-list,
 .call-starter-list,
 .business-summary-list,
-.chat-floating-menu-list {
+.chat-floating-menu-list,
+.section-menu-grid,
+.quick-action-grid,
+.api-status-grid,
+.call-action-grid,
+.tools-metric-grid {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -2306,7 +2316,12 @@ button {
 .quick-composer-list,
 .archived-modal-list,
 .call-starter-list,
-.business-summary-list {
+.business-summary-list,
+.section-menu-grid,
+.quick-action-grid,
+.api-status-grid,
+.call-action-grid,
+.tools-metric-grid {
   max-height: min(520px, 62vh);
   padding-right: 2px;
 }
@@ -2474,9 +2489,13 @@ button {
 .quick-action-grid,
 .emoji-grid,
 .emoji-token-grid,
+.section-menu-grid,
 .section-menu-actions,
 .call-shortcut-rail,
+.call-action-grid,
 .api-status-grid,
+.tools-metric-grid,
+.business-summary-list,
 .contact-create-actions,
 .qr-scanner-panel {
   min-height: 0;
@@ -2485,9 +2504,12 @@ button {
 .quick-action-grid,
 .emoji-grid,
 .emoji-token-grid,
+.section-menu-grid,
 .section-menu-actions,
 .call-shortcut-rail,
-.api-status-grid {
+.call-action-grid,
+.api-status-grid,
+.tools-metric-grid {
   max-height: min(520px, 62vh);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -2652,7 +2674,7 @@ button {
 .modal-body ol,
 [role='list'],
 [role='listbox'],
-[data-list-scroll] {
+[data-list-scroll]:not(.chat-list):not(.messages):not(.status-panel) {
   max-height: min(520px, 62vh);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -2680,6 +2702,8 @@ button {
 
 .modal-body [class$='-list'],
 .modal-body [class*='-list '],
+.modal-body [class$='-grid'],
+.modal-body [class*='-grid '],
 .modal-body [data-search-results],
 .modal-body [data-remote-search-results] {
   max-height: min(520px, 62vh);
@@ -2689,6 +2713,159 @@ button {
   scrollbar-gutter: stable;
 }
 
-.chat-floating-menu-list {
+.chat-floating-menu-list,
+.section-menu-grid,
+.quick-action-grid,
+.api-status-grid,
+.call-action-grid,
+.tools-metric-grid {
   overflow-y: auto;
+}
+
+
+/* Refuerzo de esta iteración: las listas principales mantienen su flex natural; el atributo de auditoría solo confirma scroll sin forzar altura menor. */
+.chat-list[data-list-scroll],
+.messages[data-list-scroll],
+.status-panel[data-list-scroll] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+/* Ventana flotante obligatoria de instalación PWA cuando ChatER aún no está instalado. */
+.pwa-install-floating {
+  position: fixed;
+  inset-inline: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 990;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pwa-install-floating[hidden] {
+  display: none;
+}
+
+.pwa-install-card {
+  width: min(520px, 100%);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+  pointer-events: auto;
+}
+
+.pwa-install-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 1.25rem;
+  background: var(--brand-soft);
+}
+
+.pwa-install-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pwa-install-copy small {
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+/* BLOQUE PERMISOSx: interfaz universal de permisos asociada a botones de cámara, micrófono, archivos y notificaciones. */
+.permission-lego-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.44);
+  backdrop-filter: blur(4px);
+}
+
+.permission-lego-card {
+  width: min(460px, 100%);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.26);
+}
+
+.permission-lego-icon {
+  width: 48px;
+  height: 48px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--brand-soft);
+  font-size: 1.4rem;
+}
+
+.permission-lego-content {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.permission-lego-content h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.permission-lego-content p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.permission-lego-status {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--panel-soft);
+  font-size: 0.9rem;
+}
+
+.permission-lego-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.permission-lego-actions .ghost-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .pwa-install-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .pwa-install-card .primary-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .permission-lego-card {
+    grid-template-columns: 1fr;
+  }
 }

@@ -2090,7 +2090,7 @@ En esta iteración se identificó como punto débil principal que el static site
 
 ## 54. Revisión de punto débil: imágenes temporales WebP con ImagenesCloudflareR2x
 
-En esta iteración se identificó como punto débil principal que ChatER ya usaba el contrato canónico `/api/v1/media-firmada` para adjuntos y estados, pero `APIS de memoriaBACKEND/apis.txt` ahora define un bloque más específico para el mismo proceso cuando el recurso es una imagen temporal optimizable desde navegador: `ImagenesCloudflareR2x`, montado en `/api/v1/imagenes-r2x`. Mantener todas las imágenes en `MEDIAfirmadaX` funcionaba como fallback genérico, pero desaprovechaba la política cerrada de memoriaBACKEND para imágenes WebP económicas en Cloudflare R2, con límite de 250 KB, confirmación de objeto real y URL de lectura controlada.
+En esta iteración se identificó como punto débil principal que ChatER ya usaba el contrato canónico `/api/v1/media-firmada` para adjuntos y estados, pero `APIS de memoriaBACKEND/apis.txt` ahora define un bloque más específico para el mismo proceso cuando el recurso es una imagen temporal optimizable desde navegador: `ImagenesCloudflareR2x`, montado en `/api/v1/imagenes-r2x`. Mantener todas las imágenes en `MEDIAfirmadaX` funcionaba como fallback genérico, pero desaprovechaba la política cerrada de memoriaBACKEND para imágenes WebP económicas en Cloudflare R2, con límite operativo efectivo de 200 KB en ChatER, confirmación de objeto real y URL de lectura controlada.
 
 ### Cambios aplicados
 
@@ -3236,3 +3236,173 @@ Alcance preservado:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+
+## 118. Revisión de punto débil: barrera final WebP/R2 antes de crear intención
+
+En esta iteración se identificó como punto débil que la compresión WebP ya estaba resuelta visualmente, pero la última barrera antes de `POST /api/v1/imagenes-r2x/intenciones` todavía dependía de que todos los consumidores llamaran correctamente al compresor. Para evitar regresiones futuras, la política de 200 KB quedó centralizada en el bloque LEGO y se valida justo antes de solicitar la intención R2.
+
+Cambios aplicados:
+
+- `IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` expone `assertReadyForUpload()` para validar MIME WebP real, firma RIFF/WEBP y tamaño máximo efectivo.
+- `IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js` publica esa validación como único puente permitido hacia la app.
+- `js/app.js` calcula el mínimo entre la política remota y `TEMP_IMAGE_R2X_MAX_BYTES` para conservar el límite de 200 KB aunque el backend permita más.
+- `apiClient.createR2xImageIntent()` ahora valida el archivo antes de pedir URL firmada y declara `maxBytes`, `policyMaxBytes`, `metadata.maxBytes` y `metadata.guaranteedMaxBytes`.
+
+Criterio preservado: no se eliminó `MEDIAfirmadaX`; sigue siendo respaldo para archivos genéricos o cuando `ImagenesCloudflareR2x` no está disponible. La interfaz conserva la vista previa inmediata, la barra inferior sobre la imagen durante carga/envío y el botón de reintento cuando falla el envío.
+
+## 120. Revisión de punto débil: respaldo MEDIAfirmada podía quedar sin barrera WebP final
+
+En esta iteración se identificó como punto débil que la ruta preferente `ImagenesCloudflareR2x` ya validaba WebP real y peso máximo de 200 KB antes de crear intención, pero el respaldo `MEDIAfirmadaX` dependía de que la conversión previa se mantuviera intacta. Una refactorización futura o una indisponibilidad de R2x podía enviar la imagen al respaldo sin una barrera explícita inmediatamente antes de solicitar la URL firmada.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `assertImageAttachmentReadyForBackendUpload()` como barrera final para cualquier imagen que vaya a backend.
+- Antes de `apiClient.prepareMediaUpload()` se valida que la imagen sea WebP real, tenga firma `RIFF....WEBP` y no supere 200 KB.
+- La misma barrera se ejecuta en envío inicial y reintento manual de adjuntos, de modo que el botón de reintentar nunca omite la política máxima.
+- `APIs necesarias.txt` documenta que la garantía de 200 KB aplica tanto a `imagenes-r2x` como a `media-firmada`.
+- `docs/BLOQUES_LEGO.md` documenta el contrato de los bloques raíz `IMAGENwebpCOMPRESIONx`, `QRcodigosX` y `PERMISOSx` para evitar duplicación funcional.
+- `NOVAelimina.txt` marca los archivos standalone heredados de compresión WebP y QR para que Nova los elimine y se conserve un solo punto canónico por bloque LEGO.
+- `app-version.json` y `service-worker.js` suben a `2026-07-04-webp-media-final-120` para invalidar cache PWA y servir la barrera corregida.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check auth-gate.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js` ejecutado correctamente.
+- `node --check QRcodigosX/BLOQUE/qr-core.js` ejecutado correctamente.
+- `node --check QRcodigosX/conexion/qr-codigosx.js` ejecutado correctamente.
+- `node --check PERMISOSx/BLOQUE/permisos-core.js` ejecutado correctamente.
+- `node --check PERMISOSx/conexion/permisosx.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json`, `estructura_del_proyecto.json` y `js/CONFIGmemoriaBACKEND.json` validados como JSON correcto.
+
+Alcance preservado:
+
+- La mejora se limita a la barrera final de imágenes hacia backend, documentación LEGO, declaración de APIs necesarias, versión PWA y rutas heredadas marcadas para eliminación. No modifica autenticación, contactos, QR funcional, permisos funcionales, listas con scroll, menús de chat, STREMEx, llamadas, estados, herramientas, assets ni contratos existentes fuera de los puntos afectados.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 124. Revisión de punto débil: margen blando WebP podía degradar una imagen que ya cumplía 200 KB
+
+En esta iteración se identificó como punto débil principal del bloque `IMAGENwebpCOMPRESIONx` que la búsqueda de candidatos usaba un margen blando interno como objetivo preferente. Ese margen ayudaba a dejar holgura, pero podía descartar un candidato visualmente mejor que ya cumplía el requisito real: no superar 200 KB. El resultado seguía siendo válido, pero podía bajar dimensión o calidad más de lo necesario.
+
+Cambios aplicados:
+
+- `IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` sube a `1.12.0` y esquema `webp-200kb-v3`.
+- La búsqueda por dimensión/calidad ahora conserva dos tipos de candidatos: el mejor bajo margen blando y el mejor bajo límite duro real de 200 KB.
+- Si no conviene usar el margen blando por pérdida visual, el bloque puede usar el candidato bajo límite duro, siempre con validación final `RIFF/WEBP` y `size <= maxBytes` antes de devolver o subir.
+- La garantía auditable agrega `acceptedLimit` y `targetHeadroomMet` para que `js/app.js` pueda guardar si la salida quedó bajo margen blando o bajo límite duro seguro.
+- `js/app.js` conserva esos campos en `message.imageCompression` para auditoría y reintentos.
+- `app-version.json` y `service-worker.js` suben a `2026-07-04-webp-candidate-124` para invalidar cache PWA y servir el bloque actualizado.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- La mejora se limita al bloque LEGO de compresión WebP, su conexión, la auditoría del mensaje, documentación y versión PWA. No modifica autenticación, contactos, QR, permisos, menús de chat, listas con scroll, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `STREMEx`, llamadas, estados, herramientas ni contratos existentes fuera del punto afectado.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+
+## 125. Revisión de punto débil: permisos compuestos y QR sin alternativa de lectura por imagen
+
+En esta iteración se identificó que los módulos principales ya cubrían el flujo de contacto por QR, compresión WebP, permisos y mensajes multimedia, pero quedaban dos puntos débiles de robustez: `PERMISOSx` evaluaba la capacidad combinada de cámara y micrófono usando solo el permiso de cámara, y el flujo de escaneo QR dependía de cámara activa más `BarcodeDetector`, dejando la alternativa manual como único respaldo.
+
+Cambios aplicados:
+- `PERMISOSx/BLOQUE/permisos-core.js` ahora consulta permisos múltiples cuando una capacidad los requiere y fusiona el estado: denegado domina, concedido solo aplica si todos están concedidos y prompt se conserva cuando al menos uno sigue pendiente.
+- `QRcodigosX/BLOQUE/qr-core.js` agrega `scanFromImage()` como lector QR reutilizable para imágenes, usando la misma validación de payload de perfil ChatER.
+- `QRcodigosX/conexion/qr-codigosx.js` expone el nuevo puente mínimo sin duplicar lógica pesada fuera del bloque.
+- `js/app.js` agrega selección de imagen del QR dentro de Crear contacto, pasando por `PERMISOSx` para archivos antes de leer la imagen, y conserva cámara/manual como opciones existentes.
+- `js/app.js` centraliza `getMessagePreviewText()` para que imágenes y otros adjuntos sin texto no dejen la lista de chats ni archivados con vista previa vacía.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-04-webp-scroll-audit-126` para que la PWA instalada actualice el shell.
+
+Lógica preservada: no se modifica la compresión WebP, la cola durable, STREMEx, instalación PWA, creación idempotente de contactos, render de mensajes ni acciones existentes de menús; solo se refuerzan permisos, lectura QR y previsualización de último mensaje.
+
+## 126. Revisión de punto débil: selección perceptual WebP y scroll auditable en listas dinámicas
+
+En esta iteración se identificó que el proyecto ya contenía los bloques LEGO principales para compresión WebP, QR, permisos, contacto por correo/QR, instalación PWA, adjuntos multimedia y mensajería con cola/reintento. El punto débil más crítico restante estaba en la decisión interna del bloque `IMAGENwebpCOMPRESIONx`: aunque el límite de 200 KB estaba protegido, la comparación entre candidatos podía seguir favoreciendo una imagen con más píxeles pero calidad visual baja frente a una salida ligeramente menor y más limpia. Además, las listas dinámicas podían depender de clases manuales y quedar sin marca auditable de scroll si se agregaban nuevos paneles o modales.
+
+Cambios aplicados:
+
+- `IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` sube a `1.13.0` y esquema `webp-200kb-v4`.
+- La selección de candidatos WebP usa `perceptualScore` con penalización progresiva por baja calidad, `qualityBand` y cortes tempranos solo cuando la banda de calidad es segura.
+- La garantía auditable de compresión conserva `qualityBand`, `perceptualScore`, tamaño, dimensiones, calidad, firma `RIFF_WEBP`, `acceptedLimit` y `targetHeadroomMet` para impedir regresiones en reintentos o rutas de respaldo.
+- `js/app.js` conserva esa telemetría en `message.imageCompression`, de forma que la UI y los reintentos mantienen evidencia de que la imagen final es WebP real y no supera 200 KB.
+- `js/app.js` agrega `applyListScrollSemantics()` para marcar listas renderizadas dinámicamente con `data-list-scroll`, `tabindex` y etiquetas accesibles cuando aplica.
+- `css/styles.css` refuerza el scroll de listas sin forzar altura menor en paneles principales como chats, mensajes y estados.
+- `APIs necesarias.txt` se mantiene como definición de conceptos de backend únicamente; no se creó concepto de API para scroll ni procesos locales.
+- `docs/BLOQUES_LEGO.md`, `app-version.json` y `service-worker.js` quedan sincronizados con la versión `2026-07-04-webp-scroll-audit-126`.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js` ejecutado correctamente.
+- `node --check QRcodigosX/BLOQUE/qr-core.js` ejecutado correctamente.
+- `node --check QRcodigosX/conexion/qr-codigosx.js` ejecutado correctamente.
+- `node --check PERMISOSx/BLOQUE/permisos-core.js` ejecutado correctamente.
+- `node --check PERMISOSx/conexion/permisosx.js` ejecutado correctamente.
+- `app-version.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+
+Alcance preservado:
+
+- La mejora se limita al bloque LEGO de compresión WebP, su puente, auditoría de mensajes con imagen, scroll de listas dinámicas, documentación y versión PWA. No modifica autenticación, creación idempotente de contactos, QR funcional, permisos funcionales, STREMEx, instalación PWA, llamadas, estados, herramientas, rutas de memoriaBACKEND ni contratos existentes fuera de los puntos afectados.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+
+## 128. Revisión de punto débil: lookahead WebP debía obedecer la política efectiva del backend
+
+En esta iteración se identificó que el bloque `IMAGENwebpCOMPRESIONx` ya impedía subir imágenes por encima de 200 KB y comparaba candidatos con una ventana perceptual acotada. El punto débil restante estaba en que el cálculo de esa ventana usaba el máximo global del bloque como referencia inicial. Aunque la validación final rechazaba cualquier salida por encima de `maxBytes`, el diagnóstico y el checkpoint podían no representar con precisión una política remota menor a 200 KB.
+
+Cambios aplicados:
+
+- `IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` sube a `1.15.0` y esquema `webp-200kb-v6`.
+- `getAcceptedCandidateLookaheadCount()` recibe `maxBytes`, lo normaliza y decide la ventana con la política efectiva, no con el máximo global.
+- Los diagnósticos registran `effectiveMaxBytes` y `selectionPolicy = bounded-lookahead-best-perceptual-candidate-under-effective-policy`.
+- La garantía final conserva la validación estricta de WebP real `RIFF....WEBP` y `size <= maxBytes`.
+- `IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js`, `app-version.json`, `service-worker.js` y la versión reportada por telemetría en `js/app.js` quedan sincronizados con `2026-07-04-webp-policy-lookahead-128`.
+
+Validación ejecutada:
+
+- `node --check IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js` ejecutado correctamente.
+- `node --check IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js` ejecutado correctamente.
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- La mejora se limita al bloque LEGO de compresión WebP, su puente, documentación y versión PWA/telemetría. No modifica contactos, QR, permisos, instalación PWA, STREMEx, rutas de `memoriaBACKEND`, listas con scroll, autenticación ni render de mensajes.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 129. Revisión de punto débil: expiración defensiva del indicador remoto `Escribiendo...`
+
+La señal de escritura sigue siendo efímera y usa los eventos existentes `typing.start`/`typing.stop` por STREMEx y `setTyping()` como respaldo. No se requiere una API nueva: el punto débil estaba en el cliente. El frontend ahora asocia cada señal remota a su conversación, mantiene la gracia de 2 segundos después de `typing.stop` y agrega expiración defensiva cuando llega `typing.start` pero nunca llega el cierre.
+
+Reglas funcionales actualizadas:
+
+- `Escribiendo...` solo puede permanecer activo si existe una señal remota reciente de escritura para esa conversación.
+- `typing.stop` no borra el indicador al instante: espera 2 segundos para evitar parpadeos en pausas cortas; si llega sin una señal activa previa, no crea un falso estado de escritura.
+- Si se pierde `typing.stop`, el indicador se limpia automáticamente con `REMOTE_TYPING_STALE_MS`.
+- Si llega presencia mientras el contacto está escribiendo, la presencia se guarda como estado previo y se restaura al terminar la escritura sin persistir el texto efímero `Escribiendo...`.
+- La limpieza de sesión cancela temporizadores de escritura remota para evitar estados tardíos de usuarios anteriores.
+

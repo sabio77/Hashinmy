@@ -75,6 +75,8 @@
   const updateBanner = document.getElementById('pwaUpdateBanner');
   const updateButton = document.getElementById('pwaUpdateButton');
   const dismissButton = document.getElementById('pwaUpdateDismissButton');
+  const installPrompt = document.getElementById('pwaInstallPrompt');
+  const installButton = document.getElementById('pwaInstallButton');
 
   function showUpdateBanner(worker) {
     state.waitingWorker = worker || state.waitingWorker;
@@ -84,6 +86,32 @@
 
   function hideUpdateBanner() {
     if (updateBanner) updateBanner.hidden = true;
+  }
+
+  function isInstalledPwa() {
+    return Boolean(
+      window.matchMedia?.('(display-mode: standalone)')?.matches
+      || window.matchMedia?.('(display-mode: fullscreen)')?.matches
+      || navigator.standalone
+    );
+  }
+
+  function showInstallPrompt() {
+    if (!installPrompt || isInstalledPwa()) return false;
+    installPrompt.hidden = false;
+    return true;
+  }
+
+  function hideInstallPrompt() {
+    if (installPrompt) installPrompt.hidden = true;
+  }
+
+  function refreshInstallPromptVisibility() {
+    if (isInstalledPwa()) {
+      hideInstallPrompt();
+      return false;
+    }
+    return showInstallPrompt();
   }
 
   function rememberPublishedVersion(versionPayload = {}) {
@@ -310,12 +338,17 @@
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     state.deferredInstallPrompt = event;
+    showInstallPrompt();
   });
 
   window.addEventListener('appinstalled', () => {
     state.deferredInstallPrompt = null;
+    hideInstallPrompt();
     hideUpdateBanner();
   });
+
+  window.addEventListener('focus', refreshInstallPromptVisibility);
+  document.addEventListener('visibilitychange', refreshInstallPromptVisibility);
 
   navigator.serviceWorker?.addEventListener('controllerchange', () => {
     if (state.refreshing) return;
@@ -345,25 +378,40 @@
 
   dismissButton?.addEventListener('click', hideUpdateBanner);
 
+  async function installCurrentApp() {
+    if (isInstalledPwa()) {
+      hideInstallPrompt();
+      return { ok: true, message: 'ChatER ya está instalado en este dispositivo.' };
+    }
+
+    if (!state.deferredInstallPrompt) {
+      await state.registration?.update?.();
+      showInstallPrompt();
+      return { ok: false, message: 'La ventana de instalación seguirá visible y el navegador mostrará la instalación cuando cumpla sus condiciones.' };
+    }
+
+    state.deferredInstallPrompt.prompt();
+    const choice = await state.deferredInstallPrompt.userChoice;
+    state.deferredInstallPrompt = null;
+
+    if (choice.outcome === 'accepted') hideInstallPrompt();
+    else showInstallPrompt();
+
+    return {
+      ok: choice.outcome === 'accepted',
+      message: choice.outcome === 'accepted' ? 'ChatER quedó listo para instalarse.' : 'La instalación fue cancelada.'
+    };
+  }
+
+  installButton?.addEventListener('click', async () => {
+    const result = await installCurrentApp();
+    if (!result.ok) refreshInstallPromptVisibility();
+  });
+
+  refreshInstallPromptVisibility();
+
   window.ChatERPWA = {
-    async install() {
-      if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
-        return { ok: true, message: 'ChatER ya está instalado en este dispositivo.' };
-      }
-
-      if (!state.deferredInstallPrompt) {
-        await state.registration?.update();
-        return { ok: false, message: 'El navegador mostrará la instalación cuando cumpla sus condiciones.' };
-      }
-
-      state.deferredInstallPrompt.prompt();
-      const choice = await state.deferredInstallPrompt.userChoice;
-      state.deferredInstallPrompt = null;
-      return {
-        ok: choice.outcome === 'accepted',
-        message: choice.outcome === 'accepted' ? 'ChatER quedó listo para instalarse.' : 'La instalación fue cancelada.'
-      };
-    },
+    install: installCurrentApp,
     async checkForUpdates() {
       if (!state.registration) {
         const result = await registerServiceWorker();

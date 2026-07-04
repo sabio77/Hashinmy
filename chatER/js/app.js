@@ -143,11 +143,20 @@ function removeSessionStorageItem(key) {
 }
 
 const CHATER_IMAGE_UPLOAD_MAX_BYTES = 200 * 1024;
+const CHATER_IMAGE_UPLOAD_MAX_DIMENSION = 4096;
 
 function clampImageUploadMaxBytes(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return CHATER_IMAGE_UPLOAD_MAX_BYTES;
   return Math.max(1, Math.min(CHATER_IMAGE_UPLOAD_MAX_BYTES, Math.round(parsed)));
+}
+
+function clampImageUploadMaxDimension(value, fallback = 1600) {
+  const parsed = Number(value);
+  const parsedFallback = Number(fallback);
+  const safeFallback = Number.isFinite(parsedFallback) && parsedFallback > 0 ? parsedFallback : 1600;
+  const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : safeFallback;
+  return Math.max(320, Math.min(CHATER_IMAGE_UPLOAD_MAX_DIMENSION, Math.round(resolved)));
 }
 
 const CHATER_CONFIG = {
@@ -786,7 +795,7 @@ const seedState = {
       email: 'carlos@example.com',
       avatar: 'CA',
       avatarImage: 'assets/avatar-carlos.png',
-      status: 'Escribiendo...',
+      status: 'En línea',
       section: 'chats',
       archived: false,
       pinned: false,
@@ -965,6 +974,9 @@ const typingState = {
   timer: null,
   conversationId: ''
 };
+const REMOTE_TYPING_GRACE_MS = 2000;
+const REMOTE_TYPING_STALE_MS = 6500;
+const remoteTypingDisplayState = new Map();
 
 const presenceSyncState = {
   status: '',
@@ -1559,7 +1571,13 @@ const apiClient = {
       timeoutMs: CHATER_CONFIG.mediaUploadTimeoutMs
     });
   },
-  createR2xImageIntent(file, options = {}, clientMutationId = generateClientMutationId()) {
+  async createR2xImageIntent(file, options = {}, clientMutationId = generateClientMutationId()) {
+    const maxBytes = clampImageUploadMaxBytes(Math.min(
+      Number(options.maxBytes || CHATER_CONFIG.r2xImageMaxBytes),
+      CHATER_CONFIG.r2xImageMaxBytes
+    ));
+    const uploadPolicy = await assertR2xReadyWebpFile(file, maxBytes);
+
     return this.request('/api/v1/imagenes-r2x/intenciones', {
       method: 'POST',
       timeoutMs: CHATER_CONFIG.mediaUploadTimeoutMs,
@@ -1573,6 +1591,8 @@ const apiClient = {
         mimeType: 'image/webp',
         sizeBytes: file.size,
         size: file.size,
+        maxBytes: uploadPolicy.maxBytes,
+        policyMaxBytes: uploadPolicy.maxBytes,
         width: options.width || 0,
         height: options.height || 0,
         sha256: options.sha256 || '',
@@ -1582,7 +1602,10 @@ const apiClient = {
         metadata: {
           source: 'chater-static-site',
           originalFilename: options.originalFilename || '',
-          originalMimeType: options.originalMimeType || ''
+          originalMimeType: options.originalMimeType || '',
+          maxBytes: uploadPolicy.maxBytes,
+          guaranteedMaxBytes: true,
+          legoValidator: uploadPolicy.validator || 'IMAGENwebpCOMPRESIONx'
         },
         clientMutationId
       }))
@@ -4578,7 +4601,7 @@ function buildClientTelemetryPayload(kind = 'client_error', details = {}) {
       userId,
       hasAuthenticatedSession: Boolean(getSessionEmail()),
       appVersion: typeof APP_VERSION !== 'undefined' ? APP_VERSION : '',
-      serviceWorkerVersion: '2026-07-04-chat-floating-options-117',
+      serviceWorkerVersion: '2026-07-04-webp-effective-policy-v15-137',
       occurredAt: new Date().toISOString()
     }
   };
@@ -4812,6 +4835,59 @@ function showToast(message) {
   }, 2600);
 }
 
+const SCROLLABLE_LIST_SELECTOR = [
+  '#chatList',
+  '.chat-list',
+  '.messages',
+  '.modal-body',
+  '.modal-list',
+  '.archived-modal-list',
+  '.quick-composer-list',
+  '.call-starter-list',
+  '.emoji-panel-content',
+  '.emoji-grid',
+  '.emoji-token-grid',
+  '.tools-panel',
+  '.qr-scanner-panel',
+  '.permission-lego-content',
+  '.contact-create-actions',
+  '.section-menu-grid',
+  '.section-menu-actions',
+  '.quick-action-grid',
+  '.api-status-grid',
+  '.call-action-grid',
+  '.call-shortcut-rail',
+  '.tools-metric-grid',
+  '.business-summary-list',
+  '.chat-floating-menu-list',
+  '.chat-floating-menu-options',
+  '[data-search-results]',
+  '[data-remote-search-results]',
+  '[role="list"]',
+  '[role="listbox"]'
+].join(',');
+
+function applyListScrollSemantics(root = document) {
+  if (!root?.querySelectorAll) return;
+  const nodes = [];
+  if (root.matches?.(SCROLLABLE_LIST_SELECTOR)) nodes.push(root);
+  root.querySelectorAll(SCROLLABLE_LIST_SELECTOR).forEach((node) => nodes.push(node));
+
+  nodes.forEach((node) => {
+    if (!node || node.dataset?.listScrollLocked === 'true') return;
+    node.dataset.listScroll = 'true';
+    if (!node.hasAttribute('tabindex')) node.setAttribute('tabindex', '0');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('archived-modal-list')) node.setAttribute('aria-label', 'Lista de chats archivados');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('quick-composer-list')) node.setAttribute('aria-label', 'Lista de acciones rápidas');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('call-starter-list')) node.setAttribute('aria-label', 'Lista de contactos para llamada');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('section-menu-actions')) node.setAttribute('aria-label', 'Lista de acciones de la sección');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('call-shortcut-rail')) node.setAttribute('aria-label', 'Lista de accesos de llamada');
+    if (!node.hasAttribute('aria-label') && node.classList?.contains('api-status-grid')) node.setAttribute('aria-label', 'Lista de estados de APIs');
+    if (!node.hasAttribute('aria-label') && node.matches?.('[data-search-results], [data-remote-search-results]')) node.setAttribute('aria-label', 'Lista de resultados de búsqueda');
+    if (!node.hasAttribute('aria-label') && node.matches?.('[role="list"], [role="listbox"]')) node.setAttribute('aria-label', 'Lista navegable');
+  });
+}
+
 function setModal(title, contentNodeOrHtml, modalKind = '') {
   stopActiveQrScanner();
   activeModalKind = modalKind;
@@ -4824,6 +4900,7 @@ function setModal(title, contentNodeOrHtml, modalKind = '') {
     modalBody.appendChild(contentNodeOrHtml);
   }
 
+  applyListScrollSemantics(modalBody);
   modalOverlay.hidden = false;
   renderNavigationState();
 }
@@ -4859,6 +4936,23 @@ function closeEmojiPanel() {
 function closeTransientPanels() {
   closeEmojiPanel();
   closeChatFloatingMenu();
+}
+
+async function requestChaterPermission(capability, options = {}) {
+  const permissionBridge = window.ChatERPermisosLego;
+  const request = typeof options.request === 'function' ? options.request : null;
+
+  if (!permissionBridge?.requestCapability) {
+    if (request) return request();
+    return true;
+  }
+
+  return permissionBridge.requestCapability({
+    appName: 'ChatER',
+    capability,
+    ...options,
+    request
+  });
 }
 
 function setMobileSearchVisible(visible) {
@@ -5464,6 +5558,7 @@ function renderCurrentSection() {
     renderStatesList();
     renderStatusPanel(getActiveState());
     setComposerEnabled(false);
+    applyListScrollSemantics(chatView);
     return;
   }
 
@@ -5476,6 +5571,7 @@ function renderCurrentSection() {
     renderCallsList();
     setComposerEnabled(false);
     renderCallsEmptyState();
+    applyListScrollSemantics(chatView);
     return;
   }
 
@@ -5484,11 +5580,13 @@ function renderCurrentSection() {
     renderToolsList();
     setComposerEnabled(false);
     renderToolsPanel();
+    applyListScrollSemantics(chatView);
     return;
   }
 
   renderChatList(searchInput.value);
   renderConversation();
+  applyListScrollSemantics(chatView);
 }
 
 async function startConversationFromSearch(email = '') {
@@ -5499,6 +5597,22 @@ async function startConversationFromSearch(email = '') {
   }
 
   await openOrCreateContactConversation({ email: normalizedEmail }, { closeModal: false, clearSearch: true, source: 'search' });
+}
+
+
+function getMessagePreviewText(message = null, emptyText = 'Sin mensajes todavía') {
+  if (!message) return emptyText;
+  const directText = String(message.text || message.body || message.caption || message.mediaCaption || '').trim();
+  if (directText) return directText;
+
+  const mediaKind = getMessageMediaKind(message);
+  const mediaName = String(message.mediaName || message.attachmentName || message.filename || '').trim();
+  if (mediaKind === 'image') return mediaName ? `Imagen · ${mediaName}` : 'Imagen';
+  if (mediaKind === 'video') return mediaName ? `Video · ${mediaName}` : 'Video';
+  if (mediaKind === 'audio') return mediaName ? `Audio · ${mediaName}` : 'Audio';
+  if (mediaKind === 'file') return mediaName ? `Archivo · ${mediaName}` : 'Archivo adjunto';
+
+  return mediaName || emptyText;
 }
 
 function renderChatList(filter = '') {
@@ -5572,7 +5686,7 @@ function renderChatList(filter = '') {
     content.className = 'chat-item-content';
     content.innerHTML = `
       <p class="chat-item-name">${escapeHTML(conversation.name)}</p>
-      <p class="chat-item-preview">${escapeHTML(lastMessage ? lastMessage.text : 'Sin mensajes todavía')}</p>
+      <p class="chat-item-preview">${escapeHTML(getMessagePreviewText(lastMessage))}</p>
     `;
 
     const meta = document.createElement('span');
@@ -6075,6 +6189,29 @@ function isR2xPolicyUnavailableError(error) {
   return String(error?.code || '').toUpperCase() === 'R2X_POLICY_UNAVAILABLE';
 }
 
+async function resolveChatImageCompressionPolicy(context = 'chat-message') {
+  const normalizedContext = normalizeR2xImageContext(context);
+  const fallbackPolicy = getDefaultR2xImagePolicy(normalizedContext);
+
+  if (!CHATER_CONFIG.backendBaseUrl) return fallbackPolicy;
+
+  try {
+    const policy = await loadR2xImagePolicy(normalizedContext);
+    if (!policy?.enabled) return fallbackPolicy;
+    return {
+      ...fallbackPolicy,
+      ...policy,
+      maxBytes: clampImageUploadMaxBytes(Math.min(policy.maxBytes || fallbackPolicy.maxBytes, CHATER_CONFIG.r2xImageMaxBytes)),
+      maxDimension: clampImageUploadMaxDimension(parsePositivePolicyNumber(policy.maxDimension, fallbackPolicy.maxDimension), fallbackPolicy.maxDimension),
+      source: policy.source || 'memoriaBACKEND'
+    };
+  } catch (error) {
+    if (isBackendAuthError(error)) throw error;
+    console.warn('No se pudo leer la política de imagen antes de comprimir; se usa política local estricta de 200 KB.', error);
+    return fallbackPolicy;
+  }
+}
+
 function isRecoverableR2xBackendError(error = {}) {
   const status = Number(error.status || error.responseStatus || error.payload?.statusCode || error.payload?.metadata?.statusCode || 0);
   const code = String(error.code || error.payload?.err || error.payload?.code || error.payload?.error?.code || error.payload?.metadata?.err || '').trim().toUpperCase();
@@ -6127,18 +6264,36 @@ function buildTemporaryWebpFilename(fileName = 'imagen.webp') {
 
 function canvasToWebpBlob(canvas, quality) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(async (blob) => {
-      if (!blob) {
-        reject(new Error('No se pudo convertir la imagen a WebP.'));
-        return;
-      }
-      try {
-        await assertVerifiedWebpBlob(blob);
-        resolve(blob);
-      } catch (error) {
-        reject(error);
-      }
-    }, 'image/webp', quality);
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('El navegador no completó la conversión WebP a tiempo. La imagen no se enviará sin garantía de peso.'));
+    }, 12000);
+
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      callback(value);
+    };
+
+    try {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          finish(reject, new Error('No se pudo convertir la imagen a WebP.'));
+          return;
+        }
+        try {
+          await assertVerifiedWebpBlob(blob);
+          finish(resolve, blob);
+        } catch (error) {
+          finish(reject, error);
+        }
+      }, 'image/webp', quality);
+    } catch (error) {
+      finish(reject, new Error('El navegador bloqueó la conversión WebP segura. La imagen no se enviará sin cumplir el límite de 200 KB.'));
+    }
   });
 }
 
@@ -6172,6 +6327,68 @@ async function loadImageSourceForCanvas(file) {
   }
 
   return loadImageElementForCanvasFallback(file);
+}
+
+const FALLBACK_PROGRESSIVE_DOWNSCALE_RATIO = 0.5;
+const FALLBACK_PROGRESSIVE_DOWNSCALE_TRIGGER_RATIO = 1.85;
+
+function getCanvasImageSourceSize(source, fallbackWidth = 1, fallbackHeight = 1) {
+  return {
+    width: Math.max(1, Math.round(Number(source?.width || source?.naturalWidth || fallbackWidth || 1))),
+    height: Math.max(1, Math.round(Number(source?.height || source?.naturalHeight || fallbackHeight || 1)))
+  };
+}
+
+function createCanvasDownscaleScratch(width, height) {
+  const scratch = document.createElement('canvas');
+  scratch.width = Math.max(1, Math.round(width));
+  scratch.height = Math.max(1, Math.round(height));
+  const scratchContext = scratch.getContext('2d', { alpha: true, desynchronized: true }) || scratch.getContext('2d', { alpha: true });
+  if (!scratchContext) throw new Error('El navegador no pudo preparar una etapa intermedia de compresión.');
+  scratchContext.imageSmoothingEnabled = true;
+  scratchContext.imageSmoothingQuality = 'high';
+  return { canvas: scratch, context: scratchContext };
+}
+
+function releaseCanvasDownscaleScratch(canvas) {
+  try {
+    if (canvas?.getContext) {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  } catch (error) {
+    // Liberación defensiva sin bloquear el envío de la imagen.
+  }
+}
+
+function drawImageSourceProgressively(context, source, targetWidth, targetHeight, sourceWidth, sourceHeight) {
+  let currentSource = source;
+  let currentWidth = Math.max(1, Math.round(sourceWidth || targetWidth));
+  let currentHeight = Math.max(1, Math.round(sourceHeight || targetHeight));
+  const scratchCanvases = [];
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+
+  try {
+    while (currentWidth / targetWidth > FALLBACK_PROGRESSIVE_DOWNSCALE_TRIGGER_RATIO
+      || currentHeight / targetHeight > FALLBACK_PROGRESSIVE_DOWNSCALE_TRIGGER_RATIO) {
+      const nextWidth = Math.max(targetWidth, Math.round(currentWidth * FALLBACK_PROGRESSIVE_DOWNSCALE_RATIO));
+      const nextHeight = Math.max(targetHeight, Math.round(currentHeight * FALLBACK_PROGRESSIVE_DOWNSCALE_RATIO));
+      if (nextWidth === currentWidth && nextHeight === currentHeight) break;
+
+      const scratch = createCanvasDownscaleScratch(nextWidth, nextHeight);
+      scratch.context.drawImage(currentSource, 0, 0, currentWidth, currentHeight, 0, 0, nextWidth, nextHeight);
+      scratchCanvases.push(scratch.canvas);
+      currentSource = scratch.canvas;
+      currentWidth = nextWidth;
+      currentHeight = nextHeight;
+    }
+
+    context.drawImage(currentSource, 0, 0, currentWidth, currentHeight, 0, 0, targetWidth, targetHeight);
+  } finally {
+    scratchCanvases.forEach(releaseCanvasDownscaleScratch);
+  }
 }
 
 async function calculateBlobSha256(blob) {
@@ -6257,9 +6474,92 @@ function assertCompressedWebpFileWithinLimit(file, maxBytes) {
   }
 }
 
+async function assertR2xReadyWebpFile(file, maxBytes = CHATER_CONFIG.r2xImageMaxBytes) {
+  const effectiveMaxBytes = clampImageUploadMaxBytes(Math.min(
+    Number(maxBytes || CHATER_CONFIG.r2xImageMaxBytes),
+    CHATER_CONFIG.r2xImageMaxBytes
+  ));
+
+  if (window.ChatERImageWebpCompressorLego?.assertReadyForUpload) {
+    const result = await window.ChatERImageWebpCompressorLego.assertReadyForUpload(file, effectiveMaxBytes);
+    return {
+      ...(result || {}),
+      validator: 'IMAGENwebpCOMPRESIONx.assertReadyForUpload',
+      maxBytes: effectiveMaxBytes,
+      guaranteedMaxBytes: true
+    };
+  }
+
+  assertCompressedWebpFileWithinLimit(file, effectiveMaxBytes);
+  await assertVerifiedWebpBlob(file);
+  return {
+    ok: true,
+    validator: 'js/app.js defensive-fallback',
+    mimeType: 'image/webp',
+    maxBytes: effectiveMaxBytes,
+    sizeBytes: file.size,
+    guaranteedMaxBytes: true
+  };
+}
+
+const FALLBACK_WEBP_VISUAL_QUALITY_FLOOR = 0.66;
+const FALLBACK_WEBP_NOTICEABLE_QUALITY_FLOOR = 0.74;
+const FALLBACK_WEBP_EMERGENCY_QUALITY_FLOOR = 0.52;
+const FALLBACK_WEBP_MIN_LONG_SIDE_ABSOLUTE = 480;
+const FALLBACK_WEBP_MIN_LONG_SIDE_RATIO = 0.18;
+
+function getFallbackWebpQualityBand(quality = 0) {
+  const normalizedQuality = Number(quality || 0);
+  if (normalizedQuality >= FALLBACK_WEBP_NOTICEABLE_QUALITY_FLOOR) return 'quality-preserved';
+  if (normalizedQuality >= FALLBACK_WEBP_VISUAL_QUALITY_FLOOR) return 'acceptable';
+  if (normalizedQuality >= FALLBACK_WEBP_EMERGENCY_QUALITY_FLOOR) return 'emergency-visible-loss';
+  return 'rejectable-visible-loss';
+}
+
+function getFallbackWebpMinimumLongSide(originalWidth = 0, originalHeight = 0, maxVisualLongSide = 1600) {
+  const originalLongSide = Math.max(Number(originalWidth || 0), Number(originalHeight || 0));
+  const policyLongSideCap = clampImageUploadMaxDimension(maxVisualLongSide, 1600);
+  if (!originalLongSide) return Math.min(FALLBACK_WEBP_MIN_LONG_SIDE_ABSOLUTE, policyLongSideCap);
+  if (originalLongSide <= FALLBACK_WEBP_MIN_LONG_SIDE_ABSOLUTE) return Math.max(1, Math.round(originalLongSide));
+  return Math.min(
+    Math.round(originalLongSide),
+    policyLongSideCap,
+    Math.max(FALLBACK_WEBP_MIN_LONG_SIDE_ABSOLUTE, Math.round(originalLongSide * FALLBACK_WEBP_MIN_LONG_SIDE_RATIO))
+  );
+}
+
+function evaluateFallbackWebpVisualCandidate({ width = 0, height = 0, quality = 0, blob = null } = {}, originalWidth = 0, originalHeight = 0, maxVisualLongSide = 1600) {
+  const originalLongSide = Math.max(Number(originalWidth || 0), Number(originalHeight || 0));
+  const finalLongSide = Math.max(Number(width || 0), Number(height || 0));
+  const normalizedQuality = Number(quality || 0);
+  const policyLongSideCap = clampImageUploadMaxDimension(maxVisualLongSide, 1600);
+  const minLongSide = getFallbackWebpMinimumLongSide(originalWidth, originalHeight, policyLongSideCap);
+  const qualityOk = normalizedQuality >= FALLBACK_WEBP_VISUAL_QUALITY_FLOOR;
+  const dimensionOk = !originalLongSide || originalLongSide <= FALLBACK_WEBP_MIN_LONG_SIDE_ABSOLUTE || finalLongSide >= minLongSide;
+  return {
+    ok: Boolean(blob && qualityOk && dimensionOk),
+    qualityOk,
+    dimensionOk,
+    minQuality: FALLBACK_WEBP_VISUAL_QUALITY_FLOOR,
+    minLongSide,
+    finalLongSide,
+    originalLongSide,
+    policyLongSideCap,
+    qualityBand: getFallbackWebpQualityBand(normalizedQuality),
+    reason: !qualityOk ? 'quality-below-fallback-visual-floor' : (!dimensionOk ? 'dimension-below-policy-capped-fallback-visual-floor' : 'fallback-visual-floor-ok')
+  };
+}
+
+function shouldContinueFallbackWebpSearchAfterVisualRejection(visualGate = {}, quality = 0, targetWidth = 0, targetHeight = 0) {
+  if (!visualGate || visualGate.ok) return false;
+  if (!visualGate.qualityOk && Number(quality || 0) < FALLBACK_WEBP_VISUAL_QUALITY_FLOOR) return true;
+  if (!visualGate.dimensionOk) return Math.max(Number(targetWidth || 0), Number(targetHeight || 0)) > Number(visualGate.minLongSide || 0);
+  return false;
+}
+
 async function convertImageFileToTemporaryWebp(file, options = {}) {
   const maxBytes = clampImageUploadMaxBytes(options.maxBytes || CHATER_CONFIG.r2xImageMaxBytes);
-  const maxDimension = Math.max(320, Number(options.maxDimension || 1600));
+  const maxDimension = clampImageUploadMaxDimension(options.maxDimension, 1600);
 
   if (window.ChatERImageWebpCompressorLego?.compress) {
     try {
@@ -6304,32 +6604,108 @@ async function convertImageFileToTemporaryWebp(file, options = {}) {
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       context.clearRect(0, 0, targetWidth, targetHeight);
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(imageSource, 0, 0, targetWidth, targetHeight);
+      const sourceSize = getCanvasImageSourceSize(imageSource, originalWidth, originalHeight);
+      drawImageSourceProgressively(context, imageSource, targetWidth, targetHeight, sourceSize.width, sourceSize.height);
 
       const blob = await canvasToWebpBlob(canvas, quality);
       if (blob.size <= maxBytes) {
+        const visualGate = evaluateFallbackWebpVisualCandidate({ width: targetWidth, height: targetHeight, quality, blob }, originalWidth, originalHeight, maxDimension);
+        if (!visualGate.ok && shouldContinueFallbackWebpSearchAfterVisualRejection(visualGate, quality, targetWidth, targetHeight)) {
+          if (!visualGate.qualityOk) {
+            targetWidth = Math.max(1, Math.round(targetWidth * 0.88));
+            targetHeight = Math.max(1, Math.round(targetHeight * 0.88));
+            quality = Math.max(FALLBACK_WEBP_VISUAL_QUALITY_FLOOR, 0.74);
+          } else {
+            quality = Math.max(FALLBACK_WEBP_VISUAL_QUALITY_FLOOR, quality - 0.03);
+          }
+          continue;
+        }
+
+        if (!visualGate.ok) {
+          throw new Error('La imagen cumpliría el peso máximo, pero tendría pérdida visual notable. No se enviará automáticamente.');
+        }
+
         const webpFile = typeof File === 'function'
           ? new File([blob], buildTemporaryWebpFilename(file.name), { type: 'image/webp', lastModified: Date.now() })
           : Object.assign(blob, { name: buildTemporaryWebpFilename(file.name) });
         assertCompressedWebpFileWithinLimit(webpFile, maxBytes);
         await assertVerifiedWebpBlob(webpFile);
         if (typeof options.onProgress === 'function') options.onProgress(100, 'compressed');
+        const sha256 = await calculateBlobSha256(webpFile);
+        const fallbackGuaranteeBase = window.ChatERImageWebpCompressorLego?.createCompressionGuarantee
+          ? await window.ChatERImageWebpCompressorLego.createCompressionGuarantee(webpFile, maxBytes, {
+            width: targetWidth,
+            height: targetHeight,
+            originalWidth,
+            originalHeight,
+            quality,
+            qualityBand: getFallbackWebpQualityBand(quality),
+            compressionMode: 'browser-canvas-fallback',
+            targetBytes: maxBytes,
+            attempts: attempt + 1,
+            acceptedReason: 'fallback-canvas-visual-gate-under-limit'
+          })
+          : null;
+        const fallbackGuarantee = {
+          ...(fallbackGuaranteeBase || {}),
+          ok: true,
+          guaranteedMaxBytes: true,
+          validator: fallbackGuaranteeBase?.validator || 'IMAGENwebpCOMPRESIONx-fallback-canvas',
+          mimeType: 'image/webp',
+          formatVerified: 'RIFF_WEBP',
+          maxBytes,
+          hardMaxBytes: fallbackGuaranteeBase?.hardMaxBytes || CHATER_CONFIG.r2xImageMaxBytes,
+          targetBytes: fallbackGuaranteeBase?.targetBytes || maxBytes,
+          sizeBytes: webpFile.size,
+          headroomBytes: Math.max(0, maxBytes - webpFile.size),
+          width: targetWidth,
+          height: targetHeight,
+          originalWidth,
+          originalHeight,
+          quality,
+          qualityBand: fallbackGuaranteeBase?.qualityBand || getFallbackWebpQualityBand(quality),
+          compressionMode: 'browser-canvas-fallback',
+          attempts: attempt + 1,
+          acceptedReason: 'fallback-canvas-visual-gate-under-limit',
+          finalVisualGate: visualGate,
+          weakPointResolved: 'respaldo Canvas alineado con la compuerta visual del bloque LEGO: redimensionado multipaso, RIFF/WEBP real, <= 200 KB, calidad/dimensión mínimas y compuerta visual limitada por maxDimension efectivo antes del upload'
+        };
         return {
           file: webpFile,
           width: targetWidth,
           height: targetHeight,
           originalWidth,
           originalHeight,
-          sha256: await calculateBlobSha256(blob),
+          quality,
+          maxBytes,
+          sizeBytes: webpFile.size,
+          sha256,
           originalFileName: file.name || '',
-          originalMimeType: file.type || ''
+          originalMimeType: file.type || '',
+          compressionMode: 'browser-canvas-fallback',
+          qualityBand: fallbackGuarantee.qualityBand,
+          guarantee: fallbackGuarantee,
+          diagnostics: {
+            attempts: attempt + 1,
+            lastSize: webpFile.size,
+            targetBytes: maxBytes,
+            hardMaxBytes: maxBytes,
+            finalWidth: targetWidth,
+            finalHeight: targetHeight,
+            finalQuality: quality,
+            finalQualityBand: fallbackGuarantee.qualityBand,
+            finalVisualGate: visualGate,
+            visualQualityFloor: FALLBACK_WEBP_VISUAL_QUALITY_FLOOR,
+            visualMinLongSide: visualGate.minLongSide,
+            guaranteedMaxBytes: true,
+            guarantee: fallbackGuarantee,
+            weakPointResolved: fallbackGuarantee.weakPointResolved
+          }
         };
       }
 
-      if (quality > 0.55) {
-        quality = Math.max(0.55, quality - 0.08);
+      if (quality > FALLBACK_WEBP_VISUAL_QUALITY_FLOOR) {
+        quality = Math.max(FALLBACK_WEBP_VISUAL_QUALITY_FLOOR, quality - 0.08);
       } else {
         targetWidth = Math.max(1, Math.round(targetWidth * 0.82));
         targetHeight = Math.max(1, Math.round(targetHeight * 0.82));
@@ -6341,6 +6717,85 @@ async function convertImageFileToTemporaryWebp(file, options = {}) {
   }
 
   throw new Error(`La imagen debe quedar en WebP y pesar máximo ${formatFileSize(maxBytes)} para subirla por memoriaBACKEND.`);
+}
+
+
+async function reusePreparedWebpCompressionResult(file, sourceCompression = null, options = {}) {
+  if (!file || !sourceCompression || sourceCompression.file !== file) return null;
+  const mimeType = String(file.type || '').toLowerCase();
+  if (mimeType !== 'image/webp') return null;
+
+  const maxBytes = clampImageUploadMaxBytes(Math.min(
+    Number(options.maxBytes || CHATER_CONFIG.r2xImageMaxBytes),
+    CHATER_CONFIG.r2xImageMaxBytes
+  ));
+
+  if (Number(file.size || 0) > maxBytes) return null;
+
+  try {
+    if (window.ChatERImageWebpCompressorLego?.reusePreparedWebp) {
+      const reused = await window.ChatERImageWebpCompressorLego.reusePreparedWebp(file, sourceCompression, {
+        maxBytes,
+        maxDimension: options.maxDimension,
+        targetBytes: options.targetBytes,
+        signal: options.signal
+      });
+      if (reused?.file) {
+        reused.effectivePolicy = {
+          ...(sourceCompression.effectivePolicy || {}),
+          ...(options.policy && typeof options.policy === 'object' ? options.policy : {}),
+          maxBytes,
+          maxDimension: clampImageUploadMaxDimension(options.maxDimension, getDefaultR2xImagePolicy('chat-message').maxDimension),
+          reusedPreparedWebp: true,
+          reuseReason: options.reason || 'prepared-webp-already-validated'
+        };
+        return reused;
+      }
+    }
+
+    const readyGate = await assertR2xReadyWebpFile(file, maxBytes);
+    const sha = sourceCompression.sha256 || await calculateBlobSha256(file);
+    const guarantee = {
+      ...(sourceCompression.guarantee && typeof sourceCompression.guarantee === 'object' ? sourceCompression.guarantee : {}),
+      ...readyGate,
+      validator: readyGate.validator || 'IMAGENwebpCOMPRESIONx.assertReadyForUpload',
+      guaranteedMaxBytes: true,
+      maxBytes,
+      sizeBytes: file.size,
+      headroomBytes: Math.max(0, maxBytes - file.size),
+      reusedPreparedWebp: true,
+      acceptedReason: 'reused-already-validated-webp-for-effective-policy',
+      weakPointResolved: 'reutilización defensiva del WebP ya validado sin segunda compresión antes del upload'
+    };
+
+    return {
+      ...sourceCompression,
+      file,
+      maxBytes,
+      sizeBytes: file.size,
+      sha256: sha,
+      guarantee,
+      diagnostics: {
+        ...(sourceCompression.diagnostics && typeof sourceCompression.diagnostics === 'object' ? sourceCompression.diagnostics : {}),
+        reusedPreparedWebp: true,
+        hardMaxBytes: maxBytes,
+        finalHeadroomBytes: Math.max(0, maxBytes - file.size),
+        acceptedReason: 'reused-already-validated-webp-for-effective-policy',
+        weakPointResolved: 'la app reutiliza el archivo WebP ya comprimido y solo revalida bytes/formato contra la política efectiva; la compuerta visual de respaldo respeta maxDimension efectivo'
+      },
+      effectivePolicy: {
+        ...(sourceCompression.effectivePolicy || {}),
+        ...(options.policy && typeof options.policy === 'object' ? options.policy : {}),
+        maxBytes,
+        maxDimension: clampImageUploadMaxDimension(options.maxDimension, getDefaultR2xImagePolicy('chat-message').maxDimension),
+        reusedPreparedWebp: true,
+        reuseReason: options.reason || 'prepared-webp-already-validated'
+      }
+    };
+  } catch (error) {
+    if (Number(file.size || 0) > maxBytes) return null;
+    throw error;
+  }
 }
 
 function normalizeR2xImageUploadPreparation(payload = {}) {
@@ -6394,16 +6849,30 @@ async function prepareR2xTemporaryImageForBackend(file, options = {}) {
     throw createR2xPolicyUnavailableError('ImagenesCloudflareR2x no está disponible en memoriaBACKEND para este contexto. Se debe usar MEDIAfirmadaX como respaldo.');
   }
 
-  const converted = await convertImageFileToTemporaryWebp(file, {
-    maxBytes: policy.maxBytes,
+  const effectivePolicyMaxBytes = clampImageUploadMaxBytes(Math.min(policy.maxBytes, CHATER_CONFIG.r2xImageMaxBytes));
+  let converted = await reusePreparedWebpCompressionResult(file, options.precompressedImage, {
+    maxBytes: effectivePolicyMaxBytes,
     maxDimension: policy.maxDimension,
-    onProgress: (progress, stage) => {
-      if (typeof options.onProgress !== 'function') return;
-      const scaledProgress = Math.max(8, Math.min(18, Math.round(8 + (Number(progress || 0) / 100) * 10)));
-      options.onProgress(scaledProgress, stage || 'compressing');
-    }
+    policy,
+    reason: 'imagenes-r2x-preupload'
   });
-  if (typeof options.onProgress === 'function') options.onProgress(18, 'compressed');
+
+  if (converted) {
+    if (typeof options.onProgress === 'function') options.onProgress(18, 'compressed-reused');
+  } else {
+    converted = await convertImageFileToTemporaryWebp(file, {
+      maxBytes: effectivePolicyMaxBytes,
+      maxDimension: policy.maxDimension,
+      onProgress: (progress, stage) => {
+        if (typeof options.onProgress !== 'function') return;
+        const scaledProgress = Math.max(8, Math.min(18, Math.round(8 + (Number(progress || 0) / 100) * 10)));
+        options.onProgress(scaledProgress, stage || 'compressing');
+      }
+    });
+  }
+
+  const uploadPolicy = await assertR2xReadyWebpFile(converted.file, effectivePolicyMaxBytes);
+  if (typeof options.onProgress === 'function') options.onProgress(18, converted.effectivePolicy?.reusedPreparedWebp ? 'compressed-reused' : 'compressed');
 
   let preparedUpload = null;
 
@@ -6417,7 +6886,8 @@ async function prepareR2xTemporaryImageForBackend(file, options = {}) {
       height: converted.height,
       sha256: converted.sha256,
       originalFilename: converted.originalFileName,
-      originalMimeType: converted.originalMimeType
+      originalMimeType: converted.originalMimeType,
+      maxBytes: uploadPolicy.maxBytes
     }, `${clientMutationId}:r2x-intent`);
 
     preparedUpload = normalizeR2xImageUploadPreparation(intentPayload);
@@ -6467,7 +6937,14 @@ async function prepareR2xTemporaryImageForBackend(file, options = {}) {
     width: converted.width,
     height: converted.height,
     originalFileName: converted.originalFileName,
-    originalMimeType: converted.originalMimeType
+    originalMimeType: converted.originalMimeType,
+    maxBytes: uploadPolicy.maxBytes,
+    sizeBytes: converted.file.size,
+    quality: converted.quality || converted.guarantee?.quality || 0,
+    compressionMode: converted.compressionMode || converted.guarantee?.compressionMode || '',
+    guarantee: converted.guarantee || uploadPolicy,
+    diagnostics: converted.diagnostics || null,
+    guaranteedMaxBytes: true
   };
 }
 
@@ -7401,7 +7878,7 @@ function openArchivedChatsModal() {
     const avatar = createAvatarElement(conversation, 'chat-item-avatar');
     const lastMessage = conversation.messages.at(-1);
     const copy = document.createElement('span');
-    copy.innerHTML = `<strong>${conversation.pinned ? '<span class="pinned-badge archived-pin" aria-label="Chat fijado" title="Chat fijado">📌</span>' : ''}${escapeHTML(conversation.name)}</strong><small>${escapeHTML(lastMessage?.text || conversation.email || 'Sin mensajes todavía')}</small>`;
+    copy.innerHTML = `<strong>${conversation.pinned ? '<span class="pinned-badge archived-pin" aria-label="Chat fijado" title="Chat fijado">📌</span>' : ''}${escapeHTML(conversation.name)}</strong><small>${escapeHTML(getMessagePreviewText(lastMessage, conversation.email || 'Sin mensajes todavía'))}</small>`;
     main.append(avatar, copy);
     container.appendChild(row);
   });
@@ -7610,7 +8087,7 @@ function openConversationInfoModal(conversation = getActiveConversation()) {
       <div><strong>Bloqueo</strong><span>${escapeHTML(conversation.blocked ? `Activo · ${conversation.blockSyncStatus || 'local'}` : (conversation.blockSyncStatus ? `Inactivo · ${conversation.blockSyncStatus}` : 'No bloqueado'))}</span></div>
       <div><strong>Moderación</strong><span>${escapeHTML(conversation.reportSyncStatus ? `Reporte ${conversation.reportSyncStatus}` : 'Sin reportes locales')}</span></div>
       <div><strong>Historial memoriaBACKEND</strong><span>${conversation.messagesHydrated ? 'Cargado o en modo local' : 'Pendiente de cargar al abrir el chat'}</span></div>
-      <div><strong>Último mensaje</strong><span>${escapeHTML(lastMessage ? `${lastMessage.time || 'sin hora'} · ${lastMessage.text || lastMessage.attachmentName || 'mensaje'}` : 'Sin mensajes')}</span></div>
+      <div><strong>Último mensaje</strong><span>${escapeHTML(lastMessage ? `${lastMessage.time || 'sin hora'} · ${getMessagePreviewText(lastMessage, 'mensaje')}` : 'Sin mensajes')}</span></div>
     </div>
     <div class="quick-action-grid">
       <button class="primary-button" type="button" data-info-action="search">Buscar mensajes</button>
@@ -8929,8 +9406,10 @@ function openScanContactQrModal() {
     <p class="form-feedback" data-qr-feedback role="status" aria-live="polite">Preparando escáner QR...</p>
     <label for="manualQrPayload">Código QR manual</label>
     <textarea id="manualQrPayload" rows="3" placeholder="Pega aquí el contenido del QR si la cámara no está disponible"></textarea>
+    <input type="file" accept="image/*" data-qr-file-input hidden>
     <div class="quick-action-grid">
       <button class="primary-button" type="button" data-qr-action="use-manual">Usar código</button>
+      <button class="secondary-button" type="button" data-qr-action="image-file">Seleccionar imagen del QR</button>
       <button class="secondary-button" type="button" data-qr-action="back-contact">Crear por correo</button>
     </div>
   `;
@@ -8938,12 +9417,66 @@ function openScanContactQrModal() {
   const feedback = container.querySelector('[data-qr-feedback]');
   const video = container.querySelector('video');
   const manualInput = container.querySelector('#manualQrPayload');
+  const fileInput = container.querySelector('[data-qr-file-input]');
+
+  const pickQrImageFile = () => requestChaterPermission('files', {
+    title: 'Seleccionar imagen del QR',
+    description: 'ChatER abrirá tus archivos para leer una imagen del QR de perfil y crear el contacto.',
+    actionLabel: 'Seleccionar imagen',
+    request: () => new Promise((resolve, reject) => {
+      if (!fileInput) {
+        reject(new Error('No se pudo abrir el selector de imágenes.'));
+        return;
+      }
+      let settled = false;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('focus', handleDialogReturn);
+        fileInput.onchange = null;
+        fileInput.oncancel = null;
+        callback(value);
+      };
+      const handleDialogReturn = () => {
+        window.setTimeout(() => {
+          if (!settled && !fileInput.files?.length) finish(reject, new Error('No seleccionaste una imagen del QR.'));
+        }, 350);
+      };
+      fileInput.value = '';
+      fileInput.onchange = () => {
+        const file = fileInput.files?.[0] || null;
+        if (!file) {
+          finish(reject, new Error('No seleccionaste una imagen del QR.'));
+          return;
+        }
+        finish(resolve, file);
+      };
+      fileInput.oncancel = () => finish(reject, new Error('No seleccionaste una imagen del QR.'));
+      window.addEventListener('focus', handleDialogReturn, { once: true });
+      fileInput.click();
+    })
+  });
 
   container.addEventListener('click', async (event) => {
     const actionButton = event.target.closest('[data-qr-action]');
     if (!actionButton) return;
     if (actionButton.dataset.qrAction === 'back-contact') {
       openNewChatModal();
+      return;
+    }
+    if (actionButton.dataset.qrAction === 'image-file') {
+      try {
+        const file = await pickQrImageFile();
+        if (!window.ChatERQRCodeLego?.scanFromImage) throw new Error('El lector QR por imagen no está disponible en este navegador.');
+        feedback.textContent = 'Leyendo imagen del QR...';
+        const result = await window.ChatERQRCodeLego.scanFromImage(file, {
+          emptyMessage: 'No se detectó un QR en la imagen seleccionada.',
+          invalidMessage: 'La imagen no contiene un QR de perfil ChatER válido.'
+        });
+        await openOrCreateContactConversation(result.contact, { closeModal: true, clearSearch: true, source: 'profile-qr' });
+      } catch (error) {
+        feedback.textContent = error?.message || 'No se pudo leer la imagen del QR.';
+      }
       return;
     }
     if (actionButton.dataset.qrAction === 'use-manual') {
@@ -8959,13 +9492,22 @@ function openScanContactQrModal() {
 
   const canUseCameraScanner = Boolean(navigator.mediaDevices?.getUserMedia && window.BarcodeDetector && window.ChatERQRCodeLego?.scanFromVideo);
   if (!canUseCameraScanner) {
-    feedback.textContent = 'Este navegador no permite escanear QR directamente. Pega el contenido del QR para crear el contacto.';
+    feedback.textContent = 'Este navegador no permite escanear QR directamente con cámara. Puedes seleccionar una imagen del QR o pegar su contenido para crear el contacto.';
     return;
   }
 
   let stopped = false;
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+  requestChaterPermission('camera', {
+    title: 'Activar cámara para escanear QR',
+    description: 'ChatER necesita la cámara solo para leer el QR del perfil y crear el contacto automáticamente.',
+    actionLabel: 'Activar cámara',
+    request: () => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+  })
     .then((stream) => {
+      if (!stream?.getTracks) {
+        feedback.textContent = 'No se pudo iniciar la cámara. Selecciona una imagen del QR o pega el contenido manualmente.';
+        return;
+      }
       if (activeModalKind !== 'scan-contact-qr') {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -8997,12 +9539,12 @@ function openScanContactQrModal() {
           stopStream?.();
         };
       }).catch((error) => {
-        feedback.textContent = 'No se pudo activar la lectura automática. Pega el contenido del QR manualmente.';
+        feedback.textContent = 'No se pudo activar la lectura automática. Selecciona una imagen del QR o pega el contenido manualmente.';
         console.warn('No se pudo iniciar BarcodeDetector para QR.', error);
       });
     })
     .catch((error) => {
-      feedback.textContent = 'No se pudo acceder a la cámara. Pega el contenido del QR para crear el contacto.';
+      feedback.textContent = 'No se pudo acceder a la cámara. Selecciona una imagen del QR o pega el contenido manualmente.';
       console.warn('Permiso de cámara no disponible para QR.', error);
     });
 }
@@ -10338,8 +10880,14 @@ async function activateNotificationsForDevice() {
   }
 
   let permission = Notification.permission;
-  if (permission === 'default') {
-    permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    const permissionResult = await requestChaterPermission('notifications', {
+      title: 'Activar notificaciones',
+      description: 'ChatER necesita permiso para avisarte cuando recibas mensajes, llamadas y estados importantes.',
+      actionLabel: 'Activar notificaciones',
+      request: () => Notification.requestPermission()
+    });
+    permission = typeof permissionResult === 'string' ? permissionResult : Notification.permission;
   }
 
   if (permission !== 'granted') {
@@ -10674,6 +11222,7 @@ function renderEmojiPanel(filterText = '') {
   });
 
   search.addEventListener('input', () => renderEmojiPanel(search.value));
+  applyListScrollSemantics(emojiPanel);
   if (!emojiPanel.hidden) {
     search.focus({ preventScroll: true });
   }
@@ -10856,24 +11405,41 @@ function openCameraComposerPicker() {
   });
 }
 
-function selectComposerMediaAttachment(options = {}) {
+async function selectComposerMediaAttachment(options = {}) {
   closeEmojiPanel();
   const conversation = getActiveConversation();
   if (activeSection !== 'chats' || !conversation || messageInput.disabled) return;
 
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = options.accept || 'image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
-  if (options.capture) input.setAttribute('capture', options.capture);
-  input.addEventListener('change', async () => {
-    const file = input.files?.[0];
-    if (!file) {
-      if (options.emptyMessage) showToast(options.emptyMessage);
-      return;
-    }
-    await sendMediaAttachment(conversation, file, { source: options.source });
-  });
-  input.click();
+  const capability = options.source === 'camera' ? 'camera' : 'files';
+  const openPicker = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = options.accept || 'image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
+    if (options.capture) input.setAttribute('capture', options.capture);
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        if (options.emptyMessage) showToast(options.emptyMessage);
+        return;
+      }
+      await sendMediaAttachment(conversation, file, { source: options.source });
+    }, { once: true });
+    input.click();
+    return true;
+  };
+
+  try {
+    await requestChaterPermission(capability, {
+      title: capability === 'camera' ? 'Activar cámara para adjuntar' : 'Permiso de archivos para adjuntar',
+      description: capability === 'camera'
+        ? 'ChatER abrirá la cámara o galería para adjuntar una imagen o video al chat.'
+        : 'ChatER abrirá el selector del dispositivo para adjuntar el archivo al chat.',
+      actionLabel: capability === 'camera' ? 'Abrir cámara o galería' : 'Seleccionar archivo',
+      request: openPicker
+    });
+  } catch (error) {
+    showToast(error?.message || 'No se pudo abrir el selector asociado al permiso.');
+  }
 }
 
 function openQuickComposerActionsModal() {
@@ -10932,7 +11498,13 @@ async function toggleVoiceNoteRecording() {
 
   try {
     const sessionGuard = captureSessionGuard();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await requestChaterPermission('microphone', {
+      title: 'Activar micrófono',
+      description: 'ChatER necesita el micrófono para grabar la nota de voz antes de enviarla al chat.',
+      actionLabel: 'Activar micrófono',
+      request: () => navigator.mediaDevices.getUserMedia({ audio: true })
+    });
+    if (!stream?.getTracks) throw new Error('Permiso de micrófono no disponible.');
     if (!isSessionGuardCurrent(sessionGuard)) {
       stream.getTracks().forEach((track) => track.stop());
       return;
@@ -11044,19 +11616,73 @@ async function compressChatImageBeforeSend(file, onProgress) {
   const mediaKind = getMessageMediaKind({ attachmentMimeType: file?.type, attachmentName: file?.name });
   if (mediaKind !== 'image') return null;
 
+  const policy = await resolveChatImageCompressionPolicy('chat-message');
+  const defaultPolicy = getDefaultR2xImagePolicy('chat-message');
+  const effectiveMaxBytes = clampImageUploadMaxBytes(Math.min(policy.maxBytes || CHATER_CONFIG.r2xImageMaxBytes, CHATER_CONFIG.r2xImageMaxBytes));
+  const effectiveMaxDimension = clampImageUploadMaxDimension(policy.maxDimension || defaultPolicy.maxDimension, defaultPolicy.maxDimension);
   const converted = await convertImageFileToTemporaryWebp(file, {
-    maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
-    maxDimension: getDefaultR2xImagePolicy('chat-message').maxDimension,
+    maxBytes: effectiveMaxBytes,
+    maxDimension: effectiveMaxDimension,
     onProgress: typeof onProgress === 'function' ? onProgress : undefined
   });
-  assertCompressedWebpFileWithinLimit(converted.file, CHATER_CONFIG.r2xImageMaxBytes);
-  await assertVerifiedWebpBlob(converted.file);
+  await assertR2xReadyWebpFile(converted.file, effectiveMaxBytes);
+  converted.effectivePolicy = {
+    context: policy.context || 'chat-message',
+    source: policy.source || 'local-fallback',
+    enabled: Boolean(policy.enabled),
+    maxBytes: effectiveMaxBytes,
+    maxDimension: effectiveMaxDimension,
+    hardMaxDimension: CHATER_IMAGE_UPLOAD_MAX_DIMENSION
+  };
   return converted;
+}
+
+async function assertImageAttachmentReadyForBackendUpload(file, maxBytes = CHATER_CONFIG.r2xImageMaxBytes) {
+  const mediaKind = getMessageMediaKind({ attachmentMimeType: file?.type, attachmentName: file?.name });
+  if (mediaKind !== 'image') return null;
+
+  const effectiveMaxBytes = clampImageUploadMaxBytes(Math.min(
+    Number(maxBytes || CHATER_CONFIG.r2xImageMaxBytes),
+    CHATER_CONFIG.r2xImageMaxBytes
+  ));
+  return assertR2xReadyWebpFile(file, effectiveMaxBytes);
 }
 
 async function applyCompressedImageToOutgoingMessage(message, compressed, originalFile) {
   if (!message || !compressed?.file) return;
+  const previousCompression = message.imageCompression && typeof message.imageCompression === 'object' ? message.imageCompression : null;
   const uploadFile = compressed.file;
+  const guarantee = compressed.guarantee && typeof compressed.guarantee === 'object' ? compressed.guarantee : {};
+  const diagnostics = compressed.diagnostics && typeof compressed.diagnostics === 'object' ? compressed.diagnostics : {};
+  const effectiveMaxBytes = clampImageUploadMaxBytes(guarantee.maxBytes || compressed.maxBytes || CHATER_CONFIG.r2xImageMaxBytes);
+  const finalUploadGate = await assertR2xReadyWebpFile(uploadFile, effectiveMaxBytes);
+  const headroomBytes = Math.max(0, effectiveMaxBytes - uploadFile.size);
+  const compressionMode = String(compressed.compressionMode || guarantee.compressionMode || '').trim();
+  const previousOriginalFileName = String(previousCompression?.originalFileName || '').trim();
+  const currentOriginalFileName = String(originalFile?.name || '').trim();
+  const previousCompressedName = String(previousCompression?.fileName || previousCompression?.mediaName || previousCompression?.attachmentName || '').trim();
+  const currentCompressedName = String(uploadFile?.name || compressed.originalFileName || '').trim();
+  const previousCompressionMatchesOriginal = Boolean(
+    previousCompression?.status === 'compressed'
+    && compressionMode === 'original-webp-within-limit'
+    && previousOriginalFileName
+    && currentOriginalFileName
+    && previousOriginalFileName === currentOriginalFileName
+  );
+  const previousCompressionMatchesUpload = Boolean(
+    previousCompression?.status === 'compressed'
+    && compressionMode === 'original-webp-within-limit'
+    && previousCompressedName
+    && currentCompressedName
+    && previousCompressedName === currentCompressedName
+    && Number(previousCompression.sizeBytes || 0) === Number(uploadFile.size || 0)
+    && (previousCompression.validator || previousCompression.auditId || previousCompression.diagnostics)
+  );
+  const previousSourceAudit = (previousCompressionMatchesOriginal || previousCompressionMatchesUpload)
+    ? previousCompression
+    : null;
+  const sourceWasAlreadyCompressed = Boolean(previousSourceAudit);
+  const sourceAudit = sourceWasAlreadyCompressed ? previousSourceAudit : null;
   message.mediaName = uploadFile.name;
   message.mediaSizeBytes = uploadFile.size;
   message.attachmentName = uploadFile.name;
@@ -11065,13 +11691,60 @@ async function applyCompressedImageToOutgoingMessage(message, compressed, origin
   message.mediaKind = 'image';
   message.imageCompression = {
     status: 'compressed',
-    maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
+    maxBytes: effectiveMaxBytes,
     sizeBytes: uploadFile.size,
-    width: compressed.width || 0,
-    height: compressed.height || 0,
-    originalFileName: originalFile?.name || compressed.originalFileName || '',
-    originalMimeType: originalFile?.type || compressed.originalMimeType || '',
-    guaranteedMaxBytes: uploadFile.size <= CHATER_CONFIG.r2xImageMaxBytes
+    fileName: uploadFile.name,
+    mimeType: uploadFile.type || 'image/webp',
+    width: compressed.width || guarantee.width || sourceAudit?.width || 0,
+    height: compressed.height || guarantee.height || sourceAudit?.height || 0,
+    originalWidth: previousSourceAudit?.originalWidth || compressed.originalWidth || guarantee.originalWidth || 0,
+    originalHeight: previousSourceAudit?.originalHeight || compressed.originalHeight || guarantee.originalHeight || 0,
+    quality: Number(sourceAudit?.quality || compressed.quality || guarantee.quality || 0),
+    compressionMode: sourceAudit?.compressionMode || compressed.compressionMode || guarantee.compressionMode || '',
+    qualityBand: sourceAudit?.qualityBand || compressed.qualityBand || guarantee.qualityBand || diagnostics.finalQualityBand || '',
+    perceptualScore: Number(sourceAudit?.perceptualScore || compressed.perceptualScore || guarantee.perceptualScore || diagnostics.finalPerceptualScore || 0),
+    originalFileName: previousSourceAudit?.originalFileName || originalFile?.name || compressed.originalFileName || '',
+    originalMimeType: previousSourceAudit?.originalMimeType || originalFile?.type || compressed.originalMimeType || '',
+    schemaVersion: sourceAudit?.schemaVersion || guarantee.schemaVersion || 'webp-200kb-v1',
+    validator: guarantee.validator || finalUploadGate.validator || sourceAudit?.validator || 'IMAGENwebpCOMPRESIONx',
+    validatorVersion: guarantee.validatorVersion || sourceAudit?.validatorVersion || '',
+    formatVerified: guarantee.formatVerified || finalUploadGate.formatVerified || sourceAudit?.formatVerified || 'RIFF_WEBP',
+    targetBytes: Number(guarantee.targetBytes || diagnostics.targetBytes || sourceAudit?.targetBytes || effectiveMaxBytes),
+    hardMaxBytes: Number(guarantee.hardMaxBytes || diagnostics.hardMaxBytes || sourceAudit?.hardMaxBytes || CHATER_CONFIG.r2xImageMaxBytes),
+    headroomBytes,
+    auditId: guarantee.auditId || sourceAudit?.auditId || '',
+    assertedAt: guarantee.assertedAt || new Date().toISOString(),
+    acceptedReason: sourceAudit?.acceptedReason || guarantee.acceptedReason || diagnostics.acceptedReason || '',
+    acceptedLimit: sourceAudit?.acceptedLimit || guarantee.acceptedLimit || diagnostics.finalAcceptedLimit || compressed.acceptedLimit || '',
+    targetHeadroomMet: Boolean(sourceAudit?.targetHeadroomMet ?? guarantee.targetHeadroomMet ?? diagnostics.targetHeadroomMet ?? compressed.targetHeadroomMet),
+    guaranteedMaxBytes: Boolean(guarantee.guaranteedMaxBytes || finalUploadGate.guaranteedMaxBytes || sourceAudit?.guaranteedMaxBytes) || uploadFile.size <= effectiveMaxBytes,
+    effectivePolicy: compressed.effectivePolicy || sourceAudit?.effectivePolicy || null,
+    uploadPreparation: sourceWasAlreadyCompressed ? {
+      reusedCompressedWebp: true,
+      compressionMode: compressed.compressionMode || guarantee.compressionMode || 'original-webp-within-limit',
+      maxBytes: effectiveMaxBytes,
+      sizeBytes: uploadFile.size,
+      validator: guarantee.validator || finalUploadGate.validator || 'IMAGENwebpCOMPRESIONx.assertReadyForUpload',
+      note: 'Se reutilizó un WebP ya validado para no recomprimir ni perder auditoría visual original, incluso si el archivo fuente ya terminaba en .webp y el nombre final no cambió.'
+    } : null,
+    diagnostics: {
+      attempts: Number(sourceAudit?.diagnostics?.attempts || diagnostics.attempts || guarantee.attempts || 0),
+      targetBytes: Number(sourceAudit?.diagnostics?.targetBytes || diagnostics.targetBytes || guarantee.targetBytes || 0),
+      hardMaxBytes: Number(sourceAudit?.diagnostics?.hardMaxBytes || diagnostics.hardMaxBytes || effectiveMaxBytes),
+      finalWidth: Number(compressed.width || diagnostics.finalWidth || sourceAudit?.diagnostics?.finalWidth || guarantee.width || 0),
+      finalHeight: Number(compressed.height || diagnostics.finalHeight || sourceAudit?.diagnostics?.finalHeight || guarantee.height || 0),
+      finalQuality: Number(sourceAudit?.diagnostics?.finalQuality || diagnostics.finalQuality || compressed.quality || guarantee.quality || 0),
+      finalQualityBand: sourceAudit?.diagnostics?.finalQualityBand || compressed.qualityBand || guarantee.qualityBand || diagnostics.finalQualityBand || '',
+      finalPerceptualScore: Number(sourceAudit?.diagnostics?.finalPerceptualScore || compressed.perceptualScore || guarantee.perceptualScore || diagnostics.finalPerceptualScore || 0),
+      finalHeadroomBytes: Number(diagnostics.finalHeadroomBytes || headroomBytes),
+      acceptedReason: sourceAudit?.diagnostics?.acceptedReason || guarantee.acceptedReason || diagnostics.acceptedReason || '',
+      acceptedLimit: sourceAudit?.diagnostics?.acceptedLimit || guarantee.acceptedLimit || diagnostics.finalAcceptedLimit || compressed.acceptedLimit || '',
+      targetHeadroomMet: Boolean(sourceAudit?.diagnostics?.targetHeadroomMet ?? guarantee.targetHeadroomMet ?? diagnostics.targetHeadroomMet ?? compressed.targetHeadroomMet),
+      reusedCompressedWebp: sourceWasAlreadyCompressed,
+      weakPointResolved: sourceWasAlreadyCompressed
+        ? 'Se preserva la auditoría de la compresión original cuando memoriaBACKEND/R2 reutiliza un WebP ya válido, incluso si el WebP fuente y el WebP final conservan el mismo nombre; no se falsea calidad=1 ni se pierden dimensiones originales.'
+        : (guarantee.weakPointResolved || diagnostics.weakPointResolved || 'WebP validado por bloque LEGO antes del upload y registrado en el mensaje para auditoría')
+    }
   };
   message.mediaPreviewDataUrl = await createCompressedImageMessagePreview(uploadFile) || message.mediaPreviewDataUrl;
 }
@@ -11137,6 +11810,7 @@ async function sendMediaAttachment(conversation, file, options = {}) {
 
   let preparedUpload = null;
   let uploadFile = file;
+  let imageCompressionResult = null;
 
   try {
     if (mediaKind === 'image') {
@@ -11147,6 +11821,7 @@ async function sendMediaAttachment(conversation, file, options = {}) {
       });
       if (!isSessionGuardCurrent(sessionGuard)) return;
       if (compressed?.file) {
+        imageCompressionResult = compressed;
         uploadFile = compressed.file;
         await applyCompressedImageToOutgoingMessage(outgoing, compressed, file);
         updateOutgoingMediaProgress(18, 'compressed', true);
@@ -11175,43 +11850,41 @@ async function sendMediaAttachment(conversation, file, options = {}) {
           entityId: clientMessageId,
           conversationId: conversation.id,
           clientMutationId: mediaMutationId,
-          onProgress: updateOutgoingMediaProgress
+          onProgress: updateOutgoingMediaProgress,
+          precompressedImage: imageCompressionResult
         });
         if (!isSessionGuardCurrent(sessionGuard)) return;
         uploadFile = r2xPreparation.file;
         preparedUpload = r2xPreparation.preparedUpload;
-        outgoing.mediaName = uploadFile.name;
-        outgoing.mediaSizeBytes = uploadFile.size;
-        outgoing.attachmentName = uploadFile.name;
-        outgoing.attachmentSize = uploadFile.size;
-        outgoing.attachmentMimeType = uploadFile.type || 'image/webp';
-        outgoing.mediaPreviewDataUrl = await createCompressedImageMessagePreview(uploadFile) || outgoing.mediaPreviewDataUrl;
+        await applyCompressedImageToOutgoingMessage(outgoing, r2xPreparation, file);
         updateOutgoingMediaProgress(90, 'creating-media-message', true);
       } catch (error) {
         if (!isR2xPolicyUnavailableError(error)) throw error;
         console.warn('ImagenesCloudflareR2x no está disponible para adjuntos de imagen; se comprime a WebP y se usa MEDIAfirmadaX como respaldo canónico.', error);
         updateOutgoingMediaProgress(10, 'compressing', true);
-        const fallbackConverted = await convertImageFileToTemporaryWebp(uploadFile, {
+        const fallbackPolicy = getDefaultR2xImagePolicy('chat-message');
+        const fallbackConverted = await reusePreparedWebpCompressionResult(uploadFile, imageCompressionResult, {
           maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
-          maxDimension: getDefaultR2xImagePolicy('chat-message').maxDimension,
+          maxDimension: fallbackPolicy.maxDimension,
+          policy: fallbackPolicy,
+          reason: 'media-firmada-fallback-after-r2x-unavailable'
+        }) || await convertImageFileToTemporaryWebp(uploadFile, {
+          maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
+          maxDimension: fallbackPolicy.maxDimension,
           onProgress: (progress, stage) => {
             const scaledProgress = Math.max(10, Math.min(18, Math.round(10 + (Number(progress || 0) / 100) * 8)));
             updateOutgoingMediaProgress(scaledProgress, stage || 'compressing');
           }
         });
         if (!isSessionGuardCurrent(sessionGuard)) return;
-        updateOutgoingMediaProgress(18, 'compressed', true);
         uploadFile = fallbackConverted.file;
-        outgoing.mediaName = uploadFile.name;
-        outgoing.mediaSizeBytes = uploadFile.size;
-        outgoing.attachmentName = uploadFile.name;
-        outgoing.attachmentSize = uploadFile.size;
-        outgoing.attachmentMimeType = uploadFile.type || 'image/webp';
-        outgoing.mediaPreviewDataUrl = await createCompressedImageMessagePreview(uploadFile) || outgoing.mediaPreviewDataUrl;
+        await applyCompressedImageToOutgoingMessage(outgoing, fallbackConverted, file);
+        updateOutgoingMediaProgress(18, 'compressed', true);
       }
     }
 
     if (!preparedUpload) {
+      await assertImageAttachmentReadyForBackendUpload(uploadFile);
       const preparationPayload = await apiClient.prepareMediaUpload(uploadFile, mediaMutationId);
       if (!isSessionGuardCurrent(sessionGuard)) return;
       preparedUpload = normalizeMediaUploadPreparation(preparationPayload);
@@ -11240,7 +11913,8 @@ async function sendMediaAttachment(conversation, file, options = {}) {
     const mediaMessagePayload = buildMediaMessagePayload(uploadFile, preparedUpload, clientMessageId, caption, {
       originalFilename: uploadFile === file ? '' : file.name,
       originalMimeType: uploadFile === file ? '' : (file.type || ''),
-      provider: preparedUpload.provider || 'media-firmada'
+      provider: preparedUpload.provider || 'media-firmada',
+      imageCompression: outgoing.imageCompression || null
     });
     outgoing.mediaUrl = preparedUpload.publicUrl || outgoing.mediaUrl || '';
     outgoing.mediaSyncStatus = 'creating-media-message';
@@ -11271,7 +11945,8 @@ async function sendMediaAttachment(conversation, file, options = {}) {
       const mediaMessagePayload = buildMediaMessagePayload(uploadFile, preparedUpload, clientMessageId, caption, {
         originalFilename: uploadFile === file ? '' : file.name,
         originalMimeType: uploadFile === file ? '' : (file.type || ''),
-        provider: preparedUpload.provider || 'media-firmada'
+        provider: preparedUpload.provider || 'media-firmada',
+        imageCompression: outgoing.imageCompression || null
       });
       enqueueBackendOperation({
         type: 'createMediaMessage',
@@ -11360,6 +12035,7 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
 
   let preparedUpload = null;
   let uploadFile = originalFile;
+  let imageCompressionResult = null;
 
   try {
     if (mediaKind === 'image') {
@@ -11370,6 +12046,7 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
       });
       if (!isSessionGuardCurrent(sessionGuard)) return;
       if (compressed?.file) {
+        imageCompressionResult = compressed;
         uploadFile = compressed.file;
         await applyCompressedImageToOutgoingMessage(message, compressed, originalFile);
         updateOutgoingMediaProgress(18, 'compressed', true);
@@ -11387,43 +12064,41 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
           entityId: clientMessageId,
           conversationId: conversation.id,
           clientMutationId: mediaMutationId,
-          onProgress: updateOutgoingMediaProgress
+          onProgress: updateOutgoingMediaProgress,
+          precompressedImage: imageCompressionResult
         });
         if (!isSessionGuardCurrent(sessionGuard)) return;
         uploadFile = r2xPreparation.file;
         preparedUpload = r2xPreparation.preparedUpload;
-        message.mediaName = uploadFile.name;
-        message.mediaSizeBytes = uploadFile.size;
-        message.attachmentName = uploadFile.name;
-        message.attachmentSize = uploadFile.size;
-        message.attachmentMimeType = uploadFile.type || 'image/webp';
-        message.mediaPreviewDataUrl = await createCompressedImageMessagePreview(uploadFile) || message.mediaPreviewDataUrl;
+        await applyCompressedImageToOutgoingMessage(message, r2xPreparation, originalFile);
         updateOutgoingMediaProgress(90, 'creating-media-message', true);
       } catch (error) {
         if (!isR2xPolicyUnavailableError(error)) throw error;
         console.warn('ImagenesCloudflareR2x no está disponible al reintentar adjunto; se comprime a WebP y se usa MEDIAfirmadaX como respaldo canónico.', error);
         updateOutgoingMediaProgress(10, 'compressing', true);
-        const fallbackConverted = await convertImageFileToTemporaryWebp(uploadFile, {
+        const fallbackPolicy = getDefaultR2xImagePolicy('chat-message');
+        const fallbackConverted = await reusePreparedWebpCompressionResult(uploadFile, imageCompressionResult, {
           maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
-          maxDimension: getDefaultR2xImagePolicy('chat-message').maxDimension,
+          maxDimension: fallbackPolicy.maxDimension,
+          policy: fallbackPolicy,
+          reason: 'media-firmada-fallback-after-r2x-unavailable'
+        }) || await convertImageFileToTemporaryWebp(uploadFile, {
+          maxBytes: CHATER_CONFIG.r2xImageMaxBytes,
+          maxDimension: fallbackPolicy.maxDimension,
           onProgress: (progress, stage) => {
             const scaledProgress = Math.max(10, Math.min(18, Math.round(10 + (Number(progress || 0) / 100) * 8)));
             updateOutgoingMediaProgress(scaledProgress, stage || 'compressing');
           }
         });
         if (!isSessionGuardCurrent(sessionGuard)) return;
-        updateOutgoingMediaProgress(18, 'compressed', true);
         uploadFile = fallbackConverted.file;
-        message.mediaName = uploadFile.name;
-        message.mediaSizeBytes = uploadFile.size;
-        message.attachmentName = uploadFile.name;
-        message.attachmentSize = uploadFile.size;
-        message.attachmentMimeType = uploadFile.type || 'image/webp';
-        message.mediaPreviewDataUrl = await createCompressedImageMessagePreview(uploadFile) || message.mediaPreviewDataUrl;
+        await applyCompressedImageToOutgoingMessage(message, fallbackConverted, originalFile);
+        updateOutgoingMediaProgress(18, 'compressed', true);
       }
     }
 
     if (!preparedUpload) {
+      await assertImageAttachmentReadyForBackendUpload(uploadFile);
       const preparationPayload = await apiClient.prepareMediaUpload(uploadFile, mediaMutationId);
       if (!isSessionGuardCurrent(sessionGuard)) return;
       preparedUpload = normalizeMediaUploadPreparation(preparationPayload);
@@ -11452,7 +12127,8 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
     const mediaMessagePayload = buildMediaMessagePayload(uploadFile, preparedUpload, clientMessageId, explicitCaption, {
       originalFilename: uploadFile === originalFile ? '' : originalFile.name,
       originalMimeType: uploadFile === originalFile ? '' : (originalFile.type || ''),
-      provider: preparedUpload.provider || 'media-firmada'
+      provider: preparedUpload.provider || 'media-firmada',
+      imageCompression: message.imageCompression || null
     });
     message.mediaUrl = preparedUpload.publicUrl || message.mediaUrl || '';
     message.mediaSyncStatus = 'creating-media-message';
@@ -11483,7 +12159,8 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
       const mediaMessagePayload = buildMediaMessagePayload(uploadFile, preparedUpload, clientMessageId, explicitCaption, {
         originalFilename: uploadFile === originalFile ? '' : originalFile.name,
         originalMimeType: uploadFile === originalFile ? '' : (originalFile.type || ''),
-        provider: preparedUpload.provider || 'media-firmada'
+        provider: preparedUpload.provider || 'media-firmada',
+        imageCompression: message.imageCompression || null
       });
       enqueueBackendOperation({
         type: 'createMediaMessage',
@@ -11694,6 +12371,7 @@ function buildMediaMessagePayload(file, preparedUpload, clientMessageId, caption
     provider: metadata.provider || preparedUpload.provider || 'media-firmada',
     originalFilename: metadata.originalFilename || '',
     originalMimeType: metadata.originalMimeType || '',
+    imageCompression: metadata.imageCompression || null,
     clientMutationId: clientMessageId,
     clientTime: new Date().toISOString()
   };
@@ -11709,7 +12387,8 @@ function openCreateStatusModal() {
     <textarea id="statusTextInput" rows="4" maxlength="220" placeholder="Escribe una actualización para tus contactos" required></textarea>
 
     <label for="statusMediaInput">Imagen o video del estado</label>
-    <input id="statusMediaInput" type="file" accept="image/*,video/*" />
+    <button class="secondary-button" type="button" data-status-media-picker>Elegir imagen o video</button>
+    <input id="statusMediaInput" type="file" accept="image/*,video/*" hidden />
     <div class="status-media-preview" data-status-media-preview aria-live="polite"></div>
 
     <p class="modal-copy">El estado se mostrará durante 24 horas. Puedes publicarlo solo con texto o agregar una imagen/video para que se vea como una historia visual.</p>
@@ -11720,7 +12399,24 @@ function openCreateStatusModal() {
   const mediaInput = form.querySelector('#statusMediaInput');
   const mediaPreview = form.querySelector('[data-status-media-preview]');
   const feedback = form.querySelector('[data-feedback]');
+  const mediaPickerButton = form.querySelector('[data-status-media-picker]');
   renderStatusMediaPickerPreview(mediaPreview);
+
+  mediaPickerButton?.addEventListener('click', async () => {
+    try {
+      await requestChaterPermission('files', {
+        title: 'Permiso de archivos para estado',
+        description: 'ChatER abrirá el selector del dispositivo para elegir una imagen o video del estado.',
+        actionLabel: 'Elegir imagen o video',
+        request: () => {
+          mediaInput.click();
+          return true;
+        }
+      });
+    } catch (error) {
+      feedback.textContent = error?.message || 'No se pudo abrir el selector de archivos.';
+    }
+  });
 
   mediaInput.addEventListener('change', async () => {
     selectedStatusMediaFile = mediaInput.files?.[0] || null;
@@ -12042,12 +12738,46 @@ function replyToState(state) {
   hydrateConversationMessages(relatedConversation.id);
 }
 
+async function ensureCallPermissionForType(type) {
+  if (type === 'video') {
+    return requestChaterPermission('camera-microphone', {
+      title: 'Activar cámara y micrófono',
+      description: 'ChatER necesita cámara y micrófono para iniciar la videollamada con el contacto.',
+      actionLabel: 'Activar cámara y micrófono',
+      request: async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      }
+    });
+  }
+
+  return requestChaterPermission('microphone', {
+    title: 'Activar micrófono para llamada',
+    description: 'ChatER necesita el micrófono para iniciar la llamada de voz con el contacto.',
+    actionLabel: 'Activar micrófono',
+    request: async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    }
+  });
+}
+
 async function startCall(type, conversationOverride = null) {
   closeEmojiPanel();
   const sessionGuard = captureSessionGuard();
   const conversation = conversationOverride || getActiveConversation();
   if (!conversation || (activeSection !== 'chats' && !conversationOverride)) return;
   const label = type === 'video' ? 'videollamada' : 'llamada de voz';
+
+  try {
+    await ensureCallPermissionForType(type);
+  } catch (error) {
+    showToast(error?.message || 'Activa los permisos del navegador para iniciar la llamada.');
+    return;
+  }
+
   const localCallId = `call-${Date.now()}`;
   appState.calls.unshift({
     id: localCallId,
@@ -13325,6 +14055,9 @@ function disconnectStremeRealtime() {
 function createStremeClientEvent(payload) {
   return {
     ...payload,
+    senderUserId: payload.senderUserId || getCurrentUserIdentifier(),
+    senderUserEmail: payload.senderUserEmail || getSessionEmail(),
+    deviceId: payload.deviceId || getDeviceId(),
     clientMutationId: payload.clientMutationId || generateClientMutationId(),
     clientTime: new Date().toISOString()
   };
@@ -13384,7 +14117,8 @@ function handleStremeEvent(payload) {
   }
 
   if (['typing.started', 'typing.stopped', 'typing.start', 'typing.stop'].includes(normalizedPayload.type)) {
-    updateTypingStatus(normalizedPayload.data || normalizedPayload, ['typing.started', 'typing.start'].includes(normalizedPayload.type));
+    const typingEventData = { ...normalizedPayload, ...(normalizedPayload.data || {}) };
+    updateTypingStatus(typingEventData, ['typing.started', 'typing.start'].includes(normalizedPayload.type));
   }
 
   if (normalizedPayload.type === 'presence.changed') {
@@ -13427,6 +14161,7 @@ function receiveRealtimeMessage(data = {}) {
     }
   }
 
+  clearRemoteTypingStatus(conversation.id, normalizedMessage.type === 'outgoing' ? 'Entregado' : 'En línea', { render: false });
   conversation.status = normalizedMessage.type === 'outgoing' ? 'Entregado' : 'En línea';
   persistState();
   renderCurrentSection();
@@ -13491,18 +14226,160 @@ function registerRealtimeState(data = {}) {
   showToast('Hay un nuevo estado disponible.');
 }
 
-function updateTypingStatus(data = {}, isTyping) {
-  const conversation = appState.conversations.find((item) => item.id === data.chatId || item.id === data.conversationId);
+function getTypingConversationId(data = {}) {
+  return String(data.chatId || data.conversationId || data.chatID || data.channelId || data.roomId || '').trim();
+}
+
+function isTypingSignalFromSelf(data = {}) {
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const senderEmail = normalizeStorageIdentity(
+    data.senderUserEmail
+    || data.senderEmail
+    || data.userEmail
+    || data.email
+    || data.fromEmail
+    || data.actorEmail
+    || data.authorEmail
+    || ''
+  );
+  const senderUserId = normalizeBackendUserId(
+    data.senderUserId
+    || data.userId
+    || data.fromUserId
+    || data.actorUserId
+    || data.authorUserId
+    || data.uid
+    || ''
+  );
+  const senderDeviceId = String(data.deviceId || data.clientDeviceId || data.senderDeviceId || '').trim();
+
+  return Boolean(
+    (selfEmail && senderEmail && senderEmail === selfEmail)
+    || (selfUserId && senderUserId && senderUserId === selfUserId)
+    || (senderDeviceId && senderDeviceId === getDeviceId())
+  );
+}
+
+function clearRemoteTypingStatus(conversationId = '', fallbackStatus = 'En línea', options = {}) {
+  const normalizedConversationId = String(conversationId || '').trim();
+  if (!normalizedConversationId) return;
+
+  const entry = remoteTypingDisplayState.get(normalizedConversationId);
+  if (entry?.timer) clearTimeout(entry.timer);
+  if (entry?.staleTimer) clearTimeout(entry.staleTimer);
+  remoteTypingDisplayState.delete(normalizedConversationId);
+
+  const conversation = appState.conversations.find((item) => String(item.id || '') === normalizedConversationId);
   if (!conversation) return;
-  conversation.status = isTyping ? 'Escribiendo...' : 'En línea';
-  persistState();
-  renderCurrentSection();
+
+  if (conversation.status === 'Escribiendo...') {
+    conversation.status = fallbackStatus || entry?.previousStatus || 'En línea';
+  }
+
+  if (options.render !== false) renderCurrentSection();
+}
+
+function clearAllRemoteTypingStatuses() {
+  remoteTypingDisplayState.forEach((entry) => {
+    if (entry?.timer) clearTimeout(entry.timer);
+    if (entry?.staleTimer) clearTimeout(entry.staleTimer);
+  });
+  remoteTypingDisplayState.clear();
+}
+
+function scheduleRemoteTypingStaleClear(conversationId = '', entry = null) {
+  const normalizedConversationId = String(conversationId || '').trim();
+  if (!normalizedConversationId || !entry) return;
+
+  if (entry.staleTimer) clearTimeout(entry.staleTimer);
+  entry.staleTimer = setTimeout(() => {
+    const latestEntry = remoteTypingDisplayState.get(normalizedConversationId);
+    if (latestEntry !== entry) return;
+
+    if (entry.timer) clearTimeout(entry.timer);
+    remoteTypingDisplayState.delete(normalizedConversationId);
+
+    const conversation = appState.conversations.find((item) => String(item.id || '') === normalizedConversationId);
+    if (conversation?.status === 'Escribiendo...') {
+      conversation.status = entry.previousStatus || 'En línea';
+      renderCurrentSection();
+    }
+  }, REMOTE_TYPING_STALE_MS);
+}
+
+function updateTypingStatus(data = {}, isTyping) {
+  const conversationId = getTypingConversationId(data);
+  const conversation = appState.conversations.find((item) => String(item.id || '') === conversationId);
+  if (!conversation || isTypingSignalFromSelf(data)) return;
+
+  if (isTyping) {
+    const existingEntry = remoteTypingDisplayState.get(conversation.id);
+    if (existingEntry?.timer) clearTimeout(existingEntry.timer);
+    if (existingEntry?.staleTimer) clearTimeout(existingEntry.staleTimer);
+
+    const previousStatus = existingEntry?.previousStatus
+      || (conversation.status && conversation.status !== 'Escribiendo...' ? conversation.status : 'En línea');
+
+    const entry = {
+      previousStatus,
+      timer: null,
+      staleTimer: null,
+      startedAt: existingEntry?.startedAt || Date.now(),
+      lastSignalAt: Date.now()
+    };
+
+    remoteTypingDisplayState.set(conversation.id, entry);
+    scheduleRemoteTypingStaleClear(conversation.id, entry);
+
+    conversation.status = 'Escribiendo...';
+    renderCurrentSection();
+    return;
+  }
+
+  const existingStopEntry = remoteTypingDisplayState.get(conversation.id);
+  if (!existingStopEntry && conversation.status !== 'Escribiendo...') return;
+
+  const previousEntry = existingStopEntry || {
+    previousStatus: conversation.status && conversation.status !== 'Escribiendo...' ? conversation.status : 'En línea',
+    timer: null,
+    staleTimer: null,
+    startedAt: Date.now(),
+    lastSignalAt: Date.now()
+  };
+
+  if (previousEntry.timer) clearTimeout(previousEntry.timer);
+  if (previousEntry.staleTimer) clearTimeout(previousEntry.staleTimer);
+  previousEntry.lastSignalAt = Date.now();
+  previousEntry.timer = setTimeout(() => {
+    const latestEntry = remoteTypingDisplayState.get(conversation.id);
+    if (latestEntry !== previousEntry) return;
+
+    if (previousEntry.staleTimer) clearTimeout(previousEntry.staleTimer);
+    remoteTypingDisplayState.delete(conversation.id);
+    if (conversation.status === 'Escribiendo...') {
+      conversation.status = previousEntry.previousStatus || 'En línea';
+    }
+    renderCurrentSection();
+  }, REMOTE_TYPING_GRACE_MS);
+
+  remoteTypingDisplayState.set(conversation.id, previousEntry);
 }
 
 function updatePresenceStatus(data = {}) {
   const conversation = appState.conversations.find((item) => item.email === data.email || item.id === data.chatId || item.id === data.conversationId);
   if (!conversation) return;
-  conversation.status = data.status === 'online' ? 'En línea' : 'No disponible';
+  const nextStatus = data.status === 'online' ? 'En línea' : 'No disponible';
+  const remoteTypingEntry = remoteTypingDisplayState.get(conversation.id);
+
+  if (remoteTypingEntry) {
+    remoteTypingEntry.previousStatus = nextStatus;
+    conversation.status = 'Escribiendo...';
+    renderCurrentSection();
+    return;
+  }
+
+  conversation.status = nextStatus;
   persistState();
   renderCurrentSection();
 }
@@ -13574,7 +14451,7 @@ function handleComposerTyping() {
   clearTimeout(typingState.timer);
   typingState.timer = setTimeout(() => {
     stopTypingNow(conversation.id);
-  }, 1400);
+  }, REMOTE_TYPING_GRACE_MS);
 }
 
 function stopTypingNow(conversationId = typingState.conversationId) {
@@ -13598,6 +14475,7 @@ function resetTypingStateForSessionEnd() {
   clearTimeout(typingState.timer);
   typingState.isTyping = false;
   typingState.conversationId = '';
+  clearAllRemoteTypingStatuses();
 }
 
 async function logoutCurrentSession() {

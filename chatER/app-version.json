@@ -1,7 +1,15 @@
 {
-  "version": "2026-07-04-chat-floating-options-117",
-  "buildTime": "2026-07-04T01:34:00-05:00",
+  "version": "2026.07.04-webp-policy-capped-visual-gate-v22",
+  "buildTime": "2026-07-04T15:55:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER muestra las opciones del botón de tres puntos del chat activo como menú flotante reutilizando las acciones existentes de selección, contacto, búsqueda, fijado, archivado, lista, reporte y bloqueo."
+  "description": "Corrige el punto débil del bloque IMAGENwebpCOMPRESIONx: la compuerta visual de dimensión ahora respeta el maxDimension efectivo para no rechazar imágenes grandes que ya cumplen la política, el formato WebP real y el máximo de 200 KB.",
+  "build": "webp-policy-capped-visual-gate-v22",
+  "updatedAt": "2026-07-04T15:55:00-05:00",
+  "notes": "La compresión sigue siendo local. El bloque WebP y el respaldo Canvas conservan la garantía RIFF/WEBP + size <= maxBytes efectivo, pero ya no exigen una dimensión mínima superior al límite de dimensión que la política local o memoriaBACKEND permiten.",
+  "changes": [
+    "IMAGENwebpCOMPRESIONx evalúa getMinimumAcceptableLongSide() con el maxDimension efectivo y registra policyLongSideCap en la auditoría visual.",
+    "js/app.js alinea el respaldo Canvas con la misma compuerta visual limitada por política para evitar rechazos secundarios inconsistentes.",
+    "APIs necesarias.txt se mantiene sin APIs nuevas porque la compuerta visual, la compresión y la validación WebP son procesos locales del frontend."
+  ]
 }

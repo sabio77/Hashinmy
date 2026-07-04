@@ -1,26 +1,35 @@
-Conceptos de APIs necesarias para completar funciones nuevas sin ruta publicada directamente en APIS de memoriaBACKEND
+Conceptos de APIs necesarias para memoriaBACKEND que no aparecen como API publicada en `APIS de memoriaBACKEND`.
 
-1. ACCESOSdirectosCHATx
-Endpoint conceptual simulado en el static site: POST /api/v1/accesos-directos-chat
-Responsabilidad: registrar la intención de crear o mantener un acceso directo de un chat concreto en una appWEB/PWA instalada, asociado a userId/userEmail, conversationId, contactEmail, displayName, shortcutUrl, source y clientMutationId. Debe devolver requestId, shortcutId, conversationId, status y syncedAt. No debe crear accesos del sistema operativo por sí solo; debe guardar la intención auditable y permitir que memoriaBACKEND sincronice preferencias, destinos de deep link y futuras superficies de launcher compatibles. Debe ser idempotente por clientMutationId.
-Simulación implementada: js/app.js usa apiClient.createChatShortcut(). Si memoriaBACKEND no está configurado, guarda shortcutRequestedAt/shortcutSyncStatus localmente y muestra una confirmación de producción. Si existe backend y falla, encola createChatShortcut en la cola local para reintento.
+Estado actualizado 2026-07-04 v22:
+- No hay conceptos de APIs pendientes para esta iteración.
+- Este archivo se mantiene sin contratos nuevos porque las funciones backend requeridas ya aparecen cubiertas en `APIS de memoriaBACKEND/apis v483.txt` o son procesos locales del frontend.
+- No se deben volver a listar aquí como APIs necesarias: `ACCESOSdirectosX`, `CONVERSACIONESx`/acciones de chat, `RELACIONESusuarioX`/perfil-contacto-QR/contactos-QR-resolver, `PERMISOSnavegadorX`, `PWAinstalacionX`, `ImagenesCloudflareR2x`/imagenesR2, `MEDIAfirmadaX`, `STREMEx`, `SENALESefimerasX`, `PRESENCIAusuarioX` ni `MENSAJESx`, mientras sigan publicados en memoriaBACKEND.
 
-2. ACCIONESchatX
-Endpoint conceptual simulado en el static site: POST /api/v1/acciones-chat
-Responsabilidad: auditar y ejecutar acciones de administración de chat que no están cubiertas de forma directa por PATCH /api/v1/conversaciones ni por POST /api/v1/interacciones-mensaje. Debe aceptar actionType, conversationId, actorUserId, actorUserEmail, contactEmail, displayName, payload, source y clientMutationId. Acciones mínimas requeridas por esta iteración: clear_messages para vaciar mensajes cargados/auditados de un chat sin borrar el contenedor, delete_conversation para ocultar o eliminar de forma reversible/auditable una conversación desde la lista principal, y restore_conversation para reactivar un chat oculto cuando el usuario vuelve a crear el mismo contacto por correo o QR. Debe preservar retención, idempotencia, auditoría y consistencia multi-dispositivo.
-Simulación implementada: js/app.js usa apiClient.syncChatAction(). En modo local vacía, oculta o restaura el chat de inmediato sin romper la interfaz; si memoriaBACKEND está disponible y la llamada falla, encola syncChatAction para reintento seguro.
+Regla de mantenimiento obligatoria:
+- Este archivo NO define APIs para procesos locales del frontend.
+- Los procesos locales, como compresión WebP, generación/lectura visual de QR, scroll de listas, ventanas de permisos del navegador, UI PWA, manejo visual de adjuntos, barra de progreso local o gracia visual de `Escribiendo...`, se documentan en `docs/BLOQUES_LEGO.md` o en el módulo correspondiente.
+- Aquí solo se agregan conceptos de backend cuando una función requiere sincronización entre usuarios/dispositivos, auditoría, almacenamiento persistente, verificación, cuentas, relaciones, métricas o recuperación multiusuario y no existe una API asociada en `APIS de memoriaBACKEND`.
+- Si una API ya existe en `APIS de memoriaBACKEND`, este archivo no debe duplicar su contrato; como máximo puede dejarse una nota breve de extensión pendiente no publicada.
 
-3. PERFILqrCONTACTOx
-Endpoint conceptual simulado en el static site: GET /api/v1/perfil-contacto/qr y POST /api/v1/contactos/qr-resolver
-Responsabilidad: generar, firmar, resolver y auditar el QR de perfil de un usuario ChatER para crear contactos sin escritura manual. Debe devolver un payload compacto con userId, correo, nombre visible, firma, expiración opcional y permisos de visibilidad; al resolverlo debe validar firma/estado del perfil, evitar contactos duplicados, crear o confirmar la relación de contacto y devolver la conversación relacionada de forma idempotente por clientMutationId. Debe respetar privacidad, bloqueo de usuarios, rate limit y auditoría.
-Simulación implementada: js/qr-code-lego.js genera y lee el QR local de perfil; js/app.js muestra el QR en Perfil, escanea desde Crear contacto, crea o abre el chat existente y sincroniza la relación con RELACIONESusuarioX/createConversation cuando memoriaBACKEND está configurado. Si la API real no existe, la app conserva el flujo local y encola la sincronización.
+Cobertura backend ya existente en memoriaBACKEND:
+- Accesos directos de chat: cubierto por `ACCESOSdirectosX` y alias `/api/v1/accesos-directos-chat`.
+- Acciones de chat como limpiar, ocultar/restaurar o registrar acciones de conversación: cubierto por `CONVERSACIONESx` y alias `/api/v1/acciones-chat`.
+- Perfil por QR, resolución de QR de contacto y creación/restauración idempotente de relación: cubierto por `RELACIONESusuarioX`, `/api/v1/perfil-contacto/qr` y `/api/v1/contactos/qr-resolver`.
+- Auditoría de permisos del navegador cuando aplique a métricas multi-dispositivo: cubierto por `PERMISOSnavegadorX`.
+- Auditoría de instalación PWA cuando aplique a soporte o métricas: cubierto por `PWAinstalacionX`.
+- Imágenes de chat en R2 o media firmada: cubierto por `ImagenesCloudflareR2x`/imagenesR2 y `MEDIAfirmadaX`; el backend recibe únicamente el archivo WebP final ya validado por el frontend.
+- Mensajería real, señales efímeras, presencia y escritura: cubierto por `MENSAJESx`, `STREMEx`, `SENALESefimerasX` y `PRESENCIAusuarioX`.
 
-4. PERFILqrCONTACTOx / CONTACTOSidentidadX - resolución idempotente por identidad
-Endpoint conceptual simulado en el static site: POST /api/v1/contactos/qr-resolver y búsqueda interna por email/userId/participantes antes de crear conversación.
-Responsabilidad: resolver un QR o correo de contacto contra conversaciones existentes aunque el backend devuelva el email dentro de participants y no como contactEmail directo. Debe buscar por email normalizado, userId/contactUserId y participantes normalizados; si existe una conversación, debe abrirla y restaurarla si estaba archivada; si no existe, debe crear la relación/contacto y conversación de forma idempotente.
-Simulación implementada: js/app.js usa findConversationByContactIdentity() antes de crear un contacto local o remoto. Esto evita duplicados al escanear QR o escribir un correo que ya pertenece a una conversación hidratada desde memoriaBACKEND con estructura de participantes.
+Notas de mantenimiento local 2026-07-04 v22:
+- No se agrega API nueva para `IMAGENwebpCOMPRESIONx`. La compresión, redimensionado, comparación de candidatos, verificación RIFF/WEBP, control de calidad visual y garantía `<= 200 KB` son procesos locales del navegador antes de cualquier subida.
+- No se agrega API nueva para la compuerta visual limitada por `maxDimension`. El cálculo de dimensión mínima aceptable frente a la política efectiva es una validación local del bloque WebP y del respaldo Canvas, no un proceso backend.
+- No se agrega API nueva para reutilización segura de WebP preparado. `reusePreparedWebp()` solo revalida localmente el archivo contra la política efectiva antes de `imagenesR2` o `MEDIAfirmadaX`; no sincroniza datos ni requiere backend nuevo.
+- No se agrega API nueva para `QRcodigosX`. El bloque genera/lee el QR visual en el navegador; la sincronización real de contactos, identidad y conversaciones usa las APIs ya publicadas de memoriaBACKEND.
+- No se agrega API nueva para `PERMISOSx`. El bloque muestra la ventana local de permisos y guía de configuración; la auditoría remota, si se requiere, usa `PERMISOSnavegadorX`.
+- No se agrega API nueva para la ventana flotante de instalación PWA. La UI local usa `beforeinstallprompt`/`appinstalled`; la auditoría remota, si se requiere, usa `PWAinstalacionX`.
+- No se agrega API nueva para `Escribiendo...`. La app solo muestra la señal si llega escritura real de la otra parte y mantiene una gracia visual local de 2 segundos; los eventos remotos siguen perteneciendo a `STREMEx`/`SENALESefimerasX`.
+- No se agrega API nueva para scroll de listas. Es comportamiento visual local y debe mantenerse en CSS/JS de la interfaz.
 
-5. IMAGENwebpCOMPRESIONx - garantía estricta de calidad/límite
-Endpoint conceptual asociado: el frontend mantiene el bloque local js/image-webp-compressor-lego.js antes de usar /api/v1/imagenes-r2x o /api/v1/media-firmada.
-Responsabilidad: comprimir imágenes a WebP por debajo de 200 KB con búsqueda progresiva por dimensión/calidad, códigos de error estables y rechazo explícito cuando no se pueda cumplir el límite sin degradación visual excesiva. El backend nunca debe aceptar una imagen de chat si el frontend no declara image/webp y tamaño dentro de política.
-Simulación implementada: js/image-webp-compressor-lego.js expone errorCodes y js/app.js comprime toda imagen de chat antes de enviarla o de simularla localmente; si el bloque lego falla por compatibilidad usa respaldo Canvas estricto, pero si el fallo indica que no puede cumplir <= 200 KB rechaza el envío y deja botón de reintento. El bloque lego evita aceptar una salida prematura de baja calidad, sigue buscando mejor equilibrio visual antes de cerrar la compresión y ahora verifica la firma binaria RIFF/WEBP además del MIME/tamaño para no enviar imágenes mal etiquetadas como WebP.
+Criterio para futuras iteraciones:
+- Si una función nueva se puede resolver totalmente dentro del navegador o del estado local sin sincronización entre usuarios, no debe entrar en este archivo.
+- Si una función nueva necesita persistencia, verificación, relación entre cuentas, auditoría remota o consistencia multi-dispositivo y no aparece en `APIS de memoriaBACKEND`, se debe agregar aquí solo como concepto funcional, no como proceso local ni paso a paso de frontend.
