@@ -1986,10 +1986,9 @@ function shouldRequireGoogleGmailAuth() {
 }
 
 function isAllowedGmailAddress(email = '') {
-  const normalized = normalizeStorageIdentity(email);
-  if (!normalized) return false;
-  if (CHATER_CONFIG.requireGmailDomain === false) return true;
-  return normalized.endsWith('@gmail.com') || normalized.endsWith('@googlemail.com');
+  // La decisión de proveedor/dominio pertenece a AUTENTICACIONx en memoriaBACKEND.
+  // El frontend solo exige una identidad devuelta por la API oficial después de Google.
+  return Boolean(normalizeStorageIdentity(email));
 }
 
 function getAuthPayloadEmail(payload = {}, fallbackEmail = '') {
@@ -2054,31 +2053,23 @@ function isGoogleProviderPayload(payload = {}) {
 
 function validateGoogleGmailAuthPayload(payload = {}, fallbackEmail = '') {
   const normalizedPayload = normalizeAuthPayload(payload, '');
-  // La identidad autorizada debe venir del contrato real de AUTENTICACIONx
-  // (`u.e`, `user.email`, `data.user.email`, etc.). No se acepta el correo
-  // recordado en localStorage como prueba de sesión porque un static site no
-  // puede usar identidad local para abrir ChatER.
+  // ChatER replica el proyecto de referencia: el frontend no decide proveedor,
+  // no exige dominios Gmail y no compara contra identidades locales antiguas.
+  // La única autoridad de autenticación es la API oficial expuesta por login.js
+  // como window.memoriaBACKEND después de que AUTENTICACIONx validó Google.
+  if (!isGoogleProviderPayload(normalizedPayload)) {
+    return { ok: false, message: 'La sesión debe venir de la API oficial de memoriaBACKEND después de validar Google.' };
+  }
+
   const backendEmail = getAuthPayloadEmail(normalizedPayload, '');
-  const fallbackIdentity = normalizeStorageIdentity(fallbackEmail);
   const email = backendEmail || '';
 
   if (!email) {
-    return { ok: false, message: 'memoriaBACKEND no devolvió el correo de la cuenta Google validada.' };
+    return { ok: false, message: 'memoriaBACKEND no devolvió una identidad de usuario para ChatER.' };
   }
 
-  if (fallbackIdentity && backendEmail && fallbackIdentity !== backendEmail) {
-    return { ok: false, message: 'La sesión Google/Gmail verificada por memoriaBACKEND no coincide con la cuenta local recordada.' };
-  }
-
-  if (!isGoogleProviderPayload(normalizedPayload)) {
-    return { ok: false, message: 'memoriaBACKEND debe confirmar proveedor Google/Gmail en la sesión antes de abrir ChatER.' };
-  }
-
-  if (!isAllowedGmailAddress(email)) {
-    return { ok: false, message: 'ChatER solo permite cuentas Gmail verificadas por Google.' };
-  }
-
-  return { ok: true, email, payload: normalizedPayload };
+  const payloadWithAuthoritativeEmail = normalizeAuthPayload(normalizedPayload, email);
+  return { ok: true, email, payload: payloadWithAuthoritativeEmail };
 }
 
 function markBackendSessionVerified() {
@@ -2158,16 +2149,13 @@ async function getValidatedPlatformAuthGateSession(options = {}) {
 
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return null;
 
-  const payload = buildAuthPayloadFromMemoriaBackendSdk(api || getMemoriaBackendSdk(), {
-    sessionVerified: true,
-    __memoriaBackendOfficialApi: true
-  });
+  const payload = await verifyMemoriaSdkSession(api || getMemoriaBackendSdk());
 
   if (!payload) {
-    throw new Error('memoriaBACKEND no expuso una sesión Google/Gmail válida para ChatER.');
+    throw new Error('memoriaBACKEND no expuso una sesión Google válida para ChatER.');
   }
 
-  const validation = validateGoogleGmailAuthPayload(payload, '');
+  const validation = validateGoogleGmailAuthPayload(payload, options.fallbackEmail || '');
   if (!validation.ok) throw new Error(validation.message);
 
   return validation;
@@ -2179,96 +2167,41 @@ async function completePlatformAuthGateSession(options = {}) {
   return completeAuthenticatedSession(validation.email, validation.payload, options.authGuard || null);
 }
 
-function loadMemoriaGoogleLoginScript(options = {}) {
-  if (!CHATER_CONFIG.backendBaseUrl || CHATER_CONFIG.enableGoogleLoginScript === false) {
-    return Promise.reject(new Error('Configura MEMORIA_BACKEND_URL para usar el login Google/Gmail de memoriaBACKEND.'));
-  }
-
-  const existing = document.getElementById('memoriaBackendGoogleLoginScript');
-  if (getMemoriaBackendSdk() && existing?.dataset.loaded === 'true') return Promise.resolve(existing);
-
-  // Si un intento anterior falló, quedó incompleto o pertenece a una carga sin `next`,
-  // se crea un nodo nuevo. Reusar un <script> que ya disparó error puede dejar
-  // el siguiente intento sin eventos de load/error y bloquear el acceso Google/Gmail.
-  if (existing) existing.remove();
-
-  const loginScriptUrls = buildMemoriaGoogleLoginScriptUrlCandidates();
-  if (!loginScriptUrls.length) {
-    return Promise.reject(new Error('No se pudo construir la URL de login.js desde memoriaBACKEND. Revisa MEMORIA_BACKEND_URL, MEMORIA_SITE_ID y GOOGLE_LOGIN_SCRIPT_URL.'));
-  }
-
-  return new Promise((resolve, reject) => {
-    let currentIndex = 0;
-    let lastError = null;
-
-    const tryNextScript = () => {
-      if (currentIndex >= loginScriptUrls.length) {
-        const currentOrigin = getCurrentProjectOrigin() || 'dominio_actual_no_disponible';
-        const detail = lastError?.message ? `${lastError.message} ` : '';
-        reject(new Error(`${detail}El bloqueo ocurre antes de Firebase: autoriza ${currentOrigin} en los origins del site ${getMemoriaSiteId()} dentro de memoriaBACKEND y confirma también el dominio en Firebase Authentication.`));
-        return;
-      }
-
-      const baseScriptUrl = loginScriptUrls[currentIndex];
-      currentIndex += 1;
-
-      const script = document.createElement('script');
-      script.id = 'memoriaBackendGoogleLoginScript';
-      script.async = false;
-      script.defer = false;
-      script.referrerPolicy = 'strict-origin-when-cross-origin';
-      script.dataset.loading = 'true';
-      script.dataset.loaded = 'false';
-      script.dataset.baseSrc = baseScriptUrl;
-
-      script.onload = () => {
-        script.dataset.loading = 'false';
-        script.dataset.loaded = 'true';
-        resolve(script);
-      };
-
-      script.onerror = () => {
-        script.dataset.loading = 'false';
-        script.dataset.loaded = 'false';
-        script.remove();
-        lastError = new Error('No se pudo cargar un candidato válido de login.js desde memoriaBACKEND.');
-        tryNextScript();
-      };
-
-      script.src = buildRuntimeMemoriaGoogleLoginScriptUrl(baseScriptUrl);
-      document.head.appendChild(script);
-    };
-
-    tryNextScript();
-  });
+function loadMemoriaGoogleLoginScript() {
+  return Promise.reject(new Error('ChatER no carga login.js directamente; auth-gate.js es el único responsable de inicializar la autenticación Google de memoriaBACKEND.'));
 }
 
-async function verifyMemoriaSdkSession() {
-  const sdk = getMemoriaBackendSdk();
+async function verifyMemoriaSdkSession(sdk = getMemoriaBackendSdk()) {
   const directPayload = buildAuthPayloadFromMemoriaBackendSdk(sdk);
-  if (directPayload) return directPayload;
+  if (directPayload?.user?.email) return directPayload;
 
   const verifier = sdk?.verificarSesion || sdk?.checkSession;
-  if (typeof verifier !== 'function') return null;
+  if (typeof verifier !== 'function') return directPayload || null;
 
   const payload = await verifier.call(sdk);
-  if (payload?.ok === 0 || payload?.ok === false) return null;
-  return normalizeAuthPayload({ ...payload, sessionVerified: true, __memoriaBackendOfficialApi: true });
+  if (payload?.ok === 0 || payload?.ok === false) return directPayload || null;
+
+  return normalizeAuthPayload({
+    ...(directPayload && typeof directPayload === 'object' ? directPayload : {}),
+    ...(payload && typeof payload === 'object' ? payload : {}),
+    sessionVerified: true,
+    __memoriaBackendOfficialApi: true
+  }, directPayload?.user?.email || '');
 }
 
 async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmail = '', options = {}) {
   if (!CHATER_CONFIG.backendBaseUrl) {
-    throw new Error('Configura MEMORIA_BACKEND_URL para validar la sesión Google/Gmail con memoriaBACKEND.');
+    throw new Error('Configura MEMORIA_BACKEND_URL para validar la sesión Google con memoriaBACKEND.');
   }
 
   const authGuard = options.authGuard || null;
   if (authGuard && !isAuthAttemptCurrent(authGuard)) {
-    throw new Error('Intento de autenticación Google/Gmail cancelado.');
+    throw new Error('Intento de autenticación Google cancelado.');
   }
 
   const sdkPayload = await verifyMemoriaSdkSession().catch(() => null);
   if (authGuard && !isAuthAttemptCurrent(authGuard)) {
-    throw new Error('Intento de autenticación Google/Gmail cancelado.');
+    throw new Error('Intento de autenticación Google cancelado.');
   }
 
   const candidatePayload = normalizeAuthPayload({
@@ -2277,10 +2210,6 @@ async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmai
     sessionVerified: Boolean(sdkPayload) || Boolean(payload?.__memoriaBackendOfficialApi),
     __memoriaBackendOfficialApi: Boolean(sdkPayload) || Boolean(payload?.__memoriaBackendOfficialApi)
   }, fallbackEmail);
-
-  if (!candidatePayload.__memoriaBackendOfficialApi) {
-    throw new Error('La autenticación debe completarse desde la API oficial window.memoriaBACKEND emitida por login.js.');
-  }
 
   const validation = validateGoogleGmailAuthPayload(candidatePayload, fallbackEmail);
   if (!validation.ok) throw new Error(validation.message);
@@ -2301,7 +2230,6 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
     const validation = validateGoogleGmailAuthPayload(payload, getSessionEmail());
     if (!validation.ok) {
       if (!options.silent) loginFeedback.textContent = validation.message;
-      clearSession();
       return false;
     }
 
@@ -2310,12 +2238,8 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
   } catch (error) {
     if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
 
-    if (isBackendAuthError(error) || shouldRequireGoogleGmailAuth()) {
-      clearSession();
-    }
-
     if (!options.silent) {
-      loginFeedback.textContent = error?.message || 'No se pudo verificar la sesión Google/Gmail con memoriaBACKEND.';
+      loginFeedback.textContent = error?.message || 'No se pudo verificar la sesión Google con memoriaBACKEND.';
     }
     return false;
   }
@@ -2323,64 +2247,29 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
 
 async function startGoogleGmailLogin(options = {}) {
   if (!CHATER_CONFIG.backendBaseUrl) {
-    throw new Error('Configura MEMORIA_BACKEND_URL para proteger ChatER con Google/Gmail desde memoriaBACKEND.');
+    throw new Error('Configura MEMORIA_BACKEND_URL para proteger ChatER con Google desde memoriaBACKEND.');
   }
 
-  const authGuard = options.authGuard || activeGoogleLoginAttemptGuard || captureAuthAttempt(options.fallbackEmail || 'google-gmail');
+  const authGuard = options.authGuard || activeGoogleLoginAttemptGuard || captureAuthAttempt(options.fallbackEmail || 'google');
   activeGoogleLoginAttemptGuard = authGuard;
   if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
 
   const platformGate = getPlatformAuthGate();
-  if (platformGate) {
-    loginFeedback.textContent = 'Validando acceso con Google desde memoriaBACKEND...';
-    try {
-      const completed = await completePlatformAuthGateSession({ authGuard });
-      if (completed || getSessionEmail()) return buildAuthPayloadFromMemoriaBackendSdk() || { ok: true };
-      if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-      throw new Error('memoriaBACKEND no confirmó la sesión Google/Gmail.');
-    } catch (error) {
-      if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-      platformGate.showError?.(error?.message || 'No se pudo validar Google con memoriaBACKEND.');
-      throw error;
-    }
+  if (!platformGate) {
+    throw new Error('auth-gate.js debe ser quien cargue login.js y exponga la API oficial de memoriaBACKEND.');
   }
 
-  loginFeedback.textContent = 'Abriendo autenticación segura con Google...';
+  loginFeedback.textContent = 'Validando acceso con Google desde memoriaBACKEND...';
   try {
-    await loadMemoriaGoogleLoginScript({ interactive: true });
+    const completed = await completePlatformAuthGateSession({ authGuard, fallbackEmail: options.fallbackEmail || '' });
+    if (completed || getSessionEmail()) return buildAuthPayloadFromMemoriaBackendSdk() || { ok: true };
+    if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
+    throw new Error('memoriaBACKEND no confirmó la sesión Google.');
   } catch (error) {
     if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-    throw new Error(error?.message || 'No se pudo cargar login.js desde memoriaBACKEND.');
+    platformGate.showError?.(error?.message || 'No se pudo validar Google con memoriaBACKEND.');
+    throw error;
   }
-  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-
-  const sdkSession = await verifyMemoriaSdkSession().catch(() => null);
-  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-
-  if (sdkSession) {
-    const validation = await verifyGoogleGmailPayloadAgainstBackend(sdkSession, options.fallbackEmail || '', { authGuard });
-    if (!completeAuthenticatedSession(validation.email, validation.payload, authGuard)) return { ok: false, staleAuthAttempt: true };
-    return validation.payload;
-  }
-
-  const sdk = getMemoriaBackendSdk();
-  const openLogin = sdk?.abrirLogin || sdk?.openLogin || sdk?.iniciarLogin || sdk?.login;
-  if (typeof openLogin === 'function') {
-    try {
-      const result = openLogin.call(sdk, { next: getCurrentPageUrl(), s: getMemoriaSiteId() });
-      if (result && typeof result.then === 'function') await result;
-      return { ok: true, pendingGoogleLogin: true };
-    } catch (error) {
-      if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-      throw new Error(error?.message || 'No se pudo abrir la ventana de Google desde memoriaBACKEND.');
-    }
-  }
-
-  if (document.getElementById('mb-login-root')) {
-    return { ok: true, pendingGoogleLogin: true };
-  }
-
-  throw new Error('login.js cargó, pero memoriaBACKEND no expuso una ventana o método de autenticación Google.');
 }
 
 async function handleMemoriaBackendLoginEvent(event) {
@@ -2388,7 +2277,7 @@ async function handleMemoriaBackendLoginEvent(event) {
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
 
   const eventDetail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
-  const sdkPayload = buildAuthPayloadFromMemoriaBackendSdk();
+  const sdkPayload = await verifyMemoriaSdkSession().catch(() => null);
   const eventOk = eventDetail.ok === 1 || eventDetail.ok === true || String(eventDetail.ok || '').trim() === '1';
   const payload = normalizeAuthPayload({
     ...eventDetail,
@@ -2398,24 +2287,22 @@ async function handleMemoriaBackendLoginEvent(event) {
   });
 
   try {
-    // El evento oficial de login.js puede llegar después de una redirección o
-    // en navegadores donde la cookie de tercero no queda disponible. En ese caso
-    // todavía no existe correo local, pero el payload/tk/idToken debe poder
-    // validarse contra AUTENTICACIONx antes de abrir ChatER.
-    const validation = await verifyGoogleGmailPayloadAgainstBackend(payload, '', { authGuard });
+    // Igual que el proyecto de referencia, el evento oficial de login.js se
+    // acepta como señal de la API memoriaBACKEND; no se vuelve a crear ni a
+    // validar una sesión Google por rutas paralelas desde ChatER.
+    const validation = validateGoogleGmailAuthPayload(payload, '');
+    if (!validation.ok) throw new Error(validation.message);
     completeAuthenticatedSession(validation.email, validation.payload, authGuard);
   } catch (error) {
     if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
-    loginFeedback.textContent = error?.message || 'No se pudo validar la sesión Google/Gmail con memoriaBACKEND.';
-    clearSession();
-    renderShell();
+    loginFeedback.textContent = error?.message || 'No se pudo leer la sesión Google expuesta por memoriaBACKEND.';
   }
 }
 
 function registerMemoriaBackendLoginListeners() {
   window.addEventListener('memoriaBACKEND:login', handleMemoriaBackendLoginEvent);
   window.addEventListener('memoriaBACKEND:sdk-ready', () => {
-    restoreGoogleGmailSessionFromBackend({ silent: true });
+    if (getMemoriaBackendSdk()) restoreGoogleGmailSessionFromBackend({ silent: true });
   });
 }
 
@@ -2429,46 +2316,35 @@ async function bootstrapGoogleGmailSession() {
 
   if (!CHATER_CONFIG.backendBaseUrl) {
     clearSession();
-    loginFeedback.textContent = 'Configura MEMORIA_BACKEND_URL para acceder a ChatER con Google/Gmail.';
+    loginFeedback.textContent = 'Configura MEMORIA_BACKEND_URL para acceder a ChatER con Google desde memoriaBACKEND.';
     renderShell();
     return;
   }
 
   if (!getSessionEmail()) {
-    loginFeedback.textContent = 'Verificando sesión Google/Gmail...';
+    loginFeedback.textContent = 'Esperando autenticación Google de memoriaBACKEND...';
   }
 
   const platformGate = getPlatformAuthGate();
-  if (platformGate) {
-    try {
-      const completed = await completePlatformAuthGateSession({ silent: true });
-      if (completed || getSessionEmail()) return;
-    } catch (error) {
-      clearSession();
-      loginFeedback.textContent = error?.message || 'No se pudo validar la sesión Google/Gmail con memoriaBACKEND.';
-      platformGate.showError?.(loginFeedback.textContent);
-      renderShell();
-      return;
-    }
-  }
-
-  const restored = await restoreGoogleGmailSessionFromBackend({ silent: true });
-  if (!restored) {
+  if (!platformGate) {
     clearSession();
-    loginFeedback.textContent = 'Ingresa con una cuenta Gmail validada por Google para continuar.';
+    loginFeedback.textContent = 'auth-gate.js no está disponible para cargar login.js de memoriaBACKEND.';
     renderShell();
-    if (CHATER_CONFIG.autoLoadGoogleLoginScript) {
-      loadMemoriaGoogleLoginScript({ silent: true }).catch((error) => {
-        console.warn('No se pudo precargar login.js desde memoriaBACKEND; se reintentará al tocar Continuar con Google.', error);
-        if (!getSessionEmail()) {
-          loginFeedback.textContent = 'Ingresa con una cuenta Gmail validada por Google para continuar.';
-        }
-      });
-    }
     return;
   }
 
-  renderShell();
+  try {
+    const completed = await completePlatformAuthGateSession({ silent: true });
+    if (completed || getSessionEmail()) return;
+    clearSession();
+    loginFeedback.textContent = 'Ingresa con Google desde memoriaBACKEND para continuar.';
+    renderShell();
+  } catch (error) {
+    clearSession();
+    loginFeedback.textContent = error?.message || 'No se pudo validar la sesión Google con memoriaBACKEND.';
+    platformGate.showError?.(loginFeedback.textContent);
+    renderShell();
+  }
 }
 
 async function fetchWithTimeout(resource, options = {}, timeoutMs = CHATER_CONFIG.apiTimeoutMs) {
@@ -11521,20 +11397,17 @@ async function logoutCurrentSession() {
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const authGuard = captureAuthAttempt('google-gmail');
+  const authGuard = captureAuthAttempt('google');
   const submitButton = loginForm.querySelector('button[type="submit"]');
-  loginFeedback.textContent = 'Preparando acceso con Google...';
+  loginFeedback.textContent = 'Esperando Google desde memoriaBACKEND...';
   submitButton.disabled = true;
-  submitButton.textContent = 'Abriendo Google...';
+  submitButton.textContent = 'Validando Google...';
 
   try {
-    const restored = await restoreGoogleGmailSessionFromBackend({ silent: true, authGuard });
-    if (restored || getSessionEmail()) return;
-
     await startGoogleGmailLogin({ authGuard });
   } catch (error) {
     if (!isAuthAttemptCurrent(authGuard)) return;
-    loginFeedback.textContent = error?.message || 'No se pudo abrir la autenticación Google/Gmail de memoriaBACKEND.';
+    loginFeedback.textContent = error?.message || 'No se pudo abrir la autenticación Google de memoriaBACKEND.';
   } finally {
     if (isAuthAttemptCurrent(authGuard)) {
       submitButton.disabled = false;

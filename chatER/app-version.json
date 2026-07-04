@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-platform-auth-gate-90",
-  "buildTime": "2026-07-03T21:54:00-05:00",
+  "version": "2026-07-03-memoriabackend-auth-only-91",
+  "buildTime": "2026-07-03T22:00:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER delega la autenticación Google/Gmail al auth-gate de memoriaBACKEND y abre la interfaz solo cuando window.memoriaBACKEND confirma sesión válida."
+  "description": "ChatER delega la autenticación Google exclusivamente a auth-gate.js y a la API oficial window.memoriaBACKEND, sin cargar ni validar login.js desde js/app.js."
 }
