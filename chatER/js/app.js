@@ -3,7 +3,8 @@ const chaterVolatileSessionStorage = new Map();
 const chaterRuntimeAuth = {
   accessToken: '',
   refreshToken: '',
-  verifiedAt: 0
+  verifiedAt: 0,
+  verifiedThisBoot: false
 };
 let chaterStorageWarningShown = false;
 let chaterSessionStorageWarningShown = false;
@@ -2090,6 +2091,7 @@ function validateGoogleGmailAuthPayload(payload = {}, fallbackEmail = '') {
 function markBackendSessionVerified() {
   const verifiedAt = Date.now();
   chaterRuntimeAuth.verifiedAt = verifiedAt;
+  chaterRuntimeAuth.verifiedThisBoot = true;
   writeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey, String(verifiedAt));
   // Limpieza de compatibilidad: versiones anteriores guardaban esta marca en localStorage.
   removeStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
@@ -2098,6 +2100,13 @@ function markBackendSessionVerified() {
 function isBackendSessionRecentlyVerified(maxAgeMs = 10 * 60 * 1000) {
   const verifiedAt = Number(chaterRuntimeAuth.verifiedAt || readSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey, '0'));
   return Number.isFinite(verifiedAt) && verifiedAt > 0 && Date.now() - verifiedAt <= maxAgeMs;
+}
+
+function isBackendSessionVerifiedForCurrentBoot() {
+  // Un correo o una marca vieja en local/sessionStorage no abre la pantalla protegida.
+  // Cada arranque debe pasar primero por memoriaBACKEND (/auth/check, /auth/firebase/session
+  // o login.js validado) y solo entonces se permite renderizar el chat.
+  return Boolean(chaterRuntimeAuth.verifiedThisBoot && isBackendSessionRecentlyVerified());
 }
 
 function persistAuthProvider(provider = 'google.com') {
@@ -4160,7 +4169,7 @@ function persistAuthTokens(payload = {}) {
 
 function hasBackendSessionCredentials() {
   if (!CHATER_CONFIG.backendBaseUrl) return !shouldRequireGoogleGmailAuth();
-  return Boolean(getAccessToken() || getRefreshToken() || isBackendSessionRecentlyVerified());
+  return Boolean(isBackendSessionVerifiedForCurrentBoot() && (getAccessToken() || getRefreshToken() || isBackendSessionRecentlyVerified()));
 }
 
 function getBackendErrorCode(error = {}) {
@@ -4234,6 +4243,7 @@ function clearAuthTokens(email = getSessionEmail()) {
   chaterRuntimeAuth.accessToken = '';
   chaterRuntimeAuth.refreshToken = '';
   chaterRuntimeAuth.verifiedAt = 0;
+  chaterRuntimeAuth.verifiedThisBoot = false;
   removeSessionStorageItem(CHATER_CONFIG.accessTokenKey);
   removeSessionStorageItem(CHATER_CONFIG.refreshTokenKey);
   removeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
@@ -4691,7 +4701,7 @@ function renderShell() {
   const email = getSessionEmail();
 
   if (email && CHATER_CONFIG.backendBaseUrl && !hasBackendSessionCredentials()) {
-    requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse con Google/Gmail en memoriaBACKEND.');
+    requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse de nuevo con Google/Gmail en memoriaBACKEND antes de abrir el chat.');
     loginView.hidden = false;
     chatView.hidden = true;
     loginForm.querySelector('button[type="submit"]')?.focus();

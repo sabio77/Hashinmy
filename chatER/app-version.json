@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-config-json-memoriabackend-88",
-  "buildTime": "2026-07-03T20:34:00-05:00",
+  "version": "2026-07-03-google-auth-gate-89",
+  "buildTime": "2026-07-03T21:45:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER carga ORIGEN_PROYECTO, MEMORIA_BACKEND_URL y MEMORIA_SITE_ID desde js/CONFIGmemoriaBACKEND.json y deriva login.js/API desde esa configuración runtime."
+  "description": "ChatER carga ORIGEN_PROYECTO, MEMORIA_BACKEND_URL y MEMORIA_SITE_ID desde js/CONFIGmemoriaBACKEND.json, valida cada arranque con memoriaBACKEND y bloquea el chat hasta confirmar Google/Gmail."
 }
