@@ -143,7 +143,7 @@ function removeSessionStorageItem(key) {
 }
 
 const CHATER_CONFIG = {
-  backendBaseUrl: window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || '',
+  backendBaseUrl: window.CHATER_CONFIG?.MEMORIA_BACKEND_URL || 'https://mapsx.app',
   siteId: normalizeMemoriaSiteId(window.CHATER_CONFIG?.MEMORIA_SITE_ID || window.CHATER_CONFIG?.SITE_ID || 'a1'),
   apiPrefix: normalizeMemoriaApiPrefix(window.CHATER_CONFIG?.MEMORIA_API_PREFIX || '/api/v1'),
   realtimeUrl: window.CHATER_CONFIG?.STREME_REALTIME_URL || '',
