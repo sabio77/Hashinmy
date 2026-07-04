@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-google-login-fallback-86",
-  "buildTime": "2026-07-03T20:05:00-05:00",
+  "version": "2026-07-03-google-login-next-origin-fallback-87",
+  "buildTime": "2026-07-03T20:20:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER precarga login.js sin bloquear la pantalla, agrega nonce runtime y redirige a /auth/login si el script no puede cargarse directamente."
+  "description": "ChatER carga login.js con next dinámico, prueba candidatos canónicos de memoriaBACKEND sin async y deja diagnóstico claro cuando el dominio falta en origins del backend antes de Firebase."
 }

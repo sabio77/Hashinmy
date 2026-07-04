@@ -1907,36 +1907,57 @@ function getCurrentPageUrl() {
   return `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
 
-function buildMemoriaGoogleLoginUrl(path = '/auth/login') {
-  const loginUrl = new URL(buildApiUrl(path, { siteScoped: true }));
-  loginUrl.searchParams.set('n', CHATER_CONFIG.googleLoginBrandName || 'ChatER');
-  loginUrl.searchParams.set('c', CHATER_CONFIG.googleLoginThemeColor || '#25d366');
-  loginUrl.searchParams.set('next', getCurrentPageUrl());
-  if (CHATER_CONFIG.googleLoginLogoUrl) loginUrl.searchParams.set('l', CHATER_CONFIG.googleLoginLogoUrl);
-  if (CHATER_CONFIG.googleLoginBackgroundUrl) loginUrl.searchParams.set('bg', CHATER_CONFIG.googleLoginBackgroundUrl);
+function decorateMemoriaGoogleLoginUrl(rawUrl, options = {}) {
+  const loginUrl = new URL(rawUrl, window.location.origin);
+  if (getMemoriaSiteId() && !loginUrl.searchParams.has('s')) loginUrl.searchParams.set('s', getMemoriaSiteId());
+  if (!loginUrl.searchParams.has('n')) loginUrl.searchParams.set('n', CHATER_CONFIG.googleLoginBrandName || 'ChatER');
+  if (!loginUrl.searchParams.has('c')) loginUrl.searchParams.set('c', CHATER_CONFIG.googleLoginThemeColor || '#25d366');
+  if (options.includeNext !== false && !loginUrl.searchParams.has('next')) loginUrl.searchParams.set('next', getCurrentPageUrl());
+  if (CHATER_CONFIG.googleLoginLogoUrl && !loginUrl.searchParams.has('l')) loginUrl.searchParams.set('l', CHATER_CONFIG.googleLoginLogoUrl);
+  if (CHATER_CONFIG.googleLoginBackgroundUrl && !loginUrl.searchParams.has('bg')) loginUrl.searchParams.set('bg', CHATER_CONFIG.googleLoginBackgroundUrl);
   return loginUrl.toString();
 }
 
-function buildMemoriaGoogleLoginScriptUrl() {
+function buildMemoriaGoogleLoginUrl(path = '/auth/login') {
+  return decorateMemoriaGoogleLoginUrl(buildApiUrl(path, { siteScoped: true }));
+}
+
+function uniqueLoginUrls(urls = []) {
+  const seen = new Set();
+  return urls.filter((url) => {
+    const normalized = String(url || '').trim();
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
+
+function buildMemoriaGoogleLoginScriptUrlCandidates() {
+  const candidates = [];
   const configuredScriptUrl = String(CHATER_CONFIG.googleLoginScriptUrl || '').trim();
 
   if (configuredScriptUrl) {
     try {
-      const loginUrl = new URL(configuredScriptUrl, window.location.origin);
-      if (getMemoriaSiteId() && !loginUrl.searchParams.has('s')) loginUrl.searchParams.set('s', getMemoriaSiteId());
-      if (!loginUrl.searchParams.has('n')) loginUrl.searchParams.set('n', CHATER_CONFIG.googleLoginBrandName || 'ChatER');
-      if (!loginUrl.searchParams.has('c')) loginUrl.searchParams.set('c', CHATER_CONFIG.googleLoginThemeColor || '#25d366');
-      return loginUrl.toString();
+      candidates.push(decorateMemoriaGoogleLoginUrl(configuredScriptUrl));
     } catch (error) {
       console.warn('GOOGLE_LOGIN_SCRIPT_URL no es una URL válida; se usará la URL calculada desde MEMORIA_BACKEND_URL.', error);
     }
   }
 
-  return buildMemoriaGoogleLoginUrl('/login.js');
+  try {
+    candidates.push(buildMemoriaGoogleLoginUrl('/login.js'));
+  } catch (error) {
+    console.warn('No se pudo calcular /login.js desde MEMORIA_BACKEND_URL.', error);
+  }
+
+  return uniqueLoginUrls(candidates);
 }
 
-function buildRuntimeMemoriaGoogleLoginScriptUrl() {
-  const loginScriptUrl = buildMemoriaGoogleLoginScriptUrl();
+function buildMemoriaGoogleLoginScriptUrl() {
+  return buildMemoriaGoogleLoginScriptUrlCandidates()[0] || '';
+}
+
+function buildRuntimeMemoriaGoogleLoginScriptUrl(loginScriptUrl = buildMemoriaGoogleLoginScriptUrl()) {
   if (!loginScriptUrl) return '';
 
   try {
@@ -2076,39 +2097,59 @@ function loadMemoriaGoogleLoginScript(options = {}) {
   const existing = document.getElementById('memoriaBackendGoogleLoginScript');
   if (getMemoriaBackendSdk() && existing?.dataset.loaded === 'true') return Promise.resolve(existing);
 
-  const scriptUrl = buildRuntimeMemoriaGoogleLoginScriptUrl();
-  if (existing?.dataset.loading === 'true' && existing.src === scriptUrl) {
-    return new Promise((resolve, reject) => {
-      existing.addEventListener('load', () => resolve(existing), { once: true });
-      existing.addEventListener('error', () => reject(new Error('No se pudo cargar login.js desde memoriaBACKEND.')), { once: true });
-    });
-  }
-
-  // Si un intento anterior falló, quedó incompleto o pertenece a otra URL, se crea un nodo nuevo.
-  // Reusar un <script> que ya disparó error puede dejar el siguiente intento sin eventos
-  // de load/error y bloquear el acceso Google/Gmail en producción.
+  // Si un intento anterior falló, quedó incompleto o pertenece a una carga sin `next`,
+  // se crea un nodo nuevo. Reusar un <script> que ya disparó error puede dejar
+  // el siguiente intento sin eventos de load/error y bloquear el acceso Google/Gmail.
   if (existing) existing.remove();
 
-  const script = document.createElement('script');
-  script.id = 'memoriaBackendGoogleLoginScript';
-  script.async = true;
-  script.dataset.loading = 'true';
+  const loginScriptUrls = buildMemoriaGoogleLoginScriptUrlCandidates();
+  if (!loginScriptUrls.length) {
+    return Promise.reject(new Error('No se pudo construir la URL de login.js desde memoriaBACKEND. Revisa MEMORIA_BACKEND_URL, MEMORIA_SITE_ID y GOOGLE_LOGIN_SCRIPT_URL.'));
+  }
 
   return new Promise((resolve, reject) => {
-    script.onload = () => {
-      script.dataset.loading = 'false';
-      script.dataset.loaded = 'true';
-      resolve(script);
-    };
-    script.onerror = () => {
-      script.dataset.loading = 'false';
+    let currentIndex = 0;
+    let lastError = null;
+
+    const tryNextScript = () => {
+      if (currentIndex >= loginScriptUrls.length) {
+        const currentOrigin = window.location.origin || 'dominio_actual_no_disponible';
+        const detail = lastError?.message ? `${lastError.message} ` : '';
+        reject(new Error(`${detail}El bloqueo ocurre antes de Firebase: autoriza ${currentOrigin} en los origins del site ${getMemoriaSiteId()} dentro de memoriaBACKEND y confirma también el dominio en Firebase Authentication.`));
+        return;
+      }
+
+      const baseScriptUrl = loginScriptUrls[currentIndex];
+      currentIndex += 1;
+
+      const script = document.createElement('script');
+      script.id = 'memoriaBackendGoogleLoginScript';
+      script.async = false;
+      script.defer = false;
+      script.referrerPolicy = 'strict-origin-when-cross-origin';
+      script.dataset.loading = 'true';
       script.dataset.loaded = 'false';
-      script.remove();
-      reject(new Error('No se pudo cargar login.js desde memoriaBACKEND. Verifica que MEMORIA_BACKEND_URL y GOOGLE_LOGIN_SCRIPT_URL apunten al backend autorizado y que el dominio del static site esté permitido en memoriaBACKEND y Firebase.'));
+      script.dataset.baseSrc = baseScriptUrl;
+
+      script.onload = () => {
+        script.dataset.loading = 'false';
+        script.dataset.loaded = 'true';
+        resolve(script);
+      };
+
+      script.onerror = () => {
+        script.dataset.loading = 'false';
+        script.dataset.loaded = 'false';
+        script.remove();
+        lastError = new Error('No se pudo cargar un candidato válido de login.js desde memoriaBACKEND.');
+        tryNextScript();
+      };
+
+      script.src = buildRuntimeMemoriaGoogleLoginScriptUrl(baseScriptUrl);
+      document.head.appendChild(script);
     };
 
-    script.src = scriptUrl;
-    document.head.appendChild(script);
+    tryNextScript();
   });
 }
 

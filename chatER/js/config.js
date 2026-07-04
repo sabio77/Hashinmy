@@ -2,7 +2,7 @@
 // Este archivo puede reemplazarse en producción sin recompilar el frontend.
 window.CHATER_CONFIG = window.CHATER_CONFIG || {
   // Dominio base de memoriaBACKEND, sin /api/v1. Ejemplo: https://memoriabackend.example.com
-  MEMORIA_BACKEND_URL: 'https://memoriabackend.onrender.com',
+  MEMORIA_BACKEND_URL: 'https://mapsx.app',
   // Site ID autorizado en memoriaBACKEND. Se envía como ?s= y como X-MB-Site.
   MEMORIA_SITE_ID: 'a1',
   // Prefijo canónico de APIs versionadas de memoriaBACKEND.
@@ -23,7 +23,7 @@ window.CHATER_CONFIG = window.CHATER_CONFIG || {
   ENABLE_GOOGLE_LOGIN_SCRIPT: true,
   AUTOLOAD_GOOGLE_LOGIN_SCRIPT: true,
   // URL exacta del script público de AUTENTICACIONx. Se mantiene explícita para evitar que el static site intente cargar login.js desde el dominio de la app.
-  GOOGLE_LOGIN_SCRIPT_URL: 'https://memoriabackend.onrender.com/login.js?s=a1&n=ChatER&c=%2325d366',
+  GOOGLE_LOGIN_SCRIPT_URL: 'https://mapsx.app/login.js?s=a1&n=ChatER&c=%2325d366',
   GOOGLE_LOGIN_BRAND_NAME: 'ChatER',
   GOOGLE_LOGIN_THEME_COLOR: '#25d366',
   GOOGLE_LOGIN_LOGO_URL: '',

@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-03-google-login-fallback-86';
+const CHATER_SW_VERSION = '2026-07-03-google-login-next-origin-fallback-87';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
