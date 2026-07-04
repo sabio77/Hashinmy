@@ -25,17 +25,17 @@
 </head>
 <body>
   <main class="app-shell" aria-label="ChatER">
-    <section id="loginView" class="login-view" aria-label="Acceso con Google y Gmail">
+    <section id="loginView" class="login-view" aria-label="Acceso gestionado por memoriaBACKEND" hidden>
       <article class="login-card">
         <div id="loginBrandLogo" class="brand-mark brand-logo" data-brand-logo aria-hidden="true">CE</div>
         <p class="eyebrow">ChatER Web</p>
-        <h1>Ingresa con Google</h1>
-        <p class="login-copy">ChatER usa la autenticación Google/Gmail de memoriaBACKEND para proteger tu sesión y sincronizar tus conversaciones.</p>
+        <h1>Validando acceso seguro</h1>
+        <p class="login-copy">ChatER abre tu interfaz cuando memoriaBACKEND confirma tu cuenta de Google.</p>
 
         <form id="loginForm" class="login-form" autocomplete="on">
           <label for="emailInput" hidden>Correo Gmail validado por Google</label>
           <input id="emailInput" name="email" type="email" inputmode="email" autocomplete="email" hidden />
-          <button id="googleLoginButton" type="submit">Continuar con Google</button>
+          <button id="googleLoginButton" type="submit">Esperar memoriaBACKEND</button>
         </form>
 
         <p id="loginFeedback" class="form-feedback" role="status" aria-live="polite"></p>
