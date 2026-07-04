@@ -1,0 +1,26 @@
+Conceptos de APIs necesarias para completar funciones nuevas sin ruta publicada directamente en APIS de memoriaBACKEND
+
+1. ACCESOSdirectosCHATx
+Endpoint conceptual simulado en el static site: POST /api/v1/accesos-directos-chat
+Responsabilidad: registrar la intención de crear o mantener un acceso directo de un chat concreto en una appWEB/PWA instalada, asociado a userId/userEmail, conversationId, contactEmail, displayName, shortcutUrl, source y clientMutationId. Debe devolver requestId, shortcutId, conversationId, status y syncedAt. No debe crear accesos del sistema operativo por sí solo; debe guardar la intención auditable y permitir que memoriaBACKEND sincronice preferencias, destinos de deep link y futuras superficies de launcher compatibles. Debe ser idempotente por clientMutationId.
+Simulación implementada: js/app.js usa apiClient.createChatShortcut(). Si memoriaBACKEND no está configurado, guarda shortcutRequestedAt/shortcutSyncStatus localmente y muestra una confirmación de producción. Si existe backend y falla, encola createChatShortcut en la cola local para reintento.
+
+2. ACCIONESchatX
+Endpoint conceptual simulado en el static site: POST /api/v1/acciones-chat
+Responsabilidad: auditar y ejecutar acciones de administración de chat que no están cubiertas de forma directa por PATCH /api/v1/conversaciones ni por POST /api/v1/interacciones-mensaje. Debe aceptar actionType, conversationId, actorUserId, actorUserEmail, contactEmail, displayName, payload, source y clientMutationId. Acciones mínimas requeridas por esta iteración: clear_messages para vaciar mensajes cargados/auditados de un chat sin borrar el contenedor, delete_conversation para ocultar o eliminar de forma reversible/auditable una conversación desde la lista principal, y restore_conversation para reactivar un chat oculto cuando el usuario vuelve a crear el mismo contacto por correo o QR. Debe preservar retención, idempotencia, auditoría y consistencia multi-dispositivo.
+Simulación implementada: js/app.js usa apiClient.syncChatAction(). En modo local vacía, oculta o restaura el chat de inmediato sin romper la interfaz; si memoriaBACKEND está disponible y la llamada falla, encola syncChatAction para reintento seguro.
+
+3. PERFILqrCONTACTOx
+Endpoint conceptual simulado en el static site: GET /api/v1/perfil-contacto/qr y POST /api/v1/contactos/qr-resolver
+Responsabilidad: generar, firmar, resolver y auditar el QR de perfil de un usuario ChatER para crear contactos sin escritura manual. Debe devolver un payload compacto con userId, correo, nombre visible, firma, expiración opcional y permisos de visibilidad; al resolverlo debe validar firma/estado del perfil, evitar contactos duplicados, crear o confirmar la relación de contacto y devolver la conversación relacionada de forma idempotente por clientMutationId. Debe respetar privacidad, bloqueo de usuarios, rate limit y auditoría.
+Simulación implementada: js/qr-code-lego.js genera y lee el QR local de perfil; js/app.js muestra el QR en Perfil, escanea desde Crear contacto, crea o abre el chat existente y sincroniza la relación con RELACIONESusuarioX/createConversation cuando memoriaBACKEND está configurado. Si la API real no existe, la app conserva el flujo local y encola la sincronización.
+
+4. PERFILqrCONTACTOx / CONTACTOSidentidadX - resolución idempotente por identidad
+Endpoint conceptual simulado en el static site: POST /api/v1/contactos/qr-resolver y búsqueda interna por email/userId/participantes antes de crear conversación.
+Responsabilidad: resolver un QR o correo de contacto contra conversaciones existentes aunque el backend devuelva el email dentro de participants y no como contactEmail directo. Debe buscar por email normalizado, userId/contactUserId y participantes normalizados; si existe una conversación, debe abrirla y restaurarla si estaba archivada; si no existe, debe crear la relación/contacto y conversación de forma idempotente.
+Simulación implementada: js/app.js usa findConversationByContactIdentity() antes de crear un contacto local o remoto. Esto evita duplicados al escanear QR o escribir un correo que ya pertenece a una conversación hidratada desde memoriaBACKEND con estructura de participantes.
+
+5. IMAGENwebpCOMPRESIONx - garantía estricta de calidad/límite
+Endpoint conceptual asociado: el frontend mantiene el bloque local js/image-webp-compressor-lego.js antes de usar /api/v1/imagenes-r2x o /api/v1/media-firmada.
+Responsabilidad: comprimir imágenes a WebP por debajo de 200 KB con búsqueda progresiva por dimensión/calidad, códigos de error estables y rechazo explícito cuando no se pueda cumplir el límite sin degradación visual excesiva. El backend nunca debe aceptar una imagen de chat si el frontend no declara image/webp y tamaño dentro de política.
+Simulación implementada: js/image-webp-compressor-lego.js expone errorCodes y js/app.js comprime toda imagen de chat antes de enviarla o de simularla localmente; si el bloque lego falla por compatibilidad usa respaldo Canvas estricto, pero si el fallo indica que no puede cumplir <= 200 KB rechaza el envío y deja botón de reintento. El bloque lego evita aceptar una salida prematura de baja calidad, sigue buscando mejor equilibrio visual antes de cerrar la compresión y ahora verifica la firma binaria RIFF/WEBP además del MIME/tamaño para no enviar imágenes mal etiquetadas como WebP.

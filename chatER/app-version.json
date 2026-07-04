@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-03-memoriabackend-auth-only-92",
-  "buildTime": "2026-07-03T22:20:00-05:00",
+  "version": "2026-07-04-chat-floating-options-117",
+  "buildTime": "2026-07-04T01:34:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER abre la interfaz principal apenas auth-gate.js confirma window.memoriaBACKEND como API oficial autenticada, sin exigir una segunda autenticación local ni revalidar Google desde js/app.js."
+  "description": "ChatER muestra las opciones del botón de tres puntos del chat activo como menú flotante reutilizando las acciones existentes de selección, contacto, búsqueda, fijado, archivado, lista, reporte y bloqueo."
 }

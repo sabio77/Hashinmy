@@ -2274,3 +2274,421 @@ button {
 .section-menu-action.tool-row:hover {
   background: var(--panel-hover);
 }
+
+/* Reforzamiento de listas con scroll y menú contextual de chats. */
+.chat-view,
+.sidebar,
+.chat-panel,
+.modal-body,
+.quick-composer-list,
+.archived-modal-list,
+.call-starter-list,
+.business-summary-list,
+.chat-floating-menu-list {
+  min-height: 0;
+}
+
+.chat-list,
+.messages,
+.status-panel,
+.emoji-panel-content,
+.quick-composer-list,
+.archived-modal-list,
+.call-starter-list,
+.business-summary-list,
+.chat-floating-menu-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.quick-composer-list,
+.archived-modal-list,
+.call-starter-list,
+.business-summary-list {
+  max-height: min(520px, 62vh);
+  padding-right: 2px;
+}
+
+.chat-item.selected {
+  background: var(--brand-soft);
+}
+
+.chat-item.selected .chat-item-avatar {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.chat-selection-toolbar {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1180px, 100vw);
+  min-height: calc(72px + var(--safe-top));
+  padding: var(--safe-top) max(12px, var(--safe-right)) 0 max(12px, var(--safe-left));
+  display: grid;
+  grid-template-columns: 48px minmax(28px, auto) 1fr repeat(5, 48px);
+  align-items: center;
+  gap: 4px;
+  background: #111b21;
+  color: #e9edef;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px var(--shadow);
+  z-index: 60;
+}
+
+.selection-toolbar-button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.selection-toolbar-button:hover,
+.selection-toolbar-button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  outline: 0;
+}
+
+.selection-toolbar-count {
+  font-size: 24px;
+  font-weight: 500;
+  min-width: 28px;
+  text-align: center;
+}
+
+.selection-toolbar-spacer {
+  min-width: 0;
+}
+
+.chat-floating-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.chat-floating-menu {
+  position: fixed;
+  max-width: calc(100vw - 16px);
+  max-height: min(620px, calc(100vh - 24px));
+  border: 1px solid var(--border);
+  border-radius: 0 0 18px 18px;
+  background: #111b21;
+  color: #e9edef;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
+  z-index: 80;
+  overflow: hidden;
+}
+
+.chat-floating-menu-list {
+  display: grid;
+  max-height: min(610px, calc(100vh - 32px));
+}
+
+.chat-floating-menu button {
+  width: 100%;
+  min-height: 62px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0 28px;
+  cursor: pointer;
+  font-size: clamp(18px, 4vw, 28px);
+  line-height: 1.2;
+}
+
+.chat-floating-menu button:hover,
+.chat-floating-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: 0;
+}
+
+.chat-floating-menu button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .chat-selection-toolbar {
+    width: 100vw;
+    min-height: calc(58px + var(--safe-top));
+    grid-template-columns: 44px minmax(24px, auto) 1fr repeat(5, 42px);
+    gap: 0;
+  }
+
+  .selection-toolbar-button {
+    width: 42px;
+    height: 42px;
+    font-size: 23px;
+  }
+
+  .selection-toolbar-count {
+    font-size: 25px;
+  }
+
+  .chat-floating-menu {
+    right: max(0px, var(--safe-right));
+    border-radius: 0 0 0 18px;
+  }
+
+  .chat-floating-menu button {
+    min-height: 66px;
+    padding-inline: 30px;
+    font-size: clamp(24px, 7vw, 32px);
+  }
+}
+
+@media (max-width: 420px) {
+  .chat-selection-toolbar {
+    grid-template-columns: 42px minmax(22px, auto) 1fr repeat(5, 38px);
+  }
+
+  .selection-toolbar-button {
+    width: 38px;
+    height: 38px;
+    font-size: 21px;
+  }
+}
+
+/* Refuerzo incremental: QR de contactos, reintento de mensajes y listas siempre navegables. */
+.modal-body {
+  max-height: min(640px, calc(100vh - 150px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-action-grid,
+.emoji-grid,
+.emoji-token-grid,
+.section-menu-actions,
+.call-shortcut-rail,
+.api-status-grid,
+.contact-create-actions,
+.qr-scanner-panel {
+  min-height: 0;
+}
+
+.quick-action-grid,
+.emoji-grid,
+.emoji-token-grid,
+.section-menu-actions,
+.call-shortcut-rail,
+.api-status-grid {
+  max-height: min(520px, 62vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.contact-create-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.qr-icon-button {
+  width: 48px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.qr-icon-button:hover,
+.qr-icon-button:focus-visible {
+  background: var(--panel-hover);
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.profile-qr-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-soft);
+}
+
+.profile-qr-card small,
+.profile-qr-payload {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.profile-qr-code {
+  width: min(240px, 100%);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  padding: 12px;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.profile-qr-code svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.qr-fallback-shape {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(90deg, #101820 48%, transparent 49% 51%, #101820 52%),
+    linear-gradient(#101820 48%, transparent 49% 51%, #101820 52%),
+    #ffffff;
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
+.qr-scanner-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.qr-scanner-video {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-soft);
+}
+
+.message {
+  position: relative;
+}
+
+.message-media {
+  position: relative;
+}
+
+.message-media-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, #ffffff 34%, transparent);
+  z-index: 2;
+}
+
+.message-media-progress span {
+  display: block;
+  height: 100%;
+  min-width: 18%;
+  background: var(--brand);
+  transition: width 180ms ease;
+}
+
+.message-retry-button {
+  position: absolute;
+  right: -10px;
+  bottom: -10px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  color: var(--brand-dark);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.message-retry-button:hover,
+.message-retry-button:focus-visible {
+  background: var(--brand);
+  outline: 2px solid var(--brand-dark);
+  outline-offset: 2px;
+}
+
+/* Ajuste incremental: imágenes adjuntas deben verse directas, sin caption automático, con barra visual sobre la imagen. */
+.message-text[hidden] {
+  display: none;
+}
+
+.message-text[hidden] + .message-extra .message-media-image {
+  margin-top: 0;
+}
+
+.message-media-image figcaption {
+  display: none;
+}
+
+/* Refuerzo incremental: cualquier lista semántica dentro de modales o paneles queda navegable sin cortar ítems. */
+.modal-body ul,
+.modal-body ol,
+[role='list'],
+[role='listbox'],
+[data-list-scroll] {
+  max-height: min(520px, 62vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+/* Refuerzo de auditoría: todos los bloques que actúan como listas mantienen scroll propio en pantallas pequeñas o con muchos ítems. */
+.chat-list,
+.messages,
+.status-panel,
+.modal-card,
+.modal-body,
+.modal-body [class$='-list'],
+.modal-body [class*='-list '],
+.modal-body [data-search-results],
+.modal-body [data-remote-search-results],
+.chat-floating-menu,
+.chat-floating-menu-list,
+.tools-panel,
+.call-starter-list,
+.business-summary-list {
+  min-height: 0;
+}
+
+.modal-body [class$='-list'],
+.modal-body [class*='-list '],
+.modal-body [data-search-results],
+.modal-body [data-remote-search-results] {
+  max-height: min(520px, 62vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.chat-floating-menu-list {
+  overflow-y: auto;
+}

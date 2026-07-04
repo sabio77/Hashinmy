@@ -3115,3 +3115,124 @@ Validación funcional:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta limpieza de cache runtime y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 112. Revisión de punto débil: contacto existente eliminado no se restauraba al crearlo por correo o QR
+
+En esta iteración se identificó como punto débil principal que la creación de contactos ya evitaba duplicados por correo, `userId` y participantes, pero una conversación marcada como eliminada localmente podía seguir siendo encontrada como contacto existente. Al escanear el QR o escribir el mismo correo, ChatER intentaba abrir ese chat oculto; como `getActiveConversation()` y la lista visible excluyen conversaciones eliminadas, el usuario podía terminar con el panel sin conversación visible en lugar de ver el chat restaurado.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `restoreDeletedContactConversation()` como restauración idempotente antes de abrir un contacto existente.
+- Si el contacto encontrado estaba eliminado, ChatER limpia `deleted`, lo saca de Archivados, mantiene mensajes/colas existentes y abre el chat inmediatamente.
+- La restauración queda auditada con `syncChatActionWithBackend(..., 'restore_conversation', ...)`; si memoriaBACKEND no responde, se conserva en la cola local segura ya existente.
+- La creación por correo y el escaneo QR ahora cumplen la regla: si el contacto ya existe, incluso oculto por eliminación reversible, se abre el chat; si no existe, se crea y se abre.
+- `APIs necesarias.txt` amplía `ACCIONESchatX` con el concepto `restore_conversation` para que memoriaBACKEND tenga contrato auditable cuando no exista endpoint dedicado.
+- `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-04-contact-restore-97` para invalidar la cache PWA anterior.
+- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/image-webp-compressor-lego.js` ejecutado correctamente.
+- `node --check js/qr-code-lego.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json` y `estructura_del_proyecto.json` validados como JSON correcto.
+- La mejora se limita a restaurar contactos existentes ocultos al crear/leer QR; se preserva la lógica existente de autenticación Google/Gmail, privacidad, relaciones, conversaciones, mensajes, estados, llamadas, adjuntos, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `STREMEx`, `SIGNALINGtiempoRealX`, notificaciones, herramientas comerciales, búsqueda, cola local, PWA e imágenes opcionales.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.
+## 113. Revisión de punto débil: versión PWA desincronizada con el shell funcional de QR/WebP/chats
+
+En esta iteración se identificó como punto débil principal que `app-version.json` ya indicaba la versión `2026-07-04-chat-lists-qr-webp-99`, pero `service-worker.js` seguía usando `CHATER_SW_VERSION = 2026-07-04-contact-restore-97`. Esa diferencia podía dejar a una instalación PWA reutilizando cache estática anterior, aunque el ZIP ya tuviera los módulos nuevos para listas con scroll, menús de chat, QR de perfil/contacto, adjuntos WebP y búsqueda por identidad.
+
+Cambios aplicados:
+
+- `service-worker.js` sube `CHATER_SW_VERSION` a `2026-07-04-chat-readiness-cache-sync-100` para invalidar correctamente la cache estática previa.
+- `app-version.json` queda sincronizado con la misma versión funcional, evitando que diagnóstico, UI instalada y shell cacheado reporten estados distintos.
+- No se modificó la lógica de chat, contactos, QR, compresión, streaming, APIs, autenticación, PWA, assets ni contratos de memoriaBACKEND.
+- No se agregó ninguna API nueva porque la corrección solo afecta consistencia de versión/cache del shell estático.
+
+Validación funcional:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/image-webp-compressor-lego.js` ejecutado correctamente.
+- `node --check js/qr-code-lego.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json`, `estructura_del_proyecto.json` y `js/CONFIGmemoriaBACKEND.json` validados como JSON correcto.
+- Se verificó que el cambio es mínimo y solo sincroniza la versión PWA para que los módulos ya existentes sean servidos sin cache obsoleta.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta sincronización y vuelva a ejecutar la validación completa antes de emitir la frase final.
+
+## 115. Revisión de punto débil: salida WebP dependía demasiado del MIME declarado
+
+En esta iteración se identificó como punto débil principal que el flujo de imágenes ya comprimía a WebP y validaba el peso máximo de 200 KB, pero la verificación local todavía confiaba principalmente en `blob.type`/`File.type`. En navegadores o capas intermedias que devuelvan un MIME vacío o mal etiquetado, podía aceptarse una salida que parecía `image/webp` aunque no tuviera firma binaria WebP real.
+
+Cambios aplicados:
+- `js/image-webp-compressor-lego.js` agrega verificación binaria de cabecera `RIFF....WEBP` antes de aceptar blobs generados por Canvas o WebP ya existentes.
+- `js/app.js` agrega la misma validación defensiva en el respaldo Canvas y en el flujo final de adjuntos de chat, preservando el rechazo explícito si el archivo supera 200 KB.
+- La búsqueda de la lista principal de chats/contactos ahora normaliza tildes y mayúsculas, de modo que nombres visibles como “Méndez” también coincidan con búsquedas como “mendez”.
+- `app-version.json` y `service-worker.js` suben a `2026-07-04-webp-signature-search-102` para invalidar el cache PWA y entregar el shell corregido.
+
+No se agregan APIs nuevas: se conserva `ImagenesCloudflareR2x` como ruta preferente para imágenes WebP optimizadas y `MEDIAfirmadaX` como respaldo canónico cuando R2x no está disponible.
+
+
+
+## 116. Revisión de punto débil: imagen adjunta podía degradarse a chip si perdía vista previa
+
+En esta iteración se identificó como punto débil principal que el flujo de adjuntos ya comprimía imágenes a WebP, mostraba la imagen en el chat y agregaba barra visual de progreso, pero dependía de que existiera `mediaPreviewDataUrl` o `mediaUrl` en el momento de renderizar. Si el navegador compactaba almacenamiento, eliminaba una URL `blob:` transitoria, se recargaba la app antes de resolver la URL remota o la imagen fallaba al cargar, el mensaje podía terminar mostrado como chip de archivo aunque seguía siendo una imagen adjunta.
+
+Cambios aplicados:
+
+- `js/app.js` ahora renderiza todo mensaje detectado como imagen dentro de `figure.message-media-image`, incluso cuando aún no hay fuente local/remota disponible.
+- El fallback visual de imagen conserva la barra `message-media-progress` cuando el mensaje está en subida o creación de mensaje multimedia, de modo que la interfaz no pierde el indicador inferior sin texto.
+- Si la URL remota o vista previa existe, se mantiene el comportamiento anterior de mostrar el `<img>` directo; si falla, se sustituye por un bloque visual de imagen pendiente sin degradar a chip de archivo.
+- `app-version.json` y `service-worker.js` suben a `2026-07-04-image-fallback-progress-103` para invalidar el cache PWA y entregar el shell corregido.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/image-webp-compressor-lego.js` ejecutado correctamente.
+- `node --check js/qr-code-lego.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check auth-gate.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+
+Alcance preservado:
+
+- La mejora se limita al render de imágenes adjuntas sin fuente disponible y al mantenimiento de la barra visual sobre fallback de imagen. No modifica autenticación Google/Gmail, `STREMEx`, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, QR, contactos, menús de chat, búsqueda, llamadas, estados, herramientas, cola local ni contratos existentes de memoriaBACKEND.
+
+## 117. Revisión de punto débil: el botón ⋮ del chat activo abría modal en vez del menú flotante solicitado
+
+En esta iteración se identificó como punto débil principal que el flujo de longpress sobre un chat ya mostraba una barra de selección y que el botón ⋮ de esa barra abría el menú flotante de acciones; sin embargo, el botón ⋮ de la cabecera del chat activo seguía abriendo un modal centrado. Eso dejaba dos comportamientos distintos para la misma intención visual y no garantizaba que el usuario siempre viera el menú flotante tipo `menu_options_chat.jpg` al tocar los tres puntos del chat.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `openActiveConversationFloatingMenu()` para que el botón ⋮ del chat activo reutilice el mismo menú flotante ya creado para chats seleccionados.
+- `getChatFloatingMenuActions()` incorpora acciones adicionales ya existentes: buscar en chat, fijar/desfijar, archivar/restaurar y reportar conversación.
+- `handleChatFloatingMenuAction()` vincula esas acciones nuevas con las funciones existentes `openConversationSearchModal()`, `setConversationPinned()`, `setConversationArchived()` y `openReportConversationModal()`.
+- Se preserva `openConversationMenuModal()` como función existente para no eliminar lógica previa, pero el evento principal del botón ⋮ ahora apunta al menú flotante solicitado.
+- `app-version.json` y `service-worker.js` suben a `2026-07-04-chat-floating-options-117` para invalidar la cache PWA y servir la interfaz corregida.
+- No se agregan APIs nuevas porque todas las acciones conectadas usan contratos existentes o conceptos ya declarados: conversaciones, interacciones de mensaje, acciones de chat, reportes de moderación, relaciones y cola local.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check js/config.js` ejecutado correctamente.
+- `node --check js/image-webp-compressor-lego.js` ejecutado correctamente.
+- `node --check js/qr-code-lego.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `node --check auth-gate.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json`, `manifest.json`, `estructura_del_proyecto.json` y `js/CONFIGmemoriaBACKEND.json` validados como JSON correcto.
+
+Alcance preservado:
+
+- La mejora se limita al comportamiento del botón ⋮ y a reutilizar acciones ya existentes dentro del menú flotante. No modifica autenticación Google/Gmail, creación de contacto por correo/QR, compresión WebP, `ImagenesCloudflareR2x`, `MEDIAfirmadaX`, `STREMEx`, estados, llamadas, herramientas, service worker más allá de versión, assets ni contratos publicados de memoriaBACKEND.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a ejecutar la validación completa antes de emitir la frase final.

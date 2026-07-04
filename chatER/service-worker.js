@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-03-memoriabackend-auth-only-92';
+const CHATER_SW_VERSION = '2026-07-04-chat-floating-options-117';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -12,6 +12,8 @@ const APP_SHELL = [
   './js/config.js',
   './auth-gate.js',
   './js/CONFIGmemoriaBACKEND.json',
+  './js/image-webp-compressor-lego.js',
+  './js/qr-code-lego.js',
   './js/app.js',
   './js/pwa.js'
 ];
