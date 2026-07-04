@@ -2,7 +2,7 @@
 // Este archivo puede reemplazarse en producción sin recompilar el frontend.
 window.CHATER_CONFIG = window.CHATER_CONFIG || {
   // Dominio base de memoriaBACKEND, sin /api/v1. Ejemplo: https://memoriabackend.example.com
-  MEMORIA_BACKEND_URL: '',
+  MEMORIA_BACKEND_URL: 'https://mapsx.app',
   // Site ID autorizado en memoriaBACKEND. Se envía como ?s= y como X-MB-Site.
   MEMORIA_SITE_ID: 'a1',
   // Prefijo canónico de APIs versionadas de memoriaBACKEND.
