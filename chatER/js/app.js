@@ -3,8 +3,7 @@ const chaterVolatileSessionStorage = new Map();
 const chaterRuntimeAuth = {
   accessToken: '',
   refreshToken: '',
-  verifiedAt: 0,
-  verifiedThisBoot: false
+  verifiedAt: 0
 };
 let chaterStorageWarningShown = false;
 let chaterSessionStorageWarningShown = false;
@@ -1081,23 +1080,11 @@ const apiClient = {
     return this.request('/auth/providers', { skipRefresh: true });
   },
   checkAuth() {
-    return this.request('/auth/check', { skipRefresh: true })
-      .then((payload) => normalizeAuthPayload(payload));
+    return verifyMemoriaSdkSession()
+      .then((payload) => payload || { ok: 0, err: 'login_requerido' });
   },
-  createFirebaseSession(idToken, options = {}) {
-    const clientMutationId = options.clientMutationId || generateClientMutationId();
-    return this.request('/auth/firebase/session', {
-      method: 'POST',
-      skipRefresh: true,
-      idempotencyKey: clientMutationId,
-      body: JSON.stringify(withMemoriaSitePayload({
-        idToken,
-        id: idToken,
-        next: options.next || getCurrentPageUrl(),
-        deviceId: getDeviceId(),
-        clientMutationId
-      }))
-    }).then((payload) => normalizeAuthPayload(payload));
+  createFirebaseSession() {
+    return Promise.reject(new Error('La sesión Google/Gmail debe ser creada por login.js y expuesta mediante window.memoriaBACKEND.'));
   },
   login(email) {
     return startGoogleGmailLogin({ fallbackEmail: email });
@@ -1938,7 +1925,7 @@ function decorateMemoriaGoogleLoginUrl(rawUrl, options = {}) {
   return loginUrl.toString();
 }
 
-function buildMemoriaGoogleLoginUrl(path = '/auth/login') {
+function buildMemoriaGoogleLoginUrl(path = '/login.js') {
   return decorateMemoriaGoogleLoginUrl(buildApiUrl(path, { siteScoped: true }));
 }
 
@@ -2056,7 +2043,13 @@ function getAuthProviderEvidence(payload = {}) {
 
 function isGoogleProviderPayload(payload = {}) {
   const provider = getAuthProviderEvidence(payload);
-  return provider.includes('google') || provider.includes('gmail');
+  if (provider.includes('google') || provider.includes('gmail')) return true;
+
+  // El contrato oficial de login.js expone `window.memoriaBACKEND.ok === 1`
+  // después de completar Google. En ese flujo la API inyectada por
+  // memoriaBACKEND es la autoridad, igual que en el proyecto de referencia,
+  // aunque no todos los despliegues publican `provider` dentro del payload.
+  return isOfficialMemoriaBackendApiPayload(payload);
 }
 
 function validateGoogleGmailAuthPayload(payload = {}, fallbackEmail = '') {
@@ -2091,7 +2084,6 @@ function validateGoogleGmailAuthPayload(payload = {}, fallbackEmail = '') {
 function markBackendSessionVerified() {
   const verifiedAt = Date.now();
   chaterRuntimeAuth.verifiedAt = verifiedAt;
-  chaterRuntimeAuth.verifiedThisBoot = true;
   writeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey, String(verifiedAt));
   // Limpieza de compatibilidad: versiones anteriores guardaban esta marca en localStorage.
   removeStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
@@ -2102,19 +2094,50 @@ function isBackendSessionRecentlyVerified(maxAgeMs = 10 * 60 * 1000) {
   return Number.isFinite(verifiedAt) && verifiedAt > 0 && Date.now() - verifiedAt <= maxAgeMs;
 }
 
-function isBackendSessionVerifiedForCurrentBoot() {
-  // Un correo o una marca vieja en local/sessionStorage no abre la pantalla protegida.
-  // Cada arranque debe pasar primero por memoriaBACKEND (/auth/check, /auth/firebase/session
-  // o login.js validado) y solo entonces se permite renderizar el chat.
-  return Boolean(chaterRuntimeAuth.verifiedThisBoot && isBackendSessionRecentlyVerified());
-}
-
 function persistAuthProvider(provider = 'google.com') {
   writeStorageItem(CHATER_CONFIG.authProviderKey, provider || 'google.com');
 }
 
 function getMemoriaBackendSdk() {
   return window.memoriaBACKEND && typeof window.memoriaBACKEND === 'object' ? window.memoriaBACKEND : null;
+}
+
+function isMemoriaBackendSdkAuthenticated(sdk = getMemoriaBackendSdk()) {
+  if (!sdk || typeof sdk !== 'object') return false;
+  const ok = sdk.ok;
+  if (ok === 1 || ok === true) return true;
+  if (typeof ok === 'string') {
+    const normalizedOk = ok.trim().toLowerCase();
+    return normalizedOk === '1' || normalizedOk === 'true';
+  }
+  return false;
+}
+
+function buildAuthPayloadFromMemoriaBackendSdk(sdk = getMemoriaBackendSdk(), extraPayload = {}) {
+  if (!isMemoriaBackendSdkAuthenticated(sdk)) return null;
+  const user = sdk.u || sdk.user || sdk.profile || sdk.perfil || {};
+  const payload = {
+    ok: 1,
+    ...extraPayload,
+    ...sdk,
+    u: user,
+    user: {
+      ...(extraPayload.user && typeof extraPayload.user === 'object' ? extraPayload.user : {}),
+      ...(sdk.user && typeof sdk.user === 'object' ? sdk.user : {}),
+      ...(user && typeof user === 'object' ? user : {})
+    },
+    tk: sdk.tk || extraPayload.tk || extraPayload.token || '',
+    token: sdk.tk || sdk.token || extraPayload.token || extraPayload.tk || '',
+    accessToken: sdk.tk || sdk.token || extraPayload.accessToken || '',
+    sessionVerified: true,
+    __memoriaBackendOfficialApi: true
+  };
+
+  return normalizeAuthPayload(payload, extraPayload.email || user.e || user.email || '');
+}
+
+function isOfficialMemoriaBackendApiPayload(payload = {}) {
+  return Boolean(payload && typeof payload === 'object' && payload.__memoriaBackendOfficialApi === true);
 }
 
 function loadMemoriaGoogleLoginScript(options = {}) {
@@ -2183,11 +2206,15 @@ function loadMemoriaGoogleLoginScript(options = {}) {
 
 async function verifyMemoriaSdkSession() {
   const sdk = getMemoriaBackendSdk();
+  const directPayload = buildAuthPayloadFromMemoriaBackendSdk(sdk);
+  if (directPayload) return directPayload;
+
   const verifier = sdk?.verificarSesion || sdk?.checkSession;
   if (typeof verifier !== 'function') return null;
+
   const payload = await verifier.call(sdk);
   if (payload?.ok === 0 || payload?.ok === false) return null;
-  return normalizeAuthPayload({ ...payload, sessionVerified: true });
+  return normalizeAuthPayload({ ...payload, sessionVerified: true, __memoriaBackendOfficialApi: true });
 }
 
 async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmail = '', options = {}) {
@@ -2200,43 +2227,23 @@ async function verifyGoogleGmailPayloadAgainstBackend(payload = {}, fallbackEmai
     throw new Error('Intento de autenticación Google/Gmail cancelado.');
   }
 
-  const candidatePayload = normalizeAuthPayload(payload, fallbackEmail);
-  const candidateToken = candidatePayload.accessToken || '';
-  const firebaseIdToken = extractGoogleFirebaseIdTokenFromPayload(payload) || extractGoogleFirebaseIdTokenFromPayload(candidatePayload);
-  let checkedPayload;
-
-  if (firebaseIdToken) {
-    checkedPayload = await apiClient.createFirebaseSession(firebaseIdToken, {
-      next: getCurrentPageUrl(),
-      clientMutationId: options.clientMutationId || buildDeterministicMutationId('auth-firebase-session', candidatePayload.user?.email || fallbackEmail || firebaseIdToken.slice(-24))
-    });
-  } else {
-    checkedPayload = await apiClient.request('/auth/check', {
-      skipRefresh: true,
-      headers: candidateToken ? { Authorization: `Bearer ${candidateToken}` } : {}
-    });
-  }
-
+  const sdkPayload = await verifyMemoriaSdkSession().catch(() => null);
   if (authGuard && !isAuthAttemptCurrent(authGuard)) {
     throw new Error('Intento de autenticación Google/Gmail cancelado.');
   }
 
-  if (checkedPayload?.ok === 0 || checkedPayload?.ok === false) {
-    throw new Error(checkedPayload?.err || 'login_requerido');
+  const candidatePayload = normalizeAuthPayload({
+    ...(payload && typeof payload === 'object' ? payload : {}),
+    ...(sdkPayload && typeof sdkPayload === 'object' ? sdkPayload : {}),
+    sessionVerified: Boolean(sdkPayload) || Boolean(payload?.__memoriaBackendOfficialApi),
+    __memoriaBackendOfficialApi: Boolean(sdkPayload) || Boolean(payload?.__memoriaBackendOfficialApi)
+  }, fallbackEmail);
+
+  if (!candidatePayload.__memoriaBackendOfficialApi) {
+    throw new Error('La autenticación debe completarse desde la API oficial window.memoriaBACKEND emitida por login.js.');
   }
 
-  const backendProviderEvidence = getAuthProviderEvidence(checkedPayload);
-  const normalizedCheckedPayload = normalizeAuthPayload({
-    ...checkedPayload,
-    accessToken: checkedPayload.accessToken || checkedPayload.token || checkedPayload.tk || candidatePayload.accessToken || '',
-    refreshToken: checkedPayload.refreshToken || candidatePayload.refreshToken || '',
-    // La evidencia de proveedor debe venir de AUTENTICACIONx después de validar
-    // /auth/check o /auth/firebase/session. El payload local del SDK solo aporta
-    // token/candidatos, nunca reemplaza la confirmación Google/Gmail del backend.
-    authProvider: backendProviderEvidence,
-    sessionVerified: true
-  });
-  const validation = validateGoogleGmailAuthPayload(normalizedCheckedPayload, fallbackEmail);
+  const validation = validateGoogleGmailAuthPayload(candidatePayload, fallbackEmail);
   if (!validation.ok) throw new Error(validation.message);
   return validation;
 }
@@ -2248,16 +2255,11 @@ async function restoreGoogleGmailSessionFromBackend(options = {}) {
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
 
   try {
-    const payload = await apiClient.checkAuth();
+    const payload = await verifyMemoriaSdkSession();
     if (authGuard && !isAuthAttemptCurrent(authGuard)) return false;
+    if (!payload) return false;
 
-    if (payload?.ok === 0 || payload?.ok === false) {
-      clearSession();
-      return false;
-    }
-
-    const normalizedPayload = normalizeAuthPayload({ ...payload, sessionVerified: true }, '');
-    const validation = validateGoogleGmailAuthPayload(normalizedPayload, getSessionEmail());
+    const validation = validateGoogleGmailAuthPayload(payload, getSessionEmail());
     if (!validation.ok) {
       if (!options.silent) loginFeedback.textContent = validation.message;
       clearSession();
@@ -2294,9 +2296,7 @@ async function startGoogleGmailLogin(options = {}) {
     await loadMemoriaGoogleLoginScript({ interactive: true });
   } catch (error) {
     if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-    console.warn('No se pudo cargar login.js directamente; se usará /auth/login como respaldo.', error);
-    window.location.assign(buildMemoriaGoogleLoginUrl('/auth/login'));
-    return { ok: true, pendingGoogleLogin: true, fallbackRedirect: true };
+    throw new Error(error?.message || 'No se pudo cargar login.js desde memoriaBACKEND.');
   }
   if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
 
@@ -2310,28 +2310,38 @@ async function startGoogleGmailLogin(options = {}) {
   }
 
   const sdk = getMemoriaBackendSdk();
-  const openLogin = sdk?.abrirLogin || sdk?.openLogin;
+  const openLogin = sdk?.abrirLogin || sdk?.openLogin || sdk?.iniciarLogin || sdk?.login;
   if (typeof openLogin === 'function') {
     try {
-      const result = openLogin.call(sdk, { next: getCurrentPageUrl() });
+      const result = openLogin.call(sdk, { next: getCurrentPageUrl(), s: getMemoriaSiteId() });
       if (result && typeof result.then === 'function') await result;
       return { ok: true, pendingGoogleLogin: true };
     } catch (error) {
       if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-      console.warn('No se pudo abrir login.js directamente; se usará /auth/login.', error);
+      throw new Error(error?.message || 'No se pudo abrir la ventana de Google desde memoriaBACKEND.');
     }
   }
 
-  if (!isAuthAttemptCurrent(authGuard)) return { ok: false, staleAuthAttempt: true };
-  window.location.assign(buildMemoriaGoogleLoginUrl('/auth/login'));
-  return { ok: true, pendingGoogleLogin: true };
+  if (document.getElementById('mb-login-root')) {
+    return { ok: true, pendingGoogleLogin: true };
+  }
+
+  throw new Error('login.js cargó, pero memoriaBACKEND no expuso una ventana o método de autenticación Google.');
 }
 
 async function handleMemoriaBackendLoginEvent(event) {
   const authGuard = activeGoogleLoginAttemptGuard;
   if (authGuard && !isAuthAttemptCurrent(authGuard)) return;
 
-  const payload = normalizeAuthPayload({ ...(event?.detail || {}), sessionVerified: true });
+  const eventDetail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
+  const sdkPayload = buildAuthPayloadFromMemoriaBackendSdk();
+  const eventOk = eventDetail.ok === 1 || eventDetail.ok === true || String(eventDetail.ok || '').trim() === '1';
+  const payload = normalizeAuthPayload({
+    ...eventDetail,
+    ...(sdkPayload || {}),
+    sessionVerified: Boolean(sdkPayload) || eventOk,
+    __memoriaBackendOfficialApi: Boolean(sdkPayload) || eventOk
+  });
 
   try {
     // El evento oficial de login.js puede llegar después de una redirección o
@@ -4169,7 +4179,7 @@ function persistAuthTokens(payload = {}) {
 
 function hasBackendSessionCredentials() {
   if (!CHATER_CONFIG.backendBaseUrl) return !shouldRequireGoogleGmailAuth();
-  return Boolean(isBackendSessionVerifiedForCurrentBoot() && (getAccessToken() || getRefreshToken() || isBackendSessionRecentlyVerified()));
+  return Boolean(isMemoriaBackendSdkAuthenticated() || getAccessToken() || getRefreshToken() || isBackendSessionRecentlyVerified());
 }
 
 function getBackendErrorCode(error = {}) {
@@ -4243,7 +4253,6 @@ function clearAuthTokens(email = getSessionEmail()) {
   chaterRuntimeAuth.accessToken = '';
   chaterRuntimeAuth.refreshToken = '';
   chaterRuntimeAuth.verifiedAt = 0;
-  chaterRuntimeAuth.verifiedThisBoot = false;
   removeSessionStorageItem(CHATER_CONFIG.accessTokenKey);
   removeSessionStorageItem(CHATER_CONFIG.refreshTokenKey);
   removeSessionStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
@@ -4701,7 +4710,7 @@ function renderShell() {
   const email = getSessionEmail();
 
   if (email && CHATER_CONFIG.backendBaseUrl && !hasBackendSessionCredentials()) {
-    requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse de nuevo con Google/Gmail en memoriaBACKEND antes de abrir el chat.');
+    requireFreshBackendLogin(email, 'Tu sesión anterior necesita validarse con Google/Gmail en memoriaBACKEND.');
     loginView.hidden = false;
     chatView.hidden = true;
     loginForm.querySelector('button[type="submit"]')?.focus();
@@ -7887,7 +7896,7 @@ function openToolsModal() {
 }
 
 const MEMORIA_BACKEND_REQUIRED_CAPABILITIES = [
-  { label: 'Autenticación Google/Gmail', tokens: ['AUTENTICACIONx', '/auth', '/auth/firebase/session', '/login.js', 'google'] },
+  { label: 'Autenticación Google/Gmail', tokens: ['AUTENTICACIONx', 'window.memoriaBACKEND', '/login.js', 'google'] },
   { label: 'Perfil de usuario', tokens: ['PERFILusuarioX', '/api/v1/perfil-usuario', 'perfil-usuario'] },
   { label: 'Preferencias de usuario', tokens: ['PREFERENCIASusuarioX', '/api/v1/preferencias-usuario', 'preferencias-usuario'] },
   { label: 'Conversaciones', tokens: ['CONVERSACIONESx', '/api/v1/conversaciones', 'conversaciones'] },
@@ -11425,7 +11434,13 @@ function resetTypingStateForSessionEnd() {
 async function logoutCurrentSession() {
   disconnectStremeRealtime();
   try {
-    await apiClient.logout();
+    const sdk = getMemoriaBackendSdk();
+    const sdkLogout = sdk?.cerrarSesion || sdk?.logout || sdk?.signOut || sdk?.salir;
+    if (typeof sdkLogout === 'function') {
+      await sdkLogout.call(sdk);
+    } else {
+      await apiClient.logout();
+    }
   } catch (error) {
     // El cierre local no debe fallar si memoriaBACKEND no está disponible.
   } finally {

@@ -24,8 +24,7 @@
       request.overrideMimeType && request.overrideMimeType('application/json');
       request.send(null);
 
-      var hasLocalFileResponse = request.status === 0 && String(request.responseText || '').trim();
-      if ((hasLocalFileResponse || (request.status >= 200 && request.status < 300)) && request.responseText) {
+      if (request.status >= 200 && request.status < 300 && request.responseText) {
         return JSON.parse(request.responseText);
       }
 
@@ -38,8 +37,6 @@
   }
 
   var jsonConfig = loadMemoriaBackendRuntimeConfig();
-  window.CONFIGmemoriaBACKEND = Object.freeze(Object.assign({}, jsonConfig));
-
   var existingConfig = window.CHATER_CONFIG && typeof window.CHATER_CONFIG === 'object' ? window.CHATER_CONFIG : {};
   var projectOrigin = readFirst(jsonConfig, ['ORIGEN_PROYECTO', 'ORIGEN', 'PROJECT_ORIGIN', 'origin']);
   var backendUrl = readFirst(jsonConfig, ['MEMORIA_BACKEND_URL', 'DOMINIO_MEMORIABACKEND', 'DOMINIOmemoriaBACKEND', 'backendUrl']);

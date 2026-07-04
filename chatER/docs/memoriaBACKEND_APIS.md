@@ -43,17 +43,12 @@ Si `MEMORIA_BACKEND_URL` no está configurada, ChatER funciona en modo demostrac
 
 ## 3. API de autenticación Google/Gmail con AUTENTICACIONx
 
-ChatER no debe abrir sesión por OTP ni por número telefónico. El acceso a la interfaz protegida usa el bloque `AUTENTICACIONx` de `memoriaBACKEND`, con proveedor Google, correo verificado y dominio Gmail cuando `REQUIRE_GMAIL_DOMAIN` está activo.
+ChatER no debe abrir sesión por OTP, número telefónico ni validadores locales propios. El acceso a la interfaz protegida queda alineado con el proyecto de referencia: el frontend carga `GET /login.js?s={siteId}` desde `MEMORIA_BACKEND_URL` y considera autenticada la sesión solo cuando el script oficial de memoriaBACKEND expone `window.memoriaBACKEND.ok === 1` o emite `memoriaBACKEND:login` con el mismo contrato.
 
-Punto débil corregido en la integración del static site: el frontend ya no infiere `google.com` por defecto cuando `AUTENTICACIONx` devuelve solo un correo. Para abrir ChatER, `/auth/check`, `/auth/firebase/session` o el payload del SDK deben incluir evidencia explícita del proveedor Google/Gmail mediante campos como `u.pr`, `provider`, `providerId`, `authProvider`, `signInProvider`, `sign_in_provider` o `firebase.sign_in_provider`. Si memoriaBACKEND no confirma ese proveedor, el static site limpia la sesión local y vuelve al acceso Google/Gmail.
-
-Punto débil corregido en esta iteración: la carga de `login.js` podía quedar bloqueada después de un error de red, CORS o dominio no autorizado porque el navegador conservaba el `<script>` fallido y un segundo intento no garantizaba nuevos eventos `load`/`error`. ChatER ahora elimina cualquier script no cargado antes de reintentar, conecta los manejadores antes de asignar `src` y solo reutiliza el script cuando ya está cargado y corresponde a la URL vigente de `memoriaBACKEND`. Esto preserva la obligación de autenticar ChatER con Google/Gmail mediante `AUTENTICACIONx` sin crear un flujo local alterno.
-
-### GET `/auth/providers?s={siteId}`
-Devuelve los proveedores activos publicados por `AUTENTICACIONx`. ChatER lo usa como verificación auxiliar de disponibilidad del login.
+Punto débil corregido en esta iteración: el proyecto actual intentaba revalidar Google con rutas internas como `/auth/check` y crear sesión con `/auth/firebase/session`. Eso no coincidía con el otro proyecto que autentica correctamente usando la API inyectada por `login.js`. Desde esta versión, ChatER ya no crea sesiones Firebase desde el frontend ni redirige a un flujo alterno propio; la autoridad de autenticación es `window.memoriaBACKEND` como API oficial de memoriaBACKEND para static sites.
 
 ### GET `/login.js?s={siteId}`
-Script oficial de login para static sites autorizados. Debe cargarse desde el dominio real de `memoriaBACKEND`, no desde el static site. El script abre Google/Firebase y emite eventos compatibles con `window.memoriaBACKEND`.
+Script oficial de login para static sites autorizados. Debe cargarse desde el dominio real de `memoriaBACKEND`, no desde el static site. El script abre Google/Firebase, administra el flujo de cuenta autorizada y expone la sesión resultante mediante `window.memoriaBACKEND`.
 
 Parámetros visuales admitidos por ChatER:
 ```txt
@@ -61,66 +56,29 @@ n = nombre de marca visible
 c = color de tema
 l = logo público opcional
 bg = fondo público opcional
-next = URL de retorno autorizada
 ```
 
-### GET `/auth/login?s={siteId}`
-Vista HTML oficial de autenticación Google/Gmail. ChatER la usa como respaldo cuando `login.js` no expone un helper directo para abrir el popup o redirección.
-
-### GET `/auth/check?s={siteId}`
-Valida la cookie segura emitida por `AUTENTICACIONx` y devuelve la identidad vigente. ChatER la ejecuta al iniciar para no depender de credenciales locales. Si la sesión no existe, fue revocada, responde `ok:0`, devuelve un error de autenticación o no puede confirmarse contra memoriaBACKEND, el static site limpia la sesión local y vuelve a pedir Google/Gmail antes de mostrar la interfaz protegida.
-
-Response mínimo esperado:
-```json
-{
-  "ok": 1,
-  "requestId": "uuid",
-  "u": {
-    "i": "usr_123",
-    "e": "usuario@gmail.com",
-    "n": "Usuario",
-    "pr": "google.com"
+Response/estado mínimo esperado en la API inyectada:
+```js
+window.memoriaBACKEND = {
+  ok: 1,
+  tk: 'token-temporal-opcional',
+  u: {
+    i: 'usr_123',
+    e: 'usuario@gmail.com',
+    n: 'Usuario'
   }
-}
+};
 ```
 
-### POST `/auth/firebase/session?s={siteId}`
-Crea sesión backend desde un `idToken` validado por Firebase/Google. El backend debe comprobar proveedor `google.com`, correo verificado, dominio autorizado por `revisionDOMINIOS` y cabecera `X-Hashinmy-Action: webapp`.
-
-Request:
-```json
-{
-  "s": "a1",
-  "idToken": "firebase-google-id-token",
-  "next": "https://sitio-autorizado.onrender.com/",
-  "deviceId": "browser-device-id",
-  "clientMutationId": "uuid"
-}
-```
-
-Response mínimo esperado:
-```json
-{
-  "ok": 1,
-  "requestId": "uuid",
-  "u": {
-    "i": "usr_123",
-    "e": "usuario@gmail.com",
-    "n": "Usuario",
-    "pr": "google.com"
-  },
-  "tk": "token-temporal-opcional",
-  "signedSession": "token-temporal-opcional"
-}
-```
-
-La cookie `HttpOnly/Secure/SameSite=None` es la sesión principal. Si el backend devuelve `tk`, `token` o `signedSession` para compatibilidad cuando el navegador bloquea cookies, ChatER lo conserva solo como credencial temporal de pestaña mediante `sessionStorage` o memoria volátil; no lo persiste en `localStorage`.
-
-### POST `/auth/refresh?s={siteId}`
-Renueva una sesión cuando `AUTENTICACIONx` publique refresh compatible. ChatER lo usa solo si existe token temporal de pestaña o cookie válida y envía `clientMutationId`/`X-MB-Idempotency-Key` para mantener el contrato idempotente de mutaciones públicas.
+Reglas del frontend:
+- Si `window.memoriaBACKEND.ok` no es `1`/`true`, ChatER mantiene la vista de login.
+- Si `window.memoriaBACKEND.u.e` no existe o no es Gmail/Googlemail cuando `REQUIRE_GMAIL_DOMAIN` está activo, ChatER limpia la sesión local y vuelve al login.
+- Si `login.js` entrega `tk`, ChatER lo conserva solo como credencial temporal de pestaña mediante `sessionStorage` o memoria volátil, nunca en `localStorage`.
+- Los endpoints REST de negocio siguen usando `credentials: include`, `s={siteId}`, `X-MB-Site` y `X-Hashinmy-Action:webapp`, pero no son la fuente primaria para crear o autorizar la sesión Google.
 
 ### POST `/auth/logout?s={siteId}`
-Revoca la sesión en memoriaBACKEND y limpia credenciales temporales de pestaña, correo local, cursor `streme` y estado de sincronización del usuario. ChatER también envía `clientMutationId`/`X-MB-Idempotency-Key` para que reintentos de cierre no dupliquen efectos.
+Se conserva únicamente como respaldo de cierre cuando la API inyectada no publica `cerrarSesion`, `logout`, `signOut` o equivalente. El cierre local no puede fallar si memoriaBACKEND no está disponible, pero siempre limpia correo, tokens temporales, cursores y estado de sesión del navegador.
 
 ## 4. API de usuario y perfil
 
