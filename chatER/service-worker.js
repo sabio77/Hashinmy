@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-03-config-json-memoriabackend-88';
+const CHATER_SW_VERSION = '2026-07-03-platform-auth-gate-90';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -10,6 +10,7 @@ const APP_SHELL = [
   './app-version.json',
   './css/styles.css',
   './js/config.js',
+  './auth-gate.js',
   './js/CONFIGmemoriaBACKEND.json',
   './js/app.js',
   './js/pwa.js'
