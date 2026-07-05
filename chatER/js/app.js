@@ -1016,6 +1016,10 @@ const messageHistoryHydration = {
 const contactConversationSyncState = {
   inFlight: new Map()
 };
+const realtimeConversationSyncState = {
+  inFlight: '',
+  lastSyncedAt: 0
+};
 const typingState = {
   isTyping: false,
   timer: null,
@@ -3327,6 +3331,40 @@ function isMessageLikePayload(value = {}) {
     .some((key) => value[key] !== undefined && value[key] !== null);
 }
 
+function mergeSyncedConversationPayload(localConversationId, payload = {}) {
+  const remoteConversation = extractNestedObject(payload, ['chat', 'conversation'])
+    || extractNestedObject(payload, ['record'])
+    || null;
+
+  if (!remoteConversation || typeof remoteConversation !== 'object') return;
+
+  const remoteId = extractEntityId(payload, ['chat', 'conversation'])
+    || remoteConversation.id
+    || remoteConversation.chatId
+    || remoteConversation.conversationId
+    || '';
+  const normalizedRemote = normalizeConversationFromApi(remoteConversation);
+  const effectiveId = String(remoteId || normalizedRemote.id || localConversationId || '');
+  const conversation = appState.conversations.find((item) => {
+    const itemId = String(item.id || '');
+    return itemId === String(localConversationId || '') || (effectiveId && itemId === effectiveId);
+  });
+
+  if (!conversation) return;
+
+  const existingMessages = Array.isArray(conversation.messages) ? conversation.messages : [];
+  const remoteMessages = Array.isArray(normalizedRemote.messages) ? normalizedRemote.messages : [];
+  Object.assign(conversation, {
+    ...conversation,
+    ...normalizedRemote,
+    id: effectiveId || conversation.id,
+    messages: mergeMessagesByIdentity(existingMessages, remoteMessages),
+    messagesHydrated: Boolean(conversation.messagesHydrated || normalizedRemote.messagesHydrated),
+    contactSyncStatus: 'synced',
+    status: normalizedRemote.status || conversation.status || 'Sincronizado'
+  });
+}
+
 function markQueuedConversationSynced(localConversationId, payload = {}) {
   const remoteId = extractEntityId(payload, ['chat', 'conversation']);
   const conversation = appState.conversations.find((item) => item.id === localConversationId);
@@ -3341,6 +3379,7 @@ function markQueuedConversationSynced(localConversationId, payload = {}) {
     }
   }
 
+  mergeSyncedConversationPayload(remoteId ? String(remoteId) : localConversationId, payload);
   persistState();
   renderCurrentSection();
 }
@@ -7576,14 +7615,59 @@ function removeQueuedBackendOperationsForMessage(messageId = '', email = getSess
   return true;
 }
 
+function collectIdentityCandidatesFromArray(value = []) {
+  return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function getConversationIdentityContainers(conversation = {}) {
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const data = conversation.data && typeof conversation.data === 'object' ? conversation.data : {};
+  const contact = conversation.contact && typeof conversation.contact === 'object' ? conversation.contact : {};
+  const remote = conversation.remote && typeof conversation.remote === 'object' ? conversation.remote : {};
+  const recipient = conversation.recipient && typeof conversation.recipient === 'object' ? conversation.recipient : {};
+
+  return { metadata, data, contact, remote, recipient };
+}
+
 function getConversationRemoteIdentities(conversation = {}) {
   const identities = [];
   const selfEmail = normalizeStorageIdentity(getSessionEmail());
   const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const { metadata, data, contact, remote, recipient } = getConversationIdentityContainers(conversation);
 
-  const pushIdentity = (candidate = {}) => {
-    const email = normalizeStorageIdentity(candidate.email || candidate.userEmail || candidate.contactEmail || candidate.recipientUserEmail || '');
-    const userId = normalizeBackendUserId(candidate.userId || candidate.contactUserId || candidate.uid || candidate.id || candidate.recipientUserId || '');
+  const pushIdentity = (candidate = {}, fallbackName = '') => {
+    if (!candidate) return;
+    if (typeof candidate === 'string') {
+      const normalizedEmail = normalizeStorageIdentity(candidate);
+      const email = candidate.includes('@') ? normalizedEmail : '';
+      const userId = email ? '' : normalizeBackendUserId(candidate);
+      pushIdentity({ email, userId, name: fallbackName || email || userId });
+      return;
+    }
+    if (typeof candidate !== 'object' || Array.isArray(candidate)) return;
+
+    const email = normalizeStorageIdentity(
+      candidate.email
+        || candidate.userEmail
+        || candidate.contactEmail
+        || candidate.recipientUserEmail
+        || candidate.recipientEmail
+        || candidate.toEmail
+        || candidate.mail
+        || ''
+    );
+    const userId = normalizeBackendUserId(
+      candidate.userId
+        || candidate.contactUserId
+        || candidate.remoteUserId
+        || candidate.otherUserId
+        || candidate.participantUserId
+        || candidate.recipientUserId
+        || candidate.toUserId
+        || candidate.uid
+        || candidate.id
+        || ''
+    );
     if (!email && !userId) return;
     if ((selfEmail && email && email === selfEmail) || (selfUserId && userId && userId === selfUserId)) return;
     const key = `${email}|${userId}`;
@@ -7591,17 +7675,94 @@ function getConversationRemoteIdentities(conversation = {}) {
     identities.push({
       email,
       userId,
-      name: candidate.name || candidate.displayName || candidate.alias || email || userId
+      name: candidate.name || candidate.displayName || candidate.alias || fallbackName || email || userId
     });
   };
 
   pushIdentity({
-    email: conversation.email || conversation.contactEmail || conversation.userEmail || '',
-    userId: conversation.contactUserId || conversation.remoteUserId || conversation.otherUserId || conversation.participantUserId || '',
-    name: conversation.name || conversation.displayName || conversation.alias || ''
+    email: conversation.email
+      || conversation.contactEmail
+      || conversation.userEmail
+      || conversation.recipientUserEmail
+      || conversation.toEmail
+      || metadata.contactEmail
+      || metadata.email
+      || metadata.recipientUserEmail
+      || data.contactEmail
+      || data.email
+      || data.recipientUserEmail
+      || contact.email
+      || contact.userEmail
+      || remote.email
+      || recipient.email
+      || '',
+    userId: conversation.contactUserId
+      || conversation.remoteUserId
+      || conversation.otherUserId
+      || conversation.participantUserId
+      || conversation.recipientUserId
+      || conversation.toUserId
+      || metadata.contactUserId
+      || metadata.remoteUserId
+      || metadata.recipientUserId
+      || data.contactUserId
+      || data.remoteUserId
+      || data.recipientUserId
+      || contact.userId
+      || contact.id
+      || remote.userId
+      || remote.id
+      || recipient.userId
+      || recipient.id
+      || '',
+    name: conversation.name
+      || conversation.displayName
+      || conversation.alias
+      || metadata.displayName
+      || metadata.name
+      || data.displayName
+      || data.name
+      || contact.name
+      || remote.name
+      || recipient.name
+      || ''
   });
 
-  (Array.isArray(conversation.participants) ? conversation.participants : []).forEach(pushIdentity);
+  [
+    conversation.participants,
+    conversation.participantList,
+    conversation.members,
+    conversation.recipients,
+    metadata.participants,
+    metadata.participantList,
+    metadata.members,
+    metadata.recipients,
+    data.participants,
+    data.participantList,
+    data.members,
+    data.recipients
+  ].forEach((list) => collectIdentityCandidatesFromArray(list).forEach(pushIdentity));
+
+  [
+    conversation.participantEmails,
+    metadata.participantEmails,
+    data.participantEmails
+  ].forEach((list) => collectIdentityCandidatesFromArray(list).forEach((email) => pushIdentity({ email })));
+
+  if (Array.isArray(conversation.messages)) {
+    conversation.messages.slice(-5).forEach((message) => {
+      pushIdentity({
+        email: message.type === 'incoming'
+          ? (message.senderUserEmail || message.senderEmail || '')
+          : (message.recipientUserEmail || message.recipientEmail || ''),
+        userId: message.type === 'incoming'
+          ? (message.senderUserId || message.fromUserId || '')
+          : (message.recipientUserId || message.toUserId || ''),
+        name: message.senderName || message.recipientName || ''
+      });
+    });
+  }
+
   return identities;
 }
 
@@ -14144,6 +14305,44 @@ async function syncInitialDataFromBackend() {
   }
 }
 
+async function syncRealtimeConversationInboxFromBackend(options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail()) return;
+
+  const now = Date.now();
+  if (!options.force && now - Number(realtimeConversationSyncState.lastSyncedAt || 0) < 2000) return;
+
+  const sessionGuard = captureSessionGuard();
+  const sessionKey = getSessionGuardKey(sessionGuard);
+  if (realtimeConversationSyncState.inFlight === sessionKey) return;
+
+  realtimeConversationSyncState.inFlight = sessionKey;
+  try {
+    const payload = await apiClient.getConversations();
+    if (!isSessionGuardCurrent(sessionGuard) || payload?.offlineDemo) return;
+
+    const remoteConversations = extractArrayFromPayload(payload, ['chats', 'conversations', 'items']).map(normalizeConversationFromApi);
+    if (!remoteConversations.length) return;
+
+    appState.conversations = mergeConversationsById(remoteConversations, appState.conversations);
+    if (!appState.conversations.some((conversation) => conversation.id === activeConversationId)) {
+      activeConversationId = getFirstVisibleConversationId(activeConversationId) || getVisibleConversations()[0]?.id || null;
+    }
+
+    realtimeConversationSyncState.lastSyncedAt = Date.now();
+    persistState();
+    renderCurrentSection();
+    renderConversation();
+  } catch (error) {
+    if (isSessionGuardCurrent(sessionGuard)) {
+      console.warn('No se pudo reconciliar conversaciones desde STREMEx.', error);
+    }
+  } finally {
+    if (realtimeConversationSyncState.inFlight === sessionKey) {
+      realtimeConversationSyncState.inFlight = '';
+    }
+  }
+}
+
 function unwrapFulfilled(result) {
   if (result?.status !== 'fulfilled' || result.value?.offlineDemo) return null;
   return result.value;
@@ -14292,7 +14491,8 @@ function createMessageReceiptElement(message = {}) {
   const receiptStatus = getMessageReceiptStatus(message);
   const receipt = document.createElement('span');
   receipt.className = `message-receipt message-receipt-${receiptStatus}`;
-  receipt.textContent = '✓';
+  receipt.textContent = ['delivered', 'read'].includes(receiptStatus) ? '✓✓' : '✓';
+  receipt.dataset.receiptStatus = receiptStatus;
   receipt.setAttribute('aria-label', getMessageReceiptLabel(receiptStatus));
   receipt.title = getMessageReceiptLabel(receiptStatus);
   return receipt;
@@ -14833,6 +15033,9 @@ function connectStremeEventSource(channelOverride = '') {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       stremeReconnectAttempts = 0;
       sendPresenceHeartbeat('online');
+      if (channel === getCurrentUserStremeInboxChannel()) {
+        syncRealtimeConversationInboxFromBackend({ reason: 'streme-inbox-open' });
+      }
       if (activeConversationId && channel === getConversationStremeChannel(activeConversationId)) {
         sendStremeEvent({ type: 'chat.opened', chatId: activeConversationId, channel });
       }
@@ -15195,7 +15398,15 @@ function receiveRealtimeMessage(data = {}) {
   const conversation = findOrCreateConversationForRealtimeMessage(data, message);
   if (!conversation) return;
 
-  const normalizedMessage = normalizeMessageFromApi({ ...message, chatId: conversation.id, conversationId: conversation.id });
+  const normalizedMessage = normalizeMessageFromApi({
+    ...message,
+    senderUserId: message.senderUserId || data.senderUserId || '',
+    senderUserEmail: message.senderUserEmail || data.senderUserEmail || '',
+    recipientUserId: message.recipientUserId || data.recipientUserId || '',
+    recipientUserEmail: message.recipientUserEmail || data.recipientUserEmail || '',
+    chatId: conversation.id,
+    conversationId: conversation.id
+  });
   const existingMessage = findExistingMessageByIdentity(
     conversation.messages,
     normalizedMessage,

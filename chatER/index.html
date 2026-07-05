@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="ChatER, chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND." />
+  <meta name="theme-color" content="#0b141a" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="application-name" content="ChatER" />
+  <meta name="apple-mobile-web-app-title" content="ChatER" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="assets/chater-icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/chater-icon-192.png" />
+  <title>ChatER</title>
+  <script>
+    (function () {
+      var hour = new Date().getHours();
+      document.documentElement.dataset.theme = hour >= 6 && hour < 18 ? 'light' : 'dark';
+      document.documentElement.dataset.themeMode = 'automatic';
+    }());
+  </script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main class="app-shell" aria-label="ChatER">
+    <section id="chatView" class="chat-view" aria-label="Interfaz principal de ChatER" hidden>
+      <aside class="sidebar" aria-label="Lista de conversaciones">
+        <header class="sidebar-header">
+          <button id="profileButton" class="avatar-button profile-badge" type="button" aria-label="Abrir perfil">CE</button>
+          <div id="sidebarBrandLogo" class="brand-logo sidebar-brand-logo" data-brand-logo aria-hidden="true">CE</div>
+          <div class="sidebar-title">
+            <h1>ChatER</h1>
+            <p id="userEmailLabel">Sesión activa</p>
+          </div>
+          <div class="header-actions" aria-label="Acciones principales">
+            <button id="newChatButton" class="icon-button" type="button" aria-label="Nuevo chat">＋</button>
+            <button id="headerCameraButton" class="icon-button" type="button" aria-label="Crear estado rápido">▣</button>
+            <button id="headerSearchButton" class="icon-button" type="button" aria-label="Buscar en esta sección">⌕</button>
+            <button id="toolsButton" class="icon-button" type="button" aria-label="Abrir herramientas">⋮</button>
+          </div>
+        </header>
+
+        <nav class="mode-tabs" aria-label="Secciones">
+          <button class="mode-tab active" type="button" data-section="chats">Chats</button>
+          <button class="mode-tab" type="button" data-section="states">Estados</button>
+          <button class="mode-tab" type="button" data-section="calls">Llamadas</button>
+        </nav>
+
+        <section class="search-box" aria-label="Buscar conversación">
+          <input id="searchInput" type="search" placeholder="Buscar o iniciar un chat" autocomplete="off" />
+        </section>
+
+        <section id="chatList" class="chat-list" aria-label="Conversaciones disponibles"></section>
+      </aside>
+
+      <section class="chat-panel" aria-label="Conversación actual">
+        <header class="chat-header">
+          <button id="backButton" class="icon-button mobile-only" type="button" aria-label="Volver a la lista">‹</button>
+          <div id="activeAvatar" class="contact-avatar" aria-hidden="true">A</div>
+          <div class="chat-contact-info">
+            <h2 id="activeName">Selecciona un chat</h2>
+            <p id="activeStatus">Elige una conversación para comenzar</p>
+          </div>
+          <div class="chat-header-actions">
+            <button id="audioCallButton" class="icon-button" type="button" aria-label="Iniciar llamada de voz">☎</button>
+            <button id="videoCallButton" class="icon-button" type="button" aria-label="Iniciar videollamada">▣</button>
+            <button id="pinConversationButton" class="icon-button" type="button" aria-label="Fijar conversación">⌖</button>
+            <button id="archiveConversationButton" class="icon-button" type="button" aria-label="Archivar conversación">⇩</button>
+            <button id="conversationMenuButton" class="icon-button" type="button" aria-label="Abrir opciones de conversación">⋮</button>
+          </div>
+        </header>
+
+        <section id="messages" class="messages" aria-live="polite"></section>
+
+        <section id="statusPanel" class="status-panel" aria-label="Estados de 24 horas" hidden></section>
+
+        <form id="messageForm" class="message-form" autocomplete="off">
+          <button id="emojiButton" class="icon-button" type="button" aria-label="Abrir emojis">☻</button>
+          <input id="messageInput" type="text" placeholder="Mensaje" disabled />
+          <button id="attachButton" class="icon-button" type="button" aria-label="Adjuntar archivo">📎</button>
+          <button id="cameraComposerButton" class="icon-button" type="button" aria-label="Abrir cámara o galería">📷</button>
+          <button id="quickComposerButton" class="icon-button" type="button" aria-label="Abrir acciones rápidas">⚡</button>
+          <button id="voiceNoteButton" class="icon-button voice-note-button" type="button" aria-label="Grabar nota de voz">🎤</button>
+          <button id="sendButton" class="send-button" type="submit" aria-label="Enviar mensaje" disabled hidden>➤</button>
+        </form>
+
+        <section id="emojiPanel" class="emoji-panel" aria-label="Panel de emojis" hidden></section>
+      </section>
+
+      <nav id="bottomNavigation" class="bottom-navigation" aria-label="Navegación principal">
+        <button class="bottom-nav-item active" type="button" data-bottom-section="chats" aria-label="Abrir chats">
+          <span aria-hidden="true">💬</span>
+          <strong>Chats</strong>
+        </button>
+        <button class="bottom-nav-item" type="button" data-bottom-section="calls" aria-label="Abrir llamadas">
+          <span aria-hidden="true">☎</span>
+          <strong>Llamadas</strong>
+        </button>
+        <button class="bottom-nav-item" type="button" data-bottom-section="states" aria-label="Abrir estados">
+          <span aria-hidden="true">◉</span>
+          <strong>Novedades</strong>
+        </button>
+        <button class="bottom-nav-item" type="button" data-bottom-section="tools" aria-label="Abrir herramientas">
+          <span aria-hidden="true">⚙</span>
+          <strong>Herramientas</strong>
+        </button>
+      </nav>
+
+      <button id="floatingActionButton" class="floating-action-button" type="button" aria-label="Acción principal" hidden>＋</button>
+    </section>
+  </main>
+
+  <div id="modalOverlay" class="modal-overlay" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-header">
+        <h2 id="modalTitle">Acción</h2>
+        <button id="modalCloseButton" class="icon-button" type="button" aria-label="Cerrar">×</button>
+      </header>
+      <div id="modalBody" class="modal-body"></div>
+    </section>
+  </div>
+
+  <div id="pwaUpdateBanner" class="pwa-update-banner" role="status" aria-live="polite" hidden>
+    <span>Hay una actualización disponible para ChatER.</span>
+    <button id="pwaUpdateButton" type="button">Actualizar ahora</button>
+    <button id="pwaUpdateDismissButton" type="button" aria-label="Ocultar actualización">Después</button>
+  </div>
+
+  <div id="pwaInstallPrompt" class="pwa-install-floating" role="dialog" aria-live="polite" aria-label="Instalar ChatER" hidden>
+    <div class="pwa-install-card">
+      <span class="pwa-install-icon" aria-hidden="true">⬇</span>
+      <div class="pwa-install-copy">
+        <strong>Instalar ChatER</strong>
+        <small>Agrega la app a tu pantalla principal para abrirla como aplicación instalada.</small>
+      </div>
+      <button id="pwaInstallButton" class="primary-button" type="button">Instalar app</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/config.js"></script>
+  <script src="auth-gate.js"></script>
+  <script src="IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js"></script>
+  <script src="IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js"></script>
+  <script src="QRcodigosX/BLOQUE/qr-core.js"></script>
+  <script src="QRcodigosX/conexion/qr-codigosx.js"></script>
+  <script src="PERMISOSx/BLOQUE/permisos-core.js"></script>
+  <script src="PERMISOSx/conexion/permisosx.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

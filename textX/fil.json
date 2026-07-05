@@ -1,0 +1,738 @@
+{
+  "iso": "fil",
+  "name": "Filipino",
+  "nativeName": "Filipino",
+  "htmlLang": "fil",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | Software, AI at awtomasyon na 100% pinopondohan",
+    "description": "Gumagawa ang Hashinmy ng pasadyang software, AI at awtomasyon na may 100% pagpopondo para gawing moderno ang mga kumpanya nang hindi nauubos ang cash flow.",
+    "ogTitle": "Hashinmy | 100% pinopondohang pasadyang teknolohiya para sa negosyo",
+    "ogDescription": "Teknolohiyang kasosyo para gumawa ng pasadyang software, AI at awtomasyon, kasama ang operasyonal na pagsusuri at 100% pagpopondo sa development.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, pasadyang software na 100% pinopondohan, teknolohiyang pangnegosyo na may pagpopondo, digital engineering para sa kumpanya, praktikal na AI, awtomasyon ng proseso, digital transformation nang hindi nauubos ang kapital, pagbuo ng software na may pagpopondo, matatalinong sistema para sa kumpanya, software para ayusin ang proseso, awtomasyon sa benta, awtomasyon ng alok-presyo, software para sa imbentaryo, AI na may pagsusuring tao, pagsusuri ng operasyon, pagbuo ayon sa yugto, digital na kaligtasan para sa kumpanya"
+  },
+  "ui": {
+    "skip": "Lumaktaw sa kasalukuyang tanong",
+    "stageLabel": "Interaktibong karanasan ng Hashinmy",
+    "topbarLabel": "Mga kontrol ng Hashinmy",
+    "brandAria": "Magsimula muli · Hashinmy",
+    "brandSmall": "Software + AI na 100% pinopondohan",
+    "progressLabel": "Progreso ng landas",
+    "languageLabel": "Wika",
+    "languageAria": "Piliin ang wika",
+    "contentLabel": "Karanasan para buuin ang buod ng proyekto",
+    "pathLabelAria": "Buod ng napiling landas",
+    "decisionZoneLabel": "Lugar ng pagpili ng serbisyo",
+    "summaryLabelAria": "Buod ng proyekto",
+    "footerLabel": "Mga kontrol ng landas",
+    "primaryFinance": "Humingi ng pagsusuri",
+    "primaryQuote": "Ipa-kotasyon ang sistema ko",
+    "back": "Bumalik",
+    "restart": "Magsimula muli",
+    "contactLabel": "Mga detalye para makontak ka",
+    "contactPlaceholder": "Email ng kumpanya",
+    "commentLabel": "Ilarawan ang iyong proyekto",
+    "commentPlaceholder": "Sabihin sa amin kung aling proseso ang gusto mong ayusin, i-automate o gawing software: benta, alok-presyo, imbentaryo, produksiyon, suporta, datos, serbisyo sa customer, pahinang web, API, chatbot o plataporma. Isama kung saan nawawala ang oras, pera o impormasyon para makapaghanda ng malinaw na teknikal at pinansyal na landas.",
+    "submitRoute": "Ipadala sa Hashinmy",
+    "copySummaryAction": "Kopyahin ang buod",
+    "formNote": "Mananatiling naka-save lang sa browser na ito ang iyong mga sagot hanggang magpasya kang ipadala ang mga ito.",
+    "contactRequired": "Idagdag ang iyong email at WhatsApp para makumpirma ng Hashinmy ang kahilingan at makontak ka tungkol sa nakahandang landas.",
+    "copySuccess": "Nakopya ang buod. Maaari mo itong i-paste sa WhatsApp, email o CRM.",
+    "copyFailure": "Hindi ito awtomatikong nakopya. Ipagpapatuloy ng email sending ang paghahanda ng buod.",
+    "mailOpening": "Hindi namin nakumpirma sa memoriaBACKEND sa attempt na ito. Bubuksan namin ang iyong email app gamit ang nakahandang landas bilang backup.",
+    "waitSummary": "Buod ng proyekto",
+    "preparingOptions": "Inihahanda ang mga opsyon",
+    "optionFallback": "Pumili ng landas",
+    "pathLabel": "Napiling landas",
+    "pathEmpty": "Pumili ng opsyon para mabuo ang buod ng proyekto",
+    "interactionFallback": "Karanasan",
+    "summaryTitle": "Teknolohikal na landas na inihanda ng Hashinmy",
+    "projectChosen": "Napiling proyekto",
+    "expectedUse": "Inaasahang gamit",
+    "wantedValue": "Halagang hinahanap",
+    "prioritySecurity": "Kaligtasan na prayoridad",
+    "paymentMode": "Paraan ng bayad",
+    "financing": "Pagpopondo",
+    "pace": "Ritmo",
+    "technicalBase": "Iminungkahing teknikal na base",
+    "suggestedControls": "Iminungkahing kontrol",
+    "nextStep": "Susunod na yugto",
+    "contact": "Kontak",
+    "additionalComment": "Opsyonal na komento",
+    "registeredInteractions": "Mga napiling sagot",
+    "directRouteRequested": "Hiniling ang direktang alok-presyo.",
+    "directQuoteSubject": "Hashinmy · Direktang alok-presyo",
+    "financedSubject": "Hashinmy · Pasadyang software · Pagpopondo",
+    "directQuoteAudit": "Direktang alok-presyo na may buod ng proyekto.",
+    "financeAudit": "100% pagpopondo na may buod ng proyekto.",
+    "directQuoteTech": "Direktang alok-presyo · buod ng proyekto",
+    "financeTech": "USD · yugto · buod ng proyekto",
+    "topActionsLabel": "Mga produkto · Wika",
+    "proofEntryAria": "Ang Aming Karanasan · Hashinmy",
+    "proofOpenButton": "Ang Aming Karanasan",
+    "proofTitle": "Pinopondohang digital engineering",
+    "proofLead": "Ang Hashinmy ay hindi ahensiya ng website o pangkaraniwang supplier. Isa itong digital engineering firm na ginagawang pasadyang software, AI at awtomasyon ang mga proseso ng negosyo, na may 100% pagpopondo para mag-modernize nang hindi nauubos ang kapital ng operasyon.",
+    "proofCloseAria": "Isara · Ang Aming Karanasan",
+    "proofContentAria": "Ang Aming Karanasan · Madalas itanong",
+    "proofSummaryAria": "tiwala · kontrol",
+    "proofSummaryTitle": "100% pinopondohang pasadyang teknolohiya para ayusin ang operasyon, protektahan ang kapital at lumago nang may kontrol",
+    "proofTrustLabel": "tiwala · kontrol:",
+    "proofTrustText": "estratehiya sa negosyo, pasadyang sistema, ginagamit na AI, awtomasyon, APIs, web sales channels, chatbots, operasyonal na pagsusuri, 100% pagpopondo, madaling pamahalaang hulog, kaligtasan, pahintulot, traceability, kapaki-pakinabang na data at pagpapatuloy.",
+    "proofMethodLabel": "Pamamaraan:",
+    "proofMethodText": "sinusuri namin ang totoong operasyon, hinahanap kung saan nawawala ang oras, pera o impormasyon, inuuna ang module na may pinakamataas na balik, dinidisenyo ang eksaktong solusyon at sinasamahan ang pagpopondo, implementasyon, testing, adoption at evolution.",
+    "proofUseCasesLabel": "Mga gamit:",
+    "proofUseCasesText": "benta, kotasyon, imbentaryo, produksiyon, suporta, CRM, portals, ecommerce, automated customer care, reports, APIs at internal processes na ngayon ay umaasa sa files, WhatsApp o memorya ng tao.",
+    "proofBrandsTitle": "Mga brand, proyekto at kumpanyang kaugnay ng aming trabaho",
+    "proofBrandsAria": "Mga brand, proyekto at kumpanyang kaugnay ng aming trabaho",
+    "proofLogoPlaceholder": "Ang Aming Karanasan Hashinmy",
+    "proofLogoAltTemplate": "Logo ng {name}",
+    "proofFaqAria": "Madalas itanong · Ang Aming Karanasan",
+    "proofFaqWhyQuestion": "Bakit piliin ang Hashinmy?",
+    "proofFaqWhyAnswer": "Dahil hindi nagbebenta ang Hashinmy ng hiwalay na code o generic na teknolohiya: ginagawang malinaw, ligtas, nasusukat at financially viable na sistema ang konkretong problema sa operasyon.",
+    "proofFaqWhoQuestion": "Para kanino?",
+    "proofFaqWhoAnswer": "Para sa maliliit, katamtaman o malalaking kumpanya na kailangang ayusin ang proseso, i-automate ang trabaho, ikonekta ang AI, magbenta nang mas mahusay o gumawa ng sariling software habang pinoprotektahan ang cash flow.",
+    "proofFaqStartQuestion": "Paano ako magsisimula?",
+    "proofFaqStartAnswer": "Humingi ng pagsusuri para repasuhin ang operasyon, tukuyin ang pagkawala ng oras, pera o impormasyon at maghanda ng malinaw na teknikal, komersyal at pinansyal na landas.",
+    "proofBrandsStructuredDescription": "SEO list na awtomatikong ina-update mula sa mga larawang available sa assets/clientes."
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "software sa web",
+      "tech": "web · likurang sistema",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "app sa cellphone",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "software para sa PC",
+      "tech": "desktop · lokal",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "awtomasyon",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · integrasyon",
+      "tech": "AI · daloy ng trabaho",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernisasyon",
+      "tech": "software · kontrol",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "protektadong kapital"
+    },
+    "serviceFamily": {
+      "symbol": "landas",
+      "label": "Serbisyo · pagpili"
+    },
+    "buildType": {
+      "symbol": "Buo",
+      "label": "Produkto"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "awtomasyon"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernisasyon"
+    },
+    "operation": {
+      "symbol": "Gamit",
+      "label": "Gamit"
+    },
+    "value": {
+      "symbol": "Halaga",
+      "label": "Halaga · kontrol"
+    },
+    "risk": {
+      "symbol": "tiwala",
+      "label": "kaligtasan · kontrol"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% pagpopondo"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "plano ng yugto"
+    },
+    "summary": {
+      "symbol": "buod",
+      "label": "buod ng proyekto"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "pasadya"
+      ],
+      [
+        "AI",
+        "awtomasyon"
+      ],
+      [
+        "PC",
+        "mobile"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "landas"
+      ],
+      [
+        "6",
+        "Serbisyo"
+      ],
+      [
+        "1",
+        "buod ng proyekto"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "likurang sistema"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "proseso"
+      ],
+      [
+        "AI",
+        "pagsusuring tao"
+      ],
+      [
+        "BI",
+        "ulat"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernisasyon"
+      ],
+      [
+        "API",
+        "integrasyon"
+      ],
+      [
+        "UX",
+        "tiwala"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "gamit"
+      ],
+      [
+        "Local",
+        "kontrol"
+      ]
+    ],
+    "value": [
+      [
+        "daloy",
+        "proseso"
+      ],
+      [
+        "Auto",
+        "mabilis"
+      ],
+      [
+        "Data",
+        "kontrol"
+      ]
+    ],
+    "risk": [
+      [
+        "gumagamit",
+        "mga pahintulot"
+      ],
+      [
+        "Data",
+        "kaligtasan"
+      ],
+      [
+        "AI",
+        "pagsusuring tao"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "pagpopondo"
+      ],
+      [
+        "USD",
+        "yugto"
+      ],
+      [
+        "Pause",
+        "kontrol"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "mabilis"
+      ],
+      [
+        "yugto",
+        "plano"
+      ],
+      [
+        "QA",
+        "kontrol"
+      ]
+    ],
+    "summary": [
+      [
+        "landas",
+        "buod"
+      ],
+      [
+        "Email",
+        "buod ng proyekto"
+      ],
+      [
+        "pagsusuring tao",
+        "kontak"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Filipino",
+      "title": "100% pinopondohang pasadyang teknolohiya para lumago nang hindi nauubos ang kapital",
+      "copy": "Ginagawang matalinong sistema, awtomasyon at pasadyang artipisyal na intelihensiya ng Hashinmy ang mga proseso ng negosyo. Sinusuri namin ang operasyon, hinahanap kung saan nawawala ang oras, pera o impormasyon, at gumagawa ng teknolohiyang maaaring pondohan nang 100% para mag-modernize nang hindi nangangailangan ng malaking unang puhunan.\nHindi kami ahensiya ng website o pangkaraniwang supplier: kami ay kasosyong teknolohikal na pinag-uugnay ang estratehiya sa negosyo, inhinyeriya ng sistema, ginagamit na AI at abot-kayang pagpopondo.\nMay kaalaman, karanasan at pananaw na ang kumpanya mo. Ginagawa namin itong mga sistemang nag-aayos ng benta, kotasyon, imbentaryo, suporta, data, panloob na proseso at digital na channel, habang inaalagaan ang cash flow habang nagsisimulang magbigay ng halaga ang solusyon.",
+      "optionQuestion": "Ano ang pinaka-komportableng unang hakbang para sa kumpanya mo?",
+      "progress": "Simula",
+      "core": "HASHINMY",
+      "insight": "Maaari kang magsimula sa pagsusuri, pagpopondo o direktang alok-presyo; nagsisimula ang Hashinmy sa totoong problema bago tukuyin ang saklaw, paraan ng bayad o teknolohiya.",
+      "options": [
+        {
+          "label": "Operasyonal na pagsusuri",
+          "hint": "Gusto kong makita ng Hashinmy kung saan nawawala ang oras, pera o impormasyon",
+          "tech": "pagsusuri ng operasyon + teknikal na landas + pinansyal na posibilidad",
+          "insight": "Gusto kong unahin ang pag-unawa sa operasyon ko, matukoy ang prosesong pinaka-nagpapabagal sa negosyo at makatanggap ng malinaw na landas bago magpasya kung mas bagay ang pagpopondo, direktang alok-presyo o phased pagbuo."
+        },
+        {
+          "label": "100% pagpopondo",
+          "hint": "Gusto kong mag-modernize nang walang malaking paunang bayad",
+          "tech": "100% pagpopondo",
+          "insight": "Gusto kong ituloy ang development na 100% pinondohan at bayaran ito sa madaling pamahalaang hulog habang nagsisimula nang gumawa ng halaga ang sistema."
+        },
+        {
+          "label": "Direktang alok-presyo",
+          "hint": "Gusto kong malaman ang saklaw at presyo nang walang pagpopondo",
+          "tech": "direktang alok-presyo",
+          "insight": "Gusto kong makatanggap ng direktang panukala na may malinaw na saklaw, presyo at timeline para makapagpasya nang walang pagpopondo plan."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "landas",
+      "title": "Aling proseso ang kailangang tumigil sa panghuhula?",
+      "optionQuestion": "Saan pinakamasakit ang operasyon ngayon?",
+      "copy": "Piliin kung saan pinakamaraming oras, kontrol o benta ang nawawala sa kumpanya mo. Hindi nagsisimula ang Hashinmy sa pagbenta ng hiwalay na serbisyo; inuuna nitong intindihin ang operasyon at pagkatapos ay nagtatakda ng landasng nagdurugtong sa software, AI, awtomasyon at isang praktikal na paraan ng pagpapatupad.",
+      "progress": "landas",
+      "core": "Serbisyo",
+      "insight": "Pinipili ko ang pangangailangang may pinakamalaking epekto sa productivity, commercial flow o pang-operasyon kontrol para ang unang teknolohikal na solusyon ay tumugon sa tunay na sakit ng negosyo.",
+      "options": [
+        {
+          "label": "Gumawa ng sariling software",
+          "hint": "Plataporma, app o sistema para sa operasyon mo",
+          "tech": "product engineering",
+          "insight": "Gusto kong bumuo ng pasadyang sistema na gagawing sariling, scalable at measurable na tool ang kaalaman ng kumpanya ko."
+        },
+        {
+          "label": "Gawing awtomatiko gamit ang AI",
+          "hint": "Mas kaunting paulit-ulit na trabaho at mas mabilis na operasyon",
+          "tech": "awtomasyon + AI",
+          "insight": "Gusto kong bawasan ang manwal na trabaho, mga pagkakamali at mabagal na tugon gamit ang awtomasyon, matalinong tagatulong at integrasyon na konektado sa totoong negosyo."
+        },
+        {
+          "label": "I-modernize ang operasyon",
+          "hint": "Ayusin ang Excel, WhatsApp o lumang sistema",
+          "tech": "legacy modernization",
+          "insight": "Gusto kong palitan ang kalat-kalat na proseso ng konektadong operasyon na may reliable data, malinaw na permiso at traceability."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produkto",
+      "title": "Saan dapat buksan ang software mo?",
+      "optionQuestion": "Saan mo gustong gamitin ito?",
+      "copy": "Dapat sumunod ang teknikal na base sa tunay na paraan ng trabaho ng negosyo. Maaari itong browser, cellphone, PC o kombinasyon na ginagawa sa yugto, palaging may arkitektura na handang lumaki nang hindi nire-repagbuo ang sistema mula sa simula.",
+      "progress": "Produkto",
+      "core": "Buo",
+      "options": [
+        {
+          "label": "Sa browser",
+          "hint": "Mula kahit saan gamit ang web at backend",
+          "tech": "web + backend",
+          "insight": "Gusto ko ng access sa web browser, may server, database at landasng handa para lumaki."
+        },
+        {
+          "label": "Sa cellphone",
+          "hint": "Para sa benta, suporta o field work team gamit ang app/PWA",
+          "tech": "mobile/PWA",
+          "insight": "Kailangan ko ng mabilis na experience sa phones na may synchronized data."
+        },
+        {
+          "label": "Sa isang PC",
+          "hint": "Internal o kritikal use gamit ang desktop/local",
+          "tech": "desktop/local",
+          "insight": "Kailangan ko ng lokal na kontrol, maayos na takbo at matatag na panloob na operasyon."
+        }
+      ],
+      "insight": "Dapat bumukas ang plataporma kung saan nagtatrabaho na ang team mo, para ayusin ng teknolohiya ang operasyon nang hindi pinipilit ang negosyo sa hindi komportableng tool."
+    },
+    "automationType": {
+      "eyebrow": "AI · awtomasyon",
+      "title": "Aling bahagi ang dapat gawin ng sistema para sa iyo?",
+      "optionQuestion": "Ano ang gusto mong gawing awtomatiko muna?",
+      "copy": "May saysay lang ang AI at awtomasyon kapag nilulutas nito ang konkretong abala: paulit-ulit na gawain, mabagal na attention, kalat-kalat na data, desisyong kulang sa impormasyon o prosesong masyadong umaasa sa memorya ng tao.",
+      "progress": "awtomasyon",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "Paulit-ulit na gawain",
+          "hint": "Mas kaunting copy at paste gamit ang RPA at APIs",
+          "tech": "RPA/API",
+          "insight": "Gusto ko ng process robots, integrasyon at automatic flows na nagbabawas ng paulit-ulit na trabaho."
+        },
+        {
+          "label": "AI na katulong",
+          "hint": "Mag-classify, mag-summarize o sumagot gamit ang AI",
+          "tech": "AI na katulong",
+          "insight": "Gusto ko ng kapaki-pakinabang na AI na may malinaw na rules, traceability at ligtas na limits."
+        },
+        {
+          "label": "Nakikitang data",
+          "hint": "Indicators at ulat gamit ang dashboard/BI",
+          "tech": "BI/dashboard",
+          "insight": "Kailangan kong makita ang operasyon ko sa mga numero para makapagdesisyon nang mas maayos."
+        }
+      ],
+      "insight": "Nagsisimula ang tamang awtomasyon sa trabahong pinaka-paulit-ulit, pinaka-nade-delay o pinaka-nagdudulot ng pagkakamaling pantao sa araw-araw na operasyon."
+    },
+    "modernization": {
+      "eyebrow": "modernisasyon",
+      "title": "Ano ang gusto mong iwanan?",
+      "optionQuestion": "Ano ang gusto mong palitan muna?",
+      "copy": "Ang modernisasyon ay hindi pagpapalit ng kasangkapan dahil uso; ito ay paggawa sa mga spreadsheet, hiwa-hiwalay na mensahe at lumang sistema bilang mas malinaw, mas ligtas, nasusukat at handang lumaking operasyon na may mas kaunting pagkakamali.",
+      "progress": "modernisasyon",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel o lumang sistema",
+          "hint": "Lumipat sa kontrolled workflows",
+          "tech": "daloy ng trabaho + roles",
+          "insight": "Gusto kong palitan ang sheets at manual proseso ng mga module na may permiso."
+        },
+        {
+          "label": "Magkakahiwalay na kasangkapan",
+          "hint": "Pagdugtungin ang data at actions gamit ang APIs",
+          "tech": "API integration",
+          "insight": "Gusto kong mag-usap ang sistema ko at maiwasan ang dobleng pagta-type ng data."
+        },
+        {
+          "label": "Hindi propesyonal na imahe",
+          "hint": "Mas magandang experience at benta gamit ang UX/UI",
+          "tech": "UX/UI + producto",
+          "insight": "Gusto ko ng plataporma na nagpapakita ng tiwala, linaw at handa para magbenta nang mas marami."
+        }
+      ],
+      "insight": "Ang pag-iwan sa mga spreadsheet, hiwa-hiwalay na mensahe at lumang sistema ay nagbabalik ng traceability, bilis at kontrol nang hindi binabago ang esencia ng negosyo."
+    },
+    "operation": {
+      "eyebrow": "arkitektura",
+      "title": "Paano ito dapat gamitin sa totoong buhay?",
+      "optionQuestion": "Saan kailangan itong gumana nang mas mahusay?",
+      "copy": "Dapat gumana ang software kung saan nangyayari ang trabaho: opisina, field work, benta, produksiyon, suporta o pamamahala. Tinutukoy ng sagot na ito ang synchronization, permiso, backend, mobile experience o lokal na kontrol ayon sa totoong operasyon.",
+      "progress": "Gamit",
+      "core": "Arkitektura",
+      "options": [
+        {
+          "label": "Mula kahit saan",
+          "hint": "Online users gamit ang web at backend",
+          "tech": "cloud backend",
+          "insight": "Gusto ko ng browser, server at data na handang gamitin kapag kailangan ko."
+        },
+        {
+          "label": "Team na laging gumagalaw",
+          "hint": "Cellphone o tablet gamit ang PWA/app",
+          "tech": "mobile first",
+          "insight": "Kailangan ko ng bilis sa cellphone, malinaw na permiso at maaasahang pagsi-sync."
+        },
+        {
+          "label": "PC o panloob network",
+          "hint": "Local kontrol gamit ang desktop/local",
+          "tech": "desktop/local",
+          "insight": "Kailangan kong malakas itong gumana sa desktop at makapag-sync pagkatapos."
+        }
+      ],
+      "insight": "Pinipili ang arkitektura mula sa tunay na paggamit para gumana ang sistema sa opisina, field work, benta, produksiyon o suporta nang walang hindi kailangang abala."
+    },
+    "value": {
+      "eyebrow": "Halaga",
+      "title": "Ano ang dapat unang umayos?",
+      "optionQuestion": "Anong resulta ang gusto mong mapansin muna?",
+      "copy": "Dapat maramdaman agad na kapaki-pakinabang ang magandang plataporma: inaayos nito ang mga kaso, ginagawang awtomatiko ang gawain, nagpapakita ng datos na puwedeng gamiting agad at tumutulong magbenta nang mas maayos. Dinisenyo ang halaga para magsimulang bigyang-katwiran ng sistema ang puhunan sa loob ng operasyon.",
+      "progress": "Halaga",
+      "core": "Halaga",
+      "options": [
+        {
+          "label": "Ayusin ang proseso",
+          "hint": "Estadoes, roles at permiso gamit ang workflow",
+          "tech": "workflow + RBAC",
+          "insight": "Una kong gustong ayusin kung paano gumagalaw ang bawat case sa negosyo ko."
+        },
+        {
+          "label": "Gawing awtomatiko ang trabaho",
+          "hint": "Makatipid ng pang-operasyon time gamit ang RPA/API",
+          "tech": "RPA/API",
+          "insight": "Gusto kong mabawi ang oras sa pamamagitan ng pagbawas ng paulit-ulit na gawain at pagkakamaling pantao."
+        },
+        {
+          "label": "Sukatin gamit ang data o AI",
+          "hint": "Reports, alerts o katulong gamit ang BI/AI",
+          "tech": "BI + AI",
+          "insight": "Gusto kong gawing nakikitang desisyon ang kalat-kalat na impormasyon."
+        }
+      ],
+      "insight": "Dapat patunayan ng unang nakikitang halaga ang puhunan: mas maraming ayos, mas kaunting sayang na oras, mas magandang data, mas mataas na productivity o mas maraming benta opportunities."
+    },
+    "risk": {
+      "eyebrow": "tiwala · kontrol",
+      "title": "Ano ang dapat mas protektado ang pakiramdam?",
+      "optionQuestion": "Ano ang gusto mong mas protektahan?",
+      "copy": "Dinisenyo ang tiwala mula sa unang module gamit ang roles, permiso, audit, pagpapatunay at limits para sa AI. Sa ganitong paraan, bumibilis ang kumpanya nang hindi nawawala ang kontrol sa data, desisyon at kritikal proseso.",
+      "progress": "kaligtasan",
+      "core": "tiwala",
+      "options": [
+        {
+          "label": "Users at permiso",
+          "hint": "Bawat role ay nakikita lang ang kailangan gamit ang RBAC",
+          "tech": "RBAC + auditoría",
+          "insight": "Gusto ko ng roles, permiso, history of changes at access kontrol mula sa simula."
+        },
+        {
+          "label": "Sensitive data",
+          "hint": "Traceability at pagpapatunay gamit ang proteksiyon",
+          "tech": "proteksiyong dinisenyo mula simula",
+          "insight": "Kailangan ko ng pagpapatunay, event records at proteksyon ng kritikal information ko."
+        },
+        {
+          "label": "AI o kritikal proseso",
+          "hint": "Awtomasyong may pagsusuri ng tao at pamamahala",
+          "tech": "AI pamamahala",
+          "insight": "Gusto ko ng AI at awtomasyon na may limits, traceability at pagsusuri ng tao kapag kailangan."
+        }
+      ],
+      "insight": "Kailangan ng paglago ng kontrol; kaya dinidisenyo muna ang permiso, audit, pagpapatunay at mga limitasyon ng AI bago gawing awtomatiko ang kritikal proseso."
+    },
+    "finance": {
+      "eyebrow": "protektadong kapital · pagpopondo",
+      "title": "Paano ka magmo-modernize nang hindi nauubos ang kapital?",
+      "optionQuestion": "Aling modalidad ang nagpapahintulot na umusad ngayon?",
+      "copy": "Sa Hashinmy, hindi kailangang pumili ng kumpanya sa pagitan ng pagprotekta sa pera at pag-modernize. Inaayos namin ang saklaw, pinopondohan ang 100% ng development kapag pinapayagan ng pagsusuri, at nagtatakda ng madaling pamahalaang hulog para magsimulang gumawa ng halaga ang software habang binabayaran ito.\nHindi pinapalitan ng pagpopondo ang engineering; ginagawa nitong abot-kaya ang engineering sa mga kumpanyang kailangang ayusin ang proseso, gawing awtomatiko ang trabaho, isama ang AI at lumago nang hindi nauubos ang kapital.",
+      "progress": "pagpopondo",
+      "core": "USD",
+      "options": [
+        {
+          "label": "Pondohan ang 100%",
+          "hint": "Mag-develop nang walang malaking paunang bayad",
+          "tech": "100% pagpopondo",
+          "insight": "Gusto kong protektahan ang pang-operasyon capital at bayaran ang development sa madaling pamahalaang hulog habang nagsisimulang magtipid ng oras o gumawa ng benta ang software."
+        },
+        {
+          "label": "Bumuo por phases",
+          "hint": "Unahin ang module na nagbibigay ng pinakamalaking halaga",
+          "tech": "roadmap modular",
+          "insight": "Gusto kong unahin ang isang kapaki-pakinabang na unang bersyon, i-validate ang results at palawakin ang sistema na may technical at financial kontrol."
+        },
+        {
+          "label": "Makipag-usap sa advisor",
+          "hint": "Kailangan ko ng technical at financial guidance",
+          "tech": "human pagsusuri",
+          "insight": "Gusto kong suriin ng Hashinmy ang case ko at magmungkahi ng viable na landas ayon sa operasyon, priority, saklaw at paraan ng bayad."
+        }
+      ],
+      "insight": "Ginagawang viable ng pagpopondo ang pagsisimula ngayon, pagprotekta sa pang-operasyon capital at pagbabayad habang nagtitipid ng oras, nag-aayos ng proseso o nagpapalakas ng benta ang teknolohiya."
+    },
+    "timeline": {
+      "eyebrow": "Bilis",
+      "title": "Gaano kabilis dapat itong huminga?",
+      "optionQuestion": "Aling ritmo ang mas bagay sa iyo?",
+      "copy": "Tinutukoy ng ritmo kung paano gagawing kapaki-pakinabang na deliveries ang malaking pangangailangan. Maaari tayong magsimula sa MVP, maikling phase o enterprise arkitektura, habang tinitiyak na may pang-operasyon at financial halaga ang bawat hakbang.",
+      "progress": "Bilis",
+      "core": "plano",
+      "options": [
+        {
+          "label": "Sa lalong madaling panahon",
+          "hint": "Unang functional version gamit ang MVP",
+          "tech": "MVP",
+          "insight": "Gusto kong hanapin ang pinakamaliit na core na nakapagbibigay na ng halaga."
+        },
+        {
+          "label": "1 hanggang 3 buwan",
+          "hint": "Validated modular pagbuo sa short phases",
+          "tech": "short phases",
+          "insight": "Gusto kong tukuyin ang saklaw, mag-develop, mag-test at mag-launch nang may kontrol."
+        },
+        {
+          "label": "Enterprise yugto",
+          "hint": "Matibay na arkitektura gamit ang roadmap enterprise",
+          "tech": "roadmap enterprise",
+          "insight": "Gusto ko ng proteksiyon, scaling, audit at planned evolution."
+        }
+      ],
+      "insight": "Ginagawa ng tamang ritmo ang malaking pangangailangan bilang kapaki-pakinabang, nasusukat at maaaring pondohang deliveries nang hindi nawawala ang buong vision ng sistema."
+    },
+    "summary": {
+      "eyebrow": "landas · buod",
+      "title": "Handa na ang iyong teknolohikal na landas.",
+      "copy": "May paunang basa na tayo sa pangangailangan, paraan ng bayad at pang-operasyon priority. Idagdag ang kulang na konteksto para masuri ng Hashinmy ang operasyon mo, magmungkahi ng pasadyang solusyon at maghanda ng viable na teknikal, komersyal at pinansyal na landas.\nDapat ikonekta ng susunod na usapan ang business problem, panloob knowledge, saklaw ng sistema, priority, inaasahang halaga at paraan ng bayad, habang pinoprotektahan ang daloy ng pera habang nagsisimulang magdala ng results ang software.",
+      "progress": "buod ng proyekto",
+      "core": "buod ng proyekto",
+      "insight": "Handa na ang landas para ikonekta ang pangangailangan, kaalaman ng kumpanya, teknikal na saklaw, pang-operasyon priority, inaasahang halaga at modelo ng bayad sa isang viable na panukala.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "landas",
+    "service": "Serbisyo",
+    "operation": "Gamit",
+    "value": "Halaga",
+    "risk": "kaligtasan",
+    "financing": "pagpopondo",
+    "timeline": "Bilis"
+  },
+  "valueLabels": {
+    "diagnostico": "buod ng proyekto · landas",
+    "producto_digital": "pasadyang software · produkto",
+    "automatizacion_ia": "awtomasyon · AI",
+    "modernizacion_operativa": "modernisasyon · proseso",
+    "software_online": "software sa web",
+    "app_movil": "app sa cellphone",
+    "software_pc": "software para sa PC",
+    "automatizacion": "awtomasyon · proseso",
+    "ia": "AI · integrasyon",
+    "modernizacion": "modernisasyon",
+    "web_global": "web · landas",
+    "mobile_first": "app sa cellphone · gamit",
+    "pc_local": "PC · kontrol",
+    "workflow": "daloy ng trabaho · proseso",
+    "automation": "awtomasyon · mabilis",
+    "analytics": "data · ulat",
+    "ai": "AI · pagsusuring tao",
+    "experience": "UX/UI · tiwala",
+    "analytics_ai": "data · AI",
+    "roles_permisos": "gumagamit · pahintulot",
+    "datos_sensibles": "data · kaligtasan",
+    "ia_controlada": "AI · pagsusuring tao",
+    "financiamiento_100": "100% pagpopondo",
+    "sin_financiacion": "direktang alok-presyo",
+    "fases": "direktang alok-presyo · yugto",
+    "contacto_directo": "kontak · pagsusuring tao",
+    "mvp_rapido": "mabilis · MVP",
+    "1_3_meses": "1-3 · yugto",
+    "enterprise": "enterprise · plano"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "Pasadyang sistema para sa kumpanya",
+      "operation": "Arkitektura ayon sa totoong operasyon",
+      "value": "Operasyonal na halaga na uunahin",
+      "risk": "Mga kontrol na dapat tukuyin",
+      "financing": "Paraan ng pagpopondo na dapat tukuyin",
+      "timeline": "Bilis na dapat tukuyin",
+      "technical": "modular na arkitektura para sa produktibidad"
+    },
+    "technicalParts": {
+      "software_online": "web plataporma",
+      "app_movil": "app sa cellphone/PWA",
+      "software_pc": "desktop/lokal na aplikasyon",
+      "automatizacion": "awtomasyon gamit ang RPA/API",
+      "ia": "AI layer na may pagsusuri",
+      "modernizacion": "modular na modernisasyon",
+      "web_global": "likurang sistema + database",
+      "mobile_first": "mobile na synchronization",
+      "pc_local": "lokal na kontrol na may opsyonal na synchronization",
+      "workflow": "roles/permiso at mga estado",
+      "automation": "integrasyon at process robots",
+      "analytics": "dashboard/BI",
+      "ai": "matalinong katulong",
+      "analytics_ai": "BI + AI",
+      "experience": "premium UX/UI",
+      "roles_permisos": "RBAC at audit ng user",
+      "datos_sensibles": "validasyon at traceability ng data",
+      "ia_controlada": "pamamahala ng AI na may pagsusuring tao"
+    },
+    "controlBase": [
+      "validasyon ng data",
+      "traceability"
+    ],
+    "controlParts": {
+      "web_global": "roles/permiso",
+      "software_online": "roles/permiso",
+      "ia": "pagsusuring tao",
+      "analytics_ai": "pagsusuring tao",
+      "ai": "pagsusuring tao",
+      "automatizacion": "audit ng awtomasyon",
+      "automation": "audit ng awtomasyon",
+      "roles_permisos": "matrix ng roles",
+      "datos_sensibles": "proteksiyon ng sensitive data",
+      "ia_controlada": "pagsusuring tao · kontrol",
+      "financiamiento_100": "malinaw na kondisyon ng 100% pagpopondo",
+      "sin_financiacion": "malinaw na scope, presyo at panahon"
+    },
+    "nextSteps": {
+      "noService": "Komersyal na pagsusuri na may paunang konteksto ng operasyon",
+      "mvp": "Executive diagnosis + unang module na may halaga",
+      "enterprise": "Enterprise architecture na maaaring pondohan kada yugto",
+      "default": "Teknikal, komersyal at pinansyal na landas"
+    }
+  },
+  "schemaVersion": 1
+}

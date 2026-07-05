@@ -1,0 +1,1 @@
+Prompt para logo CleanMAX: recrear o preparar el logo oficial de CleanMAX respetando su composición original, proporciones, colores, tipografía y contraste. Debe ser un archivo limpio para uso web en assets/logo_clean_MAX.jpg, centrado, legible, sin añadir textos nuevos, sin alterar la marca y optimizado para mostrarse dentro de una tarjeta de prueba social empresarial.

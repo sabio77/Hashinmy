@@ -1,0 +1,738 @@
+{
+  "iso": "tr",
+  "name": "Turkish",
+  "nativeName": "Türkçe",
+  "htmlLang": "tr",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | %100 finanse edilebilen yazılım, yapay zekâ ve otomasyon",
+    "description": "Hashinmy, şirketleri nakit akışını zayıflatmadan modernleştirmek için %100 finansmanla özel yazılım, yapay zekâ ve otomasyon geliştirir.",
+    "ogTitle": "Hashinmy | %100 finanse edilebilen özel iş teknolojisi",
+    "ogDescription": "Operasyonel teşhis ve geliştirme için %100 finansmanla özel yazılım, yapay zekâ ve otomasyon oluşturan teknoloji ortağı.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, %100 finanse edilebilen özel yazılım, finanse edilebilen iş teknolojisi, şirketler için dijital mühendislik, uygulamalı yapay zekâ, iş süreçleri otomasyonu, nakit akışını zayıflatmadan dijital dönüşüm, finansmanlı yazılım geliştirme, şirketler için akıllı sistemler, süreçleri düzenleyen yazılım, satış otomasyonu, teklif otomasyonu, stok yazılımı, özel CRM, hafif özel ERP, iş API’leri, kurumsal sohbet botları, satış kanalı olarak web siteleri, özel dijital platformlar, yönetilebilir taksitlerle yazılım, iş modernizasyonu, kurumsal üretkenlik, operasyonel kontrol, iş raporları, korunan nakit akışı, Medellín’de yazılım geliştirme, Kolombiya’da kurumsal yazılım, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "Seç · rota",
+    "stageLabel": "Hashinmy · deneyim · rota",
+    "topbarLabel": "kontroller · Hashinmy",
+    "brandAria": "Yeniden başlat · Hashinmy",
+    "brandSmall": "özel yazılım · yapay zekâ",
+    "progressLabel": "rota · Tempo",
+    "languageLabel": "Dil",
+    "languageAria": "Seç · Dil",
+    "contentLabel": "deneyim · proje özeti",
+    "pathLabelAria": "rota · özet",
+    "decisionZoneLabel": "Seç · Hizmet",
+    "summaryLabelAria": "özet · proje özeti",
+    "footerLabel": "kontroller · rota",
+    "primaryFinance": "Teşhis iste",
+    "primaryQuote": "Sistemim için teklif al",
+    "back": "Geri",
+    "restart": "Yeniden başlat",
+    "contactLabel": "iletişim · Hashinmy",
+    "contactPlaceholder": "Email · WhatsApp · iletişim",
+    "commentLabel": "Projenizi açıklayın",
+    "commentPlaceholder": "Hangi süreci düzenlemek, otomatikleştirmek veya yazılıma dönüştürmek istediğinizi anlatın: satış, teklifler, stok, üretim, destek, veri, müşteri hizmeti, web sitesi, API, sohbet botu veya platform. Net bir teknik ve finansal yol hazırlamak için size zaman, para ya da bilgi kaybettiren noktayı da ekleyin.",
+    "submitRoute": "Rotayı Hashinmy’ye gönder",
+    "copySummaryAction": "Özeti kopyala",
+    "formNote": "Yanıtlarınız göndermeye karar verene kadar yalnızca bu tarayıcıda saklanır.",
+    "contactRequired": "Hashinmy’nin hazırlanmış rota ile size ulaşabilmesi için e-posta, WhatsApp veya şirket adı ekleyin.",
+    "copySuccess": "Özet kopyalandı. WhatsApp, e-posta veya CRM içine yapıştırabilirsiniz.",
+    "copyFailure": "Özet kopyalanamadı; rotayı form üzerinden Hashinmy’ye gönderin.",
+    "mailOpening": "Hazırlanmış rota e-postada açılıyor; Hashinmy’ye göndermeden önce kontrol edin.",
+    "waitSummary": "özet · proje özeti",
+    "preparingOptions": "Seçenekler hazırlanıyor",
+    "optionFallback": "Seç · rota",
+    "pathLabel": "rota · özet",
+    "pathEmpty": "Her seçim proje özetiinizi oluşturur",
+    "interactionFallback": "deneyim",
+    "summaryTitle": "Hashinmy tarafından hazırlanan teknoloji yolu",
+    "projectChosen": "Ürün · Seç",
+    "expectedUse": "Kullanım",
+    "wantedValue": "Değer",
+    "prioritySecurity": "güvenlik",
+    "paymentMode": "finansman",
+    "financing": "finansman",
+    "pace": "Tempo",
+    "technicalBase": "Önerilen teknik temel",
+    "suggestedControls": "kontroller",
+    "nextStep": "yol haritası · aşamalar",
+    "contact": "iletişim",
+    "additionalComment": "İsteğe bağlı yorum",
+    "registeredInteractions": "rota · özet",
+    "directRouteRequested": "doğrudan teklif. rota.",
+    "directQuoteSubject": "Hashinmy · doğrudan teklif",
+    "financedSubject": "Hashinmy · özel yazılım · finansman",
+    "directQuoteAudit": "doğrudan teklif. proje özeti. rota.",
+    "financeAudit": "%100 finansman. proje özeti. rota.",
+    "directQuoteTech": "doğrudan teklif · proje özeti",
+    "financeTech": "USD · aşamalar · proje özeti",
+    "topActionsLabel": "Ürünler · Dil",
+    "proofEntryAria": "Deneyimimiz · Hashinmy",
+    "proofOpenButton": "Deneyimimiz",
+    "proofTitle": "Deneyimimiz",
+    "proofLead": "Hashinmy deneyim: özel yazılım. yapay zekâ + otomasyon. mobil uygulama + PC yazılımı. %100 finansman / doğrudan teklif.",
+    "proofCloseAria": "Kapat · Deneyimimiz",
+    "proofContentAria": "Deneyimimiz · Sık sorulan sorular",
+    "proofSummaryAria": "güven · kontroller",
+    "proofSummaryTitle": "güven · kontroller · Hashinmy",
+    "proofTrustLabel": "güven · kontroller:",
+    "proofTrustText": "Güvenlik sona eklenmez; izinler, denetim ve net kurallarla baştan tasarlanır. Hashinmy bu seçimi kapsam, kontroller ve sonraki adımları olan net bir rotaya dönüştürür; böylece işletme daha az sürtünmeyle satış yapar, çalışır veya büyür. Hashinmy deneyim: özel yazılım. yapay zekâ + otomasyon. mobil uygulama + PC yazılımı. %100 finansman / doğrudan teklif.",
+    "proofMethodLabel": "Metodoloji:",
+    "proofMethodText": "Gerçek operasyonu inceler, zaman, para veya bilgi kaybının nerede oluştuğunu belirler, en yüksek geri dönüş sağlayan modülü önceliklendirir, tam çözümü tasarlar ve finansman, uygulama, test, benimseme ve evrim süreçlerinde eşlik ederiz.",
+    "proofUseCasesLabel": "Kullanım alanları:",
+    "proofUseCasesText": "satış, teklifler, stok, üretim, destek, CRM, portallar, e-ticaret, otomatik müşteri hizmeti, raporlar, API’ler ve bugün dosyalara, WhatsApp’a ya da insan hafızasına bağlı iç süreçler.",
+    "proofBrandsTitle": "Çalışmamızla ilişkili markalar, projeler ve şirketler",
+    "proofBrandsAria": "Çalışmamızla ilişkili markalar, projeler ve şirketler",
+    "proofLogoPlaceholder": "Deneyimimiz Hashinmy",
+    "proofLogoAltTemplate": "{name} logosu",
+    "proofFaqAria": "Sık sorulan sorular · Deneyimimiz",
+    "proofFaqWhyQuestion": "Neden Hashinmy seçilmeli?",
+    "proofFaqWhyAnswer": "rota Seç. yazılım proje özeti. finansman / Şimdi teklif al.",
+    "proofFaqWhoQuestion": "Kimler için?",
+    "proofFaqWhoAnswer": "rota Seç. yazılım proje özeti. finansman / Şimdi teklif al. Güvenlik sona eklenmez; izinler, denetim ve net kurallarla baştan tasarlanır. Hashinmy bu seçimi kapsam, kontroller ve sonraki adımları olan net bir rotaya dönüştürür; böylece işletme daha az sürtünmeyle satış yapar, çalışır veya büyür.",
+    "proofFaqStartQuestion": "Nasıl başlarım?",
+    "proofFaqStartAnswer": "Rotanız hazır. Göndermeden önce önemli gördüğünüz ayrıntıları ekleyebilirsiniz; Hashinmy ekibi proje yönünü, finansman seçeneğini ve sonraki adımları net ticari ve teknik bağlamla inceleyecek. doğrudan teklif. proje özeti. rota.",
+    "proofBrandsStructuredDescription": "Çalışmamızla ilişkili markalar, projeler ve şirketler"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · yazılım",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobil uygulama",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC yazılımı",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "otomasyon",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "yapay zekâ · entegrasyon",
+      "tech": "yapay zekâ · iş akışı",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernizasyon",
+      "tech": "yazılım · kontroller",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "korunan sermaye"
+    },
+    "serviceFamily": {
+      "symbol": "rota",
+      "label": "Hizmet · Seç"
+    },
+    "buildType": {
+      "symbol": "Geliştirme",
+      "label": "Ürün"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "otomasyon"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernizasyon"
+    },
+    "operation": {
+      "symbol": "Kullanım",
+      "label": "Kullanım"
+    },
+    "value": {
+      "symbol": "Değer",
+      "label": "Değer · kontroller"
+    },
+    "risk": {
+      "symbol": "güven",
+      "label": "güvenlik · kontroller"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "%100 finansman"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "yol haritası"
+    },
+    "summary": {
+      "symbol": "özet",
+      "label": "proje özeti"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "özel"
+      ],
+      [
+        "AI",
+        "otomasyon"
+      ],
+      [
+        "PC",
+        "mobil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "rota"
+      ],
+      [
+        "6",
+        "Hizmet"
+      ],
+      [
+        "1",
+        "proje özeti"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "süreçler"
+      ],
+      [
+        "AI",
+        "insan incelemesi"
+      ],
+      [
+        "BI",
+        "raporlar"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernizasyon"
+      ],
+      [
+        "API",
+        "entegrasyon"
+      ],
+      [
+        "UX",
+        "güven"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Kullanım"
+      ],
+      [
+        "Local",
+        "kontroller"
+      ]
+    ],
+    "value": [
+      [
+        "iş akışı",
+        "süreçler"
+      ],
+      [
+        "Auto",
+        "hızlı"
+      ],
+      [
+        "Data",
+        "kontroller"
+      ]
+    ],
+    "risk": [
+      [
+        "kullanıcılar",
+        "izinler"
+      ],
+      [
+        "Data",
+        "güvenlik"
+      ],
+      [
+        "AI",
+        "insan incelemesi"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "finansman"
+      ],
+      [
+        "USD",
+        "aşamalar"
+      ],
+      [
+        "Pause",
+        "kontroller"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "hızlı"
+      ],
+      [
+        "aşamalar",
+        "yol haritası"
+      ],
+      [
+        "QA",
+        "kontroller"
+      ]
+    ],
+    "summary": [
+      [
+        "rota",
+        "özet"
+      ],
+      [
+        "Email",
+        "proje özeti"
+      ],
+      [
+        "insan incelemesi",
+        "iletişim"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Türkçe",
+      "title": "Nakit kaybı yaşamadan büyümek için %100 finanse edilebilen özel teknoloji",
+      "copy": "Hashinmy, iş süreçlerini özel akıllı yazılıma, otomasyona ve yapay zekâya dönüştürür. Operasyonu analiz eder, zamanın, paranın veya bilginin nerede kaybolduğunu bulur ve büyük bir ilk yatırım gerektirmeden modernleşmek için %100 finanse edilebilen teknoloji geliştirir.\nBiz bir web sitesi ajansı ya da genel bir tedarikçi değiliz; iş stratejisini, yazılım mühendisliğini, uygulamalı yapay zekâyı ve erişilebilir finansmanı birleştiren bir teknoloji ortağıyız.\nŞirketinizin zaten bilgisi, deneyimi ve vizyonu var. Biz bunu satışları, teklifleri, stokları, desteği, verileri, iç süreçleri ve dijital kanalları düzenleyen sistemlere dönüştürürüz; çözüm değer üretmeye başlarken nakit akışını koruruz.",
+      "optionQuestion": "Şirketiniz için en rahat ilk adım hangisi?",
+      "progress": "Başlangıç",
+      "core": "HASHINMY",
+      "insight": "Teşhis, finansman veya doğrudan teklif ile başlayabilirsiniz; Hashinmy kapsamı, ödeme şeklini veya teknolojiyi tanımlamadan önce gerçek sorundan yola çıkar.",
+      "options": [
+        {
+          "label": "Operasyonel teşhis",
+          "hint": "Hashinmy’nin zaman, para veya bilgi kaybının nerede olduğunu bulmasını istiyorum",
+          "tech": "operasyon analizi + teknik yol + finansal fizibilite",
+          "insight": "Operasyonumu anlayarak başlamak, işi en çok yavaşlatan süreci tespit etmek ve finansman mı, doğrudan teklif mi yoksa aşamalı inşa mı daha uygun kararından önce net bir yol almak istiyorum."
+        },
+        {
+          "label": "%100 finansman",
+          "hint": "Büyük ilk ödeme yapmadan modernleşmek istiyorum",
+          "tech": "%100 finansman",
+          "insight": "Geliştirmeyi %100 finanse ederek ilerlemek ve sistem değer üretmeye başlarken yönetilebilir taksitlerle ödemek istiyorum."
+        },
+        {
+          "label": "Doğrudan teklif",
+          "hint": "Finansmansız kapsamı ve fiyatı bilmek istiyorum",
+          "tech": "doğrudan teklif",
+          "insight": "Finansman planı olmadan karar verebilmek için kapsamı, fiyatı ve süreleri net olan doğrudan bir öneri almak istiyorum."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "İlk kapı",
+      "title": "Hangi süreç artık doğaçlama yürümemeli?",
+      "optionQuestion": "Operasyon bugün en çok nerede zorlanıyor?",
+      "copy": "Şirketinizin en çok zamanı, kontrolü veya satışı nerede kaybettiğini seçin. Hashinmy ayrı bir hizmet satmakla başlamaz; önce operasyonu anlar, sonra yazılımı, yapay zekâyı, otomasyonu ve uygulanabilir bir yürütme biçimini bağlayan yolu tanımlar.",
+      "progress": "Yol",
+      "core": "Hizmet",
+      "insight": "Üretkenliği, ticari akışı veya operasyonel kontrolü en çok etkileyen ihtiyacı seçiyorum; böylece ilk teknoloji çözümü işin gerçek ağrısına yanıt verir.",
+      "options": [
+        {
+          "label": "Kendi yazılımını oluşturmak",
+          "hint": "Operasyonunuz için bir platform, uygulama veya sistem",
+          "tech": "ürün mühendisliği",
+          "insight": "Şirketimin bilgisini kendine ait, ölçeklenebilir ve ölçülebilir bir araca dönüştüren özel bir sistem kurmak istiyorum."
+        },
+        {
+          "label": "AI ile otomatikleştirmek",
+          "hint": "Daha az tekrar eden iş ve daha fazla operasyon hızı",
+          "tech": "otomasyon + yapay zekâ",
+          "insight": "Gerçek işe bağlı otomasyonlar, akıllı yardımcılar ve entegrasyonlarla manuel işi, hataları ve yavaş yanıtları azaltmak istiyorum."
+        },
+        {
+          "label": "Operasyonu modernleştirmek",
+          "hint": "Excel, WhatsApp veya eski sistemleri düzenlemek",
+          "tech": "eski sistemi modernleştirme",
+          "insight": "Dağınık süreçleri güvenilir veriler, net izinler ve izlenebilirlikle çalışan bağlı bir operasyona dönüştürmek istiyorum."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Dijital ürün",
+      "title": "Yazılımınız nerede açılmalı?",
+      "optionQuestion": "Nerede kullanmak istiyorsunuz?",
+      "copy": "Teknik temel, işin gerçek çalışma biçimini izlemelidir. Tarayıcı, telefon, PC veya aşamalı bir kombinasyon olabilir; her durumda sistemin sıfırdan yeniden yapılmadan büyüyebilmesi için mimari baştan hazırlanır.",
+      "progress": "Ürün",
+      "core": "Geliştirme",
+      "options": [
+        {
+          "label": "Tarayıcıda",
+          "hint": "Her yerden erişim (web + arka uç)",
+          "tech": "web + arka uç",
+          "insight": "Tarayıcıdan erişim, sunucu, veritabanı ve büyümeye hazır bir yol istiyorum."
+        },
+        {
+          "label": "Telefonda",
+          "hint": "Satış, hizmet veya saha ekibi için (uygulama/PWA)",
+          "tech": "mobil/PWA",
+          "insight": "Senkronize verilerle telefonlarda hızlı bir deneyime ihtiyacım var."
+        },
+        {
+          "label": "PC’de",
+          "hint": "İç veya kritik kullanım (masaüstü/yerel)",
+          "tech": "masaüstü/yerel",
+          "insight": "Yerel kontrol, iyi performans ve stabil iç operasyon istiyorum."
+        }
+      ],
+      "insight": "Platform, ekibinizin zaten çalıştığı yerde açılmalı; böylece teknoloji, işi rahatsız bir araca uyum sağlamaya zorlamadan operasyonu düzenler."
+    },
+    "automationType": {
+      "eyebrow": "Akıllı motor",
+      "title": "Sistem sizin yerinize ne yapmalı?",
+      "optionQuestion": "Önce neyi otomatikleştirmek istiyorsunuz?",
+      "copy": "Yapay zekâ ve otomasyon ancak somut sürtünmeyi çözdüğünde anlamlıdır: tekrar eden işler, yavaş hizmet, dağınık veriler, bilgisiz kararlar veya insan hafızasına fazla bağlı süreçler.",
+      "progress": "Otomasyon",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "Tekrar eden işler",
+          "hint": "Daha az kopyala-yapıştır (RPA + API’ler)",
+          "tech": "RPA/API",
+          "insight": "Süreç robotları, entegrasyonlar ve otomatik akışlar istiyorum."
+        },
+        {
+          "label": "AI yardımcısı",
+          "hint": "Sınıflandırmak, özetlemek veya yanıtlamak (AI)",
+          "tech": "AI yardımcısı",
+          "insight": "Net kuralları, izlenebilirliği ve güvenli sınırları olan kullanışlı yapay zekâ istiyorum."
+        },
+        {
+          "label": "Görünür veriler",
+          "hint": "Göstergeler ve raporlar (panel/BI)",
+          "tech": "BI/panel",
+          "insight": "Daha iyi karar vermek için operasyonumu rakamlarla görmek istiyorum."
+        }
+      ],
+      "insight": "Doğru otomasyon, günlük operasyonda en çok tekrarlanan, en çok geciken veya en fazla insan hatası üreten işten başlar."
+    },
+    "modernization": {
+      "eyebrow": "Mevcut operasyon",
+      "title": "Neyi geride bırakmak istiyorsunuz?",
+      "optionQuestion": "Önce neyi değiştirmek istiyorsunuz?",
+      "copy": "Modernleşmek, moda için araç değiştirmek değildir; elektronik tabloları, dağınık mesajları ve eski sistemleri daha net, güvenli, ölçülebilir ve daha az hatayla büyümeye hazır bir operasyona dönüştürmektir.",
+      "progress": "Modernleştir",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel veya eski sistem",
+          "hint": "Kontrollü akışlara geçmek (iş akışı)",
+          "tech": "iş akışı + roller",
+          "insight": "Sayfaları ve manuel süreçleri izinleri olan modüllerle değiştirmek istiyorum."
+        },
+        {
+          "label": "Ayrı araçlar",
+          "hint": "Verileri ve aksiyonları birleştirmek (API’ler)",
+          "tech": "API entegrasyonu",
+          "insight": "Sistemlerimin bağlanmasını ve çift veri girişini önlemesini istiyorum."
+        },
+        {
+          "label": "Yeterince profesyonel olmayan imaj",
+          "hint": "Daha iyi deneyim ve satış (UX/UI)",
+          "tech": "UX/UI + ürün",
+          "insight": "Güven ve netlik veren, daha fazla satışa hazır bir platform istiyorum."
+        }
+      ],
+      "insight": "Elektronik tabloları, kopuk mesajları ve eski sistemleri geride bırakmak, işin özünü değiştirmeden izlenebilirliği, hızı ve kontrolü geri kazandırır."
+    },
+    "operation": {
+      "eyebrow": "Sizi zorlamayan mimari",
+      "title": "Gerçek hayatta nasıl kullanılmalı?",
+      "optionQuestion": "En iyi nerede çalışması gerekiyor?",
+      "copy": "Yazılım, işin gerçekleştiği yerde çalışmalıdır: ofis, saha, satış, üretim, destek veya yönetim. Bu yanıt gerçek operasyona göre senkronizasyonu, izinleri, arka ucu, mobil deneyimi veya yerel kontrolü tanımlar.",
+      "progress": "Kullanım",
+      "core": "Mimari",
+      "options": [
+        {
+          "label": "Her yerden",
+          "hint": "Çevrimiçi kullanıcılar (web + arka uç)",
+          "tech": "bulut arka ucu",
+          "insight": "İhtiyacım olduğunda hazır olan tarayıcı, sunucu ve veri istiyorum."
+        },
+        {
+          "label": "Hareket halindeki ekip",
+          "hint": "Telefon veya tablet (PWA/uygulama)",
+          "tech": "mobil öncelikli",
+          "insight": "Mobil hız, net izinler ve güvenilir senkronizasyon gerekiyor."
+        },
+        {
+          "label": "PC veya iç ağ",
+          "hint": "Yerel kontrol (masaüstü/yerel)",
+          "tech": "masaüstü/yerel",
+          "insight": "Masaüstünde güçlü çalışmasını ve gerekirse sonradan senkronize olmasını istiyorum."
+        }
+      ],
+      "insight": "Mimari, gereksiz sürtünme olmadan sistemin ofiste, sahada, satışta, üretimde veya destekte çalışması için gerçek kullanım üzerinden belirlenir."
+    },
+    "value": {
+      "eyebrow": "Görünür değer",
+      "title": "Önce ne iyileşmeli?",
+      "optionQuestion": "Önce hangi sonucu fark etmek istiyorsunuz?",
+      "copy": "İyi bir platform erken aşamadan itibaren faydalı hissettirmelidir: vakaları düzenler, işleri otomatikleştirir, kullanılabilir veriler gösterir ve daha iyi satışa yardım eder. Değer, sistemin operasyon içinde yatırımını gerekçelendirmeye başlaması için tasarlanır.",
+      "progress": "Değer",
+      "core": "Motor",
+      "options": [
+        {
+          "label": "Süreçleri düzenlemek",
+          "hint": "Durumlar, roller ve izinler (iş akışı)",
+          "tech": "iş akışı + RBAC",
+          "insight": "Önce her vakanın işimin içinde nasıl ilerlediğini düzenlemek istiyorum."
+        },
+        {
+          "label": "İşi otomatikleştirmek",
+          "hint": "Operasyon zamanı kazanmak (RPA/API)",
+          "tech": "RPA/API",
+          "insight": "Tekrar eden işleri ve insan hatalarını azaltarak zamanı geri kazanmak istiyorum."
+        },
+        {
+          "label": "Veri veya AI ile ölçmek",
+          "hint": "Raporlar, uyarılar veya yardımcı (BI/AI)",
+          "tech": "BI + AI",
+          "insight": "Dağınık bilgiyi görünür kararlara dönüştürmek istiyorum."
+        }
+      ],
+      "insight": "İlk görünür değer yatırımı gerekçelendirmelidir: daha fazla düzen, daha az zaman kaybı, daha iyi veri, daha fazla üretkenlik veya daha fazla satış fırsatı."
+    },
+    "risk": {
+      "eyebrow": "Güven ve kontrol",
+      "title": "En çok ne korunmuş hissettirmeli?",
+      "optionQuestion": "Neyi daha iyi korumak istiyorsunuz?",
+      "copy": "Güven, ilk modülden itibaren roller, izinler, denetim, doğrulamalar ve yapay zekâ için sınırlarla tasarlanır. Böylece şirket, veri, karar ve kritik süreçler üzerinde kontrolü kaybetmeden hız kazanır.",
+      "progress": "Güvenlik",
+      "core": "Güven",
+      "options": [
+        {
+          "label": "Kullanıcılar ve izinler",
+          "hint": "Her rol sadece gerekli olanı görür (RBAC)",
+          "tech": "RBAC + denetim",
+          "insight": "Baştan itibaren roller, izinler, değişiklik geçmişi ve erişim kontrolü istiyorum."
+        },
+        {
+          "label": "Hassas veriler",
+          "hint": "İzlenebilirlik ve doğrulamalar (güvenlik)",
+          "tech": "güvenlik odaklı tasarım",
+          "insight": "Kritik bilgilerim için doğrulamalar, olay kayıtları ve koruma gerekiyor."
+        },
+        {
+          "label": "AI veya kritik süreçler",
+          "hint": "İnsan incelemesiyle otomatikleştirmek (yönetişim)",
+          "tech": "AI yönetişimi",
+          "insight": "AI ve otomasyonların gerektiğinde sınırları, izlenebilirliği ve insan incelemesi olmasını istiyorum."
+        }
+      ],
+      "insight": "Büyüme kontrol ister; bu yüzden izinler, denetim, doğrulamalar ve AI sınırları kritik süreçler otomatikleştirilmeden önce tasarlanır."
+    },
+    "finance": {
+      "eyebrow": "Korunan sermaye",
+      "title": "Sermayeyi tüketmeden nasıl modernleşmek istiyorsunuz?",
+      "optionQuestion": "Şimdi ilerlemeyi hangi model mümkün kılar?",
+      "copy": "Hashinmy ile şirket, nakdi korumak ile modernleşmek arasında seçim yapmak zorunda kalmaz. Kapsamı yapılandırır, teşhis izin verdiğinde geliştirmenin %100’ünü finanse eder ve yazılım değer üretmeye başlarken ödenebilecek yönetilebilir taksitleri tanımlarız.\nFinansman mühendisliğin yerine geçmez; süreçleri düzenlemek, işi otomatikleştirmek, AI entegre etmek ve sermayeyi tüketmeden büyümek isteyen şirketler için mühendisliği erişilebilir kılar.",
+      "progress": "%100 finansman",
+      "core": "100%",
+      "options": [
+        {
+          "label": "%100 finanse etmek",
+          "hint": "Büyük ilk ödeme olmadan geliştirmek",
+          "tech": "%100 finansman",
+          "insight": "Operasyon sermayesini korumak ve yazılım zaman kazandırmaya veya satış üretmeye başlarken geliştirmeyi yönetilebilir taksitlerle ödemek istiyorum."
+        },
+        {
+          "label": "Aşamalar halinde inşa etmek",
+          "hint": "Önce en fazla değer üreten modül",
+          "tech": "modüler yol haritası",
+          "insight": "İşe yarar ilk sürümü önceliklendirmek, sonuçları doğrulamak ve sistemi teknik-finansal kontrolle genişletmek istiyorum."
+        },
+        {
+          "label": "Bir danışmanla konuşmak",
+          "hint": "Teknik ve finansal rehberlik gerekiyor",
+          "tech": "insanlı teşhis",
+          "insight": "Hashinmy’nin durumumu incelemesini ve operasyona, önceliğe, kapsama ve ödeme biçimine göre uygulanabilir bir yol önermesini istiyorum."
+        }
+      ],
+      "insight": "Finansman, şimdi ilerlemeyi, operasyon sermayesini korumayı ve teknoloji zaman kazandırırken, süreçleri düzenlerken ya da satışları artırırken ödeme yapmayı mümkün kılar."
+    },
+    "timeline": {
+      "eyebrow": "Uygulama ritmi",
+      "title": "Ne kadar hızlı çalışmaya başlamalı?",
+      "optionQuestion": "Hangi ritim size daha uygun?",
+      "copy": "Ritim, büyük bir ihtiyacı faydalı teslimatlara nasıl çevireceğini belirler. MVP, kısa faz veya kurumsal mimariyle başlayabiliriz; her ilerlemenin operasyonel ve finansal değer taşımasını gözetiriz.",
+      "progress": "Ritim",
+      "core": "Yol haritası",
+      "options": [
+        {
+          "label": "Mümkün olan en kısa sürede",
+          "hint": "İlk işlevsel sürüm (MVP)",
+          "tech": "MVP",
+          "insight": "Bana şimdiden değer yaratacak minimum çekirdeği bulmak istiyorum."
+        },
+        {
+          "label": "1 ila 3 ay",
+          "hint": "Doğrulanmış modüler inşa (kısa fazlar)",
+          "tech": "kısa fazlar",
+          "insight": "Kapsamı tanımlamak, geliştirmek, test etmek ve kontrollü şekilde yayına almak istiyorum."
+        },
+        {
+          "label": "Kurumsal aşamalar",
+          "hint": "Sağlam mimari (kurumsal yol haritası)",
+          "tech": "kurumsal yol haritası",
+          "insight": "Güvenlik, ölçeklenme, denetim ve planlı evrim istiyorum."
+        }
+      ],
+      "insight": "Doğru ritim, büyük bir ihtiyacı tüm sistem vizyonunu kaybetmeden faydalı, ölçülebilir ve finanse edilebilir teslimatlara dönüştürür."
+    },
+    "summary": {
+      "eyebrow": "Yol anlaşıldı",
+      "title": "Teknoloji yolunuz hazır.",
+      "copy": "İhtiyaç, ödeme modeli ve operasyonel öncelik hakkında ilk okumaya sahibiz. Hashinmy’nin operasyonunuzu analiz etmesi, özel bir çözüm önermesi ve uygulanabilir teknik, ticari ve finansal yol hazırlaması için eksik bağlamı ekleyin.\nSonraki görüşme; iş problemi, iç bilgi, sistem kapsamı, öncelik, beklenen değer ve ödeme biçimini bağlamalı, yazılım sonuç üretmeye başlarken nakit akışını korumalıdır.",
+      "progress": "Talep",
+      "core": "Özet",
+      "insight": "Yol; ihtiyacı, kurumsal bilgiyi, teknik kapsamı, operasyonel önceliği, beklenen değeri ve ödeme modelini uygulanabilir bir öneride birleştirmek için hazırdır.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "rota",
+    "service": "Hizmet",
+    "operation": "Kullanım",
+    "value": "Değer",
+    "risk": "güvenlik",
+    "financing": "finansman",
+    "timeline": "Tempo"
+  },
+  "valueLabels": {
+    "diagnostico": "proje özeti · rota",
+    "producto_digital": "özel yazılım · Ürün",
+    "automatizacion_ia": "otomasyon · yapay zekâ",
+    "modernizacion_operativa": "modernizasyon · süreçler",
+    "software_online": "web · yazılım",
+    "app_movil": "mobil uygulama",
+    "software_pc": "PC yazılımı",
+    "automatizacion": "otomasyon · süreçler",
+    "ia": "yapay zekâ · entegrasyon",
+    "modernizacion": "modernizasyon",
+    "web_global": "web · rota",
+    "mobile_first": "mobil uygulama · Kullanım",
+    "pc_local": "PC · kontroller",
+    "workflow": "iş akışı · süreçler",
+    "automation": "otomasyon · hızlı",
+    "analytics": "veri · raporlar",
+    "ai": "yapay zekâ · insan incelemesi",
+    "experience": "UX/UI · güven",
+    "analytics_ai": "veri · yapay zekâ",
+    "roles_permisos": "kullanıcılar · izinler",
+    "datos_sensibles": "veri · güvenlik",
+    "ia_controlada": "yapay zekâ · insan incelemesi",
+    "financiamiento_100": "%100 finansman",
+    "sin_financiacion": "doğrudan teklif",
+    "fases": "doğrudan teklif · aşamalar",
+    "contacto_directo": "iletişim · insan incelemesi",
+    "mvp_rapido": "hızlı · MVP",
+    "1_3_meses": "1-3 · aşamalar",
+    "enterprise": "kurumsal · yol haritası"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "özel yazılım · Ürün",
+      "operation": "architecture · proje özeti",
+      "value": "Değer · proje özeti",
+      "risk": "güvenlik · proje özeti",
+      "financing": "finansman · proje özeti",
+      "timeline": "Tempo · proje özeti",
+      "technical": "yazılım · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · yazılım",
+      "automatizacion": "RPA/API otomasyonu",
+      "ia": "yapay zekâ · insan incelemesi",
+      "modernizacion": "modernizasyon",
+      "web_global": "arka uç + veritabanı",
+      "mobile_first": "mobil uygulama · sync",
+      "pc_local": "local · kontroller",
+      "workflow": "izinler · iş akışı",
+      "automation": "otomasyon · entegrasyon",
+      "analytics": "dashboard/BI",
+      "ai": "yapay zekâ · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "veri · güvenlik",
+      "ia_controlada": "AI governance · insan incelemesi"
+    },
+    "controlBase": [
+      "veri",
+      "kontroller"
+    ],
+    "controlParts": {
+      "web_global": "izinler",
+      "software_online": "izinler",
+      "ia": "insan incelemesi",
+      "analytics_ai": "insan incelemesi",
+      "ai": "insan incelemesi",
+      "automatizacion": "otomasyon · raporlar",
+      "automation": "otomasyon · raporlar",
+      "roles_permisos": "izinler · kontroller",
+      "datos_sensibles": "veri · güvenlik",
+      "ia_controlada": "insan incelemesi · kontroller",
+      "financiamiento_100": "%100 finansman",
+      "sin_financiacion": "doğrudan teklif"
+    },
+    "nextSteps": {
+      "noService": "iletişim · proje özeti",
+      "mvp": "MVP · proje özeti",
+      "enterprise": "kurumsal · yol haritası",
+      "default": "yazılım · yol haritası"
+    }
+  },
+  "schemaVersion": 1
+}

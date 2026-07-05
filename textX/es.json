@@ -1,0 +1,738 @@
+{
+  "iso": "es",
+  "name": "Spanish",
+  "nativeName": "Español",
+  "htmlLang": "es",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | Software, IA y automatización financiados al 100%",
+    "description": "Hashinmy desarrolla software a medida, IA y automatización con financiación 100% para modernizar empresas sin descapitalizar su flujo de caja.",
+    "ogTitle": "Hashinmy | Tecnología empresarial a la medida financiada al 100%",
+    "ogDescription": "Socio tecnológico para crear software, IA y automatización a medida, con diagnóstico operativo y financiación 100% del desarrollo.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, software a medida financiado al 100%, tecnología empresarial financiada, ingeniería digital para empresas, inteligencia artificial aplicada, automatización de procesos empresariales, transformación digital sin descapitalizarse, desarrollo de software con financiación, sistemas inteligentes para empresas, software para ordenar procesos, automatización de ventas, automatización de cotizaciones, software para inventario, CRM a medida, ERP ligero personalizado, APIs empresariales, chatbots empresariales, páginas web como canal de venta, plataformas digitales a medida, software con cuotas manejables, modernización empresarial, productividad empresarial, control operativo, reportes empresariales, flujo de caja protegido, desarrollo de software en Medellín, software empresarial en Colombia, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "Saltar a la pregunta actual",
+    "stageLabel": "Experiencia interactiva Hashinmy",
+    "topbarLabel": "Controles principales",
+    "brandAria": "Volver al inicio de Hashinmy",
+    "brandSmall": "Software + IA financiados al 100%",
+    "progressLabel": "Progreso de la ruta",
+    "languageLabel": "Idioma",
+    "languageAria": "Cambiar idioma inicial",
+    "contentLabel": "Contenido principal de la escena",
+    "pathLabelAria": "Decisiones registradas",
+    "decisionZoneLabel": "Opciones de la escena actual",
+    "summaryLabelAria": "Resumen generado",
+    "footerLabel": "Navegación de escena",
+    "primaryFinance": "Solicitar diagnóstico",
+    "primaryQuote": "Cotizar mi sistema",
+    "back": "Atrás",
+    "restart": "Reiniciar",
+    "contactLabel": "Datos de contacto",
+    "contactPlaceholder": "Correo electrónico empresarial",
+    "commentLabel": "Describe tu proyecto",
+    "commentPlaceholder": "Cuéntanos qué proceso quieres ordenar, automatizar o convertir en software: ventas, cotizaciones, inventario, producción, soporte, datos, atención, página web, API, chatbot o plataforma. Incluye qué te hace perder tiempo, dinero o información para preparar una ruta técnica y financiera clara.",
+    "submitRoute": "Enviar a Hashinmy",
+    "copySummaryAction": "Copiar resumen",
+    "formNote": "Tus respuestas se guardan solo en este navegador hasta que decidas enviarlas.",
+    "contactRequired": "Agrega tu correo electrónico y tu WhatsApp para que Hashinmy pueda confirmar la solicitud y contactarte con la ruta preparada.",
+    "copySuccess": "Resumen copiado. Puedes pegarlo en WhatsApp, correo o CRM.",
+    "copyFailure": "No se pudo copiar automáticamente. El envío por correo seguirá preparando el resumen.",
+    "mailOpening": "No pudimos confirmar por memoriaBACKEND en este intento. Abriremos tu aplicación de correo con la ruta preparada como respaldo.",
+    "waitSummary": "Preparando ruta tecnológica",
+    "preparingOptions": "Preparando opciones",
+    "optionFallback": "Elige una opción",
+    "pathLabel": "Tus Decisiones:",
+    "pathEmpty": "Cada toque arma tu brief",
+    "interactionFallback": "Interacción",
+    "summaryTitle": "Ruta tecnológica preparada por Hashinmy",
+    "projectChosen": "Proyecto elegido",
+    "expectedUse": "Uso esperado",
+    "wantedValue": "Valor buscado",
+    "prioritySecurity": "Seguridad prioritaria",
+    "paymentMode": "Modalidad de pago",
+    "financing": "Financiación",
+    "pace": "Ritmo",
+    "technicalBase": "Base técnica sugerida",
+    "suggestedControls": "Controles sugeridos",
+    "nextStep": "Siguiente paso",
+    "contact": "Contacto",
+    "additionalComment": "Comentario adicional",
+    "registeredInteractions": "Interacciones registradas",
+    "directRouteRequested": "Ruta directa solicitada.",
+    "directQuoteSubject": "Solicitud de cotización Hashinmy",
+    "financedSubject": "Solicitud de software financiado Hashinmy",
+    "directQuoteAudit": "La ruta salta al diagnóstico para cotizar el sistema con alcance, valor operativo y forma de implementación claros.",
+    "financeAudit": "La ruta salta al diagnóstico con financiación del 100% del desarrollo como prioridad principal.",
+    "directQuoteTech": "diagnóstico del sistema + alcance técnico y comercial",
+    "financeTech": "diagnóstico + financiación 100% + cuotas manejables",
+    "topActionsLabel": "Accesos rápidos de Hashinmy",
+    "proofEntryAria": "Acceso a experiencia y confianza de Hashinmy",
+    "proofOpenButton": "Nuestra Experiencia",
+    "proofTitle": "Ingeniería digital financiada",
+    "proofLead": "Hashinmy no es una agencia de páginas web ni un proveedor genérico. Es una firma de ingeniería digital que convierte procesos empresariales en software, IA y automatización a medida, con financiación 100% para modernizar sin descapitalizar la operación.",
+    "proofCloseAria": "Cerrar experiencia de Hashinmy",
+    "proofContentAria": "Prueba social, confianza, metodología y preguntas rápidas de Hashinmy",
+    "proofSummaryAria": "Confianza técnica de Hashinmy",
+    "proofSummaryTitle": "Tecnología a la medida financiada al 100% para ordenar la operación, proteger el capital y crecer con control",
+    "proofTrustLabel": "Confianza técnica:",
+    "proofTrustText": "estrategia empresarial, software a medida, IA aplicada, automatización, APIs, canales web de venta, chatbots, diagnóstico operativo, financiación 100%, cuotas manejables, seguridad, permisos, trazabilidad, datos útiles y continuidad.",
+    "proofMethodLabel": "Metodología:",
+    "proofMethodText": "revisamos la operación real, ubicamos pérdidas de tiempo, dinero o información, priorizamos el módulo de mayor retorno, diseñamos la solución exacta y acompañamos financiación, implementación, pruebas, adopción y evolución.",
+    "proofUseCasesLabel": "Casos de uso:",
+    "proofUseCasesText": "ventas, cotizaciones, inventario, producción, soporte, CRM, portales, ecommerce, atención automatizada, reportes, APIs y procesos internos que hoy dependen de archivos, WhatsApp o memoria humana.",
+    "proofBrandsTitle": "Marcas, proyectos y empresas relacionadas con nuestro trabajo",
+    "proofBrandsAria": "Logos de empresas, marcas y proyectos relacionados con Hashinmy detectados automáticamente desde assets/clientes",
+    "proofLogoPlaceholder": "Experiencia Hashinmy",
+    "proofLogoAltTemplate": "Logo de {name}",
+    "proofFaqAria": "FAQ rápido sobre experiencia y forma de trabajo de Hashinmy",
+    "proofFaqWhyQuestion": "¿Por qué contratar a Hashinmy?",
+    "proofFaqWhyAnswer": "Porque Hashinmy no vende código aislado ni tecnología genérica: convierte problemas concretos de operación en sistemas claros, seguros, medibles y viables financieramente.",
+    "proofFaqWhoQuestion": "¿Para quién es?",
+    "proofFaqWhoAnswer": "Para empresas pequeñas, medianas o grandes que necesitan ordenar procesos, automatizar trabajo, integrar IA, vender mejor o crear software propio protegiendo su flujo de caja.",
+    "proofFaqStartQuestion": "¿Cómo empiezo?",
+    "proofFaqStartAnswer": "Solicita un diagnóstico para revisar la operación, detectar pérdidas de tiempo, dinero o información y preparar una ruta técnica, comercial y financiera clara.",
+    "proofBrandsStructuredDescription": "Listado SEO actualizado automáticamente desde las imágenes disponibles en assets/clientes."
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "Software online",
+      "tech": "web + backend",
+      "short": "Web"
+    },
+    {
+      "value": "app_movil",
+      "label": "Aplicación móvil",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "Software para PC",
+      "tech": "desktop/local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "Automatización",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "Integración IA",
+      "tech": "AI workflows",
+      "short": "IA"
+    },
+    {
+      "value": "modernizacion",
+      "label": "Modernización",
+      "tech": "sistema modular",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "capital protegido"
+    },
+    "serviceFamily": {
+      "symbol": "Ruta",
+      "label": "servicio correcto"
+    },
+    "buildType": {
+      "symbol": "Build",
+      "label": "producto digital"
+    },
+    "automationType": {
+      "symbol": "IA",
+      "label": "automatización real"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "operación conectada"
+    },
+    "operation": {
+      "symbol": "Dónde",
+      "label": "arquitectura"
+    },
+    "value": {
+      "symbol": "Motor",
+      "label": "valor operativo"
+    },
+    "risk": {
+      "symbol": "Trust",
+      "label": "seguridad y control"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "cuotas claras"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "roadmap"
+    },
+    "summary": {
+      "symbol": "Listo",
+      "label": "brief generado"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "a medida"
+      ],
+      [
+        "IA",
+        "automatización"
+      ],
+      [
+        "PC",
+        "móvil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "rutas compactas"
+      ],
+      [
+        "6",
+        "capacidades"
+      ],
+      [
+        "1",
+        "brief vivo"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/móvil"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "menos tareas"
+      ],
+      [
+        "IA",
+        "asistencia"
+      ],
+      [
+        "BI",
+        "decisiones"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "sistema unido"
+      ],
+      [
+        "API",
+        "conexiones"
+      ],
+      [
+        "UX",
+        "confianza"
+      ]
+    ],
+    "operation": [
+      [
+        "Nube",
+        "acceso global"
+      ],
+      [
+        "Móvil",
+        "campo"
+      ],
+      [
+        "Local",
+        "control interno"
+      ]
+    ],
+    "value": [
+      [
+        "Flujo",
+        "orden"
+      ],
+      [
+        "Auto",
+        "velocidad"
+      ],
+      [
+        "Datos",
+        "control"
+      ]
+    ],
+    "risk": [
+      [
+        "Roles",
+        "permisos"
+      ],
+      [
+        "Datos",
+        "trazabilidad"
+      ],
+      [
+        "IA",
+        "control humano"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "financiamiento"
+      ],
+      [
+        "USD",
+        "plan mensual"
+      ],
+      [
+        "Pausa",
+        "sin intereses durante desactivación"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "rápido"
+      ],
+      [
+        "Fases",
+        "modular"
+      ],
+      [
+        "QA",
+        "validado"
+      ]
+    ],
+    "summary": [
+      [
+        "Ruta",
+        "definida"
+      ],
+      [
+        "Correo",
+        "preparado"
+      ],
+      [
+        "Humano",
+        "revisión"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Español",
+      "title": "Tecnología a la medida financiada al 100% para crecer sin descapitalizarse",
+      "copy": "Hashinmy transforma procesos empresariales en software inteligente, automatización e inteligencia artificial a la medida. Analizamos la operación, encontramos dónde se pierde tiempo, dinero o información y construimos tecnología financiable al 100% para modernizar sin exigir una gran inversión inicial.\nNo somos una agencia de páginas web ni un proveedor genérico: somos un socio tecnológico que une estrategia empresarial, ingeniería de software, IA aplicada y financiación accesible.\nTu empresa ya tiene conocimiento, experiencia y visión. Nosotros lo convertimos en sistemas que ordenan ventas, cotizaciones, inventario, soporte, datos, procesos internos y canales digitales, cuidando el flujo de caja mientras la solución empieza a generar valor.",
+      "optionQuestion": "¿Cuál es el primer paso más cómodo para tu empresa?",
+      "progress": "Inicio",
+      "core": "HASHINMY",
+      "insight": "Puedes iniciar por diagnóstico, financiación o cotización directa; Hashinmy parte del problema real antes de definir alcance, forma de pago o tecnología.",
+      "options": [
+        {
+          "label": "Diagnóstico operativo",
+          "hint": "Quiero que Hashinmy encuentre dónde se pierde tiempo, dinero o información",
+          "tech": "análisis de operación + ruta técnica + viabilidad financiera",
+          "insight": "Quiero empezar por entender mi operación, detectar el proceso que más frena el negocio y recibir una ruta clara antes de decidir si conviene financiar, cotizar directo o construir por fases."
+        },
+        {
+          "label": "Financiación 100%",
+          "hint": "Quiero modernizar sin gran pago inicial",
+          "tech": "financiación 100%",
+          "insight": "Quiero avanzar con el desarrollo financiado al 100% y pagarlo en cuotas manejables mientras el sistema empieza a generar valor."
+        },
+        {
+          "label": "Cotización directa",
+          "hint": "Quiero conocer alcance y precio sin financiación",
+          "tech": "cotización directa",
+          "insight": "Quiero recibir una propuesta directa con alcance, precio y tiempos claros para decidir sin plan de financiación."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "Primera puerta",
+      "title": "¿Qué proceso necesita dejar de improvisar?",
+      "optionQuestion": "¿Dónde duele más la operación hoy?",
+      "copy": "Elige dónde tu empresa pierde más tiempo, control o ventas. Hashinmy no parte de vender un servicio aislado: primero entiende la operación y luego define una ruta que conecte software, IA, automatización y una forma viable de implementación.",
+      "progress": "Ruta",
+      "core": "Servicio",
+      "insight": "Elijo la necesidad que más afecta productividad, flujo comercial o control operativo para que la primera solución tecnológica responda a un dolor real del negocio.",
+      "options": [
+        {
+          "label": "Crear software propio",
+          "hint": "Una plataforma, app o sistema para tu operación",
+          "tech": "product engineering",
+          "insight": "Quiero construir un sistema a medida que convierta el conocimiento de mi empresa en una herramienta propia, escalable y medible."
+        },
+        {
+          "label": "Automatizar con IA",
+          "hint": "Menos tareas repetitivas y más velocidad operativa",
+          "tech": "automation + AI",
+          "insight": "Quiero reducir trabajo manual, errores y respuestas lentas con automatizaciones, asistentes inteligentes e integraciones conectadas al negocio real."
+        },
+        {
+          "label": "Modernizar operación",
+          "hint": "Ordenar Excel, WhatsApp o sistemas viejos",
+          "tech": "legacy modernization",
+          "insight": "Quiero reemplazar procesos dispersos por una operación conectada, con datos confiables, permisos claros y trazabilidad."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Producto digital",
+      "title": "¿Dónde debería abrirse tu software?",
+      "optionQuestion": "¿Dónde quieres usarlo?",
+      "copy": "La base técnica debe seguir la forma real de trabajar del negocio. Puede ser navegador, celular, PC o una combinación por etapas, siempre con arquitectura preparada para crecer sin rehacer el sistema desde cero.",
+      "progress": "Producto",
+      "core": "Build",
+      "options": [
+        {
+          "label": "En navegador",
+          "hint": "Desde cualquier parte (web + backend)",
+          "tech": "web + backend",
+          "insight": "Quiero acceso por navegador, con servidor, base de datos y una ruta lista para crecer."
+        },
+        {
+          "label": "En celular",
+          "hint": "Para ventas, atención o equipo en campo (app/PWA)",
+          "tech": "mobile/PWA",
+          "insight": "Necesito una experiencia rápida en teléfonos, con datos sincronizados."
+        },
+        {
+          "label": "En un PC",
+          "hint": "Uso interno o crítico (desktop/local)",
+          "tech": "desktop/local",
+          "insight": "Necesito control local, buen rendimiento y operación interna estable."
+        }
+      ],
+      "insight": "La plataforma debe abrirse donde tu equipo ya trabaja, para que la tecnología ordene la operación sin obligar al negocio a adaptarse a una herramienta incómoda."
+    },
+    "automationType": {
+      "eyebrow": "Motor inteligente",
+      "title": "¿Qué parte debería hacer el sistema por ti?",
+      "optionQuestion": "¿Qué quieres automatizar primero?",
+      "copy": "La inteligencia artificial y la automatización solo tienen sentido cuando resuelven fricción concreta: tareas repetidas, atención lenta, datos dispersos, decisiones sin información o procesos que dependen demasiado de la memoria humana.",
+      "progress": "Automatización",
+      "core": "IA + RPA",
+      "options": [
+        {
+          "label": "Tareas repetidas",
+          "hint": "Menos copiar y pegar (RPA + APIs)",
+          "tech": "RPA/API",
+          "insight": "Quiero robots de proceso, integraciones y flujos automáticos."
+        },
+        {
+          "label": "Asistente con IA",
+          "hint": "Clasificar, resumir o responder (IA)",
+          "tech": "AI assistant",
+          "insight": "Quiero IA útil, con reglas claras, trazabilidad y límites seguros."
+        },
+        {
+          "label": "Datos visibles",
+          "hint": "Indicadores y reportes (dashboard/BI)",
+          "tech": "BI/dashboard",
+          "insight": "Necesito ver mi operación en números para decidir mejor."
+        }
+      ],
+      "insight": "La automatización correcta empieza por el trabajo que más se repite, más se retrasa o más errores humanos genera dentro de la operación diaria."
+    },
+    "modernization": {
+      "eyebrow": "Operación actual",
+      "title": "¿Qué quieres dejar atrás?",
+      "optionQuestion": "¿Qué quieres reemplazar primero?",
+      "copy": "Modernizar no es cambiar herramientas por moda; es convertir hojas de cálculo, mensajes sueltos y sistemas viejos en una operación más clara, segura, medible y preparada para crecer con menos errores.",
+      "progress": "Modernizar",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel o sistema viejo",
+          "hint": "Pasar a flujos controlados (workflow)",
+          "tech": "workflow + roles",
+          "insight": "Quiero reemplazar hojas y procesos manuales por módulos con permisos."
+        },
+        {
+          "label": "Herramientas separadas",
+          "hint": "Unir datos y acciones (APIs)",
+          "tech": "API integration",
+          "insight": "Quiero que mis sistemas se conecten y eviten doble digitación."
+        },
+        {
+          "label": "Imagen poco profesional",
+          "hint": "Mejor experiencia y ventas (UX/UI)",
+          "tech": "UX/UI + producto",
+          "insight": "Quiero una plataforma que transmita confianza, claridad y esté lista para vender más."
+        }
+      ],
+      "insight": "Dejar atrás hojas de cálculo, mensajes sueltos y sistemas viejos permite recuperar trazabilidad, velocidad y control sin cambiar la esencia del negocio."
+    },
+    "operation": {
+      "eyebrow": "Arquitectura sin complicarte",
+      "title": "¿Cómo debería usarse en la vida real?",
+      "optionQuestion": "¿Dónde necesitas que funcione mejor?",
+      "copy": "El software debe funcionar donde ocurre el trabajo: oficina, campo, ventas, producción, soporte o dirección. Esta respuesta define sincronización, permisos, backend, experiencia móvil o control local según la operación real.",
+      "progress": "Uso",
+      "core": "Arquitectura",
+      "options": [
+        {
+          "label": "Desde cualquier lugar",
+          "hint": "Usuarios online (web + backend)",
+          "tech": "cloud backend",
+          "insight": "Quiero navegador, servidor y datos disponibles cuando los necesite."
+        },
+        {
+          "label": "Equipo en movimiento",
+          "hint": "Celular o tablet (PWA/app)",
+          "tech": "mobile first",
+          "insight": "Necesito velocidad móvil, permisos claros y sincronización confiable."
+        },
+        {
+          "label": "PC o red interna",
+          "hint": "Control local (desktop/local)",
+          "tech": "desktop/local",
+          "insight": "Necesito que funcione fuerte en escritorio y pueda sincronizar después."
+        }
+      ],
+      "insight": "La arquitectura se decide desde el uso real para que el sistema funcione en oficina, campo, ventas, producción o soporte sin fricción innecesaria."
+    },
+    "value": {
+      "eyebrow": "Valor visible",
+      "title": "¿Qué debería mejorar primero?",
+      "optionQuestion": "¿Qué resultado quieres notar primero?",
+      "copy": "Una buena plataforma debe sentirse útil desde temprano: ordenar casos, automatizar tareas, mostrar datos accionables y ayudar a vender mejor. El valor se diseña para que el sistema empiece a justificar su inversión dentro de la operación.",
+      "progress": "Valor",
+      "core": "Motor",
+      "options": [
+        {
+          "label": "Ordenar procesos",
+          "hint": "Estados, roles y permisos (workflow)",
+          "tech": "workflow + RBAC",
+          "insight": "Primero quiero ordenar cómo se mueve cada caso dentro de mi negocio."
+        },
+        {
+          "label": "Automatizar trabajo",
+          "hint": "Ahorrar tiempo operativo (RPA/API)",
+          "tech": "RPA/API",
+          "insight": "Quiero recuperar tiempo reduciendo tareas repetitivas y errores humanos."
+        },
+        {
+          "label": "Medir con datos o IA",
+          "hint": "Reportes, alertas o asistente (BI/IA)",
+          "tech": "BI + AI",
+          "insight": "Quiero convertir información dispersa en decisiones visibles."
+        }
+      ],
+      "insight": "El primer valor visible debe justificar la inversión: más orden, menos tiempo perdido, mejores datos, más productividad o más oportunidades de venta."
+    },
+    "risk": {
+      "eyebrow": "Confianza y control",
+      "title": "¿Qué debe sentirse más protegido?",
+      "optionQuestion": "¿Qué quieres proteger mejor?",
+      "copy": "La confianza se diseña desde el primer módulo con roles, permisos, auditoría, validaciones y límites para la inteligencia artificial. Así la empresa gana velocidad sin perder control sobre datos, decisiones y procesos críticos.",
+      "progress": "Seguridad",
+      "core": "Trust",
+      "options": [
+        {
+          "label": "Usuarios y permisos",
+          "hint": "Cada rol ve solo lo necesario (RBAC)",
+          "tech": "RBAC + auditoría",
+          "insight": "Quiero roles, permisos, historial de cambios y control de acceso desde el inicio."
+        },
+        {
+          "label": "Datos sensibles",
+          "hint": "Trazabilidad y validaciones (seguridad)",
+          "tech": "security by design",
+          "insight": "Necesito validaciones, registro de eventos y protección de mi información crítica."
+        },
+        {
+          "label": "IA o procesos críticos",
+          "hint": "Automatizar con revisión humana (governance)",
+          "tech": "AI governance",
+          "insight": "Quiero IA y automatizaciones con límites, trazabilidad y revisión humana cuando haga falta."
+        }
+      ],
+      "insight": "El crecimiento necesita control; por eso permisos, auditoría, validaciones y límites para la IA se diseñan antes de automatizar procesos críticos."
+    },
+    "finance": {
+      "eyebrow": "Capital protegido",
+      "title": "¿Cómo quieres modernizarte sin descapitalizarte?",
+      "optionQuestion": "¿Qué modalidad hace viable avanzar ahora?",
+      "copy": "Con Hashinmy la empresa no tiene que escoger entre cuidar caja o modernizarse. Estructuramos el alcance, financiamos el 100% del desarrollo cuando el diagnóstico lo permite y definimos cuotas manejables para que el software empiece a generar valor mientras se paga.\nLa financiación no reemplaza la ingeniería: la vuelve accesible para empresas que necesitan ordenar procesos, automatizar trabajo, integrar IA y crecer sin descapitalizarse.",
+      "progress": "Financiación 100%",
+      "core": "100%",
+      "options": [
+        {
+          "label": "Financiar el 100%",
+          "hint": "Desarrollar sin gran pago inicial",
+          "tech": "financiación 100%",
+          "insight": "Quiero proteger el capital operativo y pagar el desarrollo en cuotas manejables mientras el software empieza a ahorrar tiempo o generar ventas."
+        },
+        {
+          "label": "Construir por fases",
+          "hint": "Primero el módulo que genere más valor",
+          "tech": "roadmap modular",
+          "insight": "Quiero priorizar una primera versión útil, validar resultados y ampliar el sistema con control técnico y financiero."
+        },
+        {
+          "label": "Hablar con un asesor",
+          "hint": "Necesito guía técnica y financiera",
+          "tech": "diagnóstico humano",
+          "insight": "Quiero que Hashinmy revise mi caso y me proponga una ruta viable según operación, prioridad, alcance y forma de pago."
+        }
+      ],
+      "insight": "La financiación vuelve viable avanzar ahora, proteger capital operativo y pagar mientras la tecnología ahorra tiempo, ordena procesos o impulsa ventas."
+    },
+    "timeline": {
+      "eyebrow": "Ritmo de ejecución",
+      "title": "¿Qué tan pronto debe estar respirando?",
+      "optionQuestion": "¿Qué ritmo te conviene más?",
+      "copy": "El ritmo define cómo convertir una necesidad grande en entregas útiles. Podemos empezar por un MVP, una fase corta o una arquitectura empresarial, cuidando que cada avance tenga valor operativo y financiero.",
+      "progress": "Ritmo",
+      "core": "Roadmap",
+      "options": [
+        {
+          "label": "Lo antes posible",
+          "hint": "Primera versión funcional (MVP)",
+          "tech": "MVP",
+          "insight": "Quiero encontrar el núcleo mínimo que ya me genere valor."
+        },
+        {
+          "label": "1 a 3 meses",
+          "hint": "Construcción modular validada (fases cortas)",
+          "tech": "fases cortas",
+          "insight": "Quiero definir alcance, desarrollar, probar y lanzar con control."
+        },
+        {
+          "label": "Etapas enterprise",
+          "hint": "Arquitectura robusta (roadmap enterprise)",
+          "tech": "roadmap enterprise",
+          "insight": "Quiero seguridad, escalamiento, auditoría y evolución planificada."
+        }
+      ],
+      "insight": "El ritmo correcto transforma una necesidad grande en entregas útiles, medibles y financiables sin perder la visión del sistema completo."
+    },
+    "summary": {
+      "eyebrow": "Ruta entendida",
+      "title": "Tu ruta tecnológica quedó lista.",
+      "copy": "Ya tenemos una lectura inicial de la necesidad, la modalidad de pago y la prioridad operativa. Agrega el contexto que falte para que Hashinmy analice tu operación, proponga una solución a medida y prepare una ruta técnica, comercial y financiera viable.\nLa siguiente conversación debe conectar problema de negocio, conocimiento interno, alcance del sistema, prioridad, valor esperado y forma de pago, cuidando el flujo de caja mientras el software empieza a generar resultados.",
+      "progress": "Solicitud",
+      "core": "Brief",
+      "insight": "La ruta queda lista para conectar necesidad, conocimiento empresarial, alcance técnico, prioridad operativa, valor esperado y modelo de pago en una propuesta viable.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "Ruta",
+    "service": "Servicio",
+    "operation": "Uso",
+    "value": "Valor",
+    "risk": "Seguridad",
+    "financing": "Modalidad",
+    "timeline": "Ritmo"
+  },
+  "valueLabels": {
+    "diagnostico": "Diagnóstico guiado",
+    "producto_digital": "Crear software",
+    "automatizacion_ia": "Automatizar o usar IA",
+    "modernizacion_operativa": "Modernizar operación",
+    "software_online": "Software online",
+    "app_movil": "Aplicación móvil",
+    "software_pc": "Software para PC",
+    "automatizacion": "Automatización empresarial",
+    "ia": "Integración IA",
+    "modernizacion": "Modernización completa",
+    "web_global": "Desde cualquier lugar",
+    "mobile_first": "Equipo en movimiento",
+    "pc_local": "PC o red interna",
+    "workflow": "Ordenar procesos",
+    "automation": "Automatizar trabajo",
+    "analytics": "Datos visibles",
+    "ai": "Asistente con IA",
+    "experience": "Experiencia profesional",
+    "analytics_ai": "Datos o IA",
+    "roles_permisos": "Usuarios y permisos",
+    "datos_sensibles": "Datos sensibles",
+    "ia_controlada": "IA o procesos críticos",
+    "financiamiento_100": "Financiación 100% del desarrollo",
+    "sin_financiacion": "Cotización directa sin financiación",
+    "fases": "Construcción por fases",
+    "contacto_directo": "Diagnóstico con asesor",
+    "mvp_rapido": "MVP rápido",
+    "1_3_meses": "1 a 3 meses",
+    "enterprise": "Etapas enterprise"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "Sistema empresarial a medida",
+      "operation": "Arquitectura según operación real",
+      "value": "Valor operativo por priorizar",
+      "risk": "Controles por definir",
+      "financing": "Modalidad financiera por definir",
+      "timeline": "Ritmo por definir",
+      "technical": "arquitectura modular orientada a productividad"
+    },
+    "technicalParts": {
+      "software_online": "plataforma web",
+      "app_movil": "app móvil/PWA",
+      "software_pc": "aplicación desktop/local",
+      "automatizacion": "automatización RPA/API",
+      "ia": "capa de IA con supervisión",
+      "modernizacion": "modernización modular",
+      "web_global": "backend + base de datos",
+      "mobile_first": "sincronización móvil",
+      "pc_local": "control local con sincronización opcional",
+      "workflow": "roles/permisos y estados",
+      "automation": "integraciones y robots de proceso",
+      "analytics": "dashboard/BI",
+      "ai": "asistente inteligente",
+      "analytics_ai": "BI + IA",
+      "experience": "UX/UI premium",
+      "roles_permisos": "RBAC y auditoría de usuarios",
+      "datos_sensibles": "validaciones y trazabilidad de datos",
+      "ia_controlada": "gobernanza de IA y revisión humana"
+    },
+    "controlBase": [
+      "validaciones de datos",
+      "trazabilidad"
+    ],
+    "controlParts": {
+      "web_global": "roles/permisos",
+      "software_online": "roles/permisos",
+      "ia": "supervisión humana de IA",
+      "analytics_ai": "supervisión humana de IA",
+      "ai": "supervisión humana de IA",
+      "automatizacion": "auditoría de automatizaciones",
+      "automation": "auditoría de automatizaciones",
+      "roles_permisos": "matriz de roles",
+      "datos_sensibles": "protección de datos sensibles",
+      "ia_controlada": "límites y revisión humana",
+      "financiamiento_100": "condiciones de financiación del 100% claras",
+      "sin_financiacion": "alcance, precio y tiempos claros"
+    },
+    "nextSteps": {
+      "noService": "Diagnóstico comercial con contexto operativo inicial",
+      "mvp": "Diagnóstico ejecutivo + primer módulo de valor",
+      "enterprise": "Arquitectura empresarial financiable por etapas",
+      "default": "Ruta técnica, comercial y financiera"
+    }
+  },
+  "schemaVersion": 1
+}

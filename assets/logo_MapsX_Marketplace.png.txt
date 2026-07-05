@@ -1,0 +1,1 @@
+Prompt para logo MapsX Marketplace: recrear o preparar el logo oficial de MapsX Marketplace respetando el círculo negro, borde turquesa, letra X blanca, texto MAPS y forma de marcador. Debe guardarse como assets/logo_MapsX_Marketplace.png, con bordes limpios, proporción cuadrada y sin alterar la marca.

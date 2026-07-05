@@ -1,0 +1,3 @@
+Imagen de respaldo para la sección Nuestra Experiencia de Hashinmy.
+Formato recomendado: webp, fondo transparente, solo el símbolo o logotipo centrado del cliente, alta legibilidad sobre tarjetas claras, sin texto promocional adicional, estilo corporativo limpio y profesional.
+Este archivo documenta el prompt base; si aún no existe un logo real en assets/clientes, la interfaz debe mostrar una figura geométrica de fallback sin romper la experiencia.

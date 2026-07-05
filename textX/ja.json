@@ -1,0 +1,738 @@
+{
+  "iso": "ja",
+  "name": "Japanese",
+  "nativeName": "日本語",
+  "htmlLang": "ja",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | 100%資金計画に対応するソフトウェア、AI、自動化",
+    "description": "Hashinmyは、キャッシュフローを守りながら企業を近代化するために、100%資金計画に対応したカスタムソフトウェア、AI、自動化を開発します。",
+    "ogTitle": "Hashinmy | 100%資金計画に対応する企業向けカスタム技術",
+    "ogDescription": "業務診断と100%開発資金計画を前提に、カスタムソフトウェア、AI、自動化を構築する技術パートナー。",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, 100%資金計画のカスタムソフトウェア, 企業技術の資金計画, 企業向けデジタルエンジニアリング, 応用AI, 業務プロセス自動化, キャッシュフローを守るデジタル変革, 資金計画付きソフトウェア開発, 企業向けスマートシステム, プロセス整理ソフトウェア, 販売自動化, 見積自動化, 在庫ソフトウェア, カスタムCRM, 軽量ERP, 企業API, 企業チャットボット, 販売チャネルとしてのWebサイト, カスタムデジタルプラットフォーム, 管理しやすい分割払い, 企業近代化, 業務管理, 企業レポート, 保護されたキャッシュフロー, メデジンのソフトウェア開発, コロンビアの企業ソフトウェア, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "現在の質問へ移動",
+    "stageLabel": "Hashinmy インタラクティブ体験",
+    "topbarLabel": "主要コントロール",
+    "brandAria": "Hashinmy の開始画面へ戻る",
+    "brandSmall": "100%資金計画のソフトウェア + AI",
+    "progressLabel": "ルートの進行状況",
+    "languageLabel": "言語",
+    "languageAria": "初期言語を変更",
+    "contentLabel": "現在の場面の主な内容",
+    "pathLabelAria": "記録された意思決定",
+    "decisionZoneLabel": "現在の場面の選択肢",
+    "summaryLabelAria": "生成された要約",
+    "footerLabel": "場面ナビゲーション",
+    "primaryFinance": "診断を依頼",
+    "primaryQuote": "自社システムを見積もる",
+    "back": "戻る",
+    "restart": "やり直す",
+    "contactLabel": "連絡先情報",
+    "contactPlaceholder": "法人メールアドレス",
+    "commentLabel": "プロジェクトを説明",
+    "commentPlaceholder": "整理、自動化、またはソフトウェア化したい業務を教えてください。販売、見積、在庫、生産、サポート、データ、顧客対応、Webページ、API、チャットボット、プラットフォームなど。時間、費用、情報が失われている点も含めると、技術面と資金面の明確なルートを準備できます。",
+    "submitRoute": "Hashinmyへ送信",
+    "copySummaryAction": "要約をコピー",
+    "formNote": "送信を決めるまで、回答はこのブラウザ内だけに保存されます。",
+    "contactRequired": "Hashinmy が依頼を確認し、準備したルートについて連絡できるよう、メールアドレスと WhatsApp を追加してください。",
+    "copySuccess": "要約をコピーしました。WhatsApp、メール、CRM に貼り付けられます。",
+    "copyFailure": "自動コピーできませんでした。メール送信では引き続き要約を準備します。",
+    "mailOpening": "今回 memoriaBACKEND で確認できませんでした。準備したルートをバックアップとして入れた状態でメールアプリを開きます。",
+    "waitSummary": "技術ルートを準備中",
+    "preparingOptions": "選択肢を準備中",
+    "optionFallback": "選択してください",
+    "pathLabel": "あなたの意思決定：",
+    "pathEmpty": "選択するたびにプロジェクト概要が組み立てられます",
+    "interactionFallback": "インタラクション",
+    "summaryTitle": "Hashinmy が準備した技術ルート",
+    "projectChosen": "選択したプロジェクト",
+    "expectedUse": "想定される使い方",
+    "wantedValue": "求める価値",
+    "prioritySecurity": "優先する安全性",
+    "paymentMode": "支払い方法",
+    "financing": "資金計画",
+    "pace": "実行ペース",
+    "technicalBase": "推奨される技術基盤",
+    "suggestedControls": "推奨コントロール",
+    "nextStep": "次のステップ",
+    "contact": "連絡先",
+    "additionalComment": "追加コメント",
+    "registeredInteractions": "記録されたインタラクション",
+    "directRouteRequested": "直接ルートが依頼されました。",
+    "directQuoteSubject": "Hashinmy 見積依頼",
+    "financedSubject": "Hashinmy 資金計画付きソフトウェア依頼",
+    "directQuoteAudit": "ルートは、範囲、業務価値、実装方法を明確にしてシステムを見積もる診断へ進みます。",
+    "financeAudit": "ルートは、開発費100%の資金計画を主な優先事項として診断へ進みます。",
+    "directQuoteTech": "システム診断 + 技術・商業範囲",
+    "financeTech": "診断 + 100%資金計画 + 管理しやすい分割",
+    "topActionsLabel": "Hashinmy クイックアクセス",
+    "proofEntryAria": "Hashinmy の実績と信頼へアクセス",
+    "proofOpenButton": "私たちの実績",
+    "proofTitle": "資金計画に対応するデジタルエンジニアリング",
+    "proofLead": "Hashinmy はWeb制作会社でも汎用ベンダーでもありません。企業プロセスをカスタムソフトウェア、AI、自動化へ変換し、100%資金計画で運転資金を守りながら近代化を支えるデジタルエンジニアリング企業です。",
+    "proofCloseAria": "Hashinmy の実績を閉じる",
+    "proofContentAria": "Hashinmy の社会的証明、信頼、方法論、簡単な質問",
+    "proofSummaryAria": "Hashinmy の技術的信頼",
+    "proofSummaryTitle": "業務を整理し、資本を守り、管理しながら成長するための100%資金計画付きカスタム技術",
+    "proofTrustLabel": "技術的信頼：",
+    "proofTrustText": "事業戦略、カスタムソフトウェア、応用AI、自動化、API、Web販売チャネル、チャットボット、業務診断、100%資金計画、管理しやすい分割、安全性、権限、トレーサビリティ、有用なデータ、継続性。",
+    "proofMethodLabel": "方法論：",
+    "proofMethodText": "実際の業務を確認し、時間・費用・情報が失われる場所を特定し、最も回収効果の高いモジュールを優先し、正確な解決策を設計し、資金計画、実装、テスト、定着、進化まで伴走します。",
+    "proofUseCasesLabel": "利用例：",
+    "proofUseCasesText": "販売、見積、在庫、生産、サポート、CRM、ポータル、EC、顧客対応の自動化、レポート、API、そして現在ファイル、WhatsApp、人の記憶に依存している社内プロセス。",
+    "proofBrandsTitle": "私たちの仕事に関連するブランド、プロジェクト、企業",
+    "proofBrandsAria": "assets/clientes から自動検出された Hashinmy 関連の企業、ブランド、プロジェクトのロゴ",
+    "proofLogoPlaceholder": "Hashinmy の実績",
+    "proofLogoAltTemplate": "{name} のロゴ",
+    "proofFaqAria": "Hashinmy の実績と働き方に関する簡易FAQ",
+    "proofFaqWhyQuestion": "なぜ Hashinmy に依頼するのですか？",
+    "proofFaqWhyAnswer": "Hashinmy は孤立したコードや汎用技術を売るのではなく、具体的な業務課題を、明確で安全、測定可能かつ財務的に実行可能なシステムへ変えるからです。",
+    "proofFaqWhoQuestion": "誰に向いていますか？",
+    "proofFaqWhoAnswer": "プロセスを整理し、作業を自動化し、AIを統合し、販売を改善し、自社ソフトウェアを作りながらキャッシュフローを守りたい中小企業から大企業まで。",
+    "proofFaqStartQuestion": "どう始めますか？",
+    "proofFaqStartAnswer": "診断を依頼し、業務を確認し、時間・費用・情報の損失を見つけ、技術・商業・資金面の明確なルートを準備します。",
+    "proofBrandsStructuredDescription": "assets/clientes にある画像から自動更新される SEO リスト。"
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "ウェブ · ソフトウェア",
+      "tech": "ウェブ · backend",
+      "short": "ウェブ"
+    },
+    {
+      "value": "app_movil",
+      "label": "モバイルアプリ",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PCソフトウェア",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "自動化",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · 連携",
+      "tech": "AI · ワークフロー",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "近代化",
+      "tech": "ソフトウェア · 管理",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "保護された資金"
+    },
+    "serviceFamily": {
+      "symbol": "ルート",
+      "label": "サービス · 選択"
+    },
+    "buildType": {
+      "symbol": "構築",
+      "label": "プロダクト"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "自動化"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "近代化"
+    },
+    "operation": {
+      "symbol": "利用",
+      "label": "利用"
+    },
+    "value": {
+      "symbol": "価値",
+      "label": "価値 · 管理"
+    },
+    "risk": {
+      "symbol": "信頼",
+      "label": "セキュリティ · 管理"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% 資金計画"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "ロードマップ"
+    },
+    "summary": {
+      "symbol": "要約",
+      "label": "プロジェクト概要"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "カスタム"
+      ],
+      [
+        "AI",
+        "自動化"
+      ],
+      [
+        "PC",
+        "モバイル"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "ルート"
+      ],
+      [
+        "6",
+        "サービス"
+      ],
+      [
+        "1",
+        "プロジェクト概要"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "プロセス"
+      ],
+      [
+        "AI",
+        "人による確認"
+      ],
+      [
+        "BI",
+        "レポート"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "近代化"
+      ],
+      [
+        "API",
+        "連携"
+      ],
+      [
+        "UX",
+        "信頼"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "ウェブ"
+      ],
+      [
+        "Mobile",
+        "利用"
+      ],
+      [
+        "Local",
+        "管理"
+      ]
+    ],
+    "value": [
+      [
+        "ワークフロー",
+        "プロセス"
+      ],
+      [
+        "Auto",
+        "高速"
+      ],
+      [
+        "Data",
+        "管理"
+      ]
+    ],
+    "risk": [
+      [
+        "ユーザー",
+        "権限"
+      ],
+      [
+        "Data",
+        "セキュリティ"
+      ],
+      [
+        "AI",
+        "人による確認"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "資金計画"
+      ],
+      [
+        "USD",
+        "段階"
+      ],
+      [
+        "Pause",
+        "管理"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "高速"
+      ],
+      [
+        "段階",
+        "ロードマップ"
+      ],
+      [
+        "QA",
+        "管理"
+      ]
+    ],
+    "summary": [
+      [
+        "ルート",
+        "要約"
+      ],
+      [
+        "Email",
+        "プロジェクト概要"
+      ],
+      [
+        "人による確認",
+        "連絡先"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "日本語",
+      "title": "資本を減らさず成長するための100%資金計画付きカスタム技術",
+      "copy": "Hashinmy は企業プロセスを、カスタムのインテリジェントソフトウェア、自動化、AIへ変換します。業務を分析し、時間・費用・情報が失われる場所を特定し、大きな初期投資を求めずに近代化できる100%資金計画対応の技術を構築します。\n私たちはWeb制作会社でも汎用ベンダーでもありません。事業戦略、ソフトウェアエンジニアリング、応用AI、利用しやすい資金計画を結びつける技術パートナーです。\nあなたの会社にはすでに知識、経験、ビジョンがあります。私たちはそれを、販売、見積、在庫、サポート、データ、社内プロセス、デジタルチャネルを整理するシステムに変え、解決策が価値を生み始めるまでキャッシュフローを守ります。",
+      "optionQuestion": "どのオプションをご希望ですか？",
+      "progress": "開始",
+      "core": "HASHINMY",
+      "insight": "診断、100%資金計画、または直接見積もりのどこからでも始められます。Hashinmyは、支払い方法や技術範囲を決める前に、まず実際の業務課題を理解します。",
+      "options": [
+        {
+          "label": "業務診断",
+          "hint": "Hashinmyに、時間・費用・情報が失われている場所を見つけてほしい",
+          "tech": "業務分析 + 技術ルート + 資金計画の実現性",
+          "insight": "まず自社の業務を理解し、事業を最も止めているプロセスを見つけ、資金計画・直接見積もり・段階的開発のどれが適切かを決める前に明確なルートを受け取りたいです。"
+        },
+        {
+          "label": "100%資金計画",
+          "hint": "大きな初期費用なしで近代化したい",
+          "tech": "100%資金計画",
+          "insight": "開発費を100%資金計画で進め、システムが価値を生み始める間に管理しやすい分割払いで支払いたいです。"
+        },
+        {
+          "label": "直接見積もり",
+          "hint": "資金計画なしで範囲と価格を知りたい",
+          "tech": "直接見積もり",
+          "insight": "資金計画を使わずに判断できるよう、範囲、価格、期間が明確な直接提案を受け取りたいです。"
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "ルート",
+      "title": "どのプロセスの場当たり対応をやめるべきですか？",
+      "optionQuestion": "最初に解決したいことは何ですか？",
+      "copy": "出発点を選ぶことで、事業上の必要を診断、見積、資金計画につながる技術ルートへ変換できます。Hashinmy はまず問題を明確にし、ソフトウェア、アプリ、自動化、AI、または全面的な近代化のどれが適切かを判断します。",
+      "progress": "ルート",
+      "core": "サービス",
+      "insight": "生産性、営業の流れ、または業務管理に最も影響している課題を選び、最初の技術ソリューションが実際の事業の痛みに答えるようにします。",
+      "options": [
+        {
+          "label": "カスタムソフトウェア · プロダクト",
+          "hint": "ウェブ · モバイルアプリ · PCソフトウェア",
+          "tech": "ソフトウェア · プロダクト",
+          "insight": "選択した方向: カスタムソフトウェア、プロダクト — ウェブ、モバイルアプリ、PCソフトウェア。"
+        },
+        {
+          "label": "自動化 · AI",
+          "hint": "RPA · API · AI",
+          "tech": "自動化 · AI",
+          "insight": "選択した方向: 自動化、AI — RPA、API、AI。"
+        },
+        {
+          "label": "近代化 · プロセス",
+          "hint": "Excel · 連携 · ワークフロー",
+          "tech": "近代化 · ワークフロー",
+          "insight": "選択した方向: 近代化、プロセス — Excel、連携、ワークフロー。"
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "プロダクト",
+      "title": "ソフトウェアはどこで使われるべきですか？",
+      "optionQuestion": "どこで使いたいですか？",
+      "copy": "ソフトウェアは、チームが実際に働く場所で動かなければなりません。Web、スマートフォン、タブレット、PC、社内ネットワークのどれで使うかによって、アーキテクチャ、同期、権限、バックエンド、体験が決まります。",
+      "progress": "プロダクト",
+      "core": "構築",
+      "options": [
+        {
+          "label": "ウェブ",
+          "hint": "ウェブ · backend · データ",
+          "tech": "ウェブ · backend",
+          "insight": "選択した方向: ウェブ — ウェブ、backend、データ。"
+        },
+        {
+          "label": "モバイルアプリ",
+          "hint": "PWA/App · 利用",
+          "tech": "mobile/PWA",
+          "insight": "選択した方向: モバイルアプリ — PWA/App、利用。"
+        },
+        {
+          "label": "PCソフトウェア",
+          "hint": "desktop/local · 管理",
+          "tech": "desktop/local",
+          "insight": "選択した方向: PCソフトウェア — desktop/local、管理。"
+        }
+      ],
+      "insight": "プラットフォームは、チームがすでに働いている場所で開ける必要があります。そうすることで、技術が業務を整え、使いにくいツールへ事業を無理に合わせることを避けられます。"
+    },
+    "automationType": {
+      "eyebrow": "AI · 自動化",
+      "title": "システムに何を任せるべきですか？",
+      "optionQuestion": "最初に何を自動化しますか？",
+      "copy": "自動化はボタンを増やすことではありません。繰り返し作業、承認、通知、レポート、AI支援を、追跡でき、人が管理できる流れに変えることです。",
+      "progress": "自動化",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "プロセス · 自動化",
+          "hint": "RPA · API · 高速",
+          "tech": "RPA/API",
+          "insight": "選択した方向: プロセス、自動化 — RPA、API、高速。"
+        },
+        {
+          "label": "AI · 人による確認",
+          "hint": "AI · 要約 · 管理",
+          "tech": "AI · 人による確認",
+          "insight": "選択した方向: AI、人による確認 — AI、要約、管理。"
+        },
+        {
+          "label": "データ · レポート",
+          "hint": "BI · レポート",
+          "tech": "BI/dashboard",
+          "insight": "選択した方向: データ、レポート — BI、レポート。"
+        }
+      ],
+      "insight": "正しい自動化は、日常業務の中で最も繰り返され、最も遅れ、または人為的ミスを生みやすい作業から始めます。"
+    },
+    "modernization": {
+      "eyebrow": "近代化",
+      "title": "何を先に手放したいですか？",
+      "optionQuestion": "まず何を置き換えますか？",
+      "copy": "近代化は流行のツールに替えることではなく、表計算、ばらばらのメッセージ、古いシステムを、より明確で安全、測定可能で成長に備えた業務へ変えることです。",
+      "progress": "近代化",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · ワークフロー",
+          "hint": "プロセス · 権限",
+          "tech": "ワークフロー · 権限",
+          "insight": "選択した方向: Excel、ワークフロー — プロセス、権限。"
+        },
+        {
+          "label": "連携 · データ",
+          "hint": "API · 管理",
+          "tech": "API · 連携",
+          "insight": "選択した方向: 連携、データ — API、管理。"
+        },
+        {
+          "label": "UX/UI · 信頼",
+          "hint": "体験 · 価値",
+          "tech": "UX/UI + product",
+          "insight": "選択した方向: UX/UI、信頼 — 体験、価値。"
+        }
+      ],
+      "insight": "スプレッドシート、ばらばらのメッセージ、古いシステムを手放すことで、事業の本質を変えずに追跡性、速度、管理を取り戻せます。"
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "実際の仕事ではどう使われるべきですか？",
+      "optionQuestion": "どこで最も安定して動く必要がありますか？",
+      "copy": "ソフトウェアは、オフィス、現場、販売、生産、サポート、経営の実際の使い方に合わせる必要があります。そこからクラウド、モバイル優先、デスクトップ、または混合構成を決めます。",
+      "progress": "利用",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "ウェブ · ルート",
+          "hint": "cloud · backend · データ",
+          "tech": "cloud backend",
+          "insight": "選択した方向: ウェブ、ルート — cloud、backend、データ。"
+        },
+        {
+          "label": "モバイルアプリ · 利用",
+          "hint": "モバイルアプリ · tablet · sync",
+          "tech": "mobile first",
+          "insight": "選択した方向: モバイルアプリ、利用 — モバイルアプリ、tablet、sync。"
+        },
+        {
+          "label": "PC · 管理",
+          "hint": "desktop/local · セキュリティ",
+          "tech": "desktop/local",
+          "insight": "選択した方向: PC、管理 — desktop/local、セキュリティ。"
+        }
+      ],
+      "insight": "アーキテクチャは実際の使い方から決めます。オフィス、現場、営業、生産、サポートのどこでも不要な摩擦なく動くシステムにするためです。"
+    },
+    "value": {
+      "eyebrow": "価値",
+      "title": "最初に何を改善すべきですか？",
+      "optionQuestion": "最初に見たい成果は何ですか？",
+      "copy": "良いプラットフォームは早い段階で価値を感じられるべきです。プロセスを整理し、反復作業を減らし、重要データを見える化し、販売を支援して、投資の意味を業務の中で示します。",
+      "progress": "価値",
+      "core": "価値",
+      "options": [
+        {
+          "label": "プロセス · ワークフロー",
+          "hint": "権限 · 管理",
+          "tech": "workflow + RBAC",
+          "insight": "選択した方向: プロセス、ワークフロー — 権限、管理。"
+        },
+        {
+          "label": "自動化 · 高速",
+          "hint": "RPA/API · プロセス",
+          "tech": "RPA/API",
+          "insight": "選択した方向: 自動化、高速 — RPA/API、プロセス。"
+        },
+        {
+          "label": "データ · AI",
+          "hint": "レポート · AI",
+          "tech": "BI + AI",
+          "insight": "選択した方向: データ、AI — レポート、AI。"
+        }
+      ],
+      "insight": "最初に見える価値は投資を正当化する必要があります。より多い秩序、少ない時間ロス、良いデータ、高い生産性、または新しい販売機会です。"
+    },
+    "risk": {
+      "eyebrow": "信頼 · 管理",
+      "title": "何をより強く守るべきですか？",
+      "optionQuestion": "何をより強く守りたいですか？",
+      "copy": "信頼は最初のモジュールから設計します。役割、権限、監査、検証、AIの制限により、企業はデータと重要プロセスの管理を失わずにスピードを上げられます。",
+      "progress": "セキュリティ",
+      "core": "信頼",
+      "options": [
+        {
+          "label": "ユーザー · 権限",
+          "hint": "RBAC · 管理",
+          "tech": "RBAC + audit",
+          "insight": "選択した方向: ユーザー、権限 — RBAC、管理。"
+        },
+        {
+          "label": "データ · セキュリティ",
+          "hint": "データ · 管理",
+          "tech": "設計段階からのセキュリティ",
+          "insight": "選択した方向: データ、セキュリティ — データ、管理。"
+        },
+        {
+          "label": "AI · 人による確認",
+          "hint": "自動化 · 管理",
+          "tech": "AI governance",
+          "insight": "選択した方向: AI、人による確認 — 自動化、管理。"
+        }
+      ],
+      "insight": "成長には管理が必要です。そのため、権限、監査、検証、AIの制限は、重要なプロセスを自動化する前に設計します。"
+    },
+    "finance": {
+      "eyebrow": "保護された資金 · 資金計画",
+      "title": "資本を減らさずにどう近代化しますか？",
+      "optionQuestion": "支払いをどう整理しますか？",
+      "copy": "企業はキャッシュフロー保護と近代化のどちらかを選ぶ必要はありません。Hashinmy は診断が可能と判断した場合、範囲を整理し、開発の100%資金計画を構成し、ソフトウェアが価値を生み始める間に支払える管理しやすい分割を定義します。",
+      "progress": "資金計画",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% 資金計画",
+          "hint": "USD · 段階 · 保護された資金",
+          "tech": "USD · 資金計画",
+          "insight": "選択した方向: 100% 資金計画 — USD、段階、保護された資金。"
+        },
+        {
+          "label": "直接見積もり · 段階",
+          "hint": "ロードマップ · 段階",
+          "tech": "ロードマップ",
+          "insight": "選択した方向: 直接見積もり、段階 — ロードマップ、段階。"
+        },
+        {
+          "label": "連絡先 · 人による確認",
+          "hint": "プロジェクト概要 · 連絡先",
+          "tech": "人による確認",
+          "insight": "選択した方向: 連絡先、人による確認 — プロジェクト概要、連絡先。"
+        }
+      ],
+      "insight": "資金計画により、今すぐ前進し、運転資金を守り、技術が時間を節約し、プロセスを整え、売上を後押しする間に支払うことが可能になります。"
+    },
+    "timeline": {
+      "eyebrow": "進行",
+      "title": "どれくらい早く動き始める必要がありますか？",
+      "optionQuestion": "どのペースが合っていますか？",
+      "copy": "実行ペースは、大きなニーズを有用な納品へ分けます。MVP、短いフェーズ、企業向けロードマップのいずれでも、各前進に業務価値と財務価値を持たせます。",
+      "progress": "進行",
+      "core": "ロードマップ",
+      "options": [
+        {
+          "label": "高速 · MVP",
+          "hint": "プロダクト · 高速",
+          "tech": "MVP",
+          "insight": "選択した方向: 高速、MVP — プロダクト、高速。"
+        },
+        {
+          "label": "1-3 · 段階",
+          "hint": "ロードマップ · 管理",
+          "tech": "段階",
+          "insight": "選択した方向: 1-3、段階 — ロードマップ、管理。"
+        },
+        {
+          "label": "エンタープライズ · ロードマップ",
+          "hint": "セキュリティ · エンタープライズ",
+          "tech": "エンタープライズ・ロードマップ",
+          "insight": "選択した方向: エンタープライズ、ロードマップ — セキュリティ、エンタープライズ。"
+        }
+      ],
+      "insight": "適切な実行リズムは、大きな必要性を、全体像を失わないまま有用で測定可能かつ資金計画に乗せやすい納品へ変えます。"
+    },
+    "summary": {
+      "eyebrow": "ルート · 要約",
+      "title": "技術ルートの準備ができました。",
+      "copy": "必要、支払い方法、業務上の優先度について初期理解ができました。不足する背景を追加すると、Hashinmy が業務を分析し、カスタム解決策を提案し、技術・商業・資金面で実行可能なルートを準備できます。",
+      "progress": "プロジェクト概要",
+      "core": "概要",
+      "insight": "このルートは、必要性、企業内の知識、技術範囲、業務上の優先度、期待される価値、支払いモデルを、実行可能な提案へつなげる準備ができています。",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "ルート",
+    "service": "サービス",
+    "operation": "使い方",
+    "value": "価値",
+    "risk": "安全性",
+    "financing": "方式",
+    "timeline": "ペース"
+  },
+  "valueLabels": {
+    "diagnostico": "ガイド付き診断",
+    "producto_digital": "ソフトウェア作成",
+    "automatizacion_ia": "自動化またはAI活用",
+    "modernizacion_operativa": "業務近代化",
+    "software_online": "オンラインソフトウェア",
+    "app_movil": "モバイルアプリ",
+    "software_pc": "PC向けソフトウェア",
+    "automatizacion": "企業自動化",
+    "ia": "AI連携",
+    "modernizacion": "全面的な近代化",
+    "web_global": "どこからでも",
+    "mobile_first": "移動するチーム",
+    "pc_local": "PCまたは社内ネットワーク",
+    "workflow": "プロセス整理",
+    "automation": "作業自動化",
+    "analytics": "見えるデータ",
+    "ai": "AIアシスタント",
+    "experience": "プロフェッショナル体験",
+    "analytics_ai": "データまたはAI",
+    "roles_permisos": "ユーザーと権限",
+    "datos_sensibles": "機密データ",
+    "ia_controlada": "AIまたは重要プロセス",
+    "financiamiento_100": "開発費100%資金計画",
+    "sin_financiacion": "資金計画なしの直接見積",
+    "fases": "段階的構築",
+    "contacto_directo": "担当者との診断",
+    "mvp_rapido": "高速MVP",
+    "1_3_meses": "1〜3か月",
+    "enterprise": "エンタープライズ段階"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "カスタムソフトウェア · プロダクト",
+      "operation": "architecture · プロジェクト概要",
+      "value": "価値 · プロジェクト概要",
+      "risk": "セキュリティ · プロジェクト概要",
+      "financing": "資金計画 · プロジェクト概要",
+      "timeline": "進行 · プロジェクト概要",
+      "technical": "ソフトウェア · architecture"
+    },
+    "technicalParts": {
+      "software_online": "ウェブ · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · ソフトウェア",
+      "automatizacion": "RPA/API自動化",
+      "ia": "AI · 人による確認",
+      "modernizacion": "近代化",
+      "web_global": "バックエンド + データベース",
+      "mobile_first": "モバイルアプリ · sync",
+      "pc_local": "local · 管理",
+      "workflow": "権限 · ワークフロー",
+      "automation": "自動化 · 連携",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "データ · セキュリティ",
+      "ia_controlada": "AI governance · 人による確認"
+    },
+    "controlBase": [
+      "データ",
+      "管理"
+    ],
+    "controlParts": {
+      "web_global": "権限",
+      "software_online": "権限",
+      "ia": "人による確認",
+      "analytics_ai": "人による確認",
+      "ai": "人による確認",
+      "automatizacion": "自動化 · レポート",
+      "automation": "自動化 · レポート",
+      "roles_permisos": "権限 · 管理",
+      "datos_sensibles": "データ · セキュリティ",
+      "ia_controlada": "人による確認 · 管理",
+      "financiamiento_100": "100% 資金計画",
+      "sin_financiacion": "直接見積もり"
+    },
+    "nextSteps": {
+      "noService": "連絡先 · プロジェクト概要",
+      "mvp": "MVP · プロジェクト概要",
+      "enterprise": "エンタープライズ · ロードマップ",
+      "default": "ソフトウェア · ロードマップ"
+    }
+  },
+  "schemaVersion": 1
+}

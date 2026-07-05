@@ -1,0 +1,738 @@
+{
+  "iso": "vi",
+  "name": "Vietnamese",
+  "nativeName": "Tiếng Việt",
+  "htmlLang": "vi",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | Phần mềm, AI và tự động hóa được tài trợ 100%",
+    "description": "Hashinmy phát triển phần mềm tùy chỉnh, AI và tự động hóa với tài trợ 100% để hiện đại hóa doanh nghiệp mà không làm cạn vốn.",
+    "ogTitle": "Hashinmy | Công nghệ doanh nghiệp tùy chỉnh được tài trợ 100%",
+    "ogDescription": "Đối tác công nghệ để tạo phần mềm tùy chỉnh, AI và tự động hóa, với chẩn đoán vận hành và tài trợ 100% cho phát triển.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, phần mềm tùy chỉnh được tài trợ 100%, công nghệ doanh nghiệp được tài trợ, kỹ thuật số cho doanh nghiệp, trí tuệ nhân tạo ứng dụng, tự động hóa doanh nghiệp, phần mềm để sắp xếp quy trình, chuyển đổi số mà không làm cạn vốn, phát triển phần mềm với khoản trả góp dễ quản lý, hệ thống thông minh cho doanh nghiệp, chatbot doanh nghiệp, API doanh nghiệp, nền tảng số tùy chỉnh, CRM tùy chỉnh, ERP nhẹ tùy chỉnh, tự động hóa báo giá, tự động hóa bán hàng, kiểm soát vận hành, năng suất doanh nghiệp, dòng tiền được bảo vệ, hiện đại hóa doanh nghiệp, phần mềm doanh nghiệp tại Colombia, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "Chuyển đến câu hỏi hiện tại",
+    "stageLabel": "Trải nghiệm tương tác Hashinmy",
+    "topbarLabel": "Điều khiển chính",
+    "brandAria": "Quay lại trang đầu Hashinmy",
+    "brandSmall": "Phần mềm + AI được tài trợ 100%",
+    "progressLabel": "Tiến độ lộ trình",
+    "languageLabel": "Ngôn ngữ",
+    "languageAria": "Đổi ngôn ngữ ban đầu",
+    "contentLabel": "Nội dung chính của cảnh",
+    "pathLabelAria": "Các quyết định đã ghi nhận",
+    "decisionZoneLabel": "Tùy chọn của cảnh hiện tại",
+    "summaryLabelAria": "Tóm tắt đã tạo",
+    "footerLabel": "Điều hướng cảnh",
+    "primaryFinance": "Yêu cầu chẩn đoán",
+    "primaryQuote": "Báo giá hệ thống của tôi",
+    "back": "Quay lại",
+    "restart": "Bắt đầu lại",
+    "contactLabel": "Thông tin liên hệ",
+    "contactPlaceholder": "Email doanh nghiệp",
+    "commentLabel": "Mô tả dự án của bạn",
+    "commentPlaceholder": "Hãy cho chúng tôi biết quy trình nào bạn muốn sắp xếp, tự động hóa hoặc chuyển thành phần mềm: bán hàng, báo giá, tồn kho, sản xuất, hỗ trợ, dữ liệu, chăm sóc khách hàng, website, API, chatbot hoặc nền tảng. Nêu rõ điều gì làm bạn mất thời gian, tiền hoặc thông tin để chuẩn bị lộ trình kỹ thuật và tài chính rõ ràng.",
+    "submitRoute": "Gửi đến Hashinmy",
+    "copySummaryAction": "Sao chép tóm tắt",
+    "formNote": "Câu trả lời của bạn chỉ được lưu trong trình duyệt này cho đến khi bạn quyết định gửi.",
+    "contactRequired": "Thêm email và WhatsApp để Hashinmy có thể xác nhận yêu cầu và liên hệ với bạn bằng lộ trình đã chuẩn bị.",
+    "copySuccess": "Đã sao chép tóm tắt. Bạn có thể dán vào WhatsApp, email hoặc CRM.",
+    "copyFailure": "Không thể tự động sao chép. Việc gửi email vẫn sẽ chuẩn bị tóm tắt.",
+    "mailOpening": "Lần này chúng tôi chưa thể xác nhận qua memoriaBACKEND. Chúng tôi sẽ mở ứng dụng email của bạn với lộ trình đã chuẩn bị làm phương án dự phòng.",
+    "waitSummary": "Đang chuẩn bị lộ trình công nghệ",
+    "preparingOptions": "Đang chuẩn bị tùy chọn",
+    "optionFallback": "Chọn một tùy chọn",
+    "pathLabel": "Quyết định của bạn:",
+    "pathEmpty": "Mỗi lần chọn tạo nên bản tóm tắt dự án của bạn",
+    "interactionFallback": "Tương tác",
+    "summaryTitle": "Lộ trình công nghệ do Hashinmy chuẩn bị",
+    "projectChosen": "Dự án đã chọn",
+    "expectedUse": "Cách sử dụng dự kiến",
+    "wantedValue": "Giá trị mong muốn",
+    "prioritySecurity": "Ưu tiên bảo mật",
+    "paymentMode": "Hình thức thanh toán",
+    "financing": "Tài trợ",
+    "pace": "Nhịp độ",
+    "technicalBase": "Nền tảng kỹ thuật đề xuất",
+    "suggestedControls": "Kiểm soát đề xuất",
+    "nextStep": "Bước tiếp theo",
+    "contact": "Liên hệ",
+    "additionalComment": "Bình luận bổ sung",
+    "registeredInteractions": "Tương tác đã ghi nhận",
+    "directRouteRequested": "Đã yêu cầu lộ trình trực tiếp.",
+    "directQuoteSubject": "Hashinmy · báo giá trực tiếp không tài trợ",
+    "financedSubject": "Yêu cầu phần mềm được tài trợ Hashinmy",
+    "directQuoteAudit": "Báo giá trực tiếp không tài trợ. Tóm tắt dự án. Lộ trình.",
+    "financeAudit": "Lộ trình chuyển đến chẩn đoán với tài trợ 100% phát triển là ưu tiên chính.",
+    "directQuoteTech": "Báo giá trực tiếp không tài trợ · tóm tắt dự án",
+    "financeTech": "chẩn đoán + tài trợ 100% + khoản trả góp dễ quản lý",
+    "topActionsLabel": "Truy cập nhanh Hashinmy",
+    "proofEntryAria": "Truy cập kinh nghiệm và niềm tin của Hashinmy",
+    "proofOpenButton": "Kinh nghiệm của chúng tôi",
+    "proofTitle": "Kỹ thuật số được tài trợ",
+    "proofLead": "Hashinmy không phải là agency làm website hay nhà cung cấp chung chung. Đây là công ty kỹ thuật số chuyển đổi quy trình doanh nghiệp thành phần mềm tùy chỉnh, AI và tự động hóa, với tài trợ 100% để hiện đại hóa mà không làm cạn vốn vận hành.",
+    "proofCloseAria": "Đóng trải nghiệm Hashinmy",
+    "proofContentAria": "Bằng chứng xã hội, niềm tin, phương pháp và câu hỏi nhanh về Hashinmy",
+    "proofSummaryAria": "Niềm tin kỹ thuật của Hashinmy",
+    "proofSummaryTitle": "Công nghệ tùy chỉnh được tài trợ 100% để sắp xếp vận hành, bảo vệ vốn và tăng trưởng có kiểm soát",
+    "proofTrustLabel": "Niềm tin kỹ thuật:",
+    "proofTrustText": "chiến lược doanh nghiệp, phần mềm tùy chỉnh, AI ứng dụng, tự động hóa, API, kênh bán hàng web, chatbot, chẩn đoán vận hành, tài trợ 100%, khoản trả góp dễ quản lý, bảo mật, quyền truy cập, truy vết, dữ liệu hữu ích và tính liên tục.",
+    "proofMethodLabel": "Phương pháp:",
+    "proofMethodText": "chúng tôi xem xét vận hành thực tế, tìm điểm mất thời gian, tiền hoặc thông tin, ưu tiên mô-đun có lợi tức cao nhất, thiết kế giải pháp chính xác và đồng hành trong tài trợ, triển khai, kiểm thử, áp dụng và phát triển.",
+    "proofUseCasesLabel": "Trường hợp sử dụng:",
+    "proofUseCasesText": "bán hàng, báo giá, tồn kho, sản xuất, hỗ trợ, CRM, cổng thông tin, thương mại điện tử, chăm sóc tự động, báo cáo, API và quy trình nội bộ hiện phụ thuộc vào tệp, WhatsApp hoặc trí nhớ con người.",
+    "proofBrandsTitle": "Thương hiệu, dự án và doanh nghiệp liên quan đến công việc của chúng tôi",
+    "proofBrandsAria": "Logo của doanh nghiệp, thương hiệu và dự án liên quan đến Hashinmy được tự động phát hiện từ assets/clientes",
+    "proofLogoPlaceholder": "Kinh nghiệm Hashinmy",
+    "proofLogoAltTemplate": "Logo của {name}",
+    "proofFaqAria": "FAQ nhanh về kinh nghiệm và cách làm việc của Hashinmy",
+    "proofFaqWhyQuestion": "Vì sao nên thuê Hashinmy?",
+    "proofFaqWhyAnswer": "Vì Hashinmy không bán mã rời rạc hay công nghệ chung chung: chúng tôi biến vấn đề vận hành cụ thể thành hệ thống rõ ràng, an toàn, đo lường được và khả thi về tài chính.",
+    "proofFaqWhoQuestion": "Dành cho ai?",
+    "proofFaqWhoAnswer": "Dành cho doanh nghiệp nhỏ, vừa hoặc lớn cần sắp xếp quy trình, tự động hóa công việc, tích hợp AI, bán hàng tốt hơn hoặc tạo phần mềm riêng trong khi bảo vệ dòng tiền.",
+    "proofFaqStartQuestion": "Bắt đầu như thế nào?",
+    "proofFaqStartAnswer": "Yêu cầu chẩn đoán để xem xét vận hành, phát hiện mất mát thời gian, tiền hoặc thông tin và chuẩn bị lộ trình kỹ thuật, thương mại và tài chính rõ ràng.",
+    "proofBrandsStructuredDescription": "Danh sách SEO được tự động cập nhật từ các hình ảnh có sẵn trong assets/clientes."
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "web · phần mềm",
+      "tech": "web · backend",
+      "short": "web"
+    },
+    {
+      "value": "app_movil",
+      "label": "ứng dụng di động",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "phần mềm PC",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "tự động hóa",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · tích hợp",
+      "tech": "AI · quy trình làm việc",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "hiện đại hóa",
+      "tech": "phần mềm · kiểm soát",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "vốn được bảo vệ"
+    },
+    "serviceFamily": {
+      "symbol": "lộ trình",
+      "label": "Dịch vụ · Chọn"
+    },
+    "buildType": {
+      "symbol": "Xây dựng",
+      "label": "Sản phẩm"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "tự động hóa"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "hiện đại hóa"
+    },
+    "operation": {
+      "symbol": "Sử dụng",
+      "label": "Sử dụng"
+    },
+    "value": {
+      "symbol": "Giá trị",
+      "label": "Giá trị · kiểm soát"
+    },
+    "risk": {
+      "symbol": "niềm tin",
+      "label": "bảo mật · kiểm soát"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "tài trợ 100%"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "lộ trình"
+    },
+    "summary": {
+      "symbol": "tóm tắt",
+      "label": "bản tóm tắt"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "tùy chỉnh"
+      ],
+      [
+        "AI",
+        "tự động hóa"
+      ],
+      [
+        "PC",
+        "di động"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "lộ trình"
+      ],
+      [
+        "6",
+        "Dịch vụ"
+      ],
+      [
+        "1",
+        "bản tóm tắt"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "quy trình"
+      ],
+      [
+        "AI",
+        "xem xét bởi con người"
+      ],
+      [
+        "BI",
+        "báo cáo"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "hiện đại hóa"
+      ],
+      [
+        "API",
+        "tích hợp"
+      ],
+      [
+        "UX",
+        "niềm tin"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "web"
+      ],
+      [
+        "Mobile",
+        "Sử dụng"
+      ],
+      [
+        "Local",
+        "kiểm soát"
+      ]
+    ],
+    "value": [
+      [
+        "quy trình làm việc",
+        "quy trình"
+      ],
+      [
+        "Auto",
+        "nhanh"
+      ],
+      [
+        "Data",
+        "kiểm soát"
+      ]
+    ],
+    "risk": [
+      [
+        "người dùng",
+        "quyền truy cập"
+      ],
+      [
+        "Data",
+        "bảo mật"
+      ],
+      [
+        "AI",
+        "xem xét bởi con người"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "tài trợ"
+      ],
+      [
+        "USD",
+        "giai đoạn"
+      ],
+      [
+        "Pause",
+        "kiểm soát"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "nhanh"
+      ],
+      [
+        "giai đoạn",
+        "lộ trình"
+      ],
+      [
+        "QA",
+        "kiểm soát"
+      ]
+    ],
+    "summary": [
+      [
+        "lộ trình",
+        "tóm tắt"
+      ],
+      [
+        "Email",
+        "bản tóm tắt"
+      ],
+      [
+        "xem xét bởi con người",
+        "liên hệ"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Tiếng Việt",
+      "title": "Chào mừng đến với HASHINMY",
+      "copy": "Chúng tôi xây dựng phần mềm theo yêu cầu cho các công ty đang vận hành, bán hàng và tăng trưởng ở thị trường địa phương lẫn quốc tế. Chúng tôi tích hợp AI, tự động hóa, chương trình PC, phần mềm CAD có xuất DXF, ứng dụng web, đám mây, SEO, chatbot, công cụ báo giá kỹ thuật, bảo mật và tính liên tục vận hành.\nMedellín và Colombia là nơi khởi nguồn của chúng tôi; phạm vi thương mại và kỹ thuật là toàn cầu.\nChúng tôi thúc đẩy phát triển công nghệ cho doanh nghiệp bằng các giải pháp được tài trợ 100%, giúp họ đạt tối đa tiềm năng, nâng cao năng suất và mở rộng hiệu quả hơn.",
+      "optionQuestion": "Bạn muốn chọn tùy chọn nào?",
+      "progress": "Bắt đầu",
+      "core": "HASHINMY",
+      "insight": "Bạn có thể bắt đầu bằng chẩn đoán, tài trợ hoặc báo giá trực tiếp; Hashinmy xuất phát từ vấn đề thật trước khi xác định phạm vi, hình thức thanh toán hoặc công nghệ.",
+      "options": [
+        {
+          "label": "Chẩn đoán vận hành",
+          "hint": "Tôi muốn Hashinmy tìm nơi đang mất thời gian, tiền hoặc thông tin",
+          "tech": "phân tích vận hành + lộ trình kỹ thuật + khả thi tài chính",
+          "insight": "Tôi muốn bắt đầu bằng cách hiểu vận hành của mình, phát hiện quy trình đang kìm hãm doanh nghiệp nhiều nhất và nhận lộ trình rõ ràng trước khi quyết định nên tài trợ, báo giá trực tiếp hay xây dựng theo giai đoạn."
+        },
+        {
+          "label": "Tài trợ 100%",
+          "hint": "Tôi muốn hiện đại hóa mà không cần khoản đầu tư ban đầu lớn",
+          "tech": "tài trợ 100%",
+          "insight": "Tôi muốn triển khai phần phát triển được tài trợ 100% và trả theo khoản dễ quản lý trong khi hệ thống bắt đầu tạo giá trị."
+        },
+        {
+          "label": "Báo giá trực tiếp",
+          "hint": "Tôi muốn biết phạm vi và giá mà không cần tài trợ",
+          "tech": "báo giá trực tiếp",
+          "insight": "Tôi muốn nhận đề xuất trực tiếp với phạm vi, giá và thời gian rõ ràng để quyết định mà không có kế hoạch tài trợ."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "lộ trình",
+      "title": "Bạn muốn đạt điều gì trước tiên?",
+      "optionQuestion": "Bạn muốn giải quyết điều gì trước?",
+      "copy": "Chọn điểm bắt đầu và chúng tôi sẽ chuẩn bị một lộ trình rõ ràng để biến nhu cầu của bạn thành đề xuất thực tế.",
+      "progress": "lộ trình",
+      "core": "Dịch vụ",
+      "insight": "Tôi chọn nhu cầu ảnh hưởng nhiều nhất đến năng suất, luồng thương mại hoặc kiểm soát vận hành để giải pháp công nghệ đầu tiên giải quyết đúng nỗi đau thật của doanh nghiệp.",
+      "options": [
+        {
+          "label": "phần mềm tùy chỉnh · Sản phẩm",
+          "hint": "web · ứng dụng di động · phần mềm PC",
+          "tech": "phần mềm · Sản phẩm",
+          "insight": "Hướng đã chọn: phần mềm tùy chỉnh, Sản phẩm — web, ứng dụng di động, phần mềm PC."
+        },
+        {
+          "label": "tự động hóa · AI",
+          "hint": "RPA · API · AI",
+          "tech": "tự động hóa · AI",
+          "insight": "Hướng đã chọn: tự động hóa, AI — RPA, API, AI."
+        },
+        {
+          "label": "hiện đại hóa · quy trình",
+          "hint": "Excel · tích hợp · quy trình làm việc",
+          "tech": "hiện đại hóa · quy trình làm việc",
+          "insight": "Hướng đã chọn: hiện đại hóa, quy trình — Excel, tích hợp, quy trình làm việc."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Sản phẩm",
+      "title": "Phần mềm nên mở ở đâu?",
+      "optionQuestion": "Bạn muốn dùng ở đâu?",
+      "copy": "Quyết định này xác định nền tảng: trình duyệt, điện thoại hoặc PC. Hashinmy có thể kết hợp thêm mô-đun nếu dự án cần.",
+      "progress": "Sản phẩm",
+      "core": "Xây dựng",
+      "options": [
+        {
+          "label": "web",
+          "hint": "web · backend · dữ liệu",
+          "tech": "web · backend",
+          "insight": "Hướng đã chọn: web — web, backend, dữ liệu."
+        },
+        {
+          "label": "ứng dụng di động",
+          "hint": "PWA/App · Sử dụng",
+          "tech": "mobile/PWA",
+          "insight": "Hướng đã chọn: ứng dụng di động — PWA/App, Sử dụng."
+        },
+        {
+          "label": "phần mềm PC",
+          "hint": "desktop/local · kiểm soát",
+          "tech": "desktop/local",
+          "insight": "Hướng đã chọn: phần mềm PC — desktop/local, kiểm soát."
+        }
+      ],
+      "insight": "Nền tảng nên mở ở nơi đội ngũ của bạn đã làm việc, để công nghệ sắp xếp vận hành mà không buộc doanh nghiệp thích nghi với một công cụ bất tiện."
+    },
+    "automationType": {
+      "eyebrow": "AI · tự động hóa",
+      "title": "Hệ thống nên làm phần nào thay bạn?",
+      "optionQuestion": "Bạn muốn tự động hóa điều gì trước?",
+      "copy": "Tự động hóa không phải thêm AI cho hợp xu hướng. Đó là cách giảm việc lặp lại, lỗi và ma sát tại điểm gây đau nhất.",
+      "progress": "tự động hóa",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "quy trình · tự động hóa",
+          "hint": "RPA · API · nhanh",
+          "tech": "RPA/API",
+          "insight": "Hướng đã chọn: quy trình, tự động hóa — RPA, API, nhanh."
+        },
+        {
+          "label": "AI · xem xét bởi con người",
+          "hint": "AI · tóm tắt · kiểm soát",
+          "tech": "AI · xem xét bởi con người",
+          "insight": "Hướng đã chọn: AI, xem xét bởi con người — AI, tóm tắt, kiểm soát."
+        },
+        {
+          "label": "dữ liệu · báo cáo",
+          "hint": "BI · báo cáo",
+          "tech": "BI/dashboard",
+          "insight": "Hướng đã chọn: dữ liệu, báo cáo — BI, báo cáo."
+        }
+      ],
+      "insight": "Tự động hóa đúng bắt đầu từ phần việc lặp lại nhiều nhất, thường bị chậm nhất hoặc tạo ra nhiều lỗi con người nhất trong vận hành hằng ngày."
+    },
+    "modernization": {
+      "eyebrow": "hiện đại hóa",
+      "title": "Bạn muốn bỏ lại điều gì?",
+      "optionQuestion": "Bạn muốn thay thế điều gì trước?",
+      "copy": "Hiện đại hóa biến các công cụ rời rạc thành một hệ thống an toàn hơn, đo lường được và sẵn sàng mở rộng. Hashinmy biến lựa chọn này thành một lộ trình rõ ràng với phạm vi, kiểm soát và bước tiếp theo, để doanh nghiệp bán hàng, vận hành hoặc mở rộng với ít ma sát hơn.",
+      "progress": "hiện đại hóa",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · quy trình làm việc",
+          "hint": "quy trình · quyền truy cập",
+          "tech": "quy trình làm việc · quyền truy cập",
+          "insight": "Hướng đã chọn: Excel, quy trình làm việc — quy trình, quyền truy cập."
+        },
+        {
+          "label": "tích hợp · dữ liệu",
+          "hint": "API · kiểm soát",
+          "tech": "API · tích hợp",
+          "insight": "Hướng đã chọn: tích hợp, dữ liệu — API, kiểm soát."
+        },
+        {
+          "label": "UX/UI · niềm tin",
+          "hint": "trải nghiệm · Giá trị",
+          "tech": "UX/UI + product",
+          "insight": "Hướng đã chọn: UX/UI, niềm tin — trải nghiệm, Giá trị."
+        }
+      ],
+      "insight": "Bỏ lại bảng tính, tin nhắn rời rạc và hệ thống cũ giúp lấy lại khả năng truy vết, tốc độ và kiểm soát mà không làm thay đổi bản chất doanh nghiệp."
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Trong thực tế nên được sử dụng như thế nào?",
+      "optionQuestion": "Nơi nào cần hoạt động tốt nhất?",
+      "copy": "Câu trả lời cho biết nên ưu tiên backend, đồng bộ, ứng dụng di động hay phần mềm cục bộ. Hashinmy biến lựa chọn này thành một lộ trình rõ ràng với phạm vi, kiểm soát và bước tiếp theo, để doanh nghiệp bán hàng, vận hành hoặc mở rộng với ít ma sát hơn.",
+      "progress": "Sử dụng",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "web · lộ trình",
+          "hint": "cloud · backend · dữ liệu",
+          "tech": "cloud backend",
+          "insight": "Hướng đã chọn: web, lộ trình — cloud, backend, dữ liệu."
+        },
+        {
+          "label": "ứng dụng di động · Sử dụng",
+          "hint": "ứng dụng di động · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Hướng đã chọn: ứng dụng di động, Sử dụng — ứng dụng di động, tablet, sync."
+        },
+        {
+          "label": "PC · kiểm soát",
+          "hint": "desktop/local · bảo mật",
+          "tech": "desktop/local",
+          "insight": "Hướng đã chọn: PC, kiểm soát — desktop/local, bảo mật."
+        }
+      ],
+      "insight": "Kiến trúc được quyết định từ cách sử dụng thực tế để hệ thống hoạt động ở văn phòng, hiện trường, bán hàng, sản xuất hoặc hỗ trợ mà không tạo ma sát không cần thiết."
+    },
+    "value": {
+      "eyebrow": "Giá trị",
+      "title": "Điều gì cần cải thiện trước?",
+      "optionQuestion": "Bạn muốn thấy kết quả nào trước?",
+      "copy": "Một nền tảng tốt không chỉ đẹp mắt. Nó sắp xếp quy trình, tự động hóa công việc và hiển thị dữ liệu để ra quyết định.",
+      "progress": "Giá trị",
+      "core": "Giá trị",
+      "options": [
+        {
+          "label": "quy trình · quy trình làm việc",
+          "hint": "quyền truy cập · kiểm soát",
+          "tech": "workflow + RBAC",
+          "insight": "Hướng đã chọn: quy trình, quy trình làm việc — quyền truy cập, kiểm soát."
+        },
+        {
+          "label": "tự động hóa · nhanh",
+          "hint": "RPA/API · quy trình",
+          "tech": "RPA/API",
+          "insight": "Hướng đã chọn: tự động hóa, nhanh — RPA/API, quy trình."
+        },
+        {
+          "label": "dữ liệu · AI",
+          "hint": "báo cáo · AI",
+          "tech": "BI + AI",
+          "insight": "Hướng đã chọn: dữ liệu, AI — báo cáo, AI."
+        }
+      ],
+      "insight": "Giá trị thấy được đầu tiên phải chứng minh khoản đầu tư: trật tự hơn, ít mất thời gian hơn, dữ liệu tốt hơn, năng suất cao hơn hoặc nhiều cơ hội bán hàng hơn."
+    },
+    "risk": {
+      "eyebrow": "niềm tin · kiểm soát",
+      "title": "Điều gì cần được bảo vệ nhất?",
+      "optionQuestion": "Bạn muốn bảo vệ điều gì tốt hơn?",
+      "copy": "Bảo mật không được thêm vào cuối cùng. Nó được thiết kế từ đầu bằng quyền, kiểm toán và quy tắc rõ ràng. Hashinmy biến lựa chọn này thành một lộ trình rõ ràng với phạm vi, kiểm soát và bước tiếp theo, để doanh nghiệp bán hàng, vận hành hoặc mở rộng với ít ma sát hơn.",
+      "progress": "bảo mật",
+      "core": "niềm tin",
+      "options": [
+        {
+          "label": "người dùng · quyền truy cập",
+          "hint": "RBAC · kiểm soát",
+          "tech": "RBAC + audit",
+          "insight": "Hướng đã chọn: người dùng, quyền truy cập — RBAC, kiểm soát."
+        },
+        {
+          "label": "dữ liệu · bảo mật",
+          "hint": "dữ liệu · kiểm soát",
+          "tech": "bảo mật ngay từ thiết kế",
+          "insight": "Hướng đã chọn: dữ liệu, bảo mật — dữ liệu, kiểm soát."
+        },
+        {
+          "label": "AI · xem xét bởi con người",
+          "hint": "tự động hóa · kiểm soát",
+          "tech": "AI governance",
+          "insight": "Hướng đã chọn: AI, xem xét bởi con người — tự động hóa, kiểm soát."
+        }
+      ],
+      "insight": "Tăng trưởng cần kiểm soát; vì vậy quyền truy cập, kiểm toán, xác thực và giới hạn cho AI được thiết kế trước khi tự động hóa các quy trình quan trọng."
+    },
+    "finance": {
+      "eyebrow": "vốn được bảo vệ · tài trợ",
+      "title": "Làm sao tiến lên mà không làm chậm vận hành?",
+      "optionQuestion": "Bạn muốn sắp xếp thanh toán thế nào?",
+      "copy": "Việc phát triển có thể chia theo khoản USD dựa trên phạm vi, phê duyệt và nhịp triển khai. Hashinmy biến lựa chọn này thành một lộ trình rõ ràng với phạm vi, kiểm soát và bước tiếp theo, để doanh nghiệp bán hàng, vận hành hoặc mở rộng với ít ma sát hơn.",
+      "progress": "tài trợ",
+      "core": "USD",
+      "options": [
+        {
+          "label": "tài trợ 100%",
+          "hint": "USD · giai đoạn · vốn được bảo vệ",
+          "tech": "USD · tài trợ",
+          "insight": "Hướng đã chọn: tài trợ 100% — USD, giai đoạn, vốn được bảo vệ."
+        },
+        {
+          "label": "Xây dựng theo giai đoạn",
+          "hint": "lộ trình · giai đoạn",
+          "tech": "lộ trình",
+          "insight": "Tôi muốn ưu tiên một phiên bản đầu tiên hữu ích, xác thực kết quả và mở rộng hệ thống với kiểm soát kỹ thuật và tài chính."
+        },
+        {
+          "label": "liên hệ · xem xét bởi con người",
+          "hint": "bản tóm tắt · liên hệ",
+          "tech": "xem xét bởi con người",
+          "insight": "Hướng đã chọn: liên hệ, xem xét bởi con người — bản tóm tắt, liên hệ."
+        }
+      ],
+      "insight": "Tài trợ giúp việc tiến lên ngay bây giờ trở nên khả thi, bảo vệ vốn vận hành và trả dần trong khi công nghệ tiết kiệm thời gian, sắp xếp quy trình hoặc thúc đẩy bán hàng."
+    },
+    "timeline": {
+      "eyebrow": "Tiến độ",
+      "title": "Bao lâu thì cần bắt đầu hoạt động?",
+      "optionQuestion": "Nhịp nào phù hợp nhất?",
+      "copy": "Câu trả lời này tách phiên bản hữu ích đầu tiên khỏi nền tảng lớn được xây theo từng giai đoạn. Hashinmy biến lựa chọn này thành một lộ trình rõ ràng với phạm vi, kiểm soát và bước tiếp theo, để doanh nghiệp bán hàng, vận hành hoặc mở rộng với ít ma sát hơn.",
+      "progress": "Tiến độ",
+      "core": "lộ trình",
+      "options": [
+        {
+          "label": "nhanh · MVP",
+          "hint": "Sản phẩm · nhanh",
+          "tech": "MVP",
+          "insight": "Hướng đã chọn: nhanh, MVP — Sản phẩm, nhanh."
+        },
+        {
+          "label": "1-3 · giai đoạn",
+          "hint": "lộ trình · kiểm soát",
+          "tech": "giai đoạn",
+          "insight": "Hướng đã chọn: 1-3, giai đoạn — lộ trình, kiểm soát."
+        },
+        {
+          "label": "doanh nghiệp · lộ trình",
+          "hint": "bảo mật · doanh nghiệp",
+          "tech": "lộ trình cấp doanh nghiệp",
+          "insight": "Hướng đã chọn: doanh nghiệp, lộ trình — bảo mật, doanh nghiệp."
+        }
+      ],
+      "insight": "Nhịp độ đúng biến một nhu cầu lớn thành các phần bàn giao hữu ích, đo lường được và có thể tài trợ mà không mất tầm nhìn về toàn bộ hệ thống."
+    },
+    "summary": {
+      "eyebrow": "lộ trình · tóm tắt",
+      "title": "Chúng tôi đã hiểu điều bạn đang tìm.",
+      "copy": "Lộ trình của bạn đã sẵn sàng. Trước khi gửi, bạn có thể bổ sung bất kỳ chi tiết quan trọng nào; đội ngũ Hashinmy sẽ xem lại hướng dự án, lựa chọn tài chính và các bước tiếp theo trong bối cảnh kinh doanh và kỹ thuật rõ ràng.",
+      "progress": "bản tóm tắt",
+      "core": "bản tóm tắt",
+      "insight": "Lộ trình đã sẵn sàng để kết nối nhu cầu, kiến thức doanh nghiệp, phạm vi kỹ thuật, ưu tiên vận hành, giá trị mong đợi và mô hình thanh toán thành một đề xuất khả thi.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "lộ trình",
+    "service": "Dịch vụ",
+    "operation": "Sử dụng",
+    "value": "Giá trị",
+    "risk": "bảo mật",
+    "financing": "tài trợ",
+    "timeline": "Tiến độ"
+  },
+  "valueLabels": {
+    "diagnostico": "bản tóm tắt · lộ trình",
+    "producto_digital": "phần mềm tùy chỉnh · Sản phẩm",
+    "automatizacion_ia": "tự động hóa · AI",
+    "modernizacion_operativa": "hiện đại hóa · quy trình",
+    "software_online": "web · phần mềm",
+    "app_movil": "ứng dụng di động",
+    "software_pc": "phần mềm PC",
+    "automatizacion": "tự động hóa · quy trình",
+    "ia": "AI · tích hợp",
+    "modernizacion": "hiện đại hóa",
+    "web_global": "web · lộ trình",
+    "mobile_first": "ứng dụng di động · Sử dụng",
+    "pc_local": "PC · kiểm soát",
+    "workflow": "quy trình làm việc · quy trình",
+    "automation": "tự động hóa · nhanh",
+    "analytics": "dữ liệu · báo cáo",
+    "ai": "AI · xem xét bởi con người",
+    "experience": "UX/UI · niềm tin",
+    "analytics_ai": "dữ liệu · AI",
+    "roles_permisos": "người dùng · quyền truy cập",
+    "datos_sensibles": "dữ liệu · bảo mật",
+    "ia_controlada": "AI · xem xét bởi con người",
+    "financiamiento_100": "tài trợ 100%",
+    "sin_financiacion": "Báo giá trực tiếp không tài trợ",
+    "fases": "Xây dựng theo giai đoạn",
+    "contacto_directo": "liên hệ · xem xét bởi con người",
+    "mvp_rapido": "nhanh · MVP",
+    "1_3_meses": "1-3 · giai đoạn",
+    "enterprise": "doanh nghiệp · lộ trình"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "phần mềm tùy chỉnh · Sản phẩm",
+      "operation": "architecture · bản tóm tắt",
+      "value": "Giá trị · bản tóm tắt",
+      "risk": "bảo mật · bản tóm tắt",
+      "financing": "tài trợ · bản tóm tắt",
+      "timeline": "Tiến độ · bản tóm tắt",
+      "technical": "phần mềm · architecture"
+    },
+    "technicalParts": {
+      "software_online": "web · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · phần mềm",
+      "automatizacion": "tự động hóa RPA/API",
+      "ia": "AI · xem xét bởi con người",
+      "modernizacion": "hiện đại hóa",
+      "web_global": "backend + cơ sở dữ liệu",
+      "mobile_first": "ứng dụng di động · sync",
+      "pc_local": "local · kiểm soát",
+      "workflow": "quyền truy cập · quy trình làm việc",
+      "automation": "tự động hóa · tích hợp",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "dữ liệu · bảo mật",
+      "ia_controlada": "AI governance · xem xét bởi con người"
+    },
+    "controlBase": [
+      "dữ liệu",
+      "kiểm soát"
+    ],
+    "controlParts": {
+      "web_global": "quyền truy cập",
+      "software_online": "quyền truy cập",
+      "ia": "xem xét bởi con người",
+      "analytics_ai": "xem xét bởi con người",
+      "ai": "xem xét bởi con người",
+      "automatizacion": "tự động hóa · báo cáo",
+      "automation": "tự động hóa · báo cáo",
+      "roles_permisos": "quyền truy cập · kiểm soát",
+      "datos_sensibles": "dữ liệu · bảo mật",
+      "ia_controlada": "xem xét bởi con người · kiểm soát",
+      "financiamiento_100": "tài trợ 100%",
+      "sin_financiacion": "Báo giá trực tiếp không tài trợ"
+    },
+    "nextSteps": {
+      "noService": "liên hệ · bản tóm tắt",
+      "mvp": "MVP · bản tóm tắt",
+      "enterprise": "doanh nghiệp · lộ trình",
+      "default": "phần mềm · lộ trình"
+    }
+  },
+  "schemaVersion": 1
+}

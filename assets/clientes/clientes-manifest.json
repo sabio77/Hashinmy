@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": "assets/clientes",
+  "generatedAt": "2026-06-26T02:51:31.994Z",
+  "logos": [
+    {
+      "name": "Clean MAX",
+      "file": "logo_clean_MAX.jpg"
+    },
+    {
+      "name": "Design & 3D International",
+      "file": "logo_design_&_3D_international.png"
+    },
+    {
+      "name": "Griferías VX",
+      "file": "logo_griferias_VX.png"
+    },
+    {
+      "name": "IA Colombia",
+      "file": "logo_IA-Colombia.jpg"
+    },
+    {
+      "name": "MapsX Marketplace",
+      "file": "logo_MapsX_Marketplace.png"
+    },
+    {
+      "name": "Maxpunz",
+      "file": "logo_maxpunz.png"
+    },
+    {
+      "name": "Robots Colombia",
+      "file": "logo_robots-colombia.png"
+    },
+    {
+      "name": "Xzone Industries",
+      "file": "logo_xzone_industries.png"
+    }
+  ]
+}

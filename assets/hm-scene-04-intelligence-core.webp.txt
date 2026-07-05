@@ -1,0 +1,12 @@
+BASE VISUAL HASHINMY IMMERSIVE v2
+Formato final: hm-scene-04-intelligence-core.webp
+Relación: 16:9, calidad premium, composición tipo interfaz empresarial futurista de lujo. Referencia conceptual: vitrina de producto premium con objeto central flotante, diagonales amplias, navegación guiada sin scroll, vidrio esmerilado, capas flotantes, fondo azul hielo, azul petróleo, blanco suave y negro tinta.
+Regla matemática común: usar una retícula 12x8; eje diagonal principal desde x=68% y=-10% hasta x=46% y=110%; eje secundario suave desde x=84% y=-10% hasta x=62% y=110%; dejar zona limpia de lectura en el tercio inferior izquierdo; profundidad en 3 capas medibles: fondo atmosférico 28%, escenario principal 50%, partículas/paneles 22%; el fondo debe sentirse más visible, vivo y reconocible, sin perder la zona de lectura de la interfaz.
+Lenguaje coordinado: bordes redondeados de 18-32 px visuales, paneles translúcidos, microbrillos, líneas vectoriales finas, sombras suaves, módulos tipo software empresarial, sensación de tecnología avanzada y financiación empresarial; todas las escenas deben parecer parte de una misma campaña visual.
+Restricciones: sin caricatura, sin estilo infantil, sin personas reales, sin texto legible dentro de la imagen, sin marcas de terceros, sin logotipos inventados, sin elementos inconexos; el texto real lo renderiza la interfaz HTML.
+
+TÍTULO DE ESCENA: Núcleo de inteligencia y automatización
+OBJETIVO: Motor central de IA responsable con anillos de datos, pequeños robots abstractos de proceso y paneles de analítica; la composición debe sugerir automatización seria, no magia ni ciencia ficción exagerada.
+Composición exacta: punto focal en x=62%, y=42%; volumen principal dentro de x=42%-84%, y=16%-66%; dejar x=7%-45%, y=54%-84% con contraste controlado pero no apagado para que la card de texto HTML se lea encima mientras el fondo sigue visible y con vida.
+Iluminación: highlights fríos en 30°, reflejo suave inferior y sombra ambiental consistente; usar partículas pequeñas solo sobre el eje diagonal para que no compitan con los textos HTML; aumentar presencia de gradientes, profundidad y microbrillos del fondo sin ensuciar la lectura.
+Entrega esperada: imagen .webp sin texto, lista para usarse como fondo/escenario dentro de la experiencia inmersiva Hashinmy.

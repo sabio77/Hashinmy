@@ -1,0 +1,738 @@
+{
+  "iso": "sv",
+  "name": "Swedish",
+  "nativeName": "Svenska",
+  "htmlLang": "sv",
+  "dir": "ltr",
+  "meta": {
+    "title": "Hashinmy | Programvara, AI och automatisering finansierade till 100%",
+    "description": "Hashinmy utvecklar anpassad programvara, AI och automatisering med 100% finansiering för att modernisera företag utan att tömma kapitalet.",
+    "ogTitle": "Hashinmy | Skräddarsydd företagsteknik finansierad till 100%",
+    "ogDescription": "Teknikpartner för att skapa anpassad programvara, AI och automatisering, med operativ diagnos och 100% utvecklingsfinansiering.",
+    "appleTitle": "Hashinmy",
+    "applicationName": "Hashinmy",
+    "author": "Hashinmy",
+    "keywords": "Hashinmy, hashinmy.com, 100% finansierad anpassad programvara, finansierad företagsteknik, digital ingenjörskonst för företag, tillämpad artificiell intelligens, företagsautomatisering, programvara för att ordna processer, digital transformation utan att tömma kapitalet, mjukvaruutveckling med hanterbara avbetalningar, intelligenta system för företag, företagschatbots, företags-API:er, anpassade digitala plattformar, anpassat CRM, lättviktigt anpassat ERP, automatisering av offerter, försäljningsautomatisering, operativ kontroll, företagsproduktivitet, skyddat kassaflöde, företagsmodernisering, företagsprogramvara i Colombia, Hashinmy Medellín Colombia"
+  },
+  "ui": {
+    "skip": "Hoppa till den aktuella frågan",
+    "stageLabel": "Interaktiv Hashinmy-upplevelse",
+    "topbarLabel": "Huvudkontroller",
+    "brandAria": "Gå tillbaka till Hashinmys start",
+    "brandSmall": "Programvara + AI finansierade till 100%",
+    "progressLabel": "Ruttens framsteg",
+    "languageLabel": "Språk",
+    "languageAria": "Ändra startspråk",
+    "contentLabel": "Huvudinnehåll i scenen",
+    "pathLabelAria": "Registrerade beslut",
+    "decisionZoneLabel": "Alternativ för aktuell scen",
+    "summaryLabelAria": "Genererad sammanfattning",
+    "footerLabel": "Scennavigering",
+    "primaryFinance": "Begär diagnos",
+    "primaryQuote": "Offerera mitt system",
+    "back": "Tillbaka",
+    "restart": "Starta om",
+    "contactLabel": "Kontaktuppgifter",
+    "contactPlaceholder": "Företagets e-postadress",
+    "commentLabel": "Beskriv ditt projekt",
+    "commentPlaceholder": "Berätta vilken process du vill ordna, automatisera eller omvandla till programvara: försäljning, offerter, lager, produktion, support, data, kundservice, webbplats, API, chatbot eller plattform. Ta med vad som gör att företaget förlorar tid, pengar eller information, så att vi kan förbereda en tydlig teknisk och finansiell väg.",
+    "submitRoute": "Skicka till Hashinmy",
+    "copySummaryAction": "Kopiera sammanfattning",
+    "formNote": "Dina svar sparas bara i den här webbläsaren tills du väljer att skicka dem.",
+    "contactRequired": "Lägg till din e-postadress och WhatsApp så att Hashinmy kan bekräfta förfrågan och kontakta dig med den förberedda rutten.",
+    "copySuccess": "Sammanfattningen är kopierad. Du kan klistra in den i WhatsApp, e-post eller CRM.",
+    "copyFailure": "Det gick inte att kopiera automatiskt. E-postskicket fortsätter att förbereda sammanfattningen.",
+    "mailOpening": "Vi kunde inte bekräfta via memoriaBACKEND den här gången. Vi öppnar din e-postapp med den förberedda rutten som reserv.",
+    "waitSummary": "Förbereder teknisk rutt",
+    "preparingOptions": "Förbereder alternativ",
+    "optionFallback": "Välj ett alternativ",
+    "pathLabel": "Dina beslut:",
+    "pathEmpty": "Varje tryck bygger din projektöversikt",
+    "interactionFallback": "Interaktion",
+    "summaryTitle": "Teknisk rutt förberedd av Hashinmy",
+    "projectChosen": "Valt projekt",
+    "expectedUse": "Förväntad användning",
+    "wantedValue": "Sökt värde",
+    "prioritySecurity": "Prioriterad säkerhet",
+    "paymentMode": "Betalningsmodell",
+    "financing": "Finansiering",
+    "pace": "Tempo",
+    "technicalBase": "Föreslagen teknisk bas",
+    "suggestedControls": "Föreslagna kontroller",
+    "nextStep": "Nästa steg",
+    "contact": "Kontakt",
+    "additionalComment": "Ytterligare kommentar",
+    "registeredInteractions": "Registrerade interaktioner",
+    "directRouteRequested": "Direkt rutt begärd.",
+    "directQuoteSubject": "Offertförfrågan Hashinmy",
+    "financedSubject": "Förfrågan om finansierad programvara Hashinmy",
+    "directQuoteAudit": "Rutten går till diagnosen för att offerera systemet med tydlig omfattning, operativt värde och implementeringsform.",
+    "financeAudit": "Rutten går till diagnosen med 100% utvecklingsfinansiering som huvudprioritet.",
+    "directQuoteTech": "systemdiagnos + teknisk och kommersiell omfattning",
+    "financeTech": "diagnos + 100% finansiering + hanterbara avbetalningar",
+    "topActionsLabel": "Snabba ingångar till Hashinmy",
+    "proofEntryAria": "Tillgång till Hashinmys erfarenhet och förtroende",
+    "proofOpenButton": "Vår erfarenhet",
+    "proofTitle": "Finansierad digital ingenjörskonst",
+    "proofLead": "Hashinmy är inte en webbyrå eller en generisk leverantör. Det är ett digitalt ingenjörsföretag som omvandlar affärsprocesser till anpassad programvara, AI och automatisering, med 100% finansiering för att modernisera utan att tömma verksamhetens kapital.",
+    "proofCloseAria": "Stäng Hashinmy-upplevelsen",
+    "proofContentAria": "Social proof, förtroende, metodik och snabba frågor om Hashinmy",
+    "proofSummaryAria": "Tekniskt förtroende för Hashinmy",
+    "proofSummaryTitle": "Skräddarsydd teknik finansierad till 100% för att ordna verksamheten, skydda kapitalet och växa med kontroll",
+    "proofTrustLabel": "Tekniskt förtroende:",
+    "proofTrustText": "affärsstrategi, anpassad programvara, tillämpad AI, automatisering, API:er, webbförsäljningskanaler, chatbots, operativ diagnos, 100% finansiering, hanterbara avbetalningar, säkerhet, behörigheter, spårbarhet, användbar data och kontinuitet.",
+    "proofMethodLabel": "Metodik:",
+    "proofMethodText": "vi granskar den verkliga verksamheten, hittar förluster av tid, pengar eller information, prioriterar modulen med störst avkastning, designar den exakta lösningen och följer finansiering, implementering, tester, adoption och vidareutveckling.",
+    "proofUseCasesLabel": "Användningsfall:",
+    "proofUseCasesText": "försäljning, offerter, lager, produktion, support, CRM, portaler, e-handel, automatiserad service, rapporter, API:er och interna processer som i dag beror på filer, WhatsApp eller mänskligt minne.",
+    "proofBrandsTitle": "Varumärken, projekt och företag kopplade till vårt arbete",
+    "proofBrandsAria": "Logotyper för företag, varumärken och projekt relaterade till Hashinmy som upptäckts automatiskt från assets/clientes",
+    "proofLogoPlaceholder": "Hashinmy-upplevelse",
+    "proofLogoAltTemplate": "Logotyp för {name}",
+    "proofFaqAria": "Snabb FAQ om Hashinmys erfarenhet och arbetssätt",
+    "proofFaqWhyQuestion": "Varför anlita Hashinmy?",
+    "proofFaqWhyAnswer": "Eftersom Hashinmy inte säljer isolerad kod eller generisk teknik: vi omvandlar konkreta operativa problem till tydliga, säkra, mätbara och finansiellt genomförbara system.",
+    "proofFaqWhoQuestion": "Vem är det för?",
+    "proofFaqWhoAnswer": "För små, medelstora eller stora företag som behöver ordna processer, automatisera arbete, integrera AI, sälja bättre eller skapa egen programvara samtidigt som kassaflödet skyddas.",
+    "proofFaqStartQuestion": "Hur börjar jag?",
+    "proofFaqStartAnswer": "Begär en diagnos för att granska verksamheten, hitta förluster av tid, pengar eller information och förbereda en tydlig teknisk, kommersiell och finansiell väg.",
+    "proofBrandsStructuredDescription": "SEO-lista automatiskt uppdaterad från tillgängliga bilder i assets/clientes."
+  },
+  "services": [
+    {
+      "value": "software_online",
+      "label": "webb · programvara",
+      "tech": "webb · backend",
+      "short": "webb"
+    },
+    {
+      "value": "app_movil",
+      "label": "mobilapp",
+      "tech": "iOS/Android/PWA",
+      "short": "App"
+    },
+    {
+      "value": "software_pc",
+      "label": "PC-programvara",
+      "tech": "desktop · local",
+      "short": "PC"
+    },
+    {
+      "value": "automatizacion",
+      "label": "automatisering",
+      "tech": "RPA + APIs",
+      "short": "Auto"
+    },
+    {
+      "value": "ia",
+      "label": "AI · integration",
+      "tech": "AI · arbetsflöde",
+      "short": "AI"
+    },
+    {
+      "value": "modernizacion",
+      "label": "modernisering",
+      "tech": "programvara · kontroller",
+      "short": "360"
+    }
+  ],
+  "sceneAssets": {
+    "intro": {
+      "symbol": "100%",
+      "label": "skyddat kapital"
+    },
+    "serviceFamily": {
+      "symbol": "väg",
+      "label": "Tjänst · Välj"
+    },
+    "buildType": {
+      "symbol": "Bygge",
+      "label": "Produkt"
+    },
+    "automationType": {
+      "symbol": "AI",
+      "label": "automatisering"
+    },
+    "modernization": {
+      "symbol": "360",
+      "label": "modernisering"
+    },
+    "operation": {
+      "symbol": "Användning",
+      "label": "Användning"
+    },
+    "value": {
+      "symbol": "Värde",
+      "label": "Värde · kontroller"
+    },
+    "risk": {
+      "symbol": "förtroende",
+      "label": "säkerhet · kontroller"
+    },
+    "finance": {
+      "symbol": "USD",
+      "label": "100% finansiering"
+    },
+    "timeline": {
+      "symbol": "MVP",
+      "label": "roadmap"
+    },
+    "summary": {
+      "symbol": "sammanfattning",
+      "label": "projektsammanfattning"
+    }
+  },
+  "metricsByScene": {
+    "intro": [
+      [
+        "Web",
+        "anpassad"
+      ],
+      [
+        "AI",
+        "automatisering"
+      ],
+      [
+        "PC",
+        "mobil"
+      ]
+    ],
+    "serviceFamily": [
+      [
+        "3",
+        "väg"
+      ],
+      [
+        "6",
+        "Tjänst"
+      ],
+      [
+        "1",
+        "projektsammanfattning"
+      ]
+    ],
+    "buildType": [
+      [
+        "Web",
+        "backend"
+      ],
+      [
+        "App",
+        "PWA/mobile"
+      ],
+      [
+        "PC",
+        "local"
+      ]
+    ],
+    "automationType": [
+      [
+        "RPA",
+        "processer"
+      ],
+      [
+        "AI",
+        "mänsklig granskning"
+      ],
+      [
+        "BI",
+        "rapporter"
+      ]
+    ],
+    "modernization": [
+      [
+        "360",
+        "modernisering"
+      ],
+      [
+        "API",
+        "integration"
+      ],
+      [
+        "UX",
+        "förtroende"
+      ]
+    ],
+    "operation": [
+      [
+        "Cloud",
+        "webb"
+      ],
+      [
+        "Mobile",
+        "Användning"
+      ],
+      [
+        "Local",
+        "kontroller"
+      ]
+    ],
+    "value": [
+      [
+        "arbetsflöde",
+        "processer"
+      ],
+      [
+        "Auto",
+        "snabbt"
+      ],
+      [
+        "Data",
+        "kontroller"
+      ]
+    ],
+    "risk": [
+      [
+        "användare",
+        "behörigheter"
+      ],
+      [
+        "Data",
+        "säkerhet"
+      ],
+      [
+        "AI",
+        "mänsklig granskning"
+      ]
+    ],
+    "finance": [
+      [
+        "100%",
+        "finansiering"
+      ],
+      [
+        "USD",
+        "faser"
+      ],
+      [
+        "Pause",
+        "kontroller"
+      ]
+    ],
+    "timeline": [
+      [
+        "MVP",
+        "snabbt"
+      ],
+      [
+        "faser",
+        "roadmap"
+      ],
+      [
+        "QA",
+        "kontroller"
+      ]
+    ],
+    "summary": [
+      [
+        "väg",
+        "sammanfattning"
+      ],
+      [
+        "Email",
+        "projektsammanfattning"
+      ],
+      [
+        "mänsklig granskning",
+        "kontakt"
+      ]
+    ]
+  },
+  "scenes": {
+    "intro": {
+      "eyebrow": "Svenska",
+      "title": "Skräddarsydd teknik med 100 % finansiering för tillväxt utan att tömma kapitalet",
+      "copy": "Hashinmy omvandlar affärsprocesser till intelligent anpassad programvara, automatisering och tillämpad AI. Vi analyserar verksamheten, hittar var tid, pengar eller information går förlorad och bygger teknik som kan finansieras fullt ut, så att modernisering inte kräver en stor första investering. Vi är inte en vanlig webbyrå eller en generisk leverantör; vi förenar affärsstrategi, mjukvaruteknik, AI och tillgänglig finansiering.",
+      "optionQuestion": "Vilket första steg känns bäst för ditt företag?",
+      "progress": "Start",
+      "core": "HASHINMY",
+      "insight": "Du kan börja med diagnos, finansiering eller direkt offert; Hashinmy utgår från det verkliga problemet innan omfattning, betalningsform eller teknik bestäms.",
+      "options": [
+        {
+          "label": "Operativ diagnos",
+          "hint": "Jag vill att Hashinmy hittar var tid, pengar eller information går förlorad",
+          "tech": "operativ analys + teknisk väg + finansiell genomförbarhet",
+          "insight": "Jag vill börja med att förstå min verksamhet, upptäcka processen som bromsar företaget mest och få en tydlig väg innan jag avgör om finansiering, direkt offert eller etappvis byggande passar."
+        },
+        {
+          "label": "100% finansiering",
+          "hint": "Jag vill modernisera utan stor första betalning",
+          "tech": "100% finansiering",
+          "insight": "Jag vill gå vidare med utvecklingen finansierad till 100% och betala i hanterbara avbetalningar medan systemet börjar skapa värde."
+        },
+        {
+          "label": "Direkt offert",
+          "hint": "Jag vill få omfattning och pris utan finansiering",
+          "tech": "direkt offert",
+          "insight": "Jag vill få ett direkt förslag med tydlig omfattning, pris och tidsplan för att besluta utan finansieringsplan."
+        }
+      ]
+    },
+    "serviceFamily": {
+      "eyebrow": "väg",
+      "title": "Vilken process behöver sluta improviseras?",
+      "optionQuestion": "Var gör verksamheten mest ont idag?",
+      "copy": "Välj var företaget förlorar mest tid, kontroll eller försäljning. Hashinmy börjar inte med att sälja en isolerad tjänst; först förstår vi verksamheten och sedan definierar vi en väg som kopplar programvara, AI, automatisering och en genomförbar implementeringsform.",
+      "progress": "Väg",
+      "core": "Tjänst",
+      "insight": "Jag väljer det behov som påverkar produktivitet, kommersiellt flöde eller operativ kontroll mest, så att den första tekniska lösningen svarar på ett verkligt affärsproblem.",
+      "options": [
+        {
+          "label": "anpassad programvara · Produkt",
+          "hint": "webb · mobilapp · PC-programvara",
+          "tech": "programvara · Produkt",
+          "insight": "Vald riktning: anpassad programvara, Produkt — webb, mobilapp, PC-programvara."
+        },
+        {
+          "label": "automatisering · AI",
+          "hint": "RPA · API · AI",
+          "tech": "automatisering · AI",
+          "insight": "Vald riktning: automatisering, AI — RPA, API, AI."
+        },
+        {
+          "label": "modernisering · processer",
+          "hint": "Excel · integration · arbetsflöde",
+          "tech": "modernisering · arbetsflöde",
+          "insight": "Vald riktning: modernisering, processer — Excel, integration, arbetsflöde."
+        }
+      ]
+    },
+    "buildType": {
+      "eyebrow": "Produkt",
+      "title": "Var bör din programvara öppnas?",
+      "optionQuestion": "Var vill du använda den?",
+      "copy": "Den tekniska basen måste följa hur verksamheten faktiskt arbetar. Den kan vara webbläsare, mobil, PC eller en kombination i etapper, alltid med en arkitektur som kan växa utan att systemet byggs om från grunden.",
+      "progress": "Produkt",
+      "core": "Bygge",
+      "options": [
+        {
+          "label": "webb",
+          "hint": "webb · backend · data",
+          "tech": "webb · backend",
+          "insight": "Vald riktning: webb — webb, backend, data."
+        },
+        {
+          "label": "mobilapp",
+          "hint": "PWA/App · Användning",
+          "tech": "mobile/PWA",
+          "insight": "Vald riktning: mobilapp — PWA/App, Användning."
+        },
+        {
+          "label": "PC-programvara",
+          "hint": "desktop/local · kontroller",
+          "tech": "desktop/local",
+          "insight": "Vald riktning: PC-programvara — desktop/local, kontroller."
+        }
+      ],
+      "insight": "Plattformen ska öppnas där teamet redan arbetar, så att tekniken ordnar verksamheten utan att tvinga företaget till ett obekvämt verktyg."
+    },
+    "automationType": {
+      "eyebrow": "AI · automatisering",
+      "title": "Vilken del ska systemet göra åt dig?",
+      "optionQuestion": "Vad vill du automatisera först?",
+      "copy": "AI och automatisering är meningsfulla först när de löser konkret friktion: upprepade uppgifter, långsam service, spridda data, beslut utan information eller processer som är för beroende av mänskligt minne.",
+      "progress": "Automatisering",
+      "core": "AI + RPA",
+      "options": [
+        {
+          "label": "processer · automatisering",
+          "hint": "RPA · API · snabbt",
+          "tech": "RPA/API",
+          "insight": "Vald riktning: processer, automatisering — RPA, API, snabbt."
+        },
+        {
+          "label": "AI · mänsklig granskning",
+          "hint": "AI · sammanfattning · kontroller",
+          "tech": "AI · mänsklig granskning",
+          "insight": "Vald riktning: AI, mänsklig granskning — AI, sammanfattning, kontroller."
+        },
+        {
+          "label": "data · rapporter",
+          "hint": "BI · rapporter",
+          "tech": "BI/dashboard",
+          "insight": "Vald riktning: data, rapporter — BI, rapporter."
+        }
+      ],
+      "insight": "Rätt automatisering börjar med arbetet som upprepas mest, försenas mest eller orsakar flest mänskliga fel."
+    },
+    "modernization": {
+      "eyebrow": "modernisering",
+      "title": "Vad vill du lämna bakom dig?",
+      "optionQuestion": "Vad vill du ersätta först?",
+      "copy": "Modernisering är inte att byta verktyg för modets skull; det är att förvandla kalkylblad, lösa meddelanden och gamla system till en tydligare, säkrare och mätbar verksamhet som kan växa med färre fel.",
+      "progress": "Modernisera",
+      "core": "360",
+      "options": [
+        {
+          "label": "Excel · arbetsflöde",
+          "hint": "processer · behörigheter",
+          "tech": "arbetsflöde · behörigheter",
+          "insight": "Vald riktning: Excel, arbetsflöde — processer, behörigheter."
+        },
+        {
+          "label": "integration · data",
+          "hint": "API · kontroller",
+          "tech": "API · integration",
+          "insight": "Vald riktning: integration, data — API, kontroller."
+        },
+        {
+          "label": "UX/UI · förtroende",
+          "hint": "upplevelse · Värde",
+          "tech": "UX/UI + product",
+          "insight": "Vald riktning: UX/UI, förtroende — upplevelse, Värde."
+        }
+      ],
+      "insight": "När kalkylblad, lösa meddelanden och gamla system lämnas bakom återfår företaget spårbarhet, hastighet och kontroll utan att ändra verksamhetens kärna."
+    },
+    "operation": {
+      "eyebrow": "architecture",
+      "title": "Hur ska det användas i verkligheten?",
+      "optionQuestion": "Var behöver det fungera bäst?",
+      "copy": "Programvaran ska fungera där arbetet sker: kontor, fält, försäljning, produktion, support eller ledning. Svaret definierar synkronisering, behörigheter, backend, mobil upplevelse eller lokal kontroll enligt den verkliga verksamheten.",
+      "progress": "Användning",
+      "core": "Architecture",
+      "options": [
+        {
+          "label": "webb · väg",
+          "hint": "cloud · backend · data",
+          "tech": "cloud backend",
+          "insight": "Vald riktning: webb, väg — cloud, backend, data."
+        },
+        {
+          "label": "mobilapp · Användning",
+          "hint": "mobilapp · tablet · sync",
+          "tech": "mobile first",
+          "insight": "Vald riktning: mobilapp, Användning — mobilapp, tablet, sync."
+        },
+        {
+          "label": "PC · kontroller",
+          "hint": "desktop/local · säkerhet",
+          "tech": "desktop/local",
+          "insight": "Vald riktning: PC, kontroller — desktop/local, säkerhet."
+        }
+      ],
+      "insight": "Arkitekturen väljs från verklig användning så att systemet fungerar på kontor, i fält, försäljning, produktion eller support utan onödig friktion."
+    },
+    "value": {
+      "eyebrow": "Värde",
+      "title": "Vad bör förbättras först?",
+      "optionQuestion": "Vilket resultat vill du märka först?",
+      "copy": "En bra plattform ska kännas nyttig tidigt: ordna ärenden, automatisera uppgifter, visa användbara data och hjälpa försäljningen. Värdet designas så att systemet börjar motivera sin investering i verksamheten.",
+      "progress": "Värde",
+      "core": "Värde",
+      "options": [
+        {
+          "label": "processer · arbetsflöde",
+          "hint": "behörigheter · kontroller",
+          "tech": "workflow + RBAC",
+          "insight": "Vald riktning: processer, arbetsflöde — behörigheter, kontroller."
+        },
+        {
+          "label": "automatisering · snabbt",
+          "hint": "RPA/API · processer",
+          "tech": "RPA/API",
+          "insight": "Vald riktning: automatisering, snabbt — RPA/API, processer."
+        },
+        {
+          "label": "data · AI",
+          "hint": "rapporter · AI",
+          "tech": "BI + AI",
+          "insight": "Vald riktning: data, AI — rapporter, AI."
+        }
+      ],
+      "insight": "Det första synliga värdet ska motivera investeringen: mer ordning, mindre förlorad tid, bättre data, högre produktivitet eller fler säljchanser."
+    },
+    "risk": {
+      "eyebrow": "förtroende · kontroller",
+      "title": "Vad måste kännas mest skyddat?",
+      "optionQuestion": "Vad vill du skydda bättre?",
+      "copy": "Förtroende byggs från första modulen med roller, behörigheter, revision, valideringar och gränser för AI. På så sätt får företaget fart utan att förlora kontroll över data, beslut och kritiska processer.",
+      "progress": "Säkerhet",
+      "core": "förtroende",
+      "options": [
+        {
+          "label": "användare · behörigheter",
+          "hint": "RBAC · kontroller",
+          "tech": "RBAC + audit",
+          "insight": "Vald riktning: användare, behörigheter — RBAC, kontroller."
+        },
+        {
+          "label": "data · säkerhet",
+          "hint": "data · kontroller",
+          "tech": "säkerhet från designen",
+          "insight": "Vald riktning: data, säkerhet — data, kontroller."
+        },
+        {
+          "label": "AI · mänsklig granskning",
+          "hint": "automatisering · kontroller",
+          "tech": "AI governance",
+          "insight": "Vald riktning: AI, mänsklig granskning — automatisering, kontroller."
+        }
+      ],
+      "insight": "Tillväxt kräver kontroll; därför designas behörigheter, revision, valideringar och AI-gränser innan kritiska processer automatiseras."
+    },
+    "finance": {
+      "eyebrow": "skyddat kapital · finansiering",
+      "title": "Hur vill du modernisera utan att tömma kapitalet?",
+      "optionQuestion": "Vilken modell gör det möjligt att gå vidare nu?",
+      "copy": "Med Hashinmy behöver företaget inte välja mellan att skydda kassaflödet och att modernisera. Vi strukturerar omfattningen, finansierar 100 % av utvecklingen när diagnosen tillåter det och definierar hanterbara delbetalningar så att programvaran kan börja skapa värde medan den betalas. Finansiering ersätter inte ingenjörsarbetet; den gör det tillgängligt för företag som behöver ordna processer, automatisera arbete, integrera AI och växa utan att decapitaliseras.",
+      "progress": "100 % finansiering",
+      "core": "USD",
+      "options": [
+        {
+          "label": "100% finansiering",
+          "hint": "USD · faser · skyddat kapital",
+          "tech": "USD · finansiering",
+          "insight": "Vald riktning: 100% finansiering — USD, faser, skyddat kapital."
+        },
+        {
+          "label": "direkt offert · faser",
+          "hint": "roadmap · faser",
+          "tech": "roadmap",
+          "insight": "Vald riktning: direkt offert, faser — roadmap, faser."
+        },
+        {
+          "label": "kontakt · mänsklig granskning",
+          "hint": "projektsammanfattning · kontakt",
+          "tech": "mänsklig granskning",
+          "insight": "Vald riktning: kontakt, mänsklig granskning — projektsammanfattning, kontakt."
+        }
+      ],
+      "insight": "Finansiering gör det möjligt att börja nu, skydda rörelsekapital och betala medan tekniken sparar tid, ordnar processer eller driver försäljning."
+    },
+    "timeline": {
+      "eyebrow": "Tempo",
+      "title": "Hur snabbt måste systemet börja andas?",
+      "optionQuestion": "Vilket tempo passar bäst?",
+      "copy": "Tempot avgör hur ett stort behov blir till nyttiga leveranser. Vi kan börja med en MVP, en kort fas eller en företagsarkitektur, samtidigt som varje steg har operativt och finansiellt värde.",
+      "progress": "Tempo",
+      "core": "roadmap",
+      "options": [
+        {
+          "label": "snabbt · MVP",
+          "hint": "Produkt · snabbt",
+          "tech": "MVP",
+          "insight": "Vald riktning: snabbt, MVP — Produkt, snabbt."
+        },
+        {
+          "label": "1-3 · faser",
+          "hint": "roadmap · kontroller",
+          "tech": "faser",
+          "insight": "Vald riktning: 1-3, faser — roadmap, kontroller."
+        },
+        {
+          "label": "enterprise · roadmap",
+          "hint": "säkerhet · enterprise",
+          "tech": "företagsroadmap",
+          "insight": "Vald riktning: enterprise, roadmap — säkerhet, enterprise."
+        }
+      ],
+      "insight": "Rätt tempo gör ett stort behov till nyttiga, mätbara och finansierbara leveranser utan att tappa visionen för hela systemet."
+    },
+    "summary": {
+      "eyebrow": "väg · sammanfattning",
+      "title": "Din tekniska väg är klar.",
+      "copy": "Vi har redan en första läsning av behovet, betalningsmodellen och den operativa prioriteten. Lägg till den kontext som saknas så att Hashinmy kan analysera verksamheten, föreslå en anpassad lösning och förbereda en genomförbar teknisk, kommersiell och finansiell väg. Nästa samtal bör koppla affärsproblem, intern kunskap, systemets omfattning, prioritet, förväntat värde och betalningsform samtidigt som kassaflödet skyddas.",
+      "progress": "Förfrågan",
+      "core": "projektsammanfattning",
+      "insight": "Vägen är klar för att koppla behov, företagskunskap, teknisk omfattning, operativ prioritet, förväntat värde och betalningsmodell i ett genomförbart förslag.",
+      "options": []
+    }
+  },
+  "labels": {
+    "serviceFamily": "väg",
+    "service": "Tjänst",
+    "operation": "Användning",
+    "value": "Värde",
+    "risk": "säkerhet",
+    "financing": "finansiering",
+    "timeline": "Tempo"
+  },
+  "valueLabels": {
+    "diagnostico": "projektsammanfattning · väg",
+    "producto_digital": "anpassad programvara · Produkt",
+    "automatizacion_ia": "automatisering · AI",
+    "modernizacion_operativa": "modernisering · processer",
+    "software_online": "webb · programvara",
+    "app_movil": "mobilapp",
+    "software_pc": "PC-programvara",
+    "automatizacion": "automatisering · processer",
+    "ia": "AI · integration",
+    "modernizacion": "modernisering",
+    "web_global": "webb · väg",
+    "mobile_first": "mobilapp · Användning",
+    "pc_local": "PC · kontroller",
+    "workflow": "arbetsflöde · processer",
+    "automation": "automatisering · snabbt",
+    "analytics": "data · rapporter",
+    "ai": "AI · mänsklig granskning",
+    "experience": "UX/UI · förtroende",
+    "analytics_ai": "data · AI",
+    "roles_permisos": "användare · behörigheter",
+    "datos_sensibles": "data · säkerhet",
+    "ia_controlada": "AI · mänsklig granskning",
+    "financiamiento_100": "100% finansiering",
+    "sin_financiacion": "direkt offert",
+    "fases": "direkt offert · faser",
+    "contacto_directo": "kontakt · mänsklig granskning",
+    "mvp_rapido": "snabbt · MVP",
+    "1_3_meses": "1-3 · faser",
+    "enterprise": "enterprise · roadmap"
+  },
+  "recommendation": {
+    "defaults": {
+      "service": "anpassad programvara · Produkt",
+      "operation": "architecture · projektsammanfattning",
+      "value": "Värde · projektsammanfattning",
+      "risk": "säkerhet · projektsammanfattning",
+      "financing": "finansiering · projektsammanfattning",
+      "timeline": "Tempo · projektsammanfattning",
+      "technical": "programvara · architecture"
+    },
+    "technicalParts": {
+      "software_online": "webb · platform",
+      "app_movil": "mobile app/PWA",
+      "software_pc": "desktop/local · programvara",
+      "automatizacion": "RPA/API-automatisering",
+      "ia": "AI · mänsklig granskning",
+      "modernizacion": "modernisering",
+      "web_global": "serverdel + databas",
+      "mobile_first": "mobilapp · sync",
+      "pc_local": "local · kontroller",
+      "workflow": "behörigheter · arbetsflöde",
+      "automation": "automatisering · integration",
+      "analytics": "dashboard/BI",
+      "ai": "AI · assistant",
+      "analytics_ai": "BI + AI",
+      "experience": "UX/UI",
+      "roles_permisos": "RBAC + audit",
+      "datos_sensibles": "data · säkerhet",
+      "ia_controlada": "AI governance · mänsklig granskning"
+    },
+    "controlBase": [
+      "data",
+      "kontroller"
+    ],
+    "controlParts": {
+      "web_global": "behörigheter",
+      "software_online": "behörigheter",
+      "ia": "mänsklig granskning",
+      "analytics_ai": "mänsklig granskning",
+      "ai": "mänsklig granskning",
+      "automatizacion": "automatisering · rapporter",
+      "automation": "automatisering · rapporter",
+      "roles_permisos": "behörigheter · kontroller",
+      "datos_sensibles": "data · säkerhet",
+      "ia_controlada": "mänsklig granskning · kontroller",
+      "financiamiento_100": "100% finansiering",
+      "sin_financiacion": "direkt offert"
+    },
+    "nextSteps": {
+      "noService": "kontakt · projektsammanfattning",
+      "mvp": "MVP · projektsammanfattning",
+      "enterprise": "enterprise · roadmap",
+      "default": "programvara · roadmap"
+    }
+  },
+  "schemaVersion": 1
+}

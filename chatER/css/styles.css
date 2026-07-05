@@ -2870,22 +2870,24 @@ button {
   }
 }
 
-/* Recibos de entrega ChatER: un solo check cambia de color según memoriaBACKEND/STREMEx. */
+/* Recibos de entrega ChatER: check gris al salir, doble check verde al entregarse y doble check azul al leerse. */
 .message-time-with-receipt {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 5px;
 }
 
 .message-receipt {
   display: inline-grid;
   place-items: center;
-  width: 10px;
-  height: 10px;
-  font-size: 9px;
+  width: auto;
+  min-width: 14px;
+  height: 12px;
+  font-size: 11px;
   line-height: 1;
   font-weight: 900;
+  letter-spacing: -2px;
   color: #8a8f98;
   transform: translateY(-0.5px);
 }
