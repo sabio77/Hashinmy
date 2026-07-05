@@ -1,17 +1,15 @@
 {
-  "version": "2026-07-04-realtime-delivery-receipts-131",
-  "buildTime": "2026-07-04T19:40:00-05:00",
+  "version": "2026-07-04-archive-restore-open-134",
+  "buildTime": "2026-07-04T20:24:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER refuerza la entrega realtime entre cuentas con contactos creados por QR y muestra recibos visibles de envío, entrega y lectura.",
-  "build": "realtime-delivery-receipts-131",
-  "updatedAt": "2026-07-04T19:40:00-05:00",
-  "notes": "La PWA mantiene STREMEx como transporte realtime y reconcilia el inbox al abrir el canal de usuario para recuperar conversaciones nuevas si el evento llegó antes de que el chat existiera localmente. Los mensajes salen con destinatarios e inbox remotos tomados de participantes, metadatos y mensajes recientes.",
+  "description": "ChatER preserva la restauración de chats archivados incluso frente a respuestas o eventos remotos inconsistentes que reutilicen la mutación local con un estado contrario.",
+  "build": "archive-restore-open-134",
+  "updatedAt": "2026-07-04T20:24:00-05:00",
+  "notes": "La restauración de un chat archivado queda protegida frente a mutaciones pendientes anteriores, respuestas tardías, eventos STREMEx obsoletos y confirmaciones remotas inconsistentes: Abrir mantiene el chat archivado visible sin restaurarlo y Restaurar no permite que un parche remoto contrario lo archive otra vez automáticamente.",
   "changes": [
-    "js/app.js amplía la detección de destinatarios remotos desde participantes, metadatos, datos normalizados, contacto, receptor y mensajes recientes para mensajes creados desde QR.",
-    "js/app.js fusiona la conversación devuelta por memoriaBACKEND después de crear un chat pendiente para conservar participantes e identidades remotas antes de enviar mensajes.",
-    "js/app.js reconcilia conversaciones una vez al abrir el canal inbox de STREMEx, evitando que la cuenta destino pierda chats nuevos si el evento llegó antes de tenerlos en la lista.",
-    "js/app.js conserva identidades sender/recipient de eventos realtime aunque vengan en el payload raíz y no dentro del objeto message.",
-    "css/styles.css hace visibles los recibos: check gris para backend, doble check verde para entregado y doble check azul para leído."
+    "js/app.js conserva la decisión local restaurada cuando un evento remoto trae el mismo clientMutationId pero un estado archived contrario al deseado localmente.",
+    "js/app.js evita que una confirmación remota inconsistente se interprete como aceptación válida de una restauración y vuelva a archivar el chat automáticamente.",
+    "service-worker.js y app-version.json elevan la versión publicada para forzar actualización del shell estático en PWA instalada."
   ]
 }

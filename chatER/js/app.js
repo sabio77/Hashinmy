@@ -2855,7 +2855,9 @@ function readBackendOutbox(email = getSessionEmail()) {
     }
 
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((operation) => operation && operation.id && operation.type && operation.payload);
+    const compactedQueue = compactBackendOutboxQueue(parsed);
+    if (compactedQueue.length !== parsed.length) persistBackendOutbox(compactedQueue, email);
+    return compactedQueue;
   } catch (error) {
     console.warn('No se pudo leer la cola local de sincronización.', error);
     return [];
@@ -2870,6 +2872,108 @@ function persistBackendOutbox(queue, email = getSessionEmail()) {
   }
 }
 
+function isQueuedConversationArchivePatch(operation = {}) {
+  return operation?.type === 'updateConversation'
+    && operation.payload?.patch
+    && Object.prototype.hasOwnProperty.call(operation.payload.patch, 'archived');
+}
+
+function getQueuedArchiveConversationId(operation = {}) {
+  return String(operation.payload?.conversationId || operation.payload?.patch?.conversationId || '').trim();
+}
+
+function getQueuedArchiveMutationId(operation = {}) {
+  return String(operation.payload?.patch?.clientMutationId || operation.payload?.clientMutationId || '').trim();
+}
+
+function getQueuedArchiveChangedAt(operation = {}) {
+  const patch = operation.payload?.patch || {};
+  return patch.archiveChangedAt
+    || patch.archiveUpdatedAt
+    || patch.archivedAt
+    || patch.restoredAt
+    || operation.updatedAt
+    || operation.createdAt
+    || '';
+}
+
+function getConversationArchiveOutboxKey(conversationId = '') {
+  return `conversation-archive:${String(conversationId || '').trim()}`;
+}
+
+function shouldDiscardQueuedArchiveOperation(operation = {}) {
+  if (!isQueuedConversationArchivePatch(operation)) return false;
+
+  const conversationId = getQueuedArchiveConversationId(operation);
+  if (!conversationId) return false;
+
+  const conversation = appState.conversations.find((item) => String(item.id || '') === conversationId && !item.deleted);
+  if (!conversation) return false;
+
+  const queuedArchived = Boolean(operation.payload.patch.archived);
+  const localArchived = Boolean(conversation.archived);
+  if (queuedArchived === localArchived) return false;
+
+  const queuedMutationId = getQueuedArchiveMutationId(operation);
+  const localMutationId = String(conversation.archiveLocalMutationId || conversation.archiveClientMutationId || '').trim();
+  if (localMutationId && queuedMutationId && localMutationId !== queuedMutationId) return true;
+
+  if (isArchiveSyncStatusPending(conversation.archiveSyncStatus)) return true;
+
+  const queuedChangedAt = parseArchiveTimestampMs(getQueuedArchiveChangedAt(operation));
+  const localChangedAt = parseArchiveTimestampMs(getLocalArchiveChangedAt(conversation));
+  if (localChangedAt && queuedChangedAt) return localChangedAt >= queuedChangedAt - 5000;
+
+  if (hasExplicitLocalArchiveDecision(conversation)) return true;
+
+  return false;
+}
+
+function compactBackendOutboxQueue(queue = []) {
+  const items = Array.isArray(queue)
+    ? queue.filter((operation) => operation && operation.id && operation.type && operation.payload)
+    : [];
+  const latestArchiveOperationByConversation = new Map();
+
+  items.forEach((operation, index) => {
+    if (!isQueuedConversationArchivePatch(operation)) return;
+    const conversationId = getQueuedArchiveConversationId(operation);
+    if (!conversationId) return;
+
+    const current = latestArchiveOperationByConversation.get(conversationId);
+    const currentTime = current !== undefined ? parseArchiveTimestampMs(getQueuedArchiveChangedAt(items[current])) : 0;
+    const operationTime = parseArchiveTimestampMs(getQueuedArchiveChangedAt(operation));
+    if (current === undefined || operationTime >= currentTime) {
+      latestArchiveOperationByConversation.set(conversationId, index);
+    }
+  });
+
+  return items.filter((operation, index) => {
+    if (!isQueuedConversationArchivePatch(operation)) return true;
+    if (shouldDiscardQueuedArchiveOperation(operation)) return false;
+    const conversationId = getQueuedArchiveConversationId(operation);
+    if (!conversationId) return true;
+    return latestArchiveOperationByConversation.get(conversationId) === index;
+  });
+}
+
+function removeQueuedArchiveOperationsForConversation(conversationId = '', email = getSessionEmail()) {
+  const normalizedConversationId = String(conversationId || '').trim();
+  if (!normalizedConversationId || !CHATER_CONFIG.backendBaseUrl) return;
+
+  const ownerEmail = normalizeStorageIdentity(email);
+  const queue = readBackendOutbox(ownerEmail);
+  if (!queue.length) return;
+
+  const filteredQueue = queue.filter((operation) => {
+    return !(isQueuedConversationArchivePatch(operation) && getQueuedArchiveConversationId(operation) === normalizedConversationId);
+  });
+
+  if (filteredQueue.length !== queue.length) {
+    persistBackendOutbox(filteredQueue, ownerEmail);
+  }
+}
+
 function enqueueBackendOperation(operation) {
   if (!CHATER_CONFIG.backendBaseUrl || !operation?.type || !operation?.payload) return null;
 
@@ -2879,7 +2983,15 @@ function enqueueBackendOperation(operation) {
     return null;
   }
 
-  const queue = readBackendOutbox(ownerEmail);
+  let queue = readBackendOutbox(ownerEmail);
+  const operationForArchiveCheck = { type: operation.type, payload: operation.payload };
+  if (operation.replaceExisting && isQueuedConversationArchivePatch(operationForArchiveCheck)) {
+    const conversationId = getQueuedArchiveConversationId(operationForArchiveCheck);
+    if (conversationId) {
+      queue = queue.filter((item) => !(isQueuedConversationArchivePatch(item) && getQueuedArchiveConversationId(item) === conversationId));
+    }
+  }
+
   const dedupeKey = operation.dedupeKey || `${operation.type}:${operation.payload.clientMutationId || operation.payload.localId || generateClientMutationId()}`;
   const existingOperation = queue.find((item) => item.dedupeKey === dedupeKey);
   if (existingOperation) {
@@ -3280,6 +3392,7 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'updateConversation') {
+    if (shouldDiscardQueuedArchiveOperation(operation)) return;
     await apiClient.updateConversation(operation.payload.conversationId, operation.payload.patch);
     if (!isSessionGuardCurrent(sessionGuard)) return;
     markQueuedConversationPatchSynced(operation.payload.conversationId, operation.payload.patch);
@@ -3540,9 +3653,23 @@ function markQueuedConversationPatchSynced(conversationId, patch = {}) {
   if (!conversation) return;
 
   if (Object.prototype.hasOwnProperty.call(patch || {}, 'archived')) {
+    const patchMutationId = String(patch.clientMutationId || '').trim();
+    const currentLocalMutationId = String(conversation.archiveLocalMutationId || '').trim();
+    if (patchMutationId && currentLocalMutationId && patchMutationId !== currentLocalMutationId) {
+      persistState();
+      renderCurrentSection();
+      return;
+    }
+
+    const archiveChangedAt = patch.archiveChangedAt || patch.archivedAt || patch.restoredAt || new Date().toISOString();
     conversation.archived = Boolean(patch.archived);
     conversation.archiveSyncStatus = 'synced';
     conversation.archiveSyncedAt = new Date().toISOString();
+    conversation.archiveChangedAt = archiveChangedAt;
+    conversation.archiveClientMutationId = patch.clientMutationId || conversation.archiveClientMutationId || '';
+    conversation.archiveLocalMutationId = patch.clientMutationId || conversation.archiveLocalMutationId || '';
+    conversation.archiveLocalChangedAt = conversation.archiveLocalChangedAt || archiveChangedAt;
+    conversation.archiveDesiredArchived = Boolean(patch.archived);
     conversation.status = conversation.archived ? 'Archivado' : 'Restaurado';
   }
 
@@ -4068,6 +4195,13 @@ function normalizeLoadedState(saved) {
     conversation.pinSyncedAt = conversation.pinSyncedAt || '';
     conversation.archiveSyncStatus = conversation.archiveSyncStatus || '';
     conversation.archiveSyncedAt = conversation.archiveSyncedAt || '';
+    conversation.archiveChangedAt = conversation.archiveChangedAt || conversation.archiveUpdatedAt || conversation.archivedAt || conversation.restoredAt || '';
+    conversation.archiveClientMutationId = conversation.archiveClientMutationId || conversation.archiveMutationId || '';
+    conversation.archiveLocalMutationId = conversation.archiveLocalMutationId || '';
+    conversation.archiveLocalChangedAt = conversation.archiveLocalChangedAt || '';
+    if (Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')) {
+      conversation.archiveDesiredArchived = Boolean(conversation.archiveDesiredArchived);
+    }
     conversation.blocked = Boolean(conversation.blocked || conversation.isBlocked);
     conversation.blockSyncStatus = conversation.blockSyncStatus || '';
     conversation.blockSyncedAt = conversation.blockSyncedAt || '';
@@ -8723,26 +8857,32 @@ function openArchivedChatsModal() {
     if (!conversation) return;
 
     if (actionButton.dataset.action === 'open') {
-      activeConversationId = conversation.id;
-      activeSection = 'chats';
-      closeModal();
-      renderCurrentSection();
-      chatView.classList.add('chat-open');
-      hydrateConversationMessages(conversation.id);
+      openArchivedConversation(conversation);
       return;
     }
 
     if (actionButton.dataset.action === 'restore') {
       await setConversationArchived(conversation, false, { keepActive: true });
-      activeConversationId = conversation.id;
-      activeSection = 'chats';
-      closeModal();
-      renderCurrentSection();
-      chatView.classList.add('chat-open');
+      openArchivedConversation(conversation);
     }
   });
 
   setModal('Archivados', container, 'archived');
+}
+
+function openArchivedConversation(conversation) {
+  if (!conversation || conversation.deleted) return;
+
+  activeConversationId = conversation.id;
+  activeSection = 'chats';
+  if (searchInput) searchInput.value = '';
+  closeTransientPanels();
+  closeModal();
+  markConversationRead(conversation);
+  renderCurrentSection();
+  chatView.classList.add('chat-open');
+  sendStremeEvent({ type: 'chat.opened', chatId: conversation.id });
+  hydrateConversationMessages(conversation.id);
 }
 
 
@@ -9202,10 +9342,17 @@ async function setConversationArchived(conversation, archived, options = {}) {
 
   const sessionGuard = captureSessionGuard();
   const clientMutationId = generateClientMutationId();
+  const archiveChangedAt = new Date().toISOString();
   const previousArchived = Boolean(conversation.archived);
   conversation.archived = Boolean(archived);
   conversation.archiveSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
+  conversation.archiveChangedAt = archiveChangedAt;
+  conversation.archiveClientMutationId = clientMutationId;
+  conversation.archiveLocalMutationId = clientMutationId;
+  conversation.archiveLocalChangedAt = archiveChangedAt;
+  conversation.archiveDesiredArchived = Boolean(archived);
   conversation.status = archived ? 'Archivado' : 'Restaurado';
+  removeQueuedArchiveOperationsForConversation(conversation.id, sessionGuard.email);
 
   if (archived && activeConversationId === conversation.id && !options.keepActive) {
     activeConversationId = getFirstVisibleConversationId(conversation.id);
@@ -9218,7 +9365,12 @@ async function setConversationArchived(conversation, archived, options = {}) {
 
   if (!CHATER_CONFIG.backendBaseUrl) return;
 
-  const patch = { archived: Boolean(archived), clientMutationId };
+  const patch = {
+    archived: Boolean(archived),
+    archiveChangedAt,
+    [archived ? 'archivedAt' : 'restoredAt']: archiveChangedAt,
+    clientMutationId
+  };
   try {
     await apiClient.updateConversation(conversation.id, patch);
     if (!isSessionGuardCurrent(sessionGuard)) return;
@@ -9230,7 +9382,8 @@ async function setConversationArchived(conversation, archived, options = {}) {
     if (!stillSameArchiveState) conversation.archived = previousArchived;
     enqueueBackendOperation({
       type: 'updateConversation',
-      dedupeKey: `conversation-archive:${conversation.id}:${clientMutationId}`,
+      dedupeKey: getConversationArchiveOutboxKey(conversation.id),
+      replaceExisting: true,
       payload: { conversationId: conversation.id, patch }
     });
     persistState();
@@ -14371,6 +14524,136 @@ function mergeById(primaryItems, secondaryItems) {
     });
 }
 
+function isArchiveSyncStatusPending(status = '') {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  return normalizedStatus === 'syncing'
+    || normalizedStatus === 'pending'
+    || normalizedStatus.startsWith('syncing:')
+    || normalizedStatus.startsWith('pending:');
+}
+
+const ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS = 5000;
+
+function parseArchiveTimestampMs(value = '') {
+  const timestamp = Date.parse(String(value || ''));
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getArchiveDesiredArchivedState(conversation = {}) {
+  return Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')
+    ? Boolean(conversation.archiveDesiredArchived)
+    : Boolean(conversation.archived);
+}
+
+function hasArchiveSpecificRemoteTimestamp(conversation = {}) {
+  return Boolean(
+    conversation.archiveChangedAt
+    || conversation.archiveUpdatedAt
+    || conversation.archivedAt
+    || conversation.restoredAt
+    || conversation.archiveSyncedAt
+  );
+}
+
+function getRemoteArchiveChangedAt(conversation = {}) {
+  return conversation.archiveChangedAt
+    || conversation.archiveUpdatedAt
+    || conversation.archivedAt
+    || conversation.restoredAt
+    || conversation.updatedAt
+    || conversation.modifiedAt
+    || conversation.archiveSyncedAt
+    || '';
+}
+
+function getLocalArchiveChangedAt(conversation = {}) {
+  return conversation.archiveLocalChangedAt
+    || conversation.archiveChangedAt
+    || conversation.archiveSyncedAt
+    || conversation.updatedAt
+    || '';
+}
+
+function hasExplicitLocalArchiveDecision(conversation = {}) {
+  return Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')
+    || Boolean(conversation.archiveLocalChangedAt || conversation.archiveLocalMutationId);
+}
+
+function shouldPreserveLocalArchiveState(remoteConversation = {}, localConversation = {}) {
+  const localArchived = Boolean(localConversation.archived);
+  const remoteArchived = Boolean(remoteConversation.archived);
+  if (localArchived === remoteArchived) return false;
+
+  if (isArchiveSyncStatusPending(localConversation.archiveSyncStatus)) return true;
+  if (!hasExplicitLocalArchiveDecision(localConversation)) return false;
+
+  const localDesiredArchived = getArchiveDesiredArchivedState(localConversation);
+  const localMutationId = String(localConversation.archiveLocalMutationId || '').trim();
+  const remoteMutationId = String(remoteConversation.archiveClientMutationId || remoteConversation.clientMutationId || '').trim();
+  const remoteConfirmsLocalDesiredState = remoteArchived === localDesiredArchived;
+  if (localMutationId && remoteMutationId && localMutationId === remoteMutationId) {
+    return !remoteConfirmsLocalDesiredState;
+  }
+
+  const localChangedAt = parseArchiveTimestampMs(getLocalArchiveChangedAt(localConversation));
+  const remoteChangedAt = parseArchiveTimestampMs(getRemoteArchiveChangedAt(remoteConversation));
+  const remoteHasArchiveTimestamp = hasArchiveSpecificRemoteTimestamp(remoteConversation);
+  const remoteContradictsLocalDecision = localDesiredArchived === localArchived && remoteArchived !== localDesiredArchived;
+
+  if (remoteContradictsLocalDecision) {
+    if (!remoteHasArchiveTimestamp) return true;
+    if (localChangedAt && !remoteChangedAt) return true;
+    if (localChangedAt && remoteChangedAt && remoteChangedAt <= localChangedAt + ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS) return true;
+    if (!localChangedAt && localMutationId && (!remoteMutationId || remoteMutationId !== localMutationId)) return true;
+    return false;
+  }
+
+  if (localChangedAt && remoteChangedAt) {
+    if (!remoteHasArchiveTimestamp && localArchived !== remoteArchived) return true;
+    return remoteChangedAt <= localChangedAt + ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS;
+  }
+
+  if (localChangedAt && !remoteChangedAt) return true;
+  if (!localChangedAt && localMutationId && (!remoteMutationId || remoteMutationId !== localMutationId)) return true;
+
+  return false;
+}
+
+function buildLocalArchiveMergeState(localConversation = {}) {
+  const archived = Boolean(localConversation.archived);
+  return {
+    archived,
+    archiveSyncStatus: localConversation.archiveSyncStatus || 'pending',
+    archiveSyncedAt: localConversation.archiveSyncedAt || '',
+    archiveChangedAt: localConversation.archiveChangedAt || localConversation.archiveLocalChangedAt || '',
+    archiveClientMutationId: localConversation.archiveClientMutationId || localConversation.archiveLocalMutationId || '',
+    archiveLocalMutationId: localConversation.archiveLocalMutationId || localConversation.archiveClientMutationId || '',
+    archiveLocalChangedAt: localConversation.archiveLocalChangedAt || localConversation.archiveChangedAt || '',
+    archiveDesiredArchived: archived,
+    status: localConversation.status || (archived ? 'Archivado' : 'Restaurado')
+  };
+}
+
+function resolveConversationArchiveMergeState(remoteConversation = {}, localConversation = {}) {
+  if (shouldPreserveLocalArchiveState(remoteConversation, localConversation)) {
+    return buildLocalArchiveMergeState(localConversation);
+  }
+
+  const remoteArchived = Boolean(remoteConversation.archived);
+  const remoteArchiveChangedAt = getRemoteArchiveChangedAt(remoteConversation);
+
+  return {
+    archived: remoteArchived,
+    archiveSyncStatus: remoteConversation.archiveSyncStatus || localConversation.archiveSyncStatus || '',
+    archiveSyncedAt: remoteConversation.archiveSyncedAt || localConversation.archiveSyncedAt || '',
+    archiveChangedAt: remoteArchiveChangedAt || localConversation.archiveChangedAt || '',
+    archiveClientMutationId: remoteConversation.archiveClientMutationId || localConversation.archiveClientMutationId || '',
+    archiveLocalMutationId: remoteConversation.archiveClientMutationId || localConversation.archiveLocalMutationId || '',
+    archiveLocalChangedAt: remoteArchiveChangedAt || localConversation.archiveLocalChangedAt || '',
+    archiveDesiredArchived: remoteArchived
+  };
+}
+
 function mergeConversationsById(remoteConversations = [], localConversations = []) {
   const conversationsById = new Map();
 
@@ -14389,6 +14672,7 @@ function mergeConversationsById(remoteConversations = [], localConversations = [
     conversationsById.set(id, {
       ...localConversation,
       ...remoteConversation,
+      ...resolveConversationArchiveMergeState(remoteConversation, localConversation),
       messages: mergeMessagesByIdentity(remoteConversation.messages, localConversation.messages),
       messagesHydrated: Boolean(remoteConversation.messagesHydrated || localConversation.messagesHydrated),
       messagesHistoryCursor: remoteConversation.messagesHistoryCursor || localConversation.messagesHistoryCursor || '',
@@ -14613,6 +14897,24 @@ function readMediaValue(media = {}, keys = []) {
 
 function normalizeConversationFromApi(raw = {}) {
   const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+  const archiveChangedAt = raw.archiveChangedAt
+    || raw.archiveUpdatedAt
+    || raw.archivedAt
+    || raw.restoredAt
+    || metadata.archiveChangedAt
+    || metadata.archiveUpdatedAt
+    || metadata.archivedAt
+    || metadata.restoredAt
+    || '';
+  const archiveClientMutationId = raw.archiveClientMutationId
+    || raw.archiveMutationId
+    || raw.clientMutationId
+    || raw.idempotencyKey
+    || metadata.archiveClientMutationId
+    || metadata.archiveMutationId
+    || metadata.clientMutationId
+    || metadata.idempotencyKey
+    || '';
   const participants = normalizeConversationParticipantsForApi(
     raw.participants || raw.participantList || raw.members || metadata.participants || metadata.participantList,
     raw.contactEmail || raw.email || metadata.contactEmail || metadata.email,
@@ -14640,6 +14942,15 @@ function normalizeConversationFromApi(raw = {}) {
     status: raw.statusLabel || raw.status || raw.presence || 'Sincronizado',
     section: 'chats',
     archived: Boolean(raw.archived || raw.isArchived),
+    archiveChangedAt,
+    archiveClientMutationId,
+    archiveLocalMutationId: raw.archiveLocalMutationId || '',
+    archiveLocalChangedAt: raw.archiveLocalChangedAt || '',
+    archiveDesiredArchived: Object.prototype.hasOwnProperty.call(raw, 'archiveDesiredArchived')
+      ? Boolean(raw.archiveDesiredArchived)
+      : Boolean(raw.archived || raw.isArchived),
+    updatedAt: raw.updatedAt || raw.modifiedAt || metadata.updatedAt || metadata.modifiedAt || '',
+    lastActivityAt: raw.lastActivityAt || metadata.lastActivityAt || '',
     pinned: Boolean(raw.pinned || raw.isPinned),
     deleted: Boolean(raw.deleted || raw.isDeleted),
     muted: Boolean(raw.muted || raw.isMuted || raw.mutedUntil),
@@ -15550,7 +15861,7 @@ function upsertRealtimeConversation(data = {}, forcedPatch = {}) {
   if (!normalized.id) return false;
 
   appState.conversations = mergeConversationsById([normalized], appState.conversations);
-  if (!appState.conversations.some((conversation) => conversation.id === activeConversationId && !conversation.deleted && !conversation.archived)) {
+  if (!appState.conversations.some((conversation) => conversation.id === activeConversationId && !conversation.deleted)) {
     activeConversationId = getFirstVisibleConversationId(activeConversationId) || getVisibleConversations()[0]?.id || null;
   }
 
