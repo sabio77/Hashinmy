@@ -144,6 +144,16 @@ function removeSessionStorageItem(key) {
 
 const CHATER_IMAGE_UPLOAD_MAX_BYTES = 200 * 1024;
 const CHATER_IMAGE_UPLOAD_MAX_DIMENSION = 4096;
+const CHATER_EPHEMERAL_TTL_SECONDS = 24 * 60 * 60;
+const CHATER_EPHEMERAL_TTL_MS = CHATER_EPHEMERAL_TTL_SECONDS * 1000;
+
+function getChatEphemeralExpiresAtIso(baseTime = Date.now()) {
+  const baseMs = baseTime instanceof Date
+    ? baseTime.getTime()
+    : (Number.isFinite(Number(baseTime)) ? Number(baseTime) : Date.parse(String(baseTime || '')));
+  const safeBaseMs = Number.isFinite(baseMs) && baseMs > 0 ? baseMs : Date.now();
+  return new Date(safeBaseMs + CHATER_EPHEMERAL_TTL_MS).toISOString();
+}
 
 function clampImageUploadMaxBytes(value) {
   const parsed = Number(value);
@@ -2170,6 +2180,7 @@ const apiClient = {
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
     const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+    const expiresAt = getChatEphemeralExpiresAtIso();
 
     return this.request('/api/v1/mensajes', {
       method: 'POST',
@@ -2188,6 +2199,8 @@ const apiClient = {
         text,
         status: 'sent',
         clientTime: new Date().toISOString(),
+        expiresAt,
+        ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
           source: 'chater-static-site',
           senderUserId,
@@ -2196,6 +2209,8 @@ const apiClient = {
           recipientUserEmail: firstRecipient.email || '',
           recipients,
           ...lifecycle,
+          expiresAt,
+          ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
           channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
           userInboxChannel: getCurrentUserStremeInboxChannel(),
           remoteInboxChannels: recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean)
@@ -2433,6 +2448,7 @@ const apiClient = {
     });
   },
   prepareMediaUpload(file, clientMutationId = generateClientMutationId()) {
+    const expiresAt = getChatEphemeralExpiresAtIso();
     return this.request('/api/v1/media-firmada', {
       method: 'POST',
       timeoutMs: CHATER_CONFIG.mediaUploadTimeoutMs,
@@ -2445,6 +2461,14 @@ const apiClient = {
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         sizeBytes: file.size,
+        source: 'chater-static-site',
+        expiresAt,
+        ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
+        metadata: {
+          source: 'chater-static-site',
+          expiresAt,
+          ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS
+        },
         clientMutationId
       }))
     });
@@ -2483,6 +2507,7 @@ const apiClient = {
       CHATER_CONFIG.r2xImageMaxBytes
     ));
     const uploadPolicy = await assertR2xReadyWebpFile(file, maxBytes);
+    const expiresAt = getChatEphemeralExpiresAtIso();
 
     return this.request('/api/v1/imagenes-r2x/intenciones', {
       method: 'POST',
@@ -2505,8 +2530,12 @@ const apiClient = {
         entityType: options.entityType || 'mensaje',
         entityId: options.entityId || clientMutationId,
         conversationId: options.conversationId || '',
+        expiresAt,
+        ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
           source: 'chater-static-site',
+          expiresAt,
+          ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
           originalFilename: options.originalFilename || '',
           originalMimeType: options.originalMimeType || '',
           maxBytes: uploadPolicy.maxBytes,
@@ -2528,6 +2557,13 @@ const apiClient = {
         entityType: options.entityType || '',
         entityId: options.entityId || '',
         conversationId: options.conversationId || '',
+        expiresAt: options.expiresAt || getChatEphemeralExpiresAtIso(),
+        ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
+        metadata: {
+          source: 'chater-static-site',
+          expiresAt: options.expiresAt || getChatEphemeralExpiresAtIso(),
+          ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS
+        },
         clientMutationId
       }))
     });
@@ -2559,6 +2595,7 @@ const apiClient = {
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
     const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+    const expiresAt = getChatEphemeralExpiresAtIso();
     return this.request('/api/v1/mensajes', {
       method: 'POST',
       idempotencyKey: clientMutationId,
@@ -2584,6 +2621,8 @@ const apiClient = {
         media: payload,
         status: 'sent',
         clientTime: payload.clientTime || new Date().toISOString(),
+        expiresAt: payload.expiresAt || expiresAt,
+        ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
           source: 'chater-static-site',
           senderUserId,
@@ -2592,6 +2631,8 @@ const apiClient = {
           recipientUserEmail: firstRecipient.email || '',
           recipients,
           ...lifecycle,
+          expiresAt: payload.expiresAt || expiresAt,
+          ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
           channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
           userInboxChannel: getCurrentUserStremeInboxChannel(),
           remoteInboxChannels: recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean),
@@ -4011,6 +4052,23 @@ async function syncContactRelation(contact = {}, options = {}) {
     if (options.throwOnError) throw error;
     return null;
   }
+}
+
+
+function isContactProfileNotFoundError(error = {}) {
+  const status = Number(error.status || error.responseStatus || error.payload?.statusCode || error.payload?.metadata?.statusCode || 0);
+  const code = getBackendErrorCode(error);
+  const message = String(error.message || error.payload?.message || error.payload?.error?.message || '').toLowerCase();
+  return code === 'contact_profile_not_found'
+    || code.includes('contact_profile_not_found')
+    || (status === 404 && /(contacto|perfil|profile|contact).*(no existe|no encontrado|not found|missing)/i.test(message));
+}
+
+function buildContactProfileNotFoundFeedback(contact = {}) {
+  const email = normalizeStorageIdentity(contact.email || contact.contactEmail || '');
+  return email
+    ? `No se encontró un perfil ChatER activo para ${email}. El contacto solo se puede crear si esa persona ya inició sesión con Google/Gmail en ChatER.`
+    : 'No se encontró un perfil ChatER activo para ese contacto. El contacto solo se puede crear si esa persona ya inició sesión con Google/Gmail en ChatER.';
 }
 
 function markContactRelationSynced(contact = {}, payload = {}) {
@@ -6130,6 +6188,112 @@ function createAvatarElement(entity, className = 'chat-item-avatar') {
   renderAvatarInPlace(wrapper, entity);
   return wrapper;
 }
+
+function getProfilePreviewField(source = {}, keys = []) {
+  if (!source || typeof source !== 'object') return '';
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function resolveConversationProfilePreview(conversation = {}) {
+  const participants = normalizeConversationParticipantsForApi(
+    conversation.participants,
+    conversation.email || conversation.contactEmail,
+    conversation.name || conversation.displayName
+  );
+  const remoteParticipant = getPrimaryRemoteParticipant(participants) || {};
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const publicData = conversation.publicData && typeof conversation.publicData === 'object' ? conversation.publicData : {};
+  const contact = conversation.contact && typeof conversation.contact === 'object' ? conversation.contact : {};
+
+  const email = normalizeStorageIdentity(
+    getProfilePreviewField(remoteParticipant, ['email', 'userEmail', 'contactEmail', 'mail'])
+    || getProfilePreviewField(contact, ['email', 'userEmail', 'contactEmail', 'mail'])
+    || getProfilePreviewField(conversation, ['email', 'contactEmail', 'userEmail', 'mail'])
+    || getProfilePreviewField(metadata, ['email', 'contactEmail', 'userEmail', 'mail'])
+    || getProfilePreviewField(publicData, ['email', 'contactEmail', 'userEmail', 'mail'])
+  );
+
+  const displayName = String(
+    getProfilePreviewField(conversation, ['name', 'displayName', 'alias', 'customListName'])
+    || getProfilePreviewField(remoteParticipant, ['displayName', 'name', 'alias'])
+    || getProfilePreviewField(contact, ['displayName', 'name', 'alias'])
+    || getProfilePreviewField(metadata, ['displayName', 'name', 'alias'])
+    || getProfilePreviewField(publicData, ['displayName', 'name', 'alias'])
+    || email
+    || 'Contacto'
+  ).trim();
+
+  const avatarImage = normalizeAssetImagePath(
+    getProfilePreviewField(conversation, ['avatarImage', 'profileImage', 'avatarUrl', 'photoUrl', 'picture', 'imageUrl', 'profileImageUrl'])
+    || getProfilePreviewField(remoteParticipant, ['avatarImage', 'profileImage', 'avatarUrl', 'photoUrl', 'picture', 'imageUrl', 'profileImageUrl'])
+    || getProfilePreviewField(contact, ['avatarImage', 'profileImage', 'avatarUrl', 'photoUrl', 'picture', 'imageUrl', 'profileImageUrl'])
+    || getProfilePreviewField(metadata, ['avatarImage', 'profileImage', 'avatarUrl', 'photoUrl', 'picture', 'imageUrl', 'profileImageUrl'])
+    || getProfilePreviewField(publicData, ['avatarImage', 'profileImage', 'avatarUrl', 'photoUrl', 'picture', 'imageUrl', 'profileImageUrl'])
+  );
+
+  return {
+    name: displayName,
+    email,
+    avatar: conversation.avatar || remoteParticipant.avatar || contact.avatar || getInitials(displayName || email || 'Contacto'),
+    avatarImage
+  };
+}
+
+function openConversationProfilePreview(conversation = {}) {
+  const profile = resolveConversationProfilePreview(conversation);
+  const container = document.createElement('div');
+  container.className = 'profile-preview-modal';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'profile-preview-avatar';
+  avatar.textContent = profile.avatar || getInitials(profile.name || profile.email || 'Contacto');
+
+  if (profile.avatarImage) {
+    const image = document.createElement('img');
+    image.alt = `Foto de perfil de ${profile.name || profile.email || 'contacto'}`;
+    image.src = profile.avatarImage;
+    image.onload = () => {
+      avatar.textContent = '';
+      avatar.appendChild(image);
+    };
+    image.onerror = () => {
+      avatar.classList.add('profile-preview-placeholder');
+      avatar.textContent = profile.avatar || getInitials(profile.name || profile.email || 'Contacto');
+    };
+  } else {
+    avatar.classList.add('profile-preview-placeholder');
+  }
+
+  const info = document.createElement('div');
+  info.className = 'profile-preview-info';
+
+  const name = document.createElement('strong');
+  name.textContent = profile.name || 'Contacto';
+
+  const email = document.createElement('span');
+  email.className = 'profile-preview-email';
+  email.textContent = profile.email || 'Correo no disponible';
+
+  info.append(name, email);
+  container.append(avatar, info);
+  setModal('Perfil del chat', container, 'conversation-profile-preview');
+}
+
+function attachConversationProfilePreview(avatarElement, conversation = {}) {
+  if (!avatarElement) return;
+  avatarElement.classList.add('profile-preview-trigger');
+  avatarElement.title = 'Ver foto de perfil y correo';
+  avatarElement.setAttribute('aria-label', 'Ver foto de perfil y correo');
+  avatarElement.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openConversationProfilePreview(conversation);
+  });
+}
 function renderBrandLogoInPlace(container) {
   if (!container) return;
   const fallback = 'CE';
@@ -7051,6 +7215,7 @@ function renderChatList(filter = '') {
     button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
 
     const avatar = createAvatarElement(conversation);
+    attachConversationProfilePreview(avatar, conversation);
     const content = document.createElement('div');
     content.className = 'chat-item-content';
     content.innerHTML = `
@@ -9917,6 +10082,7 @@ function openArchivedChatsModal() {
 
     const main = row.querySelector('.archived-chat-main');
     const avatar = createAvatarElement(conversation, 'chat-item-avatar');
+    attachConversationProfilePreview(avatar, conversation);
     const lastMessage = conversation.messages.at(-1);
     const copy = document.createElement('span');
     copy.innerHTML = `<strong>${conversation.pinned ? '<span class="pinned-badge archived-pin" aria-label="Chat fijado" title="Chat fijado">📌</span>' : ''}${escapeHTML(conversation.name)}</strong><small>${escapeHTML(getMessagePreviewText(lastMessage, conversation.email || 'Sin mensajes todavía'))}</small>`;
@@ -11471,6 +11637,60 @@ function createLocalContactConversation(contact = {}) {
   return conversation;
 }
 
+
+async function createBackendConfirmedContactConversation(normalizedContact = {}, sessionGuard = captureSessionGuard()) {
+  const createConversationMutationId = normalizedContact.clientMutationId || generateClientMutationId();
+  const payload = await apiClient.createConversation({
+    name: normalizedContact.name,
+    email: normalizedContact.email,
+    userId: normalizedContact.userId,
+    source: normalizedContact.source,
+    clientMutationId: createConversationMutationId
+  }).catch((error) => {
+    if (isContactProfileNotFoundError(error)) {
+      throw new Error(buildContactProfileNotFoundFeedback(normalizedContact));
+    }
+    throw error;
+  });
+
+  if (!isSessionGuardCurrent(sessionGuard)) {
+    throw new Error('La sesión cambió antes de abrir el chat. Inicia sesión nuevamente para continuar.');
+  }
+
+  const conversation = createLocalContactConversation({
+    ...normalizedContact,
+    clientMutationId: createConversationMutationId
+  });
+  const localConversationId = conversation.id;
+
+  if (payload?.offlineDemo) {
+    conversation.status = 'Guardado localmente';
+    conversation.contactSyncStatus = 'local';
+    persistState();
+    return conversation;
+  }
+
+  const remoteConversationId = extractEntityId(payload, ['chat', 'conversation']) || localConversationId;
+  markQueuedConversationSynced(localConversationId, payload);
+  const syncedConversation = appState.conversations.find((item) => String(item.id || '') === String(remoteConversationId || '')) || conversation;
+  syncedConversation.contactSyncStatus = 'synced';
+  syncedConversation.contactSyncedAt = new Date().toISOString();
+  syncedConversation.status = 'Sincronizado';
+
+  await syncContactRelation({
+    name: normalizedContact.name,
+    email: normalizedContact.email,
+    userId: normalizedContact.userId,
+    conversationId: remoteConversationId || syncedConversation.id,
+    source: normalizedContact.source,
+    clientMutationId: createConversationMutationId
+  }, { enqueueOnFailure: true });
+
+  await forceHydrateConversationHistory(remoteConversationId || syncedConversation.id, { reason: 'redis-chat-reused-after-contact-create' });
+  persistState();
+  return syncedConversation;
+}
+
 async function syncNewContactConversation(conversation, contact, sessionGuard = captureSessionGuard()) {
   if (!conversation) return;
 
@@ -11521,6 +11741,12 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
       }
     } catch (error) {
       if (!isSessionGuardCurrent(sessionGuard)) return;
+      if (isContactProfileNotFoundError(error)) {
+        conversation.status = 'Contacto no encontrado en ChatER';
+        conversation.contactSyncStatus = 'error:contact_not_found';
+        showToast(buildContactProfileNotFoundFeedback(normalizedContact));
+        throw error;
+      }
       conversation.status = 'Pendiente de sincronizar';
       conversation.contactSyncStatus = 'pending';
       enqueueBackendOperation({
@@ -11685,13 +11911,22 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
   }
 
   const existingConversation = findConversationByContactIdentity(normalizedContact);
-  const conversation = existingConversation || createLocalContactConversation(normalizedContact);
+  let conversation = existingConversation || null;
+  const shouldConfirmBackendProfile = Boolean(!existingConversation && CHATER_CONFIG.backendBaseUrl);
 
   if (existingConversation) {
     await restoreDeletedContactConversation(existingConversation, normalizedContact, options);
     if (normalizedContact.name && normalizedContact.name !== 'Contacto' && !existingConversation.name) {
       existingConversation.name = normalizedContact.name;
     }
+  } else if (shouldConfirmBackendProfile) {
+    conversation = await createBackendConfirmedContactConversation(normalizedContact, sessionGuard);
+  } else {
+    conversation = createLocalContactConversation(normalizedContact);
+  }
+
+  if (!conversation) {
+    throw new Error('No se pudo abrir el chat del contacto.');
   }
 
   activeConversationId = conversation.id;
@@ -11703,9 +11938,11 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
   chatView.classList.add('chat-open');
   hydrateConversationMessages(conversation.id);
 
-  if (!existingConversation) {
+  if (!existingConversation && !shouldConfirmBackendProfile) {
     await syncNewContactConversation(conversation, normalizedContact, sessionGuard);
     showToast(`Contacto creado y chat abierto con ${normalizedContact.email}.`);
+  } else if (!existingConversation) {
+    showToast(`Contacto verificado y chat abierto con ${normalizedContact.email}.`);
   } else {
     showToast(existingConversation.archived
       ? `Chat archivado abierto con ${normalizedContact.email}.`
@@ -11778,8 +12015,8 @@ async function resolveContactQrWithBackend(rawValue = '', fallbackContact = {}) 
     const payload = await apiClient.resolveContactQr(normalizedFallback, rawValue);
     return normalizeContactFromQrResolverResponse(payload, normalizedFallback);
   } catch (error) {
-    console.warn('No se pudo resolver el QR con memoriaBACKEND. Se conserva el contacto local y se sincronizará por conversación.', error);
-    return normalizedFallback;
+    console.warn('memoriaBACKEND rechazó o no pudo confirmar que el contacto del QR exista.', error);
+    throw new Error('No se pudo crear el contacto: memoriaBACKEND no confirmó que el perfil del QR exista.');
   }
 }
 
