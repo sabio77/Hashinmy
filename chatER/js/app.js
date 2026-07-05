@@ -270,6 +270,724 @@ function getCurrentUserIdentifier() {
   return normalizeBackendUserId(getSessionUserId()) || normalizeStorageIdentity(getSessionEmail()) || 'anonymous';
 }
 
+
+function isBooleanFlagPresent(value) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function coerceBooleanFlag(value, fallback = false) {
+  if (!isBooleanFlagPresent(value)) return fallback === null ? null : Boolean(fallback);
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value !== 0 : Boolean(fallback);
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'y', 'si', 'sí', 'on', 'enabled', 'habilitado', 'archived', 'deleted', 'blocked'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off', 'disabled', 'deshabilitado', 'null', 'undefined', 'none', ''].includes(normalized)) return false;
+  return fallback === null ? null : Boolean(fallback);
+}
+
+function coerceFirstBooleanFlag(values = [], fallback = false) {
+  const sourceValues = Array.isArray(values) ? values : [values];
+  for (const value of sourceValues) {
+    if (isBooleanFlagPresent(value)) return coerceBooleanFlag(value, fallback);
+  }
+  return fallback === null ? null : Boolean(fallback);
+}
+
+function normalizeParticipantIdentityKey(participant = {}) {
+  if (!participant || typeof participant !== 'object') return '';
+  const email = normalizeStorageIdentity(participant.email || participant.userEmail || participant.contactEmail || participant.mail || '');
+  if (email) return `email:${email}`;
+  const userId = normalizeBackendUserId(participant.userId || participant.contactUserId || participant.uid || participant.id || '');
+  if (userId) return `user:${userId}`;
+  const displayName = String(participant.displayName || participant.name || participant.alias || '').trim().toLowerCase();
+  return displayName ? `name:${displayName}` : '';
+}
+
+function hashStableText(value = '') {
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildSharedConversationKeyFromParticipants(participants = [], type = 'direct') {
+  const identityKeys = (Array.isArray(participants) ? participants : [])
+    .map(normalizeParticipantIdentityKey)
+    .filter(Boolean)
+    .sort();
+  if (!identityKeys.length) return '';
+  return `chater:${String(type || 'direct').trim() || 'direct'}:${hashStableText(identityKeys.join('|'))}`;
+}
+
+function getCurrentUserLifecycleParticipant() {
+  const userId = normalizeBackendUserId(getSessionUserId());
+  const email = normalizeStorageIdentity(getSessionEmail());
+  if (!userId && !email) return null;
+  return {
+    ...(userId ? { userId } : {}),
+    ...(email ? { email, userEmail: email, displayName: email, name: email } : {}),
+    role: 'owner'
+  };
+}
+
+function ensureCurrentUserInLifecycleParticipants(participants = []) {
+  const normalizedParticipants = normalizeConversationParticipantsForApi(participants);
+  const selfParticipant = getCurrentUserLifecycleParticipant();
+  if (!selfParticipant) return normalizedParticipants;
+
+  const selfKey = normalizeParticipantIdentityKey(selfParticipant);
+  const hasSelf = normalizedParticipants.some((participant) => normalizeParticipantIdentityKey(participant) === selfKey);
+  if (hasSelf) return normalizedParticipants;
+
+  return normalizeConversationParticipantsForApi([selfParticipant, ...normalizedParticipants]);
+}
+
+function buildSharedConversationLifecycleMetadata(participants = [], options = {}) {
+  const normalizedParticipants = ensureCurrentUserInLifecycleParticipants(participants);
+  const participantCount = Math.max(
+    1,
+    Number(options.participantCount || 0) || 0,
+    normalizedParticipants.length || 0
+  );
+  const conversationType = options.type || options.conversationType || 'direct';
+  const sharedConversationKey = options.sharedConversationKey || buildSharedConversationKeyFromParticipants(normalizedParticipants, conversationType);
+
+  return {
+    sharedConversationKey,
+    redisConversationKey: sharedConversationKey,
+    redisChatKey: sharedConversationKey,
+    conversationType,
+    participantCount,
+    deletionCounterInitial: participantCount,
+    deletionCounterRemaining: participantCount,
+    reuseExistingRedisChat: true,
+    deleteFinalOnlyWhenAllParticipantsDeleted: true,
+    visibilityMode: 'per-participant',
+    lifecycleVersion: 1
+  };
+}
+
+function resolveConversationParticipantCountHint(conversation = {}) {
+  if (!conversation || typeof conversation !== 'object') return 0;
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const registry = conversation.deletionRegistry && typeof conversation.deletionRegistry === 'object' ? conversation.deletionRegistry : {};
+  const localRegistry = conversation.localDeletionRegistry && typeof conversation.localDeletionRegistry === 'object' ? conversation.localDeletionRegistry : {};
+  const participantRegistry = conversation.participantDeletionRegistry && typeof conversation.participantDeletionRegistry === 'object'
+    ? conversation.participantDeletionRegistry
+    : {};
+  const metadataParticipantRegistry = metadata.participantDeletionRegistry && typeof metadata.participantDeletionRegistry === 'object'
+    ? metadata.participantDeletionRegistry
+    : {};
+  const registryParticipantRegistry = registry.participantDeletionRegistry && typeof registry.participantDeletionRegistry === 'object'
+    ? registry.participantDeletionRegistry
+    : {};
+  const localParticipantRegistry = localRegistry.participantDeletionRegistry && typeof localRegistry.participantDeletionRegistry === 'object'
+    ? localRegistry.participantDeletionRegistry
+    : {};
+
+  const readCount = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+  };
+
+  const explicitCount = Math.max(
+    readCount(conversation.participantCount),
+    readCount(metadata.participantCount),
+    readCount(conversation.deletionCounterInitial),
+    readCount(metadata.deletionCounterInitial),
+    readCount(participantRegistry.counterInitial),
+    readCount(participantRegistry.participantCount),
+    readCount(metadataParticipantRegistry.counterInitial),
+    readCount(metadataParticipantRegistry.participantCount),
+    readCount(registryParticipantRegistry.counterInitial),
+    readCount(registryParticipantRegistry.participantCount),
+    readCount(localParticipantRegistry.counterInitial),
+    readCount(localParticipantRegistry.participantCount)
+  );
+
+  const remainingCount = Math.max(
+    readCount(conversation.remainingParticipantCount),
+    readCount(conversation.deletionCounterRemaining),
+    readCount(metadata.remainingParticipantCount),
+    readCount(metadata.deletionCounterRemaining),
+    readCount(participantRegistry.counterRemaining),
+    readCount(metadataParticipantRegistry.counterRemaining),
+    readCount(registryParticipantRegistry.counterRemaining),
+    readCount(localParticipantRegistry.counterRemaining)
+  );
+  const deletedParticipantCount = getConversationDeletedParticipantIdentityKeys(conversation).size;
+  const inferredCount = remainingCount || deletedParticipantCount
+    ? Math.max(remainingCount + deletedParticipantCount, deletedParticipantCount)
+    : 0;
+
+  return Math.max(explicitCount, inferredCount, 0);
+}
+
+function hasRemoteLifecycleParticipant(participants = []) {
+  const selfKey = normalizeLifecycleIdentityKeyFromValue(getCurrentUserLifecycleParticipant());
+  return (Array.isArray(participants) ? participants : []).some((participant) => {
+    const participantKey = normalizeLifecycleIdentityKeyFromValue(participant);
+    return participantKey && (!selfKey || participantKey !== selfKey);
+  });
+}
+
+function shouldRepairConversationSharedLifecycleKey(explicitKey = '', canonicalKey = '', participants = [], conversationType = 'direct') {
+  const normalizedExplicitKey = String(explicitKey || '').trim();
+  const normalizedCanonicalKey = String(canonicalKey || '').trim();
+  if (!normalizedCanonicalKey) return false;
+  if (!normalizedExplicitKey) return true;
+  if (normalizedExplicitKey === normalizedCanonicalKey) return false;
+  if (!hasRemoteLifecycleParticipant(participants)) return false;
+
+  const selfParticipant = getCurrentUserLifecycleParticipant();
+  const selfOnlyKey = selfParticipant
+    ? buildSharedConversationKeyFromParticipants([selfParticipant], conversationType)
+    : '';
+
+  // Iteraciones anteriores podían guardar la clave Redis solo con el usuario actual.
+  // Esa clave rompe la reutilización del mismo chat por todos los participantes;
+  // cuando se detecta ese caso se repara con la clave canónica de participantes.
+  return Boolean(selfOnlyKey && normalizedExplicitKey === selfOnlyKey);
+}
+
+function resolveConversationSharedLifecycleKey(conversation = {}, participants = [], conversationType = 'direct') {
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const candidates = [
+    conversation.sharedConversationKey,
+    conversation.redisConversationKey,
+    conversation.redisChatKey,
+    metadata.sharedConversationKey,
+    metadata.redisConversationKey,
+    metadata.redisChatKey
+  ]
+    .map((candidate) => String(candidate || '').trim())
+    .filter(Boolean);
+  const canonicalKey = buildSharedConversationKeyFromParticipants(participants, conversationType);
+  const stableExplicitKey = candidates.find((candidate) => {
+    return !shouldRepairConversationSharedLifecycleKey(candidate, canonicalKey, participants, conversationType);
+  }) || candidates[0] || '';
+
+  return shouldRepairConversationSharedLifecycleKey(stableExplicitKey, canonicalKey, participants, conversationType)
+    ? canonicalKey
+    : (stableExplicitKey || canonicalKey);
+}
+
+function buildConversationSharedLifecycleMetadata(conversation = {}) {
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const participants = ensureCurrentUserInLifecycleParticipants(normalizeConversationParticipantsForApi(
+    conversation.participants,
+    conversation.email || conversation.contactEmail || metadata.email || metadata.contactEmail,
+    conversation.name || conversation.displayName || metadata.name || metadata.displayName
+  ));
+  const conversationType = conversation.type || conversation.conversationType || metadata.type || metadata.conversationType || 'direct';
+  const sharedConversationKey = resolveConversationSharedLifecycleKey(conversation, participants, conversationType);
+
+  return buildSharedConversationLifecycleMetadata(participants, {
+    type: conversationType,
+    participantCount: resolveConversationParticipantCountHint(conversation),
+    sharedConversationKey
+  });
+}
+
+
+function getConversationSharedMergeKey(conversation = {}) {
+  if (!conversation || typeof conversation !== 'object') return '';
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const key = conversation.sharedConversationKey
+    || conversation.redisConversationKey
+    || conversation.redisChatKey
+    || metadata.sharedConversationKey
+    || metadata.redisConversationKey
+    || metadata.redisChatKey
+    || '';
+  return String(key || '').trim();
+}
+
+function normalizeLifecycleIdentityKeyFromValue(value = {}) {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    const rawValue = String(value || '').trim();
+    const loweredValue = rawValue.toLowerCase();
+    if (loweredValue.startsWith('email:')) {
+      const email = normalizeStorageIdentity(rawValue.slice(6));
+      return email ? `email:${email}` : '';
+    }
+    if (loweredValue.startsWith('user:')) {
+      const userId = normalizeBackendUserId(rawValue.slice(5));
+      return userId ? `user:${userId}` : '';
+    }
+    const email = normalizeStorageIdentity(rawValue);
+    if (email && email.includes('@')) return `email:${email}`;
+    const userId = normalizeBackendUserId(rawValue);
+    return userId ? `user:${userId}` : '';
+  }
+  if (typeof value !== 'object') return '';
+  return normalizeParticipantIdentityKey(value);
+}
+
+function collectLifecycleIdentityKeys(source = null) {
+  const keys = new Set();
+  const collect = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (typeof value === 'object') {
+      const directKey = normalizeLifecycleIdentityKeyFromValue(value);
+      if (directKey) keys.add(directKey);
+      [
+        value.deletedParticipants,
+        value.deletedParticipant,
+        value.deletedParticipantIds,
+        value.deletedParticipantEmails,
+        value.deletedByParticipants,
+        value.hiddenForParticipants,
+        value.hiddenForUserEmails,
+        value.restoredParticipants,
+        value.restoredParticipant,
+        value.deletionRegistry?.deletedParticipants,
+        value.deletionRegistry?.hiddenForParticipants,
+        value.participantDeletionRegistry?.deletedParticipants,
+        value.participantDeletionRegistry?.deletedParticipantIdentityKeys
+      ].forEach(collect);
+      return;
+    }
+    const key = normalizeLifecycleIdentityKeyFromValue(value);
+    if (key) keys.add(key);
+  };
+
+  collect(source);
+  return keys;
+}
+
+function getConversationParticipantIdentityKeys(conversation = {}) {
+  const participants = normalizeConversationParticipantsForApi(
+    conversation.participants,
+    conversation.email || conversation.contactEmail,
+    conversation.name || conversation.displayName
+  );
+  return new Set(participants.map(normalizeParticipantIdentityKey).filter(Boolean));
+}
+
+function getConversationDeletionRegistrySources(conversation = {}) {
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const localRegistry = conversation.localDeletionRegistry && typeof conversation.localDeletionRegistry === 'object'
+    ? conversation.localDeletionRegistry
+    : {};
+  const registry = conversation.deletionRegistry && typeof conversation.deletionRegistry === 'object'
+    ? conversation.deletionRegistry
+    : {};
+
+  return [
+    ...getDeletionRegistrySources(conversation, metadata),
+    conversation.deletedParticipant,
+    conversation.deletedParticipants,
+    conversation.deletedParticipantIdentityKeys,
+    conversation.deletedByParticipantIdentityKeys,
+    conversation.participantDeletionRegistry,
+    conversation.participantDeletionRegistry?.deletedParticipants,
+    conversation.participantDeletionRegistry?.deletedParticipantIdentityKeys,
+    registry.deletedParticipants,
+    registry.deletedParticipantIdentityKeys,
+    registry.hiddenForParticipants,
+    registry.participantDeletionRegistry,
+    registry.participantDeletionRegistry?.deletedParticipants,
+    registry.participantDeletionRegistry?.deletedParticipantIdentityKeys,
+    localRegistry.deletedParticipant,
+    localRegistry.deletedParticipants,
+    localRegistry.deletedParticipantIdentityKeys,
+    localRegistry.deletedByParticipantIdentityKeys,
+    localRegistry.deletionRegistry?.deletedParticipants,
+    localRegistry.deletionRegistry?.deletedParticipantIdentityKeys,
+    localRegistry.participantDeletionRegistry?.deletedParticipants,
+    localRegistry.participantDeletionRegistry?.deletedParticipantIdentityKeys
+  ];
+}
+
+function getConversationDeletedParticipantIdentityKeys(conversation = {}) {
+  const keys = new Set();
+  getConversationDeletionRegistrySources(conversation).forEach((source) => {
+    collectLifecycleIdentityKeys(source).forEach((key) => keys.add(key));
+  });
+  return keys;
+}
+
+function stripLifecycleIdentityKeyFromDeletionSource(source = null, identityKey = '') {
+  const normalizedIdentityKey = String(identityKey || '').trim();
+  if (!source || !normalizedIdentityKey) return source;
+
+  if (Array.isArray(source)) {
+    return source
+      .map((item) => stripLifecycleIdentityKeyFromDeletionSource(item, normalizedIdentityKey))
+      .filter((item) => {
+        if (!item) return false;
+        const itemKey = normalizeLifecycleIdentityKeyFromValue(item);
+        return !itemKey || itemKey !== normalizedIdentityKey;
+      });
+  }
+
+  if (typeof source !== 'object') {
+    const sourceKey = normalizeLifecycleIdentityKeyFromValue(source);
+    return sourceKey && sourceKey === normalizedIdentityKey ? '' : source;
+  }
+
+  const lifecycleKeys = [
+    'deletedParticipant',
+    'deletedParticipants',
+    'deletedParticipantIds',
+    'deletedParticipantEmails',
+    'deletedParticipantIdentityKeys',
+    'deletedByParticipantIdentityKeys',
+    'deletedByParticipants',
+    'hiddenForParticipants',
+    'hiddenForUserEmails',
+    'participantDeletionRegistry',
+    'deletionRegistry',
+    'localDeletionRegistry'
+  ];
+  const hasNestedLifecycleData = lifecycleKeys.some((key) => Object.prototype.hasOwnProperty.call(source, key));
+  const directKey = normalizeLifecycleIdentityKeyFromValue(source);
+  if (directKey && directKey === normalizedIdentityKey && !hasNestedLifecycleData) return null;
+
+  const cloned = { ...source };
+  lifecycleKeys.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(cloned, key)) return;
+    cloned[key] = stripLifecycleIdentityKeyFromDeletionSource(cloned[key], normalizedIdentityKey);
+  });
+  return cloned;
+}
+
+function stripCurrentParticipantFromDeletionSource(source = null) {
+  const actorKey = normalizeLifecycleIdentityKeyFromValue(getCurrentParticipantLifecycleIdentity());
+  return stripLifecycleIdentityKeyFromDeletionSource(source, actorKey);
+}
+
+function getConversationDeletionCounterState(conversation = {}, actor = getCurrentParticipantLifecycleIdentity()) {
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const participantKeys = getConversationParticipantIdentityKeys(conversation);
+  const deletedBeforeKeys = getConversationDeletedParticipantIdentityKeys(conversation);
+  const actorKey = normalizeLifecycleIdentityKeyFromValue(actor);
+  const deletedAfterKeys = new Set(deletedBeforeKeys);
+  if (actorKey) deletedAfterKeys.add(actorKey);
+
+  const participantCount = Math.max(
+    Number(lifecycle.participantCount || 0) || 0,
+    participantKeys.size,
+    1
+  );
+  const deletedBeforeCount = Math.min(deletedBeforeKeys.size, participantCount);
+  const deletedAfterCount = Math.min(deletedAfterKeys.size, participantCount);
+  const remainingCount = Math.max(participantCount - deletedAfterCount, 0);
+
+  return {
+    participantCount,
+    deletedBeforeCount,
+    deletedAfterCount,
+    remainingCount,
+    actorIdentityKey: actorKey,
+    deletedParticipantIdentityKeys: Array.from(deletedAfterKeys),
+    deletedParticipants: [actor].filter(Boolean)
+  };
+}
+
+function getConversationRestoreCounterState(conversation = {}, actor = getCurrentParticipantLifecycleIdentity()) {
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const participantKeys = getConversationParticipantIdentityKeys(conversation);
+  const deletedBeforeKeys = getConversationDeletedParticipantIdentityKeys(conversation);
+  const actorKey = normalizeLifecycleIdentityKeyFromValue(actor);
+  const deletedAfterKeys = new Set(deletedBeforeKeys);
+  if (actorKey) deletedAfterKeys.delete(actorKey);
+
+  const participantCount = Math.max(
+    Number(lifecycle.participantCount || 0) || 0,
+    participantKeys.size,
+    1
+  );
+  const deletedBeforeCount = Math.min(deletedBeforeKeys.size, participantCount);
+  const deletedAfterCount = Math.min(deletedAfterKeys.size, participantCount);
+  const remainingCount = Math.max(participantCount - deletedAfterCount, 0);
+
+  return {
+    participantCount,
+    deletedBeforeCount,
+    deletedAfterCount,
+    remainingCount,
+    actorIdentityKey: actorKey,
+    deletedParticipantIdentityKeys: Array.from(deletedAfterKeys)
+  };
+}
+
+function buildLocalConversationIdForContact(contact = {}) {
+  const participants = buildConversationCreateParticipants(contact);
+  const lifecycle = buildSharedConversationLifecycleMetadata(participants, { type: 'direct' });
+  if (lifecycle.sharedConversationKey) return `chat-${hashStableText(lifecycle.sharedConversationKey)}`;
+  const normalizedContact = normalizeContactCreationInput(contact);
+  return `chat-${normalizedContact.email || Date.now()}`;
+}
+
+function getCurrentParticipantLifecycleIdentity() {
+  return {
+    userId: normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier()),
+    userEmail: normalizeStorageIdentity(getSessionEmail()),
+    email: normalizeStorageIdentity(getSessionEmail()),
+    displayName: normalizeStorageIdentity(getSessionEmail()) || 'Usuario actual'
+  };
+}
+
+function buildConversationParticipantDeletionPayload(conversation = {}, options = {}) {
+  const deletedAt = options.deletedAt || new Date().toISOString();
+  const clientMutationId = options.clientMutationId || generateClientMutationId();
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const actor = getCurrentParticipantLifecycleIdentity();
+  const counterState = getConversationDeletionCounterState(conversation, actor);
+
+  return {
+    mode: 'hide_for_actor',
+    visibilityScope: 'actor_only',
+    internalOnly: true,
+    visibleInChat: false,
+    deletedAt,
+    actorDeletedAt: deletedAt,
+    actorUserId: actor.userId,
+    actorUserEmail: actor.userEmail,
+    actorIdentityKey: counterState.actorIdentityKey,
+    deletedByUserId: actor.userId,
+    deletedByUserEmail: actor.userEmail,
+    deletedForCurrentUser: true,
+    isDeletedForCurrentUser: true,
+    hiddenForCurrentUser: true,
+    deletedParticipant: actor,
+    deletedParticipants: counterState.deletedParticipants,
+    deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+    sharedConversationKey: lifecycle.sharedConversationKey,
+    redisConversationKey: lifecycle.redisConversationKey,
+    redisChatKey: lifecycle.redisChatKey,
+    participantCount: counterState.participantCount,
+    remainingParticipantCount: counterState.remainingCount,
+    deletionCounterInitial: counterState.participantCount,
+    deletionCounterBefore: counterState.participantCount - counterState.deletedBeforeCount,
+    deletionCounterAfter: counterState.remainingCount,
+    deletionCounterRemaining: counterState.remainingCount,
+    deletedParticipantCountBefore: counterState.deletedBeforeCount,
+    deletedParticipantCountAfter: counterState.deletedAfterCount,
+    deletionRegistry: {
+      internalOnly: true,
+      visibleInChat: false,
+      deletedParticipants: counterState.deletedParticipants,
+      deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+      deletedAt,
+      updatedAt: deletedAt
+    },
+    participantDeletionRegistry: {
+      counterInitial: counterState.participantCount,
+      counterRemaining: counterState.remainingCount,
+      deleteWhenRemainingParticipants: 0,
+      deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+      internalOnly: true,
+      visibleInChat: false
+    },
+    deleteRedisWhenRemainingCountIsZero: true,
+    deleteFinalOnlyWhenAllParticipantsDeleted: true,
+    reuseExistingRedisChat: true,
+    clientMutationId
+  };
+}
+
+function buildConversationParticipantRestorePayload(conversation = {}, options = {}) {
+  const restoredAt = options.restoredAt || new Date().toISOString();
+  const clientMutationId = options.clientMutationId || generateClientMutationId();
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const actor = getCurrentParticipantLifecycleIdentity();
+  const counterState = getConversationRestoreCounterState(conversation, actor);
+
+  return {
+    mode: 'restore_for_actor',
+    visibilityScope: 'actor_only',
+    internalOnly: true,
+    visibleInChat: false,
+    restoredAt,
+    actorRestoredAt: restoredAt,
+    actorUserId: actor.userId,
+    actorUserEmail: actor.userEmail,
+    actorIdentityKey: counterState.actorIdentityKey,
+    restoredByUserId: actor.userId,
+    restoredByUserEmail: actor.userEmail,
+    restoredParticipant: actor,
+    restoredParticipantIdentityKey: counterState.actorIdentityKey,
+    deletedForCurrentUser: false,
+    isDeletedForCurrentUser: false,
+    hiddenForCurrentUser: false,
+    removeActorFromDeletionRegistry: true,
+    sharedConversationKey: lifecycle.sharedConversationKey,
+    redisConversationKey: lifecycle.redisConversationKey,
+    redisChatKey: lifecycle.redisChatKey,
+    participantCount: counterState.participantCount,
+    remainingParticipantCount: counterState.remainingCount,
+    deletionCounterInitial: counterState.participantCount,
+    deletionCounterBefore: counterState.participantCount - counterState.deletedBeforeCount,
+    deletionCounterAfter: counterState.remainingCount,
+    deletionCounterRemaining: counterState.remainingCount,
+    deletedParticipantCountBefore: counterState.deletedBeforeCount,
+    deletedParticipantCountAfter: counterState.deletedAfterCount,
+    deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+    deletionRegistry: {
+      internalOnly: true,
+      visibleInChat: false,
+      deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+      restoredParticipant: actor,
+      restoredAt,
+      updatedAt: restoredAt
+    },
+    participantDeletionRegistry: {
+      counterInitial: counterState.participantCount,
+      counterRemaining: counterState.remainingCount,
+      deleteWhenRemainingParticipants: 0,
+      deletedParticipantIdentityKeys: counterState.deletedParticipantIdentityKeys,
+      internalOnly: true,
+      visibleInChat: false
+    },
+    restoreExistingRedisChat: true,
+    reuseExistingRedisChat: true,
+    clientMutationId
+  };
+}
+
+function normalizeIdentityList(value = []) {
+  const items = Array.isArray(value) ? value : (value ? [value] : []);
+  return items.flatMap((item) => {
+    if (!item) return [];
+    if (typeof item === 'string') {
+      const lifecycleKey = normalizeLifecycleIdentityKeyFromValue(item);
+      return [
+        lifecycleKey,
+        normalizeStorageIdentity(item),
+        normalizeBackendUserId(item)
+      ].filter(Boolean);
+    }
+    if (typeof item !== 'object') return [];
+    return [
+      normalizeLifecycleIdentityKeyFromValue(item),
+      normalizeStorageIdentity(item.email || item.userEmail || item.contactEmail || item.actorUserEmail || item.deletedByUserEmail || ''),
+      normalizeBackendUserId(item.userId || item.actorUserId || item.deletedByUserId || item.uid || item.id || '')
+    ].filter(Boolean);
+  });
+}
+
+function getDeletionRegistrySources(raw = {}, metadata = {}) {
+  return [
+    raw.deletedParticipant,
+    raw.deletedParticipants,
+    raw.deletedParticipantIds,
+    raw.deletedParticipantEmails,
+    raw.deletedParticipantIdentityKeys,
+    raw.deletedByParticipantIdentityKeys,
+    raw.deletedByParticipants,
+    raw.hiddenForParticipants,
+    raw.hiddenForUserEmails,
+    raw.participantDeletionRegistry,
+    raw.participantDeletionRegistry?.deletedParticipants,
+    raw.participantDeletionRegistry?.deletedParticipantIdentityKeys,
+    metadata.deletedParticipant,
+    metadata.deletedParticipants,
+    metadata.deletedParticipantIds,
+    metadata.deletedParticipantEmails,
+    metadata.deletedParticipantIdentityKeys,
+    metadata.deletedByParticipantIdentityKeys,
+    metadata.deletedByParticipants,
+    metadata.hiddenForParticipants,
+    metadata.hiddenForUserEmails,
+    metadata.participantDeletionRegistry,
+    metadata.participantDeletionRegistry?.deletedParticipants,
+    metadata.participantDeletionRegistry?.deletedParticipantIdentityKeys,
+    raw.deletionRegistry?.deletedParticipants,
+    raw.deletionRegistry?.deletedParticipantIdentityKeys,
+    raw.deletionRegistry?.hiddenForParticipants,
+    raw.deletionRegistry?.participantDeletionRegistry,
+    raw.deletionRegistry?.participantDeletionRegistry?.deletedParticipants,
+    raw.deletionRegistry?.participantDeletionRegistry?.deletedParticipantIdentityKeys,
+    metadata.deletionRegistry?.deletedParticipants,
+    metadata.deletionRegistry?.deletedParticipantIdentityKeys,
+    metadata.deletionRegistry?.hiddenForParticipants,
+    metadata.deletionRegistry?.participantDeletionRegistry,
+    metadata.deletionRegistry?.participantDeletionRegistry?.deletedParticipants,
+    metadata.deletionRegistry?.participantDeletionRegistry?.deletedParticipantIdentityKeys
+  ];
+}
+
+function deletionRegistryIncludesCurrentUser(raw = {}, metadata = {}) {
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const selfIdentityKeys = new Set([
+    selfEmail,
+    selfUserId,
+    selfEmail ? `email:${selfEmail}` : '',
+    selfUserId ? `user:${selfUserId}` : ''
+  ].filter(Boolean));
+  if (!selfIdentityKeys.size) return false;
+
+  return getDeletionRegistrySources(raw, metadata).some((source) => {
+    const identities = new Set([
+      ...normalizeIdentityList(source),
+      ...Array.from(collectLifecycleIdentityKeys(source))
+    ].filter(Boolean));
+    return Array.from(identities).some((identity) => selfIdentityKeys.has(identity));
+  });
+}
+
+function hasParticipantDeletionRegistry(raw = {}, metadata = {}) {
+  return getDeletionRegistrySources(raw, metadata).some((source) => {
+    if (!source) return false;
+    if (Array.isArray(source)) return source.length > 0;
+    if (typeof source === 'object') {
+      if (collectLifecycleIdentityKeys(source).size > 0) return true;
+      return Object.entries(source).some(([key, value]) => {
+        if (['internalOnly', 'visibleInChat'].includes(key)) return false;
+        if (Array.isArray(value)) return value.length > 0;
+        if (value && typeof value === 'object') return collectLifecycleIdentityKeys(value).size > 0 || Object.keys(value).length > 0;
+        return value !== undefined && value !== null && value !== '';
+      });
+    }
+    return String(source || '').trim() !== '';
+  });
+}
+
+function resolveConversationDeletedForCurrentUser(raw = {}, metadata = {}) {
+  const explicitForCurrentUser = coerceFirstBooleanFlag([
+    raw.deletedForCurrentUser,
+    raw.isDeletedForCurrentUser,
+    raw.deletedForMe,
+    raw.isDeletedForMe,
+    raw.hiddenForCurrentUser,
+    raw.isHiddenForCurrentUser,
+    metadata.deletedForCurrentUser,
+    metadata.deletedForMe,
+    metadata.hiddenForCurrentUser
+  ], null);
+
+  if (explicitForCurrentUser !== null) return explicitForCurrentUser;
+  if (deletionRegistryIncludesCurrentUser(raw, metadata)) return true;
+  if (hasParticipantDeletionRegistry(raw, metadata)) return false;
+  return coerceFirstBooleanFlag([raw.deleted, raw.isDeleted], false);
+}
+
+function resolveConversationArchivedForCurrentUser(raw = {}, metadata = {}) {
+  return coerceFirstBooleanFlag([
+    raw.archivedForCurrentUser,
+    raw.isArchivedForCurrentUser,
+    raw.archivedForMe,
+    raw.isArchivedForMe,
+    metadata.archivedForCurrentUser,
+    metadata.archivedForMe,
+    raw.archived,
+    raw.isArchived
+  ], false);
+}
+
 function normalizeConversationParticipantForApi(participant = {}, fallbackRole = 'participant') {
   if (!participant || typeof participant !== 'object') return null;
 
@@ -1290,8 +2008,15 @@ const apiClient = {
   },
   getMessages(conversationId, options = {}) {
     const params = new URLSearchParams();
+    const conversation = options.conversation || appState.conversations.find((item) => String(item.id || '') === String(conversationId || '')) || {};
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
     params.set('conversationId', conversationId);
     params.set('limit', String(options.limit || 50));
+    params.set('userEmail', getSessionEmail());
+    params.set('actorUserEmail', getSessionEmail());
+    params.set('actorUserId', getCurrentUserIdentifier());
+    if (lifecycle.sharedConversationKey) params.set('sharedConversationKey', lifecycle.sharedConversationKey);
+    if (lifecycle.redisConversationKey) params.set('redisConversationKey', lifecycle.redisConversationKey);
     if (options.before) params.set('before', options.before);
     if (options.cursor) params.set('cursor', options.cursor);
     return this.request(`/api/v1/mensajes?${params.toString()}`)
@@ -1402,17 +2127,27 @@ const apiClient = {
     });
   },
   syncChatAction(actionType = '', conversation = {}, payload = {}, clientMutationId = generateClientMutationId()) {
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
     return this.request('/api/v1/acciones-chat', {
       method: 'POST',
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         actionType,
         conversationId: conversation.id,
+        sharedConversationKey: lifecycle.sharedConversationKey,
+        redisConversationKey: lifecycle.redisConversationKey,
+        redisChatKey: lifecycle.redisChatKey,
+        participantCount: lifecycle.participantCount,
+        deleteFinalOnlyWhenAllParticipantsDeleted: true,
+        reuseExistingRedisChat: true,
         contactEmail: conversation.email || conversation.contactEmail || '',
         displayName: conversation.name || conversation.displayName || '',
         actorUserId: getCurrentUserIdentifier(),
         actorUserEmail: getSessionEmail(),
-        payload,
+        payload: {
+          ...lifecycle,
+          ...(payload && typeof payload === 'object' ? payload : {})
+        },
         source: 'chater-static-site',
         clientMutationId
       }))
@@ -1434,12 +2169,18 @@ const apiClient = {
     const firstRecipient = recipients[0] || {};
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
 
     return this.request('/api/v1/mensajes', {
       method: 'POST',
       idempotencyKey: clientMessageId,
       body: JSON.stringify(withMemoriaSitePayload({
         conversationId,
+        sharedConversationKey: lifecycle.sharedConversationKey,
+        redisConversationKey: lifecycle.redisConversationKey,
+        redisChatKey: lifecycle.redisChatKey,
+        participantCount: lifecycle.participantCount,
+        reuseExistingRedisChat: true,
         senderUserId,
         senderUserEmail,
         recipientUserId: firstRecipient.userId || '',
@@ -1454,7 +2195,8 @@ const apiClient = {
           recipientUserId: firstRecipient.userId || '',
           recipientUserEmail: firstRecipient.email || '',
           recipients,
-          channel: getConversationStremeChannel(conversationId),
+          ...lifecycle,
+          channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
           userInboxChannel: getCurrentUserStremeInboxChannel(),
           remoteInboxChannels: recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean)
         },
@@ -1464,30 +2206,57 @@ const apiClient = {
   },
   createConversation(contact) {
     const clientMutationId = contact.clientMutationId || generateClientMutationId();
+    const participants = buildConversationCreateParticipants(contact);
+    const participantEmails = participants.map((participant) => participant.email || participant.userEmail || '').filter(Boolean);
+    const lifecycle = buildSharedConversationLifecycleMetadata(participants, { type: 'direct' });
+    const contactUserId = normalizeBackendUserId(contact.userId || contact.contactUserId || contact.internalUserId || contact.uid || contact.id || '');
+    const contactEmail = normalizeStorageIdentity(contact.email || contact.contactEmail || contact.userEmail || '');
+    const displayName = String(contact.name || contact.displayName || contact.alias || contact.email || '').trim();
+
     return this.request('/api/v1/conversaciones', {
       method: 'POST',
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         type: 'direct',
         conversationType: 'direct',
-        participants: buildConversationCreateParticipants(contact),
+        participants,
+        participantEmails,
+        sharedConversationKey: lifecycle.sharedConversationKey,
+        redisConversationKey: lifecycle.redisConversationKey,
+        redisChatKey: lifecycle.redisChatKey,
+        participantCount: lifecycle.participantCount,
+        reuseExistingRedisChat: true,
+        restoreExistingRedisChat: true,
+        restoreIfParticipantDeleted: true,
+        deleteFinalOnlyWhenAllParticipantsDeleted: true,
+        visibilityMode: 'per-participant',
+        deletionPolicy: {
+          mode: 'per-participant',
+          counterInitial: lifecycle.participantCount,
+          deleteWhenRemainingParticipants: 0,
+          internalOnly: true,
+          visibleInChat: false
+        },
         ownerUserId: normalizeBackendUserId(getSessionUserId()),
         ownerUserEmail: getSessionEmail(),
-        contactUserId: normalizeBackendUserId(contact.userId || contact.contactUserId || contact.internalUserId || contact.uid || contact.id || ''),
-        contactEmail: normalizeStorageIdentity(contact.email || contact.contactEmail || contact.userEmail || ''),
-        displayName: String(contact.name || contact.displayName || contact.alias || contact.email || '').trim(),
-        title: String(contact.name || contact.displayName || contact.alias || contact.email || '').trim(),
+        contactUserId,
+        contactEmail,
+        displayName,
+        title: displayName,
         status: 'active',
         metadata: {
           source: 'chater-static-site',
           ownerUserId: normalizeBackendUserId(getSessionUserId()),
           ownerUserEmail: getSessionEmail(),
-          contactUserId: normalizeBackendUserId(contact.userId || contact.contactUserId || contact.internalUserId || contact.uid || contact.id || ''),
-          contactEmail: normalizeStorageIdentity(contact.email || contact.contactEmail || contact.userEmail || ''),
-          displayName: String(contact.name || contact.displayName || contact.alias || contact.email || '').trim(),
-          participants: buildConversationCreateParticipants(contact),
-          participantEmails: buildConversationCreateParticipants(contact).map((participant) => participant.email || participant.userEmail || '').filter(Boolean),
-          channel: getConversationStremeChannel(clientMutationId)
+          contactUserId,
+          contactEmail,
+          displayName,
+          participants,
+          participantEmails,
+          ...lifecycle,
+          restoreExistingRedisChat: true,
+          restoreIfParticipantDeleted: true,
+          channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(clientMutationId)
         },
         clientMutationId
       }))
@@ -1537,8 +2306,8 @@ const apiClient = {
         alias: displayName,
         relationType: contact.relationType || 'contact',
         status: contact.status || 'active',
-        favorite: Boolean(contact.favorite),
-        blocked: Boolean(contact.blocked),
+        favorite: coerceFirstBooleanFlag([contact.favorite], false),
+        blocked: coerceFirstBooleanFlag([contact.blocked], false),
         tags: normalizeContactRelationTags(contact.tags || contact.relationTags || []),
         metadata: {
           source: 'chater-static-site',
@@ -1789,11 +2558,17 @@ const apiClient = {
     const firstRecipient = recipients[0] || {};
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
     return this.request('/api/v1/mensajes', {
       method: 'POST',
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         conversationId,
+        sharedConversationKey: lifecycle.sharedConversationKey,
+        redisConversationKey: lifecycle.redisConversationKey,
+        redisChatKey: lifecycle.redisChatKey,
+        participantCount: lifecycle.participantCount,
+        reuseExistingRedisChat: true,
         senderUserId,
         senderUserEmail,
         recipientUserId: firstRecipient.userId || '',
@@ -1816,7 +2591,8 @@ const apiClient = {
           recipientUserId: firstRecipient.userId || '',
           recipientUserEmail: firstRecipient.email || '',
           recipients,
-          channel: getConversationStremeChannel(conversationId),
+          ...lifecycle,
+          channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
           userInboxChannel: getCurrentUserStremeInboxChannel(),
           remoteInboxChannels: recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean),
           media: payload
@@ -2910,8 +3686,8 @@ function shouldDiscardQueuedArchiveOperation(operation = {}) {
   const conversation = appState.conversations.find((item) => String(item.id || '') === conversationId && !item.deleted);
   if (!conversation) return false;
 
-  const queuedArchived = Boolean(operation.payload.patch.archived);
-  const localArchived = Boolean(conversation.archived);
+  const queuedArchived = coerceBooleanFlag(operation.payload.patch.archived, false);
+  const localArchived = coerceFirstBooleanFlag([conversation.archived], false);
   if (queuedArchived === localArchived) return false;
 
   const queuedMutationId = getQueuedArchiveMutationId(operation);
@@ -2971,6 +3747,154 @@ function removeQueuedArchiveOperationsForConversation(conversationId = '', email
 
   if (filteredQueue.length !== queue.length) {
     persistBackendOutbox(filteredQueue, ownerEmail);
+  }
+}
+
+
+function getConversationLifecycleContactEmail(conversation = {}) {
+  const directEmail = normalizeStorageIdentity(conversation.email || conversation.contactEmail || conversation.userEmail || '');
+  if (directEmail) return directEmail;
+
+  const participants = normalizeConversationParticipantsForApi(
+    conversation.participants,
+    conversation.email || conversation.contactEmail,
+    conversation.name || conversation.displayName
+  );
+  const remoteParticipant = getPrimaryRemoteParticipant(participants) || {};
+  return normalizeStorageIdentity(remoteParticipant.email || remoteParticipant.userEmail || remoteParticipant.contactEmail || '');
+}
+
+function getQueuedLifecycleConversationId(operation = {}) {
+  const payload = operation.payload || {};
+  const patch = payload.patch || {};
+  const conversation = payload.conversation || {};
+  const contact = payload.contact || {};
+  return String(
+    payload.conversationId
+    || payload.localConversationId
+    || patch.conversationId
+    || conversation.id
+    || conversation.conversationId
+    || contact.conversationId
+    || contact.chatId
+    || ''
+  ).trim();
+}
+
+function getQueuedLifecycleContactEmail(operation = {}) {
+  const payload = operation.payload || {};
+  const contact = payload.contact || {};
+  const conversation = payload.conversation || {};
+  const patch = payload.patch || {};
+  return normalizeStorageIdentity(
+    payload.contactEmail
+    || payload.blockedEmail
+    || payload.blockedUserEmail
+    || payload.email
+    || patch.contactEmail
+    || patch.email
+    || contact.email
+    || contact.contactEmail
+    || contact.userEmail
+    || conversation.email
+    || conversation.contactEmail
+    || conversation.userEmail
+    || ''
+  );
+}
+
+function isQueuedLifecycleOperationForConversation(operation = {}, conversation = {}) {
+  const conversationId = String(conversation.id || '').trim();
+  const contactEmail = getConversationLifecycleContactEmail(conversation);
+  const operationConversationId = getQueuedLifecycleConversationId(operation);
+  const operationContactEmail = getQueuedLifecycleContactEmail(operation);
+
+  return Boolean(
+    (conversationId && operationConversationId && operationConversationId === conversationId)
+    || (contactEmail && operationContactEmail && operationContactEmail === contactEmail)
+  );
+}
+
+function shouldRemoveQueuedLifecycleOperation(operation = {}, conversation = {}) {
+  if (!isQueuedLifecycleOperationForConversation(operation, conversation)) return false;
+
+  if (operation.type === 'blockUser') return true;
+  if (operation.type === 'upsertUserRelation') return true;
+  if (operation.type === 'createConversation') return true;
+  if (operation.type === 'updateConversation') return true;
+  if (operation.type === 'sendMessage') return true;
+  if (operation.type === 'createMediaMessage') return true;
+
+  if (operation.type === 'syncChatAction') {
+    const actionType = String(operation.payload?.actionType || '').trim();
+    return ['delete_conversation', 'restore_conversation', 'clear_messages'].includes(actionType);
+  }
+
+  return false;
+}
+
+function removeQueuedLifecycleOperationsForConversation(conversation = {}, email = getSessionEmail()) {
+  if (!conversation || !CHATER_CONFIG.backendBaseUrl) return;
+
+  const ownerEmail = normalizeStorageIdentity(email);
+  const queue = readBackendOutbox(ownerEmail);
+  if (!queue.length) return;
+
+  const filteredQueue = queue.filter((operation) => !shouldRemoveQueuedLifecycleOperation(operation, conversation));
+  if (filteredQueue.length !== queue.length) {
+    persistBackendOutbox(filteredQueue, ownerEmail);
+  }
+}
+
+function clearConversationBlockState(conversation = {}, options = {}) {
+  if (!conversation) return;
+  const changedAt = options.changedAt || options.syncedAt || new Date().toISOString();
+  const clientMutationId = options.clientMutationId || generateClientMutationId();
+  conversation.blocked = false;
+  conversation.blockDesiredBlocked = false;
+  conversation.blockSyncStatus = options.syncStatus || '';
+  conversation.blockSyncedAt = options.syncedAt || '';
+  conversation.blockChangedAt = changedAt;
+  conversation.blockLocalChangedAt = changedAt;
+  conversation.blockClientMutationId = clientMutationId;
+  conversation.blockLocalMutationId = clientMutationId;
+}
+
+async function syncConversationUnblockCleanup(conversation = {}, payload = null, sessionGuard = captureSessionGuard(), options = {}) {
+  if (!conversation || !payload || !CHATER_CONFIG.backendBaseUrl) return;
+
+  const cleanupStatus = options.status || 'delete_cleanup';
+  conversation.blockSyncStatus = `syncing:${cleanupStatus}`;
+  persistState();
+
+  try {
+    await apiClient.blockUser(payload);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    const syncedAt = new Date().toISOString();
+    conversation.blocked = false;
+    conversation.blockDesiredBlocked = false;
+    conversation.blockSyncStatus = `synced:${cleanupStatus}`;
+    conversation.blockSyncedAt = syncedAt;
+    conversation.blockChangedAt = syncedAt;
+    conversation.blockClientMutationId = payload.clientMutationId || conversation.blockClientMutationId || '';
+  } catch (error) {
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    const pendingAt = new Date().toISOString();
+    conversation.blocked = false;
+    conversation.blockDesiredBlocked = false;
+    conversation.blockSyncStatus = `pending:${cleanupStatus}`;
+    conversation.blockChangedAt = pendingAt;
+    conversation.blockLocalChangedAt = pendingAt;
+    conversation.blockClientMutationId = payload.clientMutationId || conversation.blockClientMutationId || '';
+    conversation.blockLocalMutationId = payload.clientMutationId || conversation.blockLocalMutationId || '';
+    enqueueBackendOperation({
+      type: 'blockUser',
+      dedupeKey: `block-user:${conversation.id}`,
+      replaceExisting: true,
+      payload
+    });
+  } finally {
+    if (isSessionGuardCurrent(sessionGuard)) persistState();
   }
 }
 
@@ -3051,8 +3975,8 @@ function buildContactRelationPayload(contact = {}, options = {}) {
     localConversationId: String(contact.localConversationId || options.localConversationId || '').trim(),
     relationType: contact.relationType || options.relationType || 'contact',
     status: contact.status || options.status || 'active',
-    favorite: Boolean(contact.favorite || options.favorite),
-    blocked: Boolean(contact.blocked || options.blocked),
+    favorite: coerceFirstBooleanFlag([contact.favorite, options.favorite], false),
+    blocked: coerceFirstBooleanFlag([contact.blocked, options.blocked], false),
     tags: normalizeContactRelationTags(contact.tags || options.tags || contact.relationTags || []),
     reason: contact.reason || options.reason || 'conversation-contact',
     clientMutationId,
@@ -3458,9 +4382,12 @@ function mergeSyncedConversationPayload(localConversationId, payload = {}) {
     || '';
   const normalizedRemote = normalizeConversationFromApi(remoteConversation);
   const effectiveId = String(remoteId || normalizedRemote.id || localConversationId || '');
+  const remoteSharedKey = getConversationSharedMergeKey(normalizedRemote);
   const conversation = appState.conversations.find((item) => {
     const itemId = String(item.id || '');
-    return itemId === String(localConversationId || '') || (effectiveId && itemId === effectiveId);
+    return itemId === String(localConversationId || '')
+      || (effectiveId && itemId === effectiveId)
+      || (remoteSharedKey && getConversationSharedMergeKey(item) === remoteSharedKey);
   });
 
   if (!conversation) return;
@@ -3471,6 +4398,9 @@ function mergeSyncedConversationPayload(localConversationId, payload = {}) {
     ...conversation,
     ...normalizedRemote,
     id: effectiveId || conversation.id,
+    ...resolveConversationArchiveMergeState(normalizedRemote, conversation),
+    ...resolveConversationDeleteMergeState(normalizedRemote, conversation),
+    ...resolveConversationBlockMergeState(normalizedRemote, conversation),
     messages: mergeMessagesByIdentity(existingMessages, remoteMessages),
     messagesHydrated: Boolean(conversation.messagesHydrated || normalizedRemote.messagesHydrated),
     contactSyncStatus: 'synced',
@@ -3529,9 +4459,12 @@ function buildConversationBlockPayload(conversation = getActiveConversation(), b
 function markConversationBlockSynced(conversationId = '', blocked = true) {
   const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || ''));
   if (!conversation) return;
+  const syncedAt = new Date().toISOString();
   conversation.blocked = Boolean(blocked);
+  conversation.blockDesiredBlocked = Boolean(blocked);
   conversation.blockSyncStatus = 'synced';
-  conversation.blockSyncedAt = new Date().toISOString();
+  conversation.blockSyncedAt = syncedAt;
+  conversation.blockChangedAt = syncedAt;
   conversation.status = blocked ? 'Contacto bloqueado' : 'Contacto desbloqueado';
   persistState();
   renderCurrentSection();
@@ -3545,8 +4478,14 @@ async function toggleConversationBlock(conversation = getActiveConversation()) {
   if (!payload) return;
 
   const previousBlocked = Boolean(conversation.blocked);
+  const blockChangedAt = new Date().toISOString();
   conversation.blocked = nextBlocked;
+  conversation.blockDesiredBlocked = nextBlocked;
   conversation.blockSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
+  conversation.blockChangedAt = blockChangedAt;
+  conversation.blockLocalChangedAt = blockChangedAt;
+  conversation.blockClientMutationId = payload.clientMutationId || '';
+  conversation.blockLocalMutationId = payload.clientMutationId || '';
   conversation.status = nextBlocked ? 'Contacto bloqueado' : 'Contacto desbloqueado';
   persistState();
   renderCurrentSection();
@@ -3725,16 +4664,43 @@ function applyRemoteConversationId(localConversationId, remoteConversationId) {
   persistBackendOutbox(updatedQueue);
 }
 
+function reconcileRemoteConversationIdentityBySharedKey(remoteConversation = {}) {
+  const remoteId = String(remoteConversation.id || remoteConversation.chatId || remoteConversation.conversationId || '').trim();
+  const sharedKey = getConversationSharedMergeKey(remoteConversation);
+  if (!remoteId || !sharedKey) return null;
+
+  const localConversation = appState.conversations.find((conversation) => {
+    return String(conversation.id || '') !== remoteId
+      && getConversationSharedMergeKey(conversation) === sharedKey;
+  });
+  if (!localConversation?.id) return null;
+
+  applyRemoteConversationId(localConversation.id, remoteId);
+  return appState.conversations.find((conversation) => String(conversation.id || '') === remoteId) || null;
+}
+
 function replaceConversationIdInPayload(payload, localConversationId, remoteConversationId) {
   if (!payload || typeof payload !== 'object') return payload;
 
-  const updatedPayload = { ...payload };
-  if (updatedPayload.conversationId === localConversationId) updatedPayload.conversationId = remoteConversationId;
-  if (updatedPayload.localConversationId === localConversationId) updatedPayload.localConversationId = remoteConversationId;
-  if (updatedPayload.contact?.conversationId === localConversationId) {
-    updatedPayload.contact = { ...updatedPayload.contact, conversationId: remoteConversationId };
-  }
-  return updatedPayload;
+  const localId = String(localConversationId || '').trim();
+  const remoteId = String(remoteConversationId || '').trim();
+  if (!localId || !remoteId) return payload;
+
+  const replaceInObject = (value, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 4) return value;
+    if (Array.isArray(value)) return value.map((item) => replaceInObject(item, depth + 1));
+
+    const cloned = { ...value };
+    ['id', 'chatId', 'conversationId', 'localConversationId'].forEach((key) => {
+      if (String(cloned[key] || '') === localId) cloned[key] = remoteId;
+    });
+    ['conversation', 'chat', 'contact', 'payload', 'data', 'metadata'].forEach((key) => {
+      if (cloned[key] && typeof cloned[key] === 'object') cloned[key] = replaceInObject(cloned[key], depth + 1);
+    });
+    return cloned;
+  };
+
+  return replaceInObject(payload);
 }
 
 function markQueuedMessageSynced(conversationId, clientMessageId, payload = {}) {
@@ -4178,9 +5144,9 @@ function normalizeLoadedState(saved) {
     conversation.messages = Array.isArray(conversation.messages) ? conversation.messages : [];
     conversation.avatar = conversation.avatar || getInitials(conversation.name || conversation.email);
     conversation.avatarImage = normalizeAssetImagePath(conversation.avatarImage || conversation.avatarAsset);
-    conversation.archived = Boolean(conversation.archived || conversation.isArchived);
+    conversation.archived = coerceFirstBooleanFlag([conversation.archived, conversation.isArchived], false);
     conversation.pinned = Boolean(conversation.pinned || conversation.isPinned);
-    conversation.deleted = Boolean(conversation.deleted || conversation.isDeleted);
+    conversation.deleted = resolveConversationDeletedForCurrentUser(conversation, conversation.metadata || {});
     conversation.muted = Boolean(conversation.muted || conversation.isMuted || conversation.mutedUntil);
     conversation.mutedUntil = conversation.mutedUntil || '';
     conversation.restricted = Boolean(conversation.restricted || conversation.isRestricted || conversation.settings?.restricted);
@@ -4190,6 +5156,17 @@ function normalizeLoadedState(saved) {
     conversation.shortcutSyncStatus = conversation.shortcutSyncStatus || '';
     conversation.actionSyncStatus = conversation.actionSyncStatus || '';
     conversation.actionSyncedAt = conversation.actionSyncedAt || '';
+    conversation.deleteSyncStatus = conversation.deleteSyncStatus || '';
+    conversation.deleteChangedAt = conversation.deleteChangedAt || conversation.deletedAt || conversation.restoredAt || '';
+    conversation.deleteClientMutationId = conversation.deleteClientMutationId || conversation.deleteMutationId || '';
+    conversation.deleteLocalMutationId = conversation.deleteLocalMutationId || '';
+    conversation.deleteLocalChangedAt = conversation.deleteLocalChangedAt || '';
+    if (Object.prototype.hasOwnProperty.call(conversation, 'deleteDesiredDeleted')) {
+      conversation.deleteDesiredDeleted = coerceBooleanFlag(conversation.deleteDesiredDeleted, conversation.deleted);
+    } else if (conversation.deleted) {
+      conversation.deleteDesiredDeleted = true;
+      conversation.deleteLocalChangedAt = conversation.deleteLocalChangedAt || conversation.deleteChangedAt || conversation.deletedAt || '';
+    }
     conversation.settings = conversation.settings && typeof conversation.settings === 'object' ? conversation.settings : {};
     conversation.pinSyncStatus = conversation.pinSyncStatus || '';
     conversation.pinSyncedAt = conversation.pinSyncedAt || '';
@@ -4200,9 +5177,9 @@ function normalizeLoadedState(saved) {
     conversation.archiveLocalMutationId = conversation.archiveLocalMutationId || '';
     conversation.archiveLocalChangedAt = conversation.archiveLocalChangedAt || '';
     if (Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')) {
-      conversation.archiveDesiredArchived = Boolean(conversation.archiveDesiredArchived);
+      conversation.archiveDesiredArchived = coerceBooleanFlag(conversation.archiveDesiredArchived, conversation.archived);
     }
-    conversation.blocked = Boolean(conversation.blocked || conversation.isBlocked);
+    conversation.blocked = coerceFirstBooleanFlag([conversation.blocked, conversation.isBlocked], false);
     conversation.blockSyncStatus = conversation.blockSyncStatus || '';
     conversation.blockSyncedAt = conversation.blockSyncedAt || '';
     conversation.reportSyncStatus = conversation.reportSyncStatus || '';
@@ -4210,6 +5187,22 @@ function normalizeLoadedState(saved) {
     conversation.lastReportReason = conversation.lastReportReason || '';
     conversation.unread = Number(conversation.unread || 0);
     conversation.participants = normalizeConversationParticipantsForApi(conversation.participants, conversation.email || conversation.contactEmail, conversation.name || conversation.displayName);
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+    conversation.sharedConversationKey = lifecycle.sharedConversationKey || conversation.sharedConversationKey || '';
+    conversation.redisConversationKey = lifecycle.redisConversationKey || conversation.redisConversationKey || conversation.sharedConversationKey || '';
+    conversation.redisChatKey = lifecycle.redisChatKey || conversation.redisChatKey || conversation.redisConversationKey || '';
+    conversation.participantCount = Number(lifecycle.participantCount || conversation.participantCount || 1) || 1;
+    conversation.reuseExistingRedisChat = coerceFirstBooleanFlag([conversation.reuseExistingRedisChat], true);
+    conversation.deleteFinalOnlyWhenAllParticipantsDeleted = coerceFirstBooleanFlag([conversation.deleteFinalOnlyWhenAllParticipantsDeleted], true);
+    conversation.metadata = {
+      ...(conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {}),
+      sharedConversationKey: conversation.sharedConversationKey,
+      redisConversationKey: conversation.redisConversationKey,
+      redisChatKey: conversation.redisChatKey,
+      participantCount: conversation.participantCount,
+      reuseExistingRedisChat: conversation.reuseExistingRedisChat,
+      deleteFinalOnlyWhenAllParticipantsDeleted: conversation.deleteFinalOnlyWhenAllParticipantsDeleted
+    };
     conversation.messagesHydrated = Boolean(conversation.messagesHydrated);
     conversation.messagesHistoryCursor = conversation.messagesHistoryCursor || '';
     conversation.messagesHistoryLastErrorAt = conversation.messagesHistoryLastErrorAt || '';
@@ -7537,7 +8530,8 @@ function renderConversation() {
     conversationMenuButton.setAttribute('aria-label', `Abrir opciones de conversación con ${conversation.name}`);
     conversationMenuButton.title = 'Opciones de conversación';
   }
-  setComposerEnabled(!conversation.archived && !conversation.blocked);
+  // Un chat archivado sigue siendo abrible y operable; archivado solo controla su visibilidad en la lista principal.
+  setComposerEnabled(!conversation.blocked);
   ensureStremeConversationSubscription(conversation.id);
 
   messagesContainer.innerHTML = '';
@@ -7549,13 +8543,14 @@ function renderConversation() {
   hydrateConversationMessages(conversation.id);
 }
 
-function shouldHydrateConversationMessages(conversation) {
+function shouldHydrateConversationMessages(conversation, options = {}) {
   if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail() || !conversation?.id) return false;
-  if (conversation.messagesHydrated) return false;
+  const forceHydration = Boolean(options.force);
+  if (conversation.messagesHydrated && !forceHydration) return false;
   if (messageHistoryHydration.inFlight.has(conversation.id)) return false;
 
   const lastErrorAt = conversation.messagesHistoryLastErrorAt ? Date.parse(conversation.messagesHistoryLastErrorAt) : 0;
-  if (lastErrorAt && Date.now() - lastErrorAt < messageHistoryHydration.retryAfterMs) return false;
+  if (!forceHydration && lastErrorAt && Date.now() - lastErrorAt < messageHistoryHydration.retryAfterMs) return false;
 
   return true;
 }
@@ -7572,12 +8567,13 @@ function syncIncomingReceiptsForVisibleConversation(conversation = {}, options =
   }
 }
 
-async function hydrateConversationMessages(conversationId) {
+async function hydrateConversationMessages(conversationId, options = {}) {
   const sessionGuard = captureSessionGuard();
   const conversation = appState.conversations.find((item) => item.id === conversationId);
-  if (!shouldHydrateConversationMessages(conversation)) return;
+  if (!shouldHydrateConversationMessages(conversation, options)) return;
 
-  messageHistoryHydration.inFlight.add(conversation.id);
+  const hydrationKey = String(conversation.id || conversationId || '');
+  messageHistoryHydration.inFlight.add(hydrationKey);
   const previousStatus = conversation.status;
   if (activeConversationId === conversation.id && activeSection === 'chats') {
     activeStatus.textContent = 'Cargando historial...';
@@ -7586,7 +8582,8 @@ async function hydrateConversationMessages(conversationId) {
   try {
     const payload = await apiClient.getMessages(conversation.id, {
       limit: 50,
-      before: conversation.messagesHistoryCursor || ''
+      before: conversation.messagesHistoryCursor || '',
+      conversation
     });
 
     if (!isSessionGuardCurrent(sessionGuard)) return;
@@ -7624,8 +8621,27 @@ async function hydrateConversationMessages(conversationId) {
       }
     }
   } finally {
-    messageHistoryHydration.inFlight.delete(conversation.id);
+    messageHistoryHydration.inFlight.delete(hydrationKey);
+    if (conversation.id && conversation.id !== hydrationKey) {
+      messageHistoryHydration.inFlight.delete(conversation.id);
+    }
   }
+}
+
+async function forceHydrateConversationHistory(conversationOrId, options = {}) {
+  if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail()) return;
+  const conversationId = typeof conversationOrId === 'object'
+    ? String(conversationOrId?.id || '')
+    : String(conversationOrId || '');
+  const conversation = appState.conversations.find((item) => String(item.id || '') === conversationId);
+  if (!conversation) return;
+
+  conversation.messagesHydrated = false;
+  conversation.messagesHistoryLastErrorAt = options.clearLastError === false
+    ? conversation.messagesHistoryLastErrorAt
+    : '';
+  persistState();
+  await hydrateConversationMessages(conversation.id, { force: true });
 }
 
 function createMessageElement(message) {
@@ -7907,7 +8923,13 @@ function getConversationRealtimeChannels(conversation = {}, options = {}) {
     if (cleanChannel && !channels.includes(cleanChannel)) channels.push(cleanChannel);
   };
 
-  if (options.includeConversation !== false) pushChannel(getConversationStremeChannel(conversation.id));
+  if (options.includeConversation !== false) {
+    pushChannel(getConversationStremeChannel(conversation.id));
+    const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+    if (lifecycle.redisConversationKey && lifecycle.redisConversationKey !== conversation.id) {
+      pushChannel(getConversationStremeChannel(lifecycle.redisConversationKey));
+    }
+  }
   if (options.includeSelf !== false) pushChannel(getCurrentUserStremeInboxChannel());
   if (options.includeRemote !== false) {
     getConversationRemoteIdentities(conversation).forEach((identity) => {
@@ -8087,9 +9109,35 @@ function sendReadReceiptsForConversation(conversation = {}, options = {}) {
 }
 
 function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
-  const conversationId = String(data.chatId || data.conversationId || message.chatId || message.conversationId || '').trim();
-  let conversation = appState.conversations.find((item) => String(item.id || '') === conversationId);
+  const rawConversation = getRealtimeRecord(data, ['conversation', 'chat']);
+  const rawMetadata = rawConversation.metadata && typeof rawConversation.metadata === 'object' ? rawConversation.metadata : {};
+  const messageMetadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  const conversationId = String(
+    data.chatId
+      || data.conversationId
+      || rawConversation.chatId
+      || rawConversation.conversationId
+      || rawConversation.id
+      || message.chatId
+      || message.conversationId
+      || ''
+  ).trim();
+  let conversation = appState.conversations.find((item) => conversationId && String(item.id || '') === conversationId);
   if (conversation) return conversation;
+
+  const incomingSharedKey = getConversationSharedMergeKey({
+    ...rawConversation,
+    ...data,
+    ...message,
+    metadata: { ...rawMetadata, ...messageMetadata, ...(data.metadata && typeof data.metadata === 'object' ? data.metadata : {}) }
+  });
+  if (incomingSharedKey) {
+    conversation = appState.conversations.find((item) => getConversationSharedMergeKey(item) === incomingSharedKey);
+    if (conversation) {
+      if (conversationId && conversation.id !== conversationId) applyRemoteConversationId(conversation.id, conversationId);
+      return conversation;
+    }
+  }
 
   const normalizedMessage = normalizeMessageFromApi({ ...message, chatId: conversationId, conversationId });
   const remoteEmail = normalizedMessage.type === 'incoming'
@@ -8107,11 +9155,30 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
     return conversation;
   }
 
-  if (!conversationId && !remoteEmail && !remoteUserId) return null;
+  if (!conversationId && !remoteEmail && !remoteUserId && !incomingSharedKey) return null;
 
-  const displayName = normalizedMessage.senderName || data.senderName || data.displayName || remoteEmail || 'Contacto';
+  const displayName = normalizedMessage.senderName || data.senderName || data.displayName || rawConversation.displayName || rawConversation.name || remoteEmail || 'Contacto';
+  const participants = ensureCurrentUserInLifecycleParticipants(normalizeConversationParticipantsForApi(
+    rawConversation.participants
+      || rawConversation.participantList
+      || rawConversation.members
+      || data.participants
+      || data.participantList
+      || data.members
+      || message.participants
+      || messageMetadata.participants
+      || [],
+    remoteEmail,
+    displayName
+  ));
+  const lifecycle = buildSharedConversationLifecycleMetadata(participants, {
+    type: rawConversation.type || rawConversation.conversationType || data.type || data.conversationType || 'direct',
+    participantCount: rawConversation.participantCount || data.participantCount || participants.length,
+    sharedConversationKey: incomingSharedKey
+  });
+
   conversation = {
-    id: conversationId || `chat-${remoteEmail || remoteUserId || Date.now()}`,
+    id: conversationId || (lifecycle.sharedConversationKey ? `chat-${hashStableText(lifecycle.sharedConversationKey)}` : `chat-${remoteEmail || remoteUserId || Date.now()}`),
     name: displayName,
     email: remoteEmail,
     contactEmail: remoteEmail,
@@ -8129,10 +9196,17 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
     lastReadAt: '',
     readSyncedAt: '',
     lastReadSyncStatus: 'local',
-    participants: [
-      { email: getSessionEmail(), userId: getSessionUserId() || getCurrentUserIdentifier(), role: 'owner', displayName: getSessionEmail() },
-      { email: remoteEmail, userId: remoteUserId, role: 'contact', displayName }
-    ].filter((participant) => participant.email || participant.userId)
+    participants,
+    sharedConversationKey: lifecycle.sharedConversationKey,
+    redisConversationKey: lifecycle.redisConversationKey,
+    redisChatKey: lifecycle.redisChatKey,
+    participantCount: lifecycle.participantCount,
+    reuseExistingRedisChat: true,
+    deleteFinalOnlyWhenAllParticipantsDeleted: true,
+    metadata: {
+      ...rawMetadata,
+      ...lifecycle
+    }
   };
   appState.conversations.unshift(conversation);
 
@@ -9331,6 +10405,97 @@ async function setConversationPinned(conversation, pinned) {
   }
 }
 
+
+function buildConversationArchivePatch(archived, archiveChangedAt = new Date().toISOString(), clientMutationId = generateClientMutationId()) {
+  const actor = getCurrentParticipantLifecycleIdentity();
+  const nextArchived = Boolean(archived);
+  return {
+    archived: nextArchived,
+    archivedForCurrentUser: nextArchived,
+    isArchivedForCurrentUser: nextArchived,
+    archivedForMe: nextArchived,
+    archiveChangedAt,
+    [nextArchived ? 'archivedAt' : 'restoredAt']: archiveChangedAt,
+    archiveVisibilityScope: 'actor_only',
+    visibilityScope: 'actor_only',
+    actorUserId: actor.userId,
+    actorUserEmail: actor.userEmail,
+    actorIdentityKey: normalizeLifecycleIdentityKeyFromValue(actor),
+    restoreMustNotRearchiveAutomatically: !nextArchived,
+    archiveFinalOnlyByManualAction: true,
+    clientMutationId
+  };
+}
+
+function applyLocalConversationArchiveState(conversation = {}, archived = false, options = {}) {
+  if (!conversation) return;
+  const archiveChangedAt = options.archiveChangedAt || options.changedAt || new Date().toISOString();
+  const clientMutationId = options.clientMutationId || generateClientMutationId();
+
+  conversation.archived = Boolean(archived);
+  conversation.archiveSyncStatus = options.syncStatus || (CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local');
+  conversation.archiveChangedAt = archiveChangedAt;
+  conversation.archiveClientMutationId = clientMutationId;
+  conversation.archiveLocalMutationId = clientMutationId;
+  conversation.archiveLocalChangedAt = archiveChangedAt;
+  conversation.archiveDesiredArchived = Boolean(archived);
+  conversation.status = options.status || (archived ? 'Archivado' : 'Restaurado');
+}
+
+function snapshotConversationArchiveState(conversation = {}) {
+  return {
+    archived: Boolean(conversation.archived),
+    archiveSyncStatus: conversation.archiveSyncStatus || '',
+    archiveChangedAt: conversation.archiveChangedAt || '',
+    archiveClientMutationId: conversation.archiveClientMutationId || '',
+    archiveLocalMutationId: conversation.archiveLocalMutationId || '',
+    archiveLocalChangedAt: conversation.archiveLocalChangedAt || '',
+    archiveDesiredArchived: Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')
+      ? Boolean(conversation.archiveDesiredArchived)
+      : undefined,
+    status: conversation.status || ''
+  };
+}
+
+function restoreConversationArchiveSnapshot(conversation = {}, snapshot = {}) {
+  if (!conversation || !snapshot) return;
+  conversation.archived = Boolean(snapshot.archived);
+  conversation.archiveSyncStatus = snapshot.archiveSyncStatus || '';
+  conversation.archiveChangedAt = snapshot.archiveChangedAt || '';
+  conversation.archiveClientMutationId = snapshot.archiveClientMutationId || '';
+  conversation.archiveLocalMutationId = snapshot.archiveLocalMutationId || '';
+  conversation.archiveLocalChangedAt = snapshot.archiveLocalChangedAt || '';
+  if (snapshot.archiveDesiredArchived === undefined) {
+    delete conversation.archiveDesiredArchived;
+  } else {
+    conversation.archiveDesiredArchived = Boolean(snapshot.archiveDesiredArchived);
+  }
+  conversation.status = snapshot.status || conversation.status || '';
+}
+
+async function syncConversationArchiveState(conversation = {}, patch = {}, sessionGuard = captureSessionGuard()) {
+  if (!conversation || !CHATER_CONFIG.backendBaseUrl) return;
+
+  try {
+    await apiClient.updateConversation(conversation.id, patch);
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    markQueuedConversationPatchSynced(conversation.id, patch);
+  } catch (error) {
+    if (!isSessionGuardCurrent(sessionGuard)) return;
+    const expectedArchived = Boolean(patch.archived);
+    const stillSameArchiveState = Boolean(conversation.archived) === expectedArchived;
+    conversation.archiveSyncStatus = stillSameArchiveState ? 'pending' : conversation.archiveSyncStatus;
+    enqueueBackendOperation({
+      type: 'updateConversation',
+      dedupeKey: getConversationArchiveOutboxKey(conversation.id),
+      replaceExisting: true,
+      payload: { conversationId: conversation.id, patch }
+    });
+    persistState();
+    renderCurrentSection();
+  }
+}
+
 async function toggleActiveConversationArchive() {
   const conversation = getActiveConversation();
   if (!conversation) return;
@@ -9343,15 +10508,15 @@ async function setConversationArchived(conversation, archived, options = {}) {
   const sessionGuard = captureSessionGuard();
   const clientMutationId = generateClientMutationId();
   const archiveChangedAt = new Date().toISOString();
-  const previousArchived = Boolean(conversation.archived);
-  conversation.archived = Boolean(archived);
-  conversation.archiveSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local';
-  conversation.archiveChangedAt = archiveChangedAt;
-  conversation.archiveClientMutationId = clientMutationId;
-  conversation.archiveLocalMutationId = clientMutationId;
-  conversation.archiveLocalChangedAt = archiveChangedAt;
-  conversation.archiveDesiredArchived = Boolean(archived);
-  conversation.status = archived ? 'Archivado' : 'Restaurado';
+  const previousArchiveState = snapshotConversationArchiveState(conversation);
+  const patch = buildConversationArchivePatch(archived, archiveChangedAt, clientMutationId);
+
+  applyLocalConversationArchiveState(conversation, archived, {
+    archiveChangedAt,
+    clientMutationId,
+    syncStatus: CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local',
+    status: archived ? 'Archivado' : 'Restaurado'
+  });
   removeQueuedArchiveOperationsForConversation(conversation.id, sessionGuard.email);
 
   if (archived && activeConversationId === conversation.id && !options.keepActive) {
@@ -9361,16 +10526,10 @@ async function setConversationArchived(conversation, archived, options = {}) {
 
   persistState();
   renderCurrentSection();
-  showToast(archived ? 'Chat archivado.' : 'Chat restaurado.');
+  if (!options.silent) showToast(archived ? 'Chat archivado.' : 'Chat restaurado.');
 
   if (!CHATER_CONFIG.backendBaseUrl) return;
 
-  const patch = {
-    archived: Boolean(archived),
-    archiveChangedAt,
-    [archived ? 'archivedAt' : 'restoredAt']: archiveChangedAt,
-    clientMutationId
-  };
   try {
     await apiClient.updateConversation(conversation.id, patch);
     if (!isSessionGuardCurrent(sessionGuard)) return;
@@ -9379,7 +10538,7 @@ async function setConversationArchived(conversation, archived, options = {}) {
     if (!isSessionGuardCurrent(sessionGuard)) return;
     const stillSameArchiveState = Boolean(conversation.archived) === Boolean(archived);
     conversation.archiveSyncStatus = stillSameArchiveState ? 'pending' : conversation.archiveSyncStatus;
-    if (!stillSameArchiveState) conversation.archived = previousArchived;
+    if (!stillSameArchiveState) restoreConversationArchiveSnapshot(conversation, previousArchiveState);
     enqueueBackendOperation({
       type: 'updateConversation',
       dedupeKey: getConversationArchiveOutboxKey(conversation.id),
@@ -10046,8 +11205,13 @@ async function createConversationShortcut(conversation) {
 function markChatActionSynced(conversationId = '', actionType = '') {
   const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || ''));
   if (!conversation) return;
+  const syncedAt = new Date().toISOString();
   conversation.actionSyncStatus = `synced:${actionType}`;
-  conversation.actionSyncedAt = new Date().toISOString();
+  conversation.actionSyncedAt = syncedAt;
+  if (actionType === 'delete_conversation' || actionType === 'restore_conversation') {
+    conversation.deleteSyncStatus = `synced:${actionType}`;
+    conversation.deleteSyncedAt = syncedAt;
+  }
   persistState();
 }
 
@@ -10058,6 +11222,9 @@ async function syncChatActionWithBackend(conversation, actionType = '', payload 
     markChatActionSynced(conversation.id, actionType);
   } catch (error) {
     conversation.actionSyncStatus = `pending:${actionType}`;
+    if (actionType === 'delete_conversation' || actionType === 'restore_conversation') {
+      conversation.deleteSyncStatus = `pending:${actionType}`;
+    }
     enqueueBackendOperation({
       type: 'syncChatAction',
       dedupeKey: `chat-action:${actionType}:${conversation.id}:${clientMutationId}`,
@@ -10094,9 +11261,63 @@ async function deleteSelectedConversations(conversations = []) {
   const label = selected.length === 1 ? 'este chat' : `${selected.length} chats`;
   if (!window.confirm(`¿Eliminar ${label} de la lista? La copia local se ocultará y la acción quedará auditada para memoriaBACKEND.`)) return;
 
+  const sessionGuard = captureSessionGuard();
   await applyToConversationsSequentially(selected, async (conversation) => {
     const clientMutationId = generateClientMutationId();
+    const deletedAt = new Date().toISOString();
+    const deletionLifecycle = buildConversationParticipantDeletionPayload(conversation, {
+      deletedAt,
+      clientMutationId
+    });
+    // Limpieza defensiva: aunque el estado local no marque bloqueo, la relación o
+    // memoriaBACKEND pueden conservar un bloqueo previo. Eliminar un chat/contacto
+    // siempre debe dejar el vínculo recreable y sin bloqueo residual.
+    const wasBlocked = coerceFirstBooleanFlag([
+      conversation.blocked,
+      conversation.isBlocked,
+      conversation.blockDesiredBlocked,
+      conversation.metadata?.blocked,
+      conversation.metadata?.isBlocked
+    ], false);
+    const unblockPayload = buildConversationBlockPayload(conversation, false, {
+      clientMutationId: `${clientMutationId}:unblock`,
+      reason: 'chat-deleted-cleanup'
+    });
+
+    removeQueuedLifecycleOperationsForConversation(conversation, sessionGuard.email);
+    removeQueuedArchiveOperationsForConversation(conversation.id, sessionGuard.email);
+    clearConversationBlockState(conversation, {
+      syncStatus: wasBlocked && CHATER_CONFIG.backendBaseUrl ? 'syncing:delete_cleanup' : '',
+      syncedAt: wasBlocked && !CHATER_CONFIG.backendBaseUrl ? deletedAt : '',
+      changedAt: deletedAt,
+      clientMutationId: `${clientMutationId}:unblock`
+    });
+    applyLocalConversationArchiveState(conversation, false, {
+      archiveChangedAt: deletedAt,
+      clientMutationId: `${clientMutationId}:archive-cleanup`,
+      syncStatus: CHATER_CONFIG.backendBaseUrl ? 'pending:delete_cleanup' : 'local:delete_cleanup',
+      status: 'Chat eliminado localmente'
+    });
     conversation.deleted = true;
+    conversation.deletedForCurrentUser = true;
+    conversation.isDeletedForCurrentUser = true;
+    conversation.hiddenForCurrentUser = true;
+    conversation.localDeletionRegistry = deletionLifecycle;
+    conversation.deletionRegistry = deletionLifecycle.deletionRegistry || conversation.deletionRegistry || null;
+    conversation.participantDeletionRegistry = deletionLifecycle.participantDeletionRegistry || conversation.participantDeletionRegistry || null;
+    conversation.deletedParticipants = deletionLifecycle.deletedParticipants || conversation.deletedParticipants || [];
+    conversation.deletedParticipantIdentityKeys = deletionLifecycle.deletedParticipantIdentityKeys || conversation.deletedParticipantIdentityKeys || [];
+    conversation.participantCount = deletionLifecycle.participantCount || conversation.participantCount || 1;
+    conversation.deletionCounterInitial = deletionLifecycle.deletionCounterInitial || conversation.deletionCounterInitial || conversation.participantCount;
+    conversation.deletionCounterRemaining = deletionLifecycle.deletionCounterRemaining;
+    conversation.remainingParticipantCount = deletionLifecycle.remainingParticipantCount;
+    conversation.deletedAt = deletedAt;
+    conversation.deleteDesiredDeleted = true;
+    conversation.deleteChangedAt = deletedAt;
+    conversation.deleteLocalChangedAt = deletedAt;
+    conversation.deleteClientMutationId = clientMutationId;
+    conversation.deleteLocalMutationId = clientMutationId;
+    conversation.deleteSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing:delete_conversation' : 'local:delete_conversation';
     conversation.actionSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing:delete_conversation' : 'local:delete_conversation';
     conversation.status = 'Chat eliminado localmente';
     if (activeConversationId === conversation.id) {
@@ -10104,7 +11325,28 @@ async function deleteSelectedConversations(conversations = []) {
       chatView.classList.remove('chat-open');
     }
     persistState();
-    await syncChatActionWithBackend(conversation, 'delete_conversation', { deletedAt: new Date().toISOString() }, clientMutationId);
+
+    await syncConversationUnblockCleanup(conversation, unblockPayload, sessionGuard);
+    await syncChatActionWithBackend(conversation, 'delete_conversation', {
+      deletedAt,
+      ...deletionLifecycle,
+      cleanup: {
+        archived: false,
+        blocked: false,
+        deletedForCurrentUser: true,
+        relationStatus: 'deleted',
+        reason: 'delete-hides-only-for-actor'
+      }
+    }, clientMutationId);
+    await syncContactRelation({
+      ...conversation,
+      email: conversation.email || conversation.contactEmail || '',
+      contactEmail: conversation.email || conversation.contactEmail || '',
+      blocked: false,
+      status: 'deleted',
+      reason: 'chat-delete-cleanup',
+      relationClientMutationId: `${clientMutationId}:relation-delete-cleanup`
+    }, { enqueueOnFailure: true });
   });
 
   closeChatSelectionMode();
@@ -10139,11 +11381,16 @@ function findConversationByContactIdentity(contact = {}) {
 
   const selfEmail = normalizeStorageIdentity(getSessionEmail());
   const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const candidateParticipants = buildConversationCreateParticipants(normalizedContact);
+  const candidateLifecycle = buildSharedConversationLifecycleMetadata(candidateParticipants, { type: 'direct' });
+  const candidateSharedKey = candidateLifecycle.sharedConversationKey || '';
 
   return appState.conversations.find((conversation) => {
     const directEmail = normalizeStorageIdentity(conversation.email || conversation.contactEmail || conversation.userEmail || '');
     const directUserId = normalizeBackendUserId(conversation.contactUserId || conversation.remoteUserId || conversation.otherUserId || conversation.participantUserId || '');
+    const conversationSharedKey = getConversationSharedMergeKey(conversation);
 
+    if (candidateSharedKey && conversationSharedKey && candidateSharedKey === conversationSharedKey) return true;
     if (normalizedEmail && directEmail === normalizedEmail) return true;
     if (normalizedUserId && directUserId === normalizedUserId) return true;
 
@@ -10169,8 +11416,14 @@ function createLocalContactConversation(contact = {}) {
   const existingConversation = findConversationByContactIdentity(normalizedContact);
   if (existingConversation) return existingConversation;
 
+  const participants = normalizeConversationParticipantsForApi([
+    { email: getSessionEmail(), userId: getSessionUserId() || getCurrentUserIdentifier(), role: 'owner', displayName: getSessionEmail() },
+    { email: normalizedContact.email, userId: normalizedContact.userId || '', role: 'contact', displayName: normalizedContact.name }
+  ], normalizedContact.email, normalizedContact.name);
+  const lifecycle = buildSharedConversationLifecycleMetadata(participants, { type: 'direct' });
+
   const conversation = {
-    id: `chat-${normalizedContact.email || Date.now()}`,
+    id: buildLocalConversationIdForContact(normalizedContact),
     name: normalizedContact.name,
     email: normalizedContact.email,
     contactEmail: normalizedContact.email,
@@ -10180,6 +11433,7 @@ function createLocalContactConversation(contact = {}) {
     status: normalizedContact.source === 'profile-qr' ? 'Contacto creado desde QR' : 'Nuevo contacto',
     section: 'chats',
     archived: false,
+    blocked: false,
     unread: 0,
     messages: [{
       id: generateClientMutationId(),
@@ -10189,16 +11443,26 @@ function createLocalContactConversation(contact = {}) {
         : `Contacto creado con ${normalizedContact.email}.`,
       time: getCurrentTime()
     }],
-    messagesHydrated: true,
+    // Con backend activo se fuerza la lectura del historial remoto: si el chat ya existía
+    // en Redis por la clave compartida, debe cargar ese mismo hilo y no quedarse solo
+    // con el mensaje local de creación.
+    messagesHydrated: !CHATER_CONFIG.backendBaseUrl,
     messagesHistoryCursor: '',
     messagesHistoryLastErrorAt: '',
+    sharedConversationKey: lifecycle.sharedConversationKey,
+    redisConversationKey: lifecycle.redisConversationKey,
+    redisChatKey: lifecycle.redisChatKey,
+    participantCount: lifecycle.participantCount,
+    reuseExistingRedisChat: true,
+    deleteFinalOnlyWhenAllParticipantsDeleted: true,
+    metadata: {
+      source: 'chater-static-site',
+      ...lifecycle
+    },
     lastReadAt: new Date().toISOString(),
     readSyncedAt: '',
     lastReadSyncStatus: 'local',
-    participants: normalizeConversationParticipantsForApi([
-      { email: getSessionEmail(), userId: getSessionUserId() || getCurrentUserIdentifier(), role: 'owner', displayName: getSessionEmail() },
-      { email: normalizedContact.email, userId: normalizedContact.userId || '', role: 'contact', displayName: normalizedContact.name }
-    ], normalizedContact.email, normalizedContact.name),
+    participants,
     contactSyncStatus: CHATER_CONFIG.backendBaseUrl ? 'pending' : 'local'
   };
 
@@ -10253,6 +11517,7 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
           source: normalizedContact.source,
           clientMutationId: createConversationMutationId
         }, { enqueueOnFailure: true });
+        await forceHydrateConversationHistory(remoteConversationId || syncedConversation.id, { reason: 'redis-chat-reused-after-contact-create' });
       }
     } catch (error) {
       if (!isSessionGuardCurrent(sessionGuard)) return;
@@ -10303,11 +11568,64 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
 
 async function restoreDeletedContactConversation(conversation, normalizedContact = {}, options = {}) {
   if (!conversation?.deleted) return;
+  const sessionGuard = captureSessionGuard();
   const restoredAt = new Date().toISOString();
   const clientMutationId = generateClientMutationId();
+  const archiveMutationId = `${clientMutationId}:archive`;
+  // Restaurar/recrear un contacto también debe revocar cualquier bloqueo residual
+  // remoto aunque la copia local ya parezca limpia.
+  const wasBlocked = coerceFirstBooleanFlag([
+    conversation.blocked,
+    conversation.isBlocked,
+    conversation.blockDesiredBlocked,
+    conversation.metadata?.blocked,
+    conversation.metadata?.isBlocked
+  ], false);
+  const unblockPayload = buildConversationBlockPayload(conversation, false, {
+    clientMutationId: `${clientMutationId}:unblock`,
+    reason: 'contact-restore-cleanup'
+  });
+  const restoreStatus = normalizedContact.source === 'profile-qr' ? 'Chat restaurado desde QR' : 'Chat restaurado por contacto existente';
+  const restoreLifecycle = buildConversationParticipantRestorePayload(conversation, {
+    restoredAt,
+    clientMutationId
+  });
+
+  removeQueuedLifecycleOperationsForConversation(conversation, sessionGuard.email);
+  removeQueuedArchiveOperationsForConversation(conversation.id, sessionGuard.email);
+  clearConversationBlockState(conversation, {
+    syncStatus: wasBlocked && CHATER_CONFIG.backendBaseUrl ? 'syncing:restore_cleanup' : '',
+    syncedAt: wasBlocked && !CHATER_CONFIG.backendBaseUrl ? restoredAt : '',
+    changedAt: restoredAt,
+    clientMutationId: `${clientMutationId}:unblock`
+  });
+  applyLocalConversationArchiveState(conversation, false, {
+    archiveChangedAt: restoredAt,
+    clientMutationId: archiveMutationId,
+    syncStatus: CHATER_CONFIG.backendBaseUrl ? 'syncing' : 'local',
+    status: restoreStatus
+  });
   conversation.deleted = false;
-  conversation.archived = false;
-  conversation.status = normalizedContact.source === 'profile-qr' ? 'Chat restaurado desde QR' : 'Chat restaurado por contacto existente';
+  conversation.deletedForCurrentUser = false;
+  conversation.isDeletedForCurrentUser = false;
+  conversation.hiddenForCurrentUser = false;
+  conversation.deletedAt = '';
+  conversation.localDeletionRegistry = null;
+  conversation.deletionRegistry = stripCurrentParticipantFromDeletionSource(conversation.deletionRegistry || null);
+  conversation.participantDeletionRegistry = stripCurrentParticipantFromDeletionSource(conversation.participantDeletionRegistry || null);
+  conversation.deletedParticipants = stripCurrentParticipantFromDeletionSource(conversation.deletedParticipants || []);
+  conversation.deletedParticipantIdentityKeys = stripCurrentParticipantFromDeletionSource(conversation.deletedParticipantIdentityKeys || []);
+  conversation.participantCount = restoreLifecycle.participantCount || conversation.participantCount || 1;
+  conversation.deletionCounterInitial = restoreLifecycle.deletionCounterInitial || conversation.deletionCounterInitial || conversation.participantCount;
+  conversation.deletionCounterRemaining = restoreLifecycle.deletionCounterRemaining;
+  conversation.remainingParticipantCount = restoreLifecycle.remainingParticipantCount;
+  conversation.deleteDesiredDeleted = false;
+  conversation.deleteChangedAt = restoredAt;
+  conversation.deleteLocalChangedAt = restoredAt;
+  conversation.deleteClientMutationId = clientMutationId;
+  conversation.deleteLocalMutationId = clientMutationId;
+  conversation.deleteSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing:restore_conversation' : 'local:restore_conversation';
+  conversation.status = restoreStatus;
   conversation.actionSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'syncing:restore_conversation' : 'local:restore_conversation';
   conversation.restoredAt = restoredAt;
 
@@ -10323,13 +11641,39 @@ async function restoreDeletedContactConversation(conversation, normalizedContact
   }
 
   persistState();
+
+  const archivePatch = buildConversationArchivePatch(false, restoredAt, archiveMutationId);
+  await syncConversationArchiveState(conversation, archivePatch, sessionGuard);
+  await syncConversationUnblockCleanup(conversation, unblockPayload, sessionGuard, { status: 'restore_cleanup' });
+  await syncContactRelation({
+    ...conversation,
+    email: normalizedContact.email || conversation.email || conversation.contactEmail || '',
+    contactEmail: normalizedContact.email || conversation.email || conversation.contactEmail || '',
+    userId: normalizedContact.userId || conversation.contactUserId || '',
+    blocked: false,
+    status: 'active',
+    reason: 'contact-restore-cleanup',
+    relationClientMutationId: `${clientMutationId}:relation`
+  }, { enqueueOnFailure: true });
   await syncChatActionWithBackend(conversation, 'restore_conversation', {
     restoredAt,
+    ...restoreLifecycle,
     reason: options.reason || 'contact-open',
     source: normalizedContact.source || options.source || 'contact-open',
     contactEmail: normalizedContact.email || conversation.email || conversation.contactEmail || '',
-    contactUserId: normalizedContact.userId || conversation.contactUserId || ''
+    contactUserId: normalizedContact.userId || conversation.contactUserId || '',
+    cleanup: {
+      archived: false,
+      blocked: false,
+      deletedForCurrentUser: false,
+      isDeletedForCurrentUser: false,
+      hiddenForCurrentUser: false,
+      localDeletionRegistry: null,
+      removeActorFromDeletionRegistry: true,
+      reason: 'restore-allows-clean-recreate'
+    }
   }, clientMutationId);
+  await forceHydrateConversationHistory(conversation.id, { reason: 'redis-chat-reused-after-contact-restore' });
 }
 
 async function openOrCreateContactConversation(contact = {}, options = {}) {
@@ -10348,9 +11692,6 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
     if (normalizedContact.name && normalizedContact.name !== 'Contacto' && !existingConversation.name) {
       existingConversation.name = normalizedContact.name;
     }
-    if (existingConversation.archived) {
-      await setConversationArchived(existingConversation, false, { keepActive: true });
-    }
   }
 
   activeConversationId = conversation.id;
@@ -10366,7 +11707,9 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
     await syncNewContactConversation(conversation, normalizedContact, sessionGuard);
     showToast(`Contacto creado y chat abierto con ${normalizedContact.email}.`);
   } else {
-    showToast(`Chat abierto con ${normalizedContact.email}.`);
+    showToast(existingConversation.archived
+      ? `Chat archivado abierto con ${normalizedContact.email}.`
+      : `Chat abierto con ${normalizedContact.email}.`);
   }
 
   return conversation;
@@ -14141,39 +15484,40 @@ function openCallKeypadModal() {
 
 function getOrCreateConversationByEmail(email) {
   const normalizedEmail = normalizeStorageIdentity(email);
-  const existingConversation = appState.conversations.find((conversation) => normalizeStorageIdentity(conversation.email || conversation.contactEmail || '') === normalizedEmail);
+  const existingConversation = findConversationByContactIdentity({ email: normalizedEmail });
   if (existingConversation) return existingConversation;
 
   const displayName = normalizedEmail.split('@')[0] || 'Contacto';
-  const conversation = {
-    id: `chat-${normalizedEmail}`,
+  const conversation = createLocalContactConversation({
     name: displayName,
     email: normalizedEmail,
-    avatar: getInitials(displayName),
-    avatarImage: '',
-    status: 'Creado desde teclado de llamadas',
-    section: 'chats',
-    unread: 0,
-    messages: []
-  };
-
-  appState.conversations.unshift(conversation);
+    source: 'call-keypad'
+  });
+  conversation.status = 'Creado desde teclado de llamadas';
+  conversation.contactSyncStatus = CHATER_CONFIG.backendBaseUrl ? 'pending' : 'local';
   persistState();
 
   if (CHATER_CONFIG.backendBaseUrl) {
     const createConversationMutationId = generateClientMutationId();
     enqueueBackendOperation({
       type: 'createConversation',
-      dedupeKey: `conversation:${normalizedEmail}`,
+      dedupeKey: `conversation:${conversation.id}`,
+      replaceExisting: true,
       payload: {
         localConversationId: conversation.id,
-        contact: { name: displayName, email: normalizedEmail, clientMutationId: createConversationMutationId }
+        contact: {
+          name: displayName,
+          email: normalizedEmail,
+          source: 'call-keypad',
+          clientMutationId: createConversationMutationId
+        }
       }
     });
   }
 
   return conversation;
 }
+
 
 async function scheduleCallForConversation(conversation, type, scheduledAt) {
   const sessionGuard = captureSessionGuard();
@@ -14476,6 +15820,7 @@ async function syncRealtimeConversationInboxFromBackend(options = {}) {
     const remoteConversations = extractArrayFromPayload(payload, ['chats', 'conversations', 'items']).map(normalizeConversationFromApi);
     if (!remoteConversations.length) return;
 
+    remoteConversations.forEach(reconcileRemoteConversationIdentityBySharedKey);
     appState.conversations = mergeConversationsById(remoteConversations, appState.conversations);
     if (!appState.conversations.some((conversation) => conversation.id === activeConversationId)) {
       activeConversationId = getFirstVisibleConversationId(activeConversationId) || getVisibleConversations()[0]?.id || null;
@@ -14524,6 +15869,243 @@ function mergeById(primaryItems, secondaryItems) {
     });
 }
 
+
+function isDeleteSyncStatusPending(status = '') {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  return normalizedStatus === 'syncing'
+    || normalizedStatus === 'pending'
+    || normalizedStatus.startsWith('syncing:')
+    || normalizedStatus.startsWith('pending:');
+}
+
+function getDeleteDesiredDeletedState(conversation = {}) {
+  return Object.prototype.hasOwnProperty.call(conversation, 'deleteDesiredDeleted')
+    ? Boolean(conversation.deleteDesiredDeleted)
+    : coerceFirstBooleanFlag([conversation.deleted, conversation.deletedForCurrentUser], false);
+}
+
+function getRemoteDeleteChangedAt(conversation = {}) {
+  return conversation.deleteChangedAt
+    || conversation.deletedAt
+    || conversation.restoredAt
+    || conversation.updatedAt
+    || conversation.modifiedAt
+    || conversation.deleteSyncedAt
+    || '';
+}
+
+function getLocalDeleteChangedAt(conversation = {}) {
+  return conversation.deleteLocalChangedAt
+    || conversation.deleteChangedAt
+    || conversation.deletedAt
+    || conversation.restoredAt
+    || conversation.deleteSyncedAt
+    || conversation.updatedAt
+    || '';
+}
+
+function hasExplicitLocalDeleteDecision(conversation = {}) {
+  return Object.prototype.hasOwnProperty.call(conversation, 'deleteDesiredDeleted')
+    || Boolean(conversation.deleteLocalChangedAt || conversation.deleteLocalMutationId);
+}
+
+function shouldPreserveLocalDeleteState(remoteConversation = {}, localConversation = {}) {
+  const localDeleted = coerceFirstBooleanFlag([localConversation.deleted, localConversation.deletedForCurrentUser], false);
+  const remoteDeleted = coerceFirstBooleanFlag([remoteConversation.deleted, remoteConversation.deletedForCurrentUser], false);
+  if (localDeleted === remoteDeleted) return false;
+
+  if (isDeleteSyncStatusPending(localConversation.deleteSyncStatus || localConversation.actionSyncStatus)) return true;
+  if (!hasExplicitLocalDeleteDecision(localConversation)) return false;
+
+  const localDesiredDeleted = getDeleteDesiredDeletedState(localConversation);
+  const localMutationId = String(localConversation.deleteLocalMutationId || '').trim();
+  const remoteMutationId = String(remoteConversation.deleteClientMutationId || remoteConversation.clientMutationId || '').trim();
+  const remoteConfirmsLocalDesiredState = remoteDeleted === localDesiredDeleted;
+  if (localMutationId && remoteMutationId && localMutationId === remoteMutationId) {
+    return !remoteConfirmsLocalDesiredState;
+  }
+
+  return remoteDeleted !== localDesiredDeleted;
+}
+
+function buildLocalDeleteMergeState(localConversation = {}) {
+  const deleted = coerceFirstBooleanFlag([localConversation.deleted, localConversation.deletedForCurrentUser], false);
+  const deletionRegistry = deleted
+    ? (localConversation.localDeletionRegistry || localConversation.deletionRegistry || null)
+    : stripCurrentParticipantFromDeletionSource(localConversation.deletionRegistry || null);
+  return {
+    deleted,
+    deletedForCurrentUser: deleted,
+    isDeletedForCurrentUser: deleted,
+    hiddenForCurrentUser: deleted,
+    deletedAt: deleted ? (localConversation.deletedAt || localConversation.deleteChangedAt || localConversation.deleteLocalChangedAt || '') : '',
+    localDeletionRegistry: deleted ? deletionRegistry : null,
+    deletionRegistry,
+    participantDeletionRegistry: deleted
+      ? (localConversation.participantDeletionRegistry || deletionRegistry?.participantDeletionRegistry || null)
+      : stripCurrentParticipantFromDeletionSource(localConversation.participantDeletionRegistry || deletionRegistry?.participantDeletionRegistry || null),
+    deletedParticipants: deleted
+      ? (localConversation.deletedParticipants || [])
+      : stripCurrentParticipantFromDeletionSource(localConversation.deletedParticipants || []),
+    deletedParticipantIdentityKeys: deleted
+      ? (localConversation.deletedParticipantIdentityKeys || [])
+      : stripCurrentParticipantFromDeletionSource(localConversation.deletedParticipantIdentityKeys || []),
+    deletionCounterInitial: localConversation.deletionCounterInitial || localConversation.participantCount || '',
+    deletionCounterRemaining: localConversation.deletionCounterRemaining ?? '',
+    remainingParticipantCount: localConversation.remainingParticipantCount ?? localConversation.deletionCounterRemaining ?? '',
+    deleteSyncStatus: localConversation.deleteSyncStatus || localConversation.actionSyncStatus || 'pending',
+    deleteSyncedAt: localConversation.deleteSyncedAt || localConversation.actionSyncedAt || '',
+    deleteChangedAt: localConversation.deleteChangedAt || localConversation.deleteLocalChangedAt || localConversation.deletedAt || localConversation.restoredAt || '',
+    deleteClientMutationId: localConversation.deleteClientMutationId || localConversation.deleteLocalMutationId || '',
+    deleteLocalMutationId: localConversation.deleteLocalMutationId || localConversation.deleteClientMutationId || '',
+    deleteLocalChangedAt: localConversation.deleteLocalChangedAt || localConversation.deleteChangedAt || '',
+    deleteDesiredDeleted: deleted
+  };
+}
+
+function resolveConversationDeleteMergeState(remoteConversation = {}, localConversation = {}) {
+  if (shouldPreserveLocalDeleteState(remoteConversation, localConversation)) {
+    return buildLocalDeleteMergeState(localConversation);
+  }
+
+  const remoteDeleted = coerceFirstBooleanFlag([remoteConversation.deleted, remoteConversation.deletedForCurrentUser], false);
+  const remoteDeleteChangedAt = getRemoteDeleteChangedAt(remoteConversation);
+  const hasLocalDeleteDecision = hasExplicitLocalDeleteDecision(localConversation);
+  const deletionRegistry = remoteDeleted
+    ? (remoteConversation.localDeletionRegistry || remoteConversation.deletionRegistry || localConversation.localDeletionRegistry || localConversation.deletionRegistry || null)
+    : stripCurrentParticipantFromDeletionSource(remoteConversation.deletionRegistry || localConversation.deletionRegistry || null);
+  const participantDeletionRegistry = remoteDeleted
+    ? (remoteConversation.participantDeletionRegistry || deletionRegistry?.participantDeletionRegistry || localConversation.participantDeletionRegistry || null)
+    : stripCurrentParticipantFromDeletionSource(remoteConversation.participantDeletionRegistry || deletionRegistry?.participantDeletionRegistry || localConversation.participantDeletionRegistry || null);
+
+  return {
+    deleted: remoteDeleted,
+    deletedForCurrentUser: remoteDeleted,
+    isDeletedForCurrentUser: remoteDeleted,
+    hiddenForCurrentUser: remoteDeleted,
+    deletedAt: remoteDeleted ? (remoteConversation.deletedAt || remoteDeleteChangedAt || '') : '',
+    localDeletionRegistry: remoteDeleted ? (remoteConversation.localDeletionRegistry || localConversation.localDeletionRegistry || null) : null,
+    deletionRegistry,
+    participantDeletionRegistry,
+    deletedParticipants: remoteDeleted
+      ? (remoteConversation.deletedParticipants || localConversation.deletedParticipants || [])
+      : stripCurrentParticipantFromDeletionSource(remoteConversation.deletedParticipants || localConversation.deletedParticipants || []),
+    deletedParticipantIdentityKeys: remoteDeleted
+      ? (remoteConversation.deletedParticipantIdentityKeys || localConversation.deletedParticipantIdentityKeys || [])
+      : stripCurrentParticipantFromDeletionSource(remoteConversation.deletedParticipantIdentityKeys || localConversation.deletedParticipantIdentityKeys || []),
+    deletionCounterInitial: remoteConversation.deletionCounterInitial || localConversation.deletionCounterInitial || remoteConversation.participantCount || localConversation.participantCount || '',
+    deletionCounterRemaining: remoteConversation.deletionCounterRemaining ?? localConversation.deletionCounterRemaining ?? '',
+    remainingParticipantCount: remoteConversation.remainingParticipantCount ?? localConversation.remainingParticipantCount ?? remoteConversation.deletionCounterRemaining ?? localConversation.deletionCounterRemaining ?? '',
+    deleteSyncStatus: remoteConversation.deleteSyncStatus || localConversation.deleteSyncStatus || '',
+    deleteSyncedAt: remoteConversation.deleteSyncedAt || localConversation.deleteSyncedAt || '',
+    deleteChangedAt: remoteDeleteChangedAt || localConversation.deleteChangedAt || '',
+    deleteClientMutationId: remoteConversation.deleteClientMutationId || localConversation.deleteClientMutationId || '',
+    deleteLocalMutationId: hasLocalDeleteDecision ? (localConversation.deleteLocalMutationId || '') : '',
+    deleteLocalChangedAt: hasLocalDeleteDecision ? (localConversation.deleteLocalChangedAt || '') : '',
+    deleteDesiredDeleted: hasLocalDeleteDecision ? getDeleteDesiredDeletedState(localConversation) : remoteDeleted
+  };
+}
+
+
+function isBlockSyncStatusPending(status = '') {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  return normalizedStatus === 'syncing'
+    || normalizedStatus === 'pending'
+    || normalizedStatus.startsWith('syncing:')
+    || normalizedStatus.startsWith('pending:');
+}
+
+function getBlockDesiredBlockedState(conversation = {}) {
+  return Object.prototype.hasOwnProperty.call(conversation, 'blockDesiredBlocked')
+    ? Boolean(conversation.blockDesiredBlocked)
+    : coerceFirstBooleanFlag([conversation.blocked], false);
+}
+
+function getRemoteBlockChangedAt(conversation = {}) {
+  return conversation.blockChangedAt
+    || conversation.blockUpdatedAt
+    || conversation.blockedAt
+    || conversation.unblockedAt
+    || conversation.updatedAt
+    || conversation.modifiedAt
+    || conversation.blockSyncedAt
+    || '';
+}
+
+function getLocalBlockChangedAt(conversation = {}) {
+  return conversation.blockLocalChangedAt
+    || conversation.blockChangedAt
+    || conversation.blockSyncedAt
+    || conversation.updatedAt
+    || '';
+}
+
+function hasExplicitLocalBlockDecision(conversation = {}) {
+  return Boolean(conversation.blockLocalChangedAt || conversation.blockLocalMutationId)
+    || isBlockSyncStatusPending(conversation.blockSyncStatus);
+}
+
+function shouldPreserveLocalBlockState(remoteConversation = {}, localConversation = {}) {
+  const localBlocked = coerceFirstBooleanFlag([localConversation.blocked], false);
+  const remoteBlocked = coerceFirstBooleanFlag([remoteConversation.blocked], false);
+  if (localBlocked === remoteBlocked) return false;
+
+  if (isBlockSyncStatusPending(localConversation.blockSyncStatus)) return true;
+  if (!hasExplicitLocalBlockDecision(localConversation)) return false;
+
+  const localDesiredBlocked = getBlockDesiredBlockedState(localConversation);
+  const localMutationId = String(localConversation.blockLocalMutationId || '').trim();
+  const remoteMutationId = String(remoteConversation.blockClientMutationId || remoteConversation.clientMutationId || '').trim();
+  const remoteConfirmsLocalDesiredState = remoteBlocked === localDesiredBlocked;
+  if (localMutationId && remoteMutationId && localMutationId === remoteMutationId) {
+    return !remoteConfirmsLocalDesiredState;
+  }
+
+  const localChangedAt = parseArchiveTimestampMs(getLocalBlockChangedAt(localConversation));
+  const remoteChangedAt = parseArchiveTimestampMs(getRemoteBlockChangedAt(remoteConversation));
+  if (remoteBlocked !== localDesiredBlocked) return true;
+  if (localChangedAt && remoteChangedAt) return remoteChangedAt <= localChangedAt + ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS;
+  if (localChangedAt && !remoteChangedAt) return true;
+  if (!localChangedAt && localMutationId && (!remoteMutationId || remoteMutationId !== localMutationId)) return true;
+
+  return false;
+}
+
+function buildLocalBlockMergeState(localConversation = {}) {
+  const blocked = coerceFirstBooleanFlag([localConversation.blocked], false);
+  return {
+    blocked,
+    blockSyncStatus: localConversation.blockSyncStatus || 'pending',
+    blockSyncedAt: localConversation.blockSyncedAt || '',
+    blockChangedAt: localConversation.blockChangedAt || localConversation.blockLocalChangedAt || '',
+    blockClientMutationId: localConversation.blockClientMutationId || localConversation.blockLocalMutationId || '',
+    blockLocalMutationId: localConversation.blockLocalMutationId || localConversation.blockClientMutationId || '',
+    blockLocalChangedAt: localConversation.blockLocalChangedAt || localConversation.blockChangedAt || '',
+    blockDesiredBlocked: blocked
+  };
+}
+
+function resolveConversationBlockMergeState(remoteConversation = {}, localConversation = {}) {
+  if (shouldPreserveLocalBlockState(remoteConversation, localConversation)) {
+    return buildLocalBlockMergeState(localConversation);
+  }
+
+  const remoteBlocked = coerceFirstBooleanFlag([remoteConversation.blocked], false);
+  const remoteBlockChangedAt = getRemoteBlockChangedAt(remoteConversation);
+  const hasLocalBlockDecision = hasExplicitLocalBlockDecision(localConversation);
+
+  return {
+    blocked: remoteBlocked,
+    blockSyncStatus: remoteConversation.blockSyncStatus || localConversation.blockSyncStatus || '',
+    blockSyncedAt: remoteConversation.blockSyncedAt || localConversation.blockSyncedAt || '',
+    blockChangedAt: remoteBlockChangedAt || localConversation.blockChangedAt || '',
+    blockClientMutationId: remoteConversation.blockClientMutationId || localConversation.blockClientMutationId || '',
+    blockLocalMutationId: hasLocalBlockDecision ? (localConversation.blockLocalMutationId || '') : '',
+    blockLocalChangedAt: hasLocalBlockDecision ? (localConversation.blockLocalChangedAt || '') : '',
+    blockDesiredBlocked: hasLocalBlockDecision ? getBlockDesiredBlockedState(localConversation) : remoteBlocked
+  };
+}
+
 function isArchiveSyncStatusPending(status = '') {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   return normalizedStatus === 'syncing'
@@ -14542,7 +16124,7 @@ function parseArchiveTimestampMs(value = '') {
 function getArchiveDesiredArchivedState(conversation = {}) {
   return Object.prototype.hasOwnProperty.call(conversation, 'archiveDesiredArchived')
     ? Boolean(conversation.archiveDesiredArchived)
-    : Boolean(conversation.archived);
+    : coerceFirstBooleanFlag([conversation.archived], false);
 }
 
 function hasArchiveSpecificRemoteTimestamp(conversation = {}) {
@@ -14580,8 +16162,8 @@ function hasExplicitLocalArchiveDecision(conversation = {}) {
 }
 
 function shouldPreserveLocalArchiveState(remoteConversation = {}, localConversation = {}) {
-  const localArchived = Boolean(localConversation.archived);
-  const remoteArchived = Boolean(remoteConversation.archived);
+  const localArchived = coerceFirstBooleanFlag([localConversation.archived], false);
+  const remoteArchived = coerceFirstBooleanFlag([remoteConversation.archived], false);
   if (localArchived === remoteArchived) return false;
 
   if (isArchiveSyncStatusPending(localConversation.archiveSyncStatus)) return true;
@@ -14601,11 +16183,13 @@ function shouldPreserveLocalArchiveState(remoteConversation = {}, localConversat
   const remoteContradictsLocalDecision = localDesiredArchived === localArchived && remoteArchived !== localDesiredArchived;
 
   if (remoteContradictsLocalDecision) {
-    if (!remoteHasArchiveTimestamp) return true;
-    if (localChangedAt && !remoteChangedAt) return true;
-    if (localChangedAt && remoteChangedAt && remoteChangedAt <= localChangedAt + ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS) return true;
-    if (!localChangedAt && localMutationId && (!remoteMutationId || remoteMutationId !== localMutationId)) return true;
-    return false;
+    // Una decisión local explícita de archivar/restaurar es la fuente de verdad del cliente
+    // frente a respuestas o eventos remotos viejos. Solo una decisión remota inequívocamente
+    // posterior puede reemplazarla; así se evita rearchivar un chat recién restaurado.
+    if (remoteHasArchiveTimestamp && localChangedAt && remoteChangedAt) {
+      return remoteChangedAt <= localChangedAt + ARCHIVE_CONFLICT_CLOCK_SKEW_TOLERANCE_MS;
+    }
+    return true;
   }
 
   if (localChangedAt && remoteChangedAt) {
@@ -14620,7 +16204,7 @@ function shouldPreserveLocalArchiveState(remoteConversation = {}, localConversat
 }
 
 function buildLocalArchiveMergeState(localConversation = {}) {
-  const archived = Boolean(localConversation.archived);
+  const archived = coerceFirstBooleanFlag([localConversation.archived], false);
   return {
     archived,
     archiveSyncStatus: localConversation.archiveSyncStatus || 'pending',
@@ -14639,8 +16223,10 @@ function resolveConversationArchiveMergeState(remoteConversation = {}, localConv
     return buildLocalArchiveMergeState(localConversation);
   }
 
-  const remoteArchived = Boolean(remoteConversation.archived);
+  const remoteArchived = coerceFirstBooleanFlag([remoteConversation.archived], false);
   const remoteArchiveChangedAt = getRemoteArchiveChangedAt(remoteConversation);
+
+  const hasLocalArchiveDecision = hasExplicitLocalArchiveDecision(localConversation);
 
   return {
     archived: remoteArchived,
@@ -14648,48 +16234,75 @@ function resolveConversationArchiveMergeState(remoteConversation = {}, localConv
     archiveSyncedAt: remoteConversation.archiveSyncedAt || localConversation.archiveSyncedAt || '',
     archiveChangedAt: remoteArchiveChangedAt || localConversation.archiveChangedAt || '',
     archiveClientMutationId: remoteConversation.archiveClientMutationId || localConversation.archiveClientMutationId || '',
-    archiveLocalMutationId: remoteConversation.archiveClientMutationId || localConversation.archiveLocalMutationId || '',
-    archiveLocalChangedAt: remoteArchiveChangedAt || localConversation.archiveLocalChangedAt || '',
-    archiveDesiredArchived: remoteArchived
+    archiveLocalMutationId: hasLocalArchiveDecision ? (localConversation.archiveLocalMutationId || '') : '',
+    archiveLocalChangedAt: hasLocalArchiveDecision ? (localConversation.archiveLocalChangedAt || '') : '',
+    archiveDesiredArchived: hasLocalArchiveDecision ? getArchiveDesiredArchivedState(localConversation) : remoteArchived
   };
 }
 
 function mergeConversationsById(remoteConversations = [], localConversations = []) {
   const conversationsById = new Map();
+  const sharedKeyToConversationId = new Map();
 
-  localConversations.filter(Boolean).forEach((conversation) => {
-    if (conversation.id) conversationsById.set(String(conversation.id), { ...conversation });
-  });
+  const rememberConversation = (conversation = {}) => {
+    const id = String(conversation.id || '');
+    if (!id) return;
+    conversationsById.set(id, { ...conversation });
+    const sharedKey = getConversationSharedMergeKey(conversation);
+    if (sharedKey && !sharedKeyToConversationId.has(sharedKey)) {
+      sharedKeyToConversationId.set(sharedKey, id);
+    }
+  };
+
+  localConversations.filter(Boolean).forEach(rememberConversation);
 
   remoteConversations.filter(Boolean).forEach((remoteConversation) => {
-    const id = String(remoteConversation.id || '');
-    const localConversation = conversationsById.get(id);
-    if (!id || !localConversation) {
-      if (id) conversationsById.set(id, { ...remoteConversation });
+    const remoteId = String(remoteConversation.id || '');
+    const sharedKey = getConversationSharedMergeKey(remoteConversation);
+    const localIdBySharedKey = sharedKey ? sharedKeyToConversationId.get(sharedKey) : '';
+    const localConversation = (remoteId && conversationsById.get(remoteId))
+      || (localIdBySharedKey && conversationsById.get(localIdBySharedKey))
+      || null;
+
+    if (!remoteId && !localConversation) return;
+
+    if (!localConversation) {
+      conversationsById.set(remoteId, { ...remoteConversation });
+      if (sharedKey) sharedKeyToConversationId.set(sharedKey, remoteId);
       return;
     }
 
-    conversationsById.set(id, {
+    const effectiveId = remoteId || String(localConversation.id || localIdBySharedKey || '');
+    const mergedConversation = {
       ...localConversation,
       ...remoteConversation,
+      id: effectiveId || localConversation.id || remoteConversation.id,
       ...resolveConversationArchiveMergeState(remoteConversation, localConversation),
       messages: mergeMessagesByIdentity(remoteConversation.messages, localConversation.messages),
       messagesHydrated: Boolean(remoteConversation.messagesHydrated || localConversation.messagesHydrated),
       messagesHistoryCursor: remoteConversation.messagesHistoryCursor || localConversation.messagesHistoryCursor || '',
       messagesHistoryLastErrorAt: localConversation.messagesHistoryLastErrorAt || '',
-      deleted: Boolean(localConversation.deleted || remoteConversation.deleted),
+      ...resolveConversationDeleteMergeState(remoteConversation, localConversation),
+      ...resolveConversationBlockMergeState(remoteConversation, localConversation),
       favorite: Boolean(localConversation.favorite || remoteConversation.favorite),
       customListName: localConversation.customListName || remoteConversation.customListName || '',
       restricted: Boolean(localConversation.restricted || remoteConversation.restricted),
       muted: Boolean(localConversation.muted || remoteConversation.muted),
       mutedUntil: localConversation.mutedUntil || remoteConversation.mutedUntil || ''
-    });
+    };
+
+    if (localIdBySharedKey && localIdBySharedKey !== effectiveId) {
+      conversationsById.delete(localIdBySharedKey);
+    }
+    conversationsById.set(mergedConversation.id, mergedConversation);
+    if (sharedKey) sharedKeyToConversationId.set(sharedKey, mergedConversation.id);
   });
 
   const orderedConversations = [];
   const seen = new Set();
   [...remoteConversations, ...localConversations].filter(Boolean).forEach((conversation) => {
-    const id = String(conversation.id || '');
+    const sharedKey = getConversationSharedMergeKey(conversation);
+    const id = (sharedKey && sharedKeyToConversationId.get(sharedKey)) || String(conversation.id || '');
     if (!id || seen.has(id)) return;
     const mergedConversation = conversationsById.get(id);
     if (mergedConversation) {
@@ -14915,11 +16528,58 @@ function normalizeConversationFromApi(raw = {}) {
     || metadata.clientMutationId
     || metadata.idempotencyKey
     || '';
-  const participants = normalizeConversationParticipantsForApi(
+  const deleteChangedAt = raw.deleteChangedAt
+    || raw.deleteUpdatedAt
+    || raw.deletedAt
+    || raw.restoredAt
+    || metadata.deleteChangedAt
+    || metadata.deleteUpdatedAt
+    || metadata.deletedAt
+    || metadata.restoredAt
+    || '';
+  const deleteClientMutationId = raw.deleteClientMutationId
+    || raw.deleteMutationId
+    || metadata.deleteClientMutationId
+    || metadata.deleteMutationId
+    || '';
+  const blockChangedAt = raw.blockChangedAt
+    || raw.blockUpdatedAt
+    || raw.blockedAt
+    || raw.unblockedAt
+    || metadata.blockChangedAt
+    || metadata.blockUpdatedAt
+    || metadata.blockedAt
+    || metadata.unblockedAt
+    || '';
+  const blockClientMutationId = raw.blockClientMutationId
+    || raw.blockMutationId
+    || metadata.blockClientMutationId
+    || metadata.blockMutationId
+    || '';
+  const participants = ensureCurrentUserInLifecycleParticipants(normalizeConversationParticipantsForApi(
     raw.participants || raw.participantList || raw.members || metadata.participants || metadata.participantList,
     raw.contactEmail || raw.email || metadata.contactEmail || metadata.email,
     raw.displayName || raw.name || metadata.displayName || metadata.name
-  );
+  ));
+  const lifecycle = buildConversationSharedLifecycleMetadata({
+    ...raw,
+    metadata,
+    participants,
+    email: raw.email || metadata.email || '',
+    contactEmail: raw.contactEmail || metadata.contactEmail || '',
+    name: raw.name || metadata.name || '',
+    displayName: raw.displayName || metadata.displayName || '',
+    type: raw.type || metadata.type || '',
+    conversationType: raw.conversationType || metadata.conversationType || '',
+    participantCount: raw.participantCount || metadata.participantCount || '',
+    sharedConversationKey: raw.sharedConversationKey || metadata.sharedConversationKey || '',
+    redisConversationKey: raw.redisConversationKey || metadata.redisConversationKey || '',
+    redisChatKey: raw.redisChatKey || metadata.redisChatKey || ''
+  });
+  const archivedForCurrentUser = resolveConversationArchivedForCurrentUser(raw, metadata);
+  const deletedForCurrentUser = resolveConversationDeletedForCurrentUser(raw, metadata);
+  const deletionLifecycle = buildRealtimeDeletionLifecycleStorage(raw, metadata, raw);
+  const blocked = coerceFirstBooleanFlag([raw.blocked, raw.isBlocked, metadata.blocked, metadata.isBlocked], false);
   const participant = getConversationDisplayParticipant(participants);
   const selfEmail = normalizeStorageIdentity(getSessionEmail());
   const rawEmail = normalizeStorageIdentity(raw.contactEmail || raw.email || metadata.contactEmail || metadata.email || '');
@@ -14941,18 +16601,35 @@ function normalizeConversationFromApi(raw = {}) {
     avatarImage: normalizeAssetImagePath(raw.avatarImage || raw.avatarAsset),
     status: raw.statusLabel || raw.status || raw.presence || 'Sincronizado',
     section: 'chats',
-    archived: Boolean(raw.archived || raw.isArchived),
+    archived: archivedForCurrentUser,
     archiveChangedAt,
     archiveClientMutationId,
     archiveLocalMutationId: raw.archiveLocalMutationId || '',
     archiveLocalChangedAt: raw.archiveLocalChangedAt || '',
     archiveDesiredArchived: Object.prototype.hasOwnProperty.call(raw, 'archiveDesiredArchived')
-      ? Boolean(raw.archiveDesiredArchived)
-      : Boolean(raw.archived || raw.isArchived),
+      ? coerceBooleanFlag(raw.archiveDesiredArchived, archivedForCurrentUser)
+      : archivedForCurrentUser,
     updatedAt: raw.updatedAt || raw.modifiedAt || metadata.updatedAt || metadata.modifiedAt || '',
     lastActivityAt: raw.lastActivityAt || metadata.lastActivityAt || '',
     pinned: Boolean(raw.pinned || raw.isPinned),
-    deleted: Boolean(raw.deleted || raw.isDeleted),
+    deleted: deletedForCurrentUser,
+    deleteChangedAt,
+    deleteClientMutationId,
+    deleteLocalMutationId: raw.deleteLocalMutationId || '',
+    deleteLocalChangedAt: raw.deleteLocalChangedAt || '',
+    deleteDesiredDeleted: Object.prototype.hasOwnProperty.call(raw, 'deleteDesiredDeleted')
+      ? coerceBooleanFlag(raw.deleteDesiredDeleted, deletedForCurrentUser)
+      : deletedForCurrentUser,
+    deleteSyncStatus: raw.deleteSyncStatus || '',
+    deleteSyncedAt: raw.deleteSyncedAt || '',
+    deletionRegistry: deletionLifecycle.deletionRegistry || raw.deletionRegistry || metadata.deletionRegistry || null,
+    localDeletionRegistry: deletedForCurrentUser ? (deletionLifecycle.localDeletionRegistry || raw.localDeletionRegistry || metadata.localDeletionRegistry || null) : null,
+    participantDeletionRegistry: deletionLifecycle.participantDeletionRegistry || raw.participantDeletionRegistry || metadata.participantDeletionRegistry || null,
+    deletedParticipants: deletionLifecycle.deletedParticipants?.length ? deletionLifecycle.deletedParticipants : (raw.deletedParticipants || metadata.deletedParticipants || []),
+    deletedParticipantIdentityKeys: deletionLifecycle.deletedParticipantIdentityKeys?.length ? deletionLifecycle.deletedParticipantIdentityKeys : (raw.deletedParticipantIdentityKeys || metadata.deletedParticipantIdentityKeys || []),
+    deletionCounterInitial: deletionLifecycle.deletionCounterInitial || raw.deletionCounterInitial || metadata.deletionCounterInitial || '',
+    deletionCounterRemaining: deletionLifecycle.deletionCounterRemaining ?? raw.deletionCounterRemaining ?? metadata.deletionCounterRemaining ?? '',
+    remainingParticipantCount: deletionLifecycle.remainingParticipantCount ?? raw.remainingParticipantCount ?? metadata.remainingParticipantCount ?? '',
     muted: Boolean(raw.muted || raw.isMuted || raw.mutedUntil),
     mutedUntil: raw.mutedUntil || '',
     restricted: Boolean(raw.restricted || raw.isRestricted || raw.settings?.restricted),
@@ -14968,7 +16645,14 @@ function normalizeConversationFromApi(raw = {}) {
     pinSyncedAt: raw.pinSyncedAt || '',
     archiveSyncStatus: raw.archiveSyncStatus || '',
     archiveSyncedAt: raw.archiveSyncedAt || '',
-    blocked: Boolean(raw.blocked || raw.isBlocked),
+    blocked,
+    blockChangedAt,
+    blockClientMutationId,
+    blockLocalMutationId: raw.blockLocalMutationId || '',
+    blockLocalChangedAt: raw.blockLocalChangedAt || '',
+    blockDesiredBlocked: Object.prototype.hasOwnProperty.call(raw, 'blockDesiredBlocked')
+      ? coerceBooleanFlag(raw.blockDesiredBlocked, blocked)
+      : blocked,
     blockSyncStatus: raw.blockSyncStatus || '',
     blockSyncedAt: raw.blockSyncedAt || '',
     reportSyncStatus: raw.reportSyncStatus || '',
@@ -14977,7 +16661,19 @@ function normalizeConversationFromApi(raw = {}) {
     unread: Number(raw.unread || raw.unreadCount || 0),
     messages,
     messagesHydrated: Boolean(hasEmbeddedMessages || raw.messagesHydrated || raw.historyLoaded),
-    messagesHistoryCursor: raw.messagesCursor || raw.nextCursor || raw.nextMessagesCursor || ''
+    messagesHistoryCursor: raw.messagesCursor || raw.nextCursor || raw.nextMessagesCursor || '',
+    metadata: {
+      ...metadata,
+      ...lifecycle
+    },
+    sharedConversationKey: lifecycle.sharedConversationKey,
+    redisConversationKey: lifecycle.redisConversationKey,
+    redisChatKey: lifecycle.redisChatKey,
+    participantCount: lifecycle.participantCount,
+    reuseExistingRedisChat: true,
+    deleteFinalOnlyWhenAllParticipantsDeleted: true,
+    deletedForCurrentUser,
+    hiddenForCurrentUser: deletedForCurrentUser
   };
 }
 
@@ -15407,10 +17103,17 @@ function pruneStremeConversationSubscriptions(activeChannel = '') {
 
 function ensureStremeConversationSubscription(conversationId = '') {
   if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail() || resolveStremeTransport() !== 'sse') return;
-  const channel = getConversationStremeChannel(conversationId);
-  if (!channel) return;
-  pruneStremeConversationSubscriptions(channel);
-  connectStremeEventSource(channel);
+  const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || '')) || {};
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const channels = [
+    getConversationStremeChannel(conversationId),
+    lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : ''
+  ].filter(Boolean);
+
+  [...new Set(channels)].forEach((channel) => {
+    pruneStremeConversationSubscriptions(channel);
+    connectStremeEventSource(channel);
+  });
 }
 
 function handleRawStremeMessage(rawMessage) {
@@ -15612,6 +17315,417 @@ function publishDurableStremeEvent(payload, options = {}) {
   });
 }
 
+
+function getRealtimeMergedMetadata(raw = {}, data = {}) {
+  const dataMetadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const rawMetadata = raw?.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+  return { ...dataMetadata, ...rawMetadata };
+}
+
+function getRealtimeArchiveFlagForCurrentUser(raw = {}, metadata = {}, data = {}) {
+  const values = [
+    raw.archivedForCurrentUser,
+    raw.isArchivedForCurrentUser,
+    raw.archivedForMe,
+    raw.isArchivedForMe,
+    metadata.archivedForCurrentUser,
+    metadata.isArchivedForCurrentUser,
+    metadata.archivedForMe,
+    metadata.isArchivedForMe,
+    data.archivedForCurrentUser,
+    data.isArchivedForCurrentUser,
+    data.archivedForMe,
+    data.isArchivedForMe
+  ];
+  return coerceFirstBooleanFlag(values, null);
+}
+
+function getRealtimeActorIdentityKey(data = {}) {
+  const raw = getRealtimeRecord(data, ['conversation', 'chat']);
+  const metadata = getRealtimeMergedMetadata(raw, data);
+  const actor = getFirstObjectCandidate(
+    raw.actor,
+    raw.archivedBy,
+    raw.restoredBy,
+    raw.deletedBy,
+    metadata.actor,
+    metadata.archivedBy,
+    metadata.restoredBy,
+    metadata.deletedBy,
+    data.actor,
+    data.archivedBy,
+    data.restoredBy,
+    data.deletedBy
+  ) || {};
+
+  return normalizeLifecycleIdentityKeyFromValue({
+    userId: actor.userId
+      || actor.actorUserId
+      || actor.deletedByUserId
+      || raw.actorUserId
+      || raw.archivedByUserId
+      || raw.restoredByUserId
+      || raw.deletedByUserId
+      || metadata.actorUserId
+      || metadata.archivedByUserId
+      || metadata.restoredByUserId
+      || metadata.deletedByUserId
+      || data.actorUserId
+      || data.archivedByUserId
+      || data.restoredByUserId
+      || data.deletedByUserId
+      || '',
+    email: actor.email
+      || actor.userEmail
+      || actor.actorUserEmail
+      || actor.deletedByUserEmail
+      || raw.actorUserEmail
+      || raw.archivedByUserEmail
+      || raw.restoredByUserEmail
+      || raw.deletedByUserEmail
+      || metadata.actorUserEmail
+      || metadata.archivedByUserEmail
+      || metadata.restoredByUserEmail
+      || metadata.deletedByUserEmail
+      || data.actorUserEmail
+      || data.archivedByUserEmail
+      || data.restoredByUserEmail
+      || data.deletedByUserEmail
+      || ''
+  });
+}
+
+
+function getRealtimeDeleteFlagForCurrentUser(raw = {}, metadata = {}, data = {}) {
+  const values = [
+    raw.deletedForCurrentUser,
+    raw.isDeletedForCurrentUser,
+    raw.deletedForMe,
+    raw.isDeletedForMe,
+    raw.hiddenForCurrentUser,
+    raw.isHiddenForCurrentUser,
+    metadata.deletedForCurrentUser,
+    metadata.isDeletedForCurrentUser,
+    metadata.deletedForMe,
+    metadata.isDeletedForMe,
+    metadata.hiddenForCurrentUser,
+    metadata.isHiddenForCurrentUser,
+    data.deletedForCurrentUser,
+    data.isDeletedForCurrentUser,
+    data.deletedForMe,
+    data.isDeletedForMe,
+    data.hiddenForCurrentUser,
+    data.isHiddenForCurrentUser
+  ];
+  return coerceFirstBooleanFlag(values, null);
+}
+
+function getRealtimeDeletionScope(raw = {}, metadata = {}, data = {}) {
+  return String(
+    raw.deleteVisibilityScope
+      || raw.deletionVisibilityScope
+      || raw.visibilityScope
+      || raw.mode
+      || metadata.deleteVisibilityScope
+      || metadata.deletionVisibilityScope
+      || metadata.visibilityScope
+      || metadata.mode
+      || data.deleteVisibilityScope
+      || data.deletionVisibilityScope
+      || data.visibilityScope
+      || data.mode
+      || ''
+  ).trim().toLowerCase();
+}
+
+function getRealtimeDeletionRemainingCount(raw = {}, metadata = {}, data = {}) {
+  const candidates = [
+    raw.remainingParticipantCount,
+    raw.deletionCounterRemaining,
+    raw.deletionCounterAfter,
+    raw.participantDeletionRegistry?.counterRemaining,
+    raw.participantDeletionRegistry?.remainingParticipantCount,
+    raw.deletionRegistry?.participantDeletionRegistry?.counterRemaining,
+    raw.deletionRegistry?.participantDeletionRegistry?.remainingParticipantCount,
+    metadata.remainingParticipantCount,
+    metadata.deletionCounterRemaining,
+    metadata.deletionCounterAfter,
+    metadata.participantDeletionRegistry?.counterRemaining,
+    metadata.participantDeletionRegistry?.remainingParticipantCount,
+    metadata.deletionRegistry?.participantDeletionRegistry?.counterRemaining,
+    metadata.deletionRegistry?.participantDeletionRegistry?.remainingParticipantCount,
+    data.remainingParticipantCount,
+    data.deletionCounterRemaining,
+    data.deletionCounterAfter,
+    data.participantDeletionRegistry?.counterRemaining,
+    data.participantDeletionRegistry?.remainingParticipantCount,
+    data.deletionRegistry?.participantDeletionRegistry?.counterRemaining,
+    data.deletionRegistry?.participantDeletionRegistry?.remainingParticipantCount
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === '') continue;
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) return Math.max(0, Math.round(parsed));
+  }
+
+  return null;
+}
+
+function isRealtimeDeletionFinalForAll(raw = {}, metadata = {}, data = {}) {
+  const remainingCount = getRealtimeDeletionRemainingCount(raw, metadata, data);
+  if (remainingCount === 0) return true;
+
+  return coerceFirstBooleanFlag([
+    raw.deleteForAllParticipants,
+    raw.deletedForAllParticipants,
+    raw.finalDelete,
+    raw.isFinalDelete,
+    raw.redisDeleted,
+    raw.deleteRedisNow,
+    metadata.deleteForAllParticipants,
+    metadata.deletedForAllParticipants,
+    metadata.finalDelete,
+    metadata.isFinalDelete,
+    metadata.redisDeleted,
+    metadata.deleteRedisNow,
+    data.deleteForAllParticipants,
+    data.deletedForAllParticipants,
+    data.finalDelete,
+    data.isFinalDelete,
+    data.redisDeleted,
+    data.deleteRedisNow
+  ], false);
+}
+
+
+function firstArrayCandidate(...candidates) {
+  return candidates.find((candidate) => Array.isArray(candidate) && candidate.length) || [];
+}
+
+function hasObjectKeys(value = {}) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length);
+}
+
+function buildRealtimeDeletionLifecycleStorage(raw = {}, metadata = {}, data = {}) {
+  const registry = getFirstObjectCandidate(
+    raw.localDeletionRegistry,
+    raw.deletionRegistry,
+    metadata.localDeletionRegistry,
+    metadata.deletionRegistry,
+    data.localDeletionRegistry,
+    data.deletionRegistry
+  );
+  const participantDeletionRegistry = getFirstObjectCandidate(
+    raw.participantDeletionRegistry,
+    metadata.participantDeletionRegistry,
+    data.participantDeletionRegistry,
+    registry.participantDeletionRegistry
+  );
+  const deletedParticipants = firstArrayCandidate(
+    raw.deletedParticipants,
+    metadata.deletedParticipants,
+    data.deletedParticipants,
+    registry.deletedParticipants,
+    participantDeletionRegistry.deletedParticipants
+  );
+  const deletedParticipantIdentityKeys = new Set([
+    ...Array.from(collectLifecycleIdentityKeys(raw.deletedParticipantIdentityKeys || [])),
+    ...Array.from(collectLifecycleIdentityKeys(metadata.deletedParticipantIdentityKeys || [])),
+    ...Array.from(collectLifecycleIdentityKeys(data.deletedParticipantIdentityKeys || [])),
+    ...Array.from(collectLifecycleIdentityKeys(registry.deletedParticipantIdentityKeys || [])),
+    ...Array.from(collectLifecycleIdentityKeys(participantDeletionRegistry.deletedParticipantIdentityKeys || [])),
+    ...Array.from(collectLifecycleIdentityKeys(deletedParticipants || []))
+  ].filter(Boolean));
+  const remainingCount = getRealtimeDeletionRemainingCount(raw, metadata, data);
+  const deletionActorIdentityKey = getRealtimeActorIdentityKey(data);
+  const hasDeletionActorContext = Boolean(getRealtimeDeletionScope(raw, metadata, data))
+    || remainingCount !== null
+    || coerceFirstBooleanFlag([
+      raw.deleted,
+      raw.isDeleted,
+      raw.deletedForCurrentUser,
+      raw.isDeletedForCurrentUser,
+      raw.hiddenForCurrentUser,
+      metadata.deleted,
+      metadata.isDeleted,
+      metadata.deletedForCurrentUser,
+      metadata.isDeletedForCurrentUser,
+      metadata.hiddenForCurrentUser,
+      data.deleted,
+      data.isDeleted,
+      data.deletedForCurrentUser,
+      data.isDeletedForCurrentUser,
+      data.hiddenForCurrentUser
+    ], false);
+  if (deletionActorIdentityKey && hasDeletionActorContext) {
+    deletedParticipantIdentityKeys.add(deletionActorIdentityKey);
+  }
+  const inferredParticipantCountFromCounter = remainingCount === null
+    ? 0
+    : Math.max(0, remainingCount + deletedParticipantIdentityKeys.size);
+  const hasLifecycleData = hasObjectKeys(registry)
+    || hasObjectKeys(participantDeletionRegistry)
+    || deletedParticipants.length > 0
+    || deletedParticipantIdentityKeys.size > 0
+    || remainingCount !== null
+    || coerceFirstBooleanFlag([
+      raw.deleted,
+      raw.isDeleted,
+      raw.deletedForCurrentUser,
+      raw.isDeletedForCurrentUser,
+      raw.hiddenForCurrentUser,
+      metadata.deleted,
+      metadata.isDeleted,
+      metadata.deletedForCurrentUser,
+      metadata.isDeletedForCurrentUser,
+      metadata.hiddenForCurrentUser,
+      data.deleted,
+      data.isDeleted,
+      data.deletedForCurrentUser,
+      data.isDeletedForCurrentUser,
+      data.hiddenForCurrentUser
+    ], false);
+
+  if (!hasLifecycleData) {
+    return {
+      deletionRegistry: null,
+      localDeletionRegistry: null,
+      participantDeletionRegistry: null,
+      deletedParticipants: [],
+      deletedParticipantIdentityKeys: [],
+      participantCount: 0,
+      deletionCounterInitial: undefined,
+      deletionCounterRemaining: undefined,
+      remainingParticipantCount: undefined
+    };
+  }
+
+  const participantCount = Math.max(
+    Number(raw.participantCount || metadata.participantCount || data.participantCount || 0) || 0,
+    Number(raw.deletionCounterInitial || metadata.deletionCounterInitial || data.deletionCounterInitial || 0) || 0,
+    Number(participantDeletionRegistry.counterInitial || 0) || 0,
+    Number(participantDeletionRegistry.participantCount || 0) || 0,
+    inferredParticipantCountFromCounter,
+    deletedParticipantIdentityKeys.size,
+    1
+  );
+  const normalizedCounterInitial = Math.max(Number(participantDeletionRegistry.counterInitial || 0) || 0, participantCount);
+  const normalizedParticipantRegistry = {
+    ...(hasObjectKeys(participantDeletionRegistry) ? participantDeletionRegistry : {}),
+    counterInitial: normalizedCounterInitial,
+    counterRemaining: remainingCount === null ? participantDeletionRegistry.counterRemaining : remainingCount,
+    deleteWhenRemainingParticipants: 0,
+    deletedParticipantIdentityKeys: Array.from(deletedParticipantIdentityKeys),
+    internalOnly: true,
+    visibleInChat: false
+  };
+
+  const normalizedRegistry = {
+    ...(hasObjectKeys(registry) ? registry : {}),
+    deletedParticipants,
+    deletedParticipantIdentityKeys: Array.from(deletedParticipantIdentityKeys),
+    participantDeletionRegistry: normalizedParticipantRegistry,
+    internalOnly: true,
+    visibleInChat: false
+  };
+
+  return {
+    deletionRegistry: normalizedRegistry,
+    localDeletionRegistry: normalizedRegistry,
+    participantDeletionRegistry: normalizedParticipantRegistry,
+    deletedParticipants,
+    deletedParticipantIdentityKeys: Array.from(deletedParticipantIdentityKeys),
+    participantCount,
+    deletionCounterInitial: normalizedCounterInitial,
+    deletionCounterRemaining: remainingCount === null ? normalizedParticipantRegistry.counterRemaining : remainingCount,
+    remainingParticipantCount: remainingCount === null ? normalizedParticipantRegistry.counterRemaining : remainingCount
+  };
+}
+
+function shouldHideRealtimeDeletedConversationForCurrentUser(data = {}) {
+  const raw = getRealtimeRecord(data, ['conversation', 'chat']);
+  const metadata = getRealtimeMergedMetadata(raw, data);
+  const explicitDeletedForCurrentUser = getRealtimeDeleteFlagForCurrentUser(raw, metadata, data);
+  if (isRealtimeDeletionFinalForAll(raw, metadata, data)) return true;
+  if (explicitDeletedForCurrentUser !== null) return explicitDeletedForCurrentUser;
+  if (deletionRegistryIncludesCurrentUser(raw, metadata)) return true;
+  if (hasParticipantDeletionRegistry(raw, metadata)) return false;
+
+  const scope = getRealtimeDeletionScope(raw, metadata, data);
+  const actorKey = getRealtimeActorIdentityKey(data);
+  const selfKey = normalizeLifecycleIdentityKeyFromValue(getCurrentParticipantLifecycleIdentity());
+  const isActorScoped = ['actor_only', 'actor-only', 'per-participant', 'participant', 'current_user', 'current-user', 'hide_for_actor'].includes(scope)
+    || scope.includes('actor')
+    || scope.includes('participant');
+
+  if ((isActorScoped || actorKey) && actorKey && selfKey && actorKey !== selfKey) return false;
+  if ((isActorScoped || actorKey) && actorKey && selfKey && actorKey === selfKey) return true;
+
+  return coerceFirstBooleanFlag([
+    raw.deleted,
+    raw.isDeleted,
+    data.deleted,
+    data.isDeleted
+  ], false);
+}
+
+function buildRealtimeArchivePatchForCurrentUser(data = {}, archived = false) {
+  const raw = getRealtimeRecord(data, ['conversation', 'chat']);
+  const metadata = getRealtimeMergedMetadata(raw, data);
+  const explicitArchivedForCurrentUser = getRealtimeArchiveFlagForCurrentUser(raw, metadata, data);
+  const scope = String(
+    raw.archiveVisibilityScope
+      || raw.visibilityScope
+      || metadata.archiveVisibilityScope
+      || metadata.visibilityScope
+      || data.archiveVisibilityScope
+      || data.visibilityScope
+      || ''
+  ).trim().toLowerCase();
+  const actorKey = getRealtimeActorIdentityKey(data);
+  const selfKey = normalizeLifecycleIdentityKeyFromValue(getCurrentParticipantLifecycleIdentity());
+  const isActorScoped = ['actor_only', 'actor-only', 'per-participant', 'participant', 'current_user', 'current-user'].includes(scope)
+    || scope.includes('actor')
+    || scope.includes('participant');
+
+  if ((isActorScoped || !scope) && explicitArchivedForCurrentUser === null && actorKey && selfKey && actorKey !== selfKey) {
+    return null;
+  }
+
+  const nextArchived = explicitArchivedForCurrentUser === null ? Boolean(archived) : Boolean(explicitArchivedForCurrentUser);
+  const archiveChangedAt = raw.archiveChangedAt
+    || raw.archiveUpdatedAt
+    || raw.archivedAt
+    || raw.restoredAt
+    || metadata.archiveChangedAt
+    || metadata.archiveUpdatedAt
+    || metadata.archivedAt
+    || metadata.restoredAt
+    || data.createdAt
+    || data.updatedAt
+    || new Date().toISOString();
+  const archiveClientMutationId = raw.archiveClientMutationId
+    || raw.archiveMutationId
+    || raw.clientMutationId
+    || metadata.archiveClientMutationId
+    || metadata.archiveMutationId
+    || metadata.clientMutationId
+    || data.clientMutationId
+    || '';
+
+  return {
+    archived: nextArchived,
+    archivedForCurrentUser: nextArchived,
+    isArchivedForCurrentUser: nextArchived,
+    archivedForMe: nextArchived,
+    archiveVisibilityScope: scope || 'actor_only',
+    visibilityScope: scope || 'actor_only',
+    archiveChangedAt,
+    archiveClientMutationId
+  };
+}
+
 function handleStremeEvent(payload) {
   if (stremeSessionGuard && !isSessionGuardCurrent(stremeSessionGuard)) return;
   const normalizedPayload = normalizeStremeInboundPayload(payload);
@@ -15678,11 +17792,13 @@ function handleStremeEvent(payload) {
   }
 
   if (normalizedPayload.type === 'conversation.archived') {
-    upsertRealtimeConversation(normalizedPayload.data, { archived: true });
+    const archivePatch = buildRealtimeArchivePatchForCurrentUser(normalizedPayload.data, true);
+    if (archivePatch) upsertRealtimeConversation(normalizedPayload.data, archivePatch);
   }
 
   if (normalizedPayload.type === 'conversation.restored') {
-    upsertRealtimeConversation(normalizedPayload.data, { archived: false });
+    const archivePatch = buildRealtimeArchivePatchForCurrentUser(normalizedPayload.data, false);
+    if (archivePatch) upsertRealtimeConversation(normalizedPayload.data, archivePatch);
   }
 
   if (normalizedPayload.type === 'conversation.deleted') {
@@ -15844,8 +17960,10 @@ function findConversationForRealtimePatch(raw = {}) {
   const id = getRealtimeConversationIdentity(raw);
   const email = normalizeStorageIdentity(raw.contactEmail || raw.email || raw.userEmail || raw.participantEmail || raw.contact?.email || '');
   const userId = normalizeBackendUserId(raw.contactUserId || raw.userId || raw.remoteUserId || raw.contact?.userId || raw.contact?.id || '');
+  const sharedKey = getConversationSharedMergeKey(raw);
   return appState.conversations.find((conversation) => {
     if (id && String(conversation.id || '') === id) return true;
+    if (sharedKey && getConversationSharedMergeKey(conversation) === sharedKey) return true;
     if (email && [conversation.email, conversation.contactEmail].map(normalizeStorageIdentity).includes(email)) return true;
     if (userId && normalizeBackendUserId(conversation.contactUserId || '') === userId) return true;
     return false;
@@ -15860,6 +17978,11 @@ function upsertRealtimeConversation(data = {}, forcedPatch = {}) {
   const normalized = normalizeConversationFromApi(existing ? { ...existing, ...raw } : raw);
   if (!normalized.id) return false;
 
+  if (existing?.id && normalized.id && String(existing.id) !== String(normalized.id) && getConversationSharedMergeKey(existing) && getConversationSharedMergeKey(existing) === getConversationSharedMergeKey(normalized)) {
+    applyRemoteConversationId(existing.id, normalized.id);
+  } else {
+    reconcileRemoteConversationIdentityBySharedKey(normalized);
+  }
   appState.conversations = mergeConversationsById([normalized], appState.conversations);
   if (!appState.conversations.some((conversation) => conversation.id === activeConversationId && !conversation.deleted)) {
     activeConversationId = getFirstVisibleConversationId(activeConversationId) || getVisibleConversations()[0]?.id || null;
@@ -15873,17 +17996,61 @@ function upsertRealtimeConversation(data = {}, forcedPatch = {}) {
 
 function removeRealtimeConversation(data = {}) {
   const raw = getRealtimeRecord(data, ['conversation', 'chat']);
+  const metadata = getRealtimeMergedMetadata(raw, data);
   const id = getRealtimeConversationIdentity(raw) || getRealtimeConversationIdentity(data);
+  const matchedConversation = findConversationForRealtimePatch({ ...raw, ...data });
+  const targetId = id || matchedConversation?.id || '';
+  const targetSharedKey = getConversationSharedMergeKey(raw) || getConversationSharedMergeKey(data) || getConversationSharedMergeKey(matchedConversation || {});
+  const deletionLifecycle = buildRealtimeDeletionLifecycleStorage(raw, metadata, data);
+  const shouldHideForCurrentUser = shouldHideRealtimeDeletedConversationForCurrentUser(data);
   let changed = false;
 
   appState.conversations = appState.conversations.map((conversation) => {
-    if (!id || String(conversation.id || '') !== id) return conversation;
+    const matchesById = targetId && String(conversation.id || '') === String(targetId);
+    const matchesBySharedKey = targetSharedKey && getConversationSharedMergeKey(conversation) === targetSharedKey;
+    if (!matchesById && !matchesBySharedKey) return conversation;
     changed = true;
-    return { ...conversation, deleted: true, status: 'Eliminado' };
+
+    const lifecycleState = {
+      localDeletionRegistry: deletionLifecycle.localDeletionRegistry || conversation.localDeletionRegistry || null,
+      deletionRegistry: deletionLifecycle.deletionRegistry || conversation.deletionRegistry || null,
+      participantDeletionRegistry: deletionLifecycle.participantDeletionRegistry || conversation.participantDeletionRegistry || null,
+      deletedParticipants: deletionLifecycle.deletedParticipants?.length ? deletionLifecycle.deletedParticipants : (conversation.deletedParticipants || []),
+      deletedParticipantIdentityKeys: deletionLifecycle.deletedParticipantIdentityKeys?.length ? deletionLifecycle.deletedParticipantIdentityKeys : (conversation.deletedParticipantIdentityKeys || []),
+      participantCount: Math.max(Number(conversation.participantCount || 0) || 0, Number(deletionLifecycle.participantCount || 0) || 0, 1),
+      deletionCounterInitial: deletionLifecycle.deletionCounterInitial || conversation.deletionCounterInitial || conversation.participantCount || 1,
+      deletionCounterRemaining: deletionLifecycle.deletionCounterRemaining ?? conversation.deletionCounterRemaining,
+      remainingParticipantCount: deletionLifecycle.remainingParticipantCount ?? conversation.remainingParticipantCount
+    };
+
+    if (!shouldHideForCurrentUser) {
+      return {
+        ...conversation,
+        ...lifecycleState,
+        status: conversation.status || 'Sincronizado'
+      };
+    }
+    return {
+      ...conversation,
+      ...lifecycleState,
+      archived: false,
+      archiveDesiredArchived: false,
+      blocked: false,
+      blockDesiredBlocked: false,
+      deleted: true,
+      deletedForCurrentUser: true,
+      isDeletedForCurrentUser: true,
+      hiddenForCurrentUser: true,
+      deleteDesiredDeleted: true,
+      deleteChangedAt: raw.deleteChangedAt || raw.deletedAt || metadata.deleteChangedAt || metadata.deletedAt || new Date().toISOString(),
+      status: 'Eliminado de tu lista'
+    };
   });
 
   if (!changed) return false;
-  if (String(activeConversationId || '') === id) activeConversationId = getFirstVisibleConversationId(id);
+  if (shouldHideForCurrentUser && (String(activeConversationId || '') === String(targetId || '') || (matchedConversation && String(activeConversationId || '') === String(matchedConversation.id || '')))) {
+    activeConversationId = getFirstVisibleConversationId(targetId || matchedConversation?.id || '');
+  }
   persistState();
   renderCurrentSection();
   renderConversation();

@@ -191,9 +191,27 @@ Request:
   "displayName": "María Gómez",
   "title": "María Gómez",
   "status": "active",
+  "sharedConversationKey": "chater:direct:hash-participantes",
+  "redisConversationKey": "chater:direct:hash-participantes",
+  "redisChatKey": "chater:direct:hash-participantes",
+  "participantCount": 2,
+  "reuseExistingRedisChat": true,
+  "restoreExistingRedisChat": true,
+  "restoreIfParticipantDeleted": true,
+  "deleteFinalOnlyWhenAllParticipantsDeleted": true,
+  "visibilityMode": "per-participant",
+  "deletionPolicy": {
+    "mode": "per-participant",
+    "counterInitial": 2,
+    "deleteWhenRemainingParticipants": 0,
+    "internalOnly": true,
+    "visibleInChat": false
+  },
   "clientMutationId": "uuid"
 }
 ```
+
+El backend debe derivar o validar `sharedConversationKey` ordenando las identidades canónicas de todos los participantes. Si ya existe un chat Redis con esa clave, no debe crear otro: debe devolver el chat existente, reutilizar `redisConversationKey/redisChatKey`, quitar al actor del registro interno de eliminados cuando esté recreando el contacto o chat, y entregar el historial existente. En chats grupales, `participantCount` representa el total original de participantes activos para que una eliminación por cuenta solo descuente visibilidad de esa cuenta y el borrado final ocurra únicamente cuando el contador interno llegue a `0`.
 
 ### GET `/api/v1/conversaciones/{conversationId}?s={siteId}`
 Detalle de conversación cuando memoriaBACKEND lo publique.
@@ -205,9 +223,17 @@ Request mínimo para archivar o restaurar:
 ```json
 {
   "archived": true,
+  "archivedForCurrentUser": true,
+  "archiveVisibilityScope": "actor_only",
+  "actorUserId": "usr_123",
+  "actorUserEmail": "usuario@correo.com",
+  "restoreMustNotRearchiveAutomatically": true,
+  "archiveFinalOnlyByManualAction": true,
   "clientMutationId": "uuid"
 }
 ```
+
+El backend debe tratar el archivado como estado por participante cuando `archiveVisibilityScope` sea `actor_only` o `per-participant`. Un evento `conversation.archived` o `conversation.restored` emitido por STREMEx no debe reescribir el estado de todos los participantes de forma global si la acción fue individual: debe incluir `actorUserId/actorUserEmail`, `archiveVisibilityScope` o una bandera explícita `archivedForCurrentUser`. El cliente ignora eventos actor-only de otros usuarios cuando no traen una bandera explícita para la cuenta actual, evitando que un chat restaurado vuelva a archivarse automáticamente por eventos viejos o ajenos.
 
 Request mínimo para fijar o desfijar:
 ```json
@@ -908,7 +934,7 @@ Para que el static site no tenga botones decorativos, cada acción visible debe 
 |---|---|---|
 | Entrar a ChatER | Exige Google/Gmail mediante `AUTENTICACIONx`, carga `login.js`, valida cookie con `/auth/check` y solo acepta correos Gmail/Google verificados cuando la configuración lo requiere | `GET /login.js`, `GET /auth/check`, `POST /auth/firebase/session`, `POST /auth/logout` |
 | Perfil | Muestra correo activo, tipo de acceso y modo visual automático | `GET /api/v1/perfil-usuario`, `PATCH /api/v1/perfil-usuario/{id}` cuando memoriaBACKEND lo publique para edición |
-| Nuevo chat `+` | Crea o abre conversación por correo electrónico, evita duplicados locales y restaura un chat archivado si el correo ya existía | `POST /api/v1/conversaciones`, `POST /api/v1/relaciones-usuario` si se habilita relación explícita, `PATCH /api/v1/conversaciones/{conversationId}` |
+| Nuevo chat `+` | Crea o abre conversación por correo electrónico, evita duplicados por correo/userId/sharedConversationKey; si ya está archivada la abre sin sacarla de Archivados; si estaba eliminada por el actor, restaura la visibilidad del actor y reutiliza el Redis chat existente | `POST /api/v1/conversaciones`, `POST /api/v1/relaciones-usuario` si se habilita relación explícita, `PATCH /api/v1/conversaciones/{conversationId}` |
 | Archivados | Muestra acceso real en la lista principal, abre chats archivados, permite restaurarlos y conserva mensajes sin depender de números telefónicos | `PATCH /api/v1/conversaciones/{conversationId}` con `archived` |
 | Fijar chat | Permite fijar o desfijar la conversación activa, ordenar fijados arriba y reflejar el pin visible como en la referencia móvil | `PATCH /api/v1/conversaciones/{conversationId}` con `pinned` |
 | Herramientas `⋮` | Abre acciones reales: modo automático, crear estado, estado de APIs, notificaciones, instalación, actualización, reintento de sincronización pendiente y cierre de sesión | `GET /api/v1/versiones/manifest`, `POST /api/v1/landing-tools/evento`, `POST /auth/logout` |
@@ -1202,7 +1228,7 @@ Cambios funcionales incorporados:
 - Las conversaciones activas se filtran fuera de archivados; las archivadas se conservan en el estado local con todos sus mensajes y metadatos.
 - El botón nuevo de la cabecera del chat permite archivar la conversación activa y cambia a acción de restauración cuando se abre un chat archivado.
 - La fila **Archivados** abre un modal funcional con las conversaciones archivadas, acciones **Abrir** y **Restaurar**, y estado vacío de producción si aún no hay chats archivados.
-- Al crear un chat con un correo que ya existe pero está archivado, ChatER lo restaura y lo abre en vez de duplicarlo.
+- Al crear o abrir un chat con un correo que ya existe pero está archivado, ChatER lo abre sin duplicarlo ni restaurarlo automáticamente; solo sale de Archivados con la acción manual **Restaurar** o con un `PATCH archived:false` emitido por el actor.
 - En modo memoriaBACKEND, archivar/restaurar usa `PATCH /api/v1/conversaciones/{conversationId}` con `archived` y `clientMutationId`; si falla, la acción queda en cola idempotente como `updateConversation`.
 - La normalización de conversaciones locales y remotas reconoce `archived`, `isArchived`, `archiveSyncStatus` y `archiveSyncedAt` sin perder lógica previa de mensajes, lectura, estados, llamadas, adjuntos, `streme` ni sesión por correo.
 - Se corrigió el incremento duplicado del contador interno de guardas de sesión para evitar saltos innecesarios en `activeSessionRuntimeId` sin cambiar el comportamiento de seguridad existente.
@@ -1214,7 +1240,7 @@ Reglas adicionales de validación:
 - Archivar debe sacar el chat de la lista principal sin borrar mensajes ni estado local.
 - Restaurar debe devolver el chat a la lista principal y abrirlo cuando la acción se ejecute desde el modal.
 - En modo backend, el cambio de archivado debe usar `PATCH /api/v1/conversaciones/{conversationId}` y encolarse si memoriaBACKEND no responde.
-- La acción de crear chat no debe duplicar una conversación archivada con el mismo correo; debe restaurarla y abrirla.
+- La acción de crear chat no debe duplicar una conversación archivada con el mismo correo; debe abrirla sin restaurarla automáticamente y solo cambiar `archived:false` cuando el actor ejecute **Restaurar**.
 - La interfaz debe seguir funcionando sin imágenes reales: los avatares opcionales continúan usando placeholders geométricos.
 
 
@@ -1824,7 +1850,7 @@ Mejora aplicada:
 - `js/app.js` agrega validación local de correo mediante `isValidEmailAddress()` reutilizando la normalización de identidad existente.
 - La lista de chats ahora muestra una acción directa **Crear chat con correo@dominio.com** cuando la búsqueda no devuelve resultados y el texto escrito es un correo válido.
 - La nueva acción reutiliza `getOrCreateConversationByEmail()` para no duplicar procesos de creación, mantener el aislamiento por correo y conservar la cola idempotente `POST /api/v1/conversaciones` cuando memoriaBACKEND está configurado.
-- Si el correo pertenece a un chat archivado, la acción lo restaura con la lógica existente de `setConversationArchived()` antes de abrirlo, preservando `PATCH /api/v1/conversaciones/{conversationId}` y la sincronización posterior.
+- Si el correo pertenece a un chat archivado, la acción lo abre sin sacarlo de Archivados ni ejecutar `setConversationArchived()`; la restauración queda reservada para la acción explícita **Restaurar**.
 - Para búsquedas que no son correo válido, el estado vacío ofrece **Nuevo chat por correo** y abre el modal existente de creación, sin inventar otro flujo.
 - `css/styles.css` añade espaciado de producción para las acciones del estado vacío sin alterar el layout general de listas, estados, llamadas o herramientas.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-search-email-start-chat-31` para que una PWA instalada detecte el cambio y actualice el shell sin reinstalar.
@@ -1833,7 +1859,7 @@ Criterio de validación nuevo:
 
 - El buscador de la lista principal debe poder iniciar una conversación cuando recibe un correo válido sin resultados.
 - La creación desde búsqueda debe reutilizar la lógica existente de conversación local y cola hacia memoriaBACKEND.
-- Los chats archivados encontrados por correo deben poder restaurarse y abrirse sin perder mensajes.
+- Los chats archivados encontrados por correo deben poder abrirse sin perder mensajes; restaurarlos exige la acción explícita **Restaurar**.
 - La mejora no debe afectar autenticación Google/Gmail, tema automático, `streme`, PWA, notificaciones, adjuntos, emojis, estados 24h, llamadas, herramientas, assets PNG opcionales ni el menú contextual de conversación.
 
 
@@ -3447,3 +3473,130 @@ Alcance preservado:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique la mejora y vuelva a validar antes de emitir la frase final.
+
+## 121. Revisión de punto débil: ciclo de archivado, eliminación limpia y chat Redis compartido
+
+En esta iteración se revisó el flujo completo de archivado/restauración, eliminación por participante y reutilización de conversaciones. El punto débil era que algunos caminos de apertura o recreación todavía podían interpretar un chat archivado como si debiera restaurarse automáticamente, y los eventos realtime de archivado podían llegar sin alcance por actor, exponiendo al cliente a rearchivados ajenos o antiguos.
+
+Cambios funcionales incorporados:
+
+- `js/app.js` permite abrir y operar un chat archivado sin sacarlo de Archivados; el composer solo se bloquea si el chat está bloqueado, no por estar archivado.
+- Crear o abrir un contacto existente ya no ejecuta restauración automática del archivado; si el chat fue eliminado por esa cuenta, se limpia la eliminación local y se reutiliza el chat existente.
+- La búsqueda y creación de conversaciones compara también por `sharedConversationKey`, `redisConversationKey` y participantes normalizados, evitando chats duplicados para los mismos participantes.
+- Los eventos `conversation.archived` y `conversation.restored` de STREMEx se aplican únicamente cuando corresponden al usuario actual o cuando el backend envía `archivedForCurrentUser`; eventos actor-only de otros participantes no reescriben el estado local.
+- La eliminación realtime oculta el chat solo para la cuenta actual, limpia banderas de archivado/bloqueo y conserva el registro interno de eliminación por participante para que el backend borre de Redis solo cuando todos los participantes hayan eliminado el chat.
+- El contrato `POST /api/v1/conversaciones` documenta `sharedConversationKey`, `redisChatKey`, `participantCount`, `deletionPolicy` y reutilización obligatoria del chat Redis existente.
+
+Reglas adicionales de validación:
+
+- Abrir un chat archivado debe abrirlo sin restaurarlo ni rearchivarlo automáticamente.
+- Restaurar un chat archivado solo debe ocurrir por acción manual del actor o por un `PATCH archived:false` actor-only de esa misma cuenta.
+- Eliminar un chat o contacto debe limpiar bloqueos locales para permitir recrearlo y recuperar el chat existente si todavía vive en Redis.
+- En conversaciones de dos o más participantes debe existir una sola identidad compartida de Redis; eliminar desde una cuenta solo reduce visibilidad/contador interno, y el borrado físico solo procede cuando el contador llega a `0`.
+- La mejora no debe afectar autenticación Google/Gmail, mensajes, adjuntos, estados, llamadas, búsqueda, PWA, imágenes opcionales, compresión WebP ni módulos LEGO.
+
+## 131. Revisión de punto débil: eliminación realtime actor-only sin ocultar chats de otros participantes
+
+En esta iteración se detectó que el archivado/restauración ya validaba actor y alcance por participante, pero los eventos `conversation.deleted` o `chat.deleted` podían llegar desde STREMEx con `deleted:true` y `visibilityScope: actor_only` sin una bandera explícita para la cuenta actual. En ese caso, una eliminación hecha por otro participante podía ocultar el chat local de quien todavía debía conservarlo.
+
+Cambios aplicados:
+
+- `js/app.js` ahora reconoce `deletedBy`, `deletedByUserId` y `deletedByUserEmail` en eventos realtime, igual que ya hacía con archivado/restauración.
+- La eliminación realtime solo oculta el chat para la cuenta actual si llega `deletedForCurrentUser`/`hiddenForCurrentUser`, si el registro interno de eliminación incluye al usuario actual, si el actor del evento es la cuenta actual o si el contador interno indica borrado final (`remainingParticipantCount`/`deletionCounterRemaining` = `0`).
+- Si otro participante elimina el chat con alcance `actor_only` o `per-participant`, ChatER conserva el chat visible para la cuenta actual y solo guarda el registro interno no visible cuando viene en el evento.
+- `app-version.json` y `service-worker.js` quedan sincronizados en `2026-07-04-chat-lifecycle-redis-137` para invalidar la caché PWA del shell estático.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- No se modifica autenticación, creación de contactos, QR, permisos, compresión WebP, mensajes, adjuntos, llamadas, estados, herramientas, búsqueda ni el contrato de creación de conversaciones. La mejora queda limitada al tratamiento realtime de eliminación por participante y a la versión de publicación.
+
+## 132. Refuerzo de punto débil: registro interno de eliminación por participante y reutilización Redis compartida
+
+En esta iteración se reforzó la parte débil del ciclo de vida de chats compartidos: los eventos realtime y payloads parciales podían perder el registro interno de eliminación por participante o no reconciliar una conversación local con la identidad canónica Redis existente. Eso podía generar duplicados, ocultamientos incorrectos o recreaciones con estado local residual.
+
+Cambios funcionales aplicados:
+
+- `js/app.js` normaliza identidades de eliminación tanto en formato simple (`correo`, `userId`) como en formato lifecycle (`email:correo`, `user:userId`) para comparar correctamente contra la cuenta actual.
+- `js/app.js` conserva fuentes internas no visibles como `deletionRegistry`, `localDeletionRegistry`, `participantDeletionRegistry`, `deletedParticipants`, `deletedParticipantIdentityKeys`, `participantCount`, `deletionCounterInitial`, `deletionCounterRemaining` y `remainingParticipantCount`.
+- Los eventos `conversation.deleted` / `chat.deleted` ya no eliminan ni ocultan el chat de la cuenta actual por una eliminación ajena mientras el contador interno no indique borrado final.
+- Cuando una cuenta elimina un chat, el cliente limpia banderas locales de bloqueo/archivado para que el contacto pueda volver a crearse y, si el chat Redis todavía existe, se reutilice la conversación existente.
+- Al restaurar o recrear una conversación eliminada localmente, el cliente remueve la identidad de la cuenta actual del registro interno y recalcula los contadores sin afectar el historial compartido restante.
+- Antes del merge realtime, el cliente reconcilia `sharedConversationKey`, `redisConversationKey`, `redisChatKey` y claves equivalentes para convertir un chat local temporal en la identidad remota canónica sin crear una segunda conversación.
+
+Contrato esperado con backend/Redis:
+
+- Para una conversación entre dos o más participantes debe existir una sola clave compartida estable en Redis.
+- La eliminación por participante debe marcarse como registro interno no visible para el usuario final.
+- El borrado físico en Redis solo debe ejecutarse cuando `deletionCounterRemaining` o `remainingParticipantCount` llegue a `0`.
+- Si una parte eliminó el chat y luego vuelve a agregar el contacto o crear la conversación, el backend debe devolver la conversación existente si todavía vive en Redis.
+- Los eventos realtime deben enviar `deletedForCurrentUser` solo cuando el evento aplica a la cuenta actual; para eliminaciones ajenas debe enviarse registro interno/contador sin ocultar el chat local.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- No se modifica autenticación, Google/Gmail, QR, permisos, compresión WebP, mensajes, adjuntos, llamadas, estados, herramientas, búsqueda ni módulos de UI no relacionados. La mejora queda limitada al ciclo de vida de conversaciones, eliminación por participante, reconciliación Redis compartida y versión/cache PWA.
+
+
+
+## 133. Refuerzo de punto débil: contador interno completo en eliminaciones parciales Redis
+
+En esta iteración se detectó un punto débil residual en el ciclo de vida de chats compartidos: si memoriaBACKEND o STREMEx enviaba un evento parcial de eliminación con `remainingParticipantCount` o `deletionCounterRemaining`, pero sin `participantCount` ni `counterInitial`, el cliente podía conservar el registro interno de eliminación pero inferir un total de participantes demasiado bajo. En chats de tres o más integrantes, eso podía dejar un contador local inconsistente aunque el backend todavía conservara el chat Redis.
+
+Cambios aplicados:
+
+- `js/app.js` ahora resuelve el total real de participantes desde `participantCount`, `deletionCounterInitial`, `participantDeletionRegistry.counterInitial` y registros equivalentes dentro de `metadata`, `deletionRegistry` y `localDeletionRegistry`.
+- Cuando un evento realtime trae contador restante y lista de participantes eliminados, `js/app.js` infiere el total como `remainingParticipantCount + deletedParticipantIdentityKeys.length`; si el backend solo informa el actor de la eliminación, ese actor también entra al registro interno para evitar degradar grupos a contador `1` por payloads parciales.
+- La restauración o recreación de un chat eliminado localmente conserva el total interno antes de remover la identidad del actor actual del registro de eliminación.
+- Se preserva la regla existente: abrir un chat archivado no lo restaura, restaurar no lo rearchiva automáticamente, eliminar limpia bloqueo local y Redis solo debe borrarse cuando el contador llega a `0`.
+- `app-version.json` y `service-worker.js` quedan sincronizados en `2026-07-04-chat-lifecycle-redis-139` para actualizar el shell instalado.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- No se modifica autenticación, Google/Gmail, QR, permisos, compresión WebP, mensajes, adjuntos, llamadas, estados, herramientas, búsqueda ni módulos visuales no relacionados. La mejora queda limitada al contador interno de eliminación por participante, conservación del registro no visible y versión/cache PWA.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+## 134. Refuerzo de punto débil: limpieza defensiva de bloqueo al eliminar y recrear contactos
+
+En esta iteración se detectó un punto débil residual del ciclo de vida de chats/contactos: la eliminación local ya limpiaba `blocked` y removía operaciones pendientes, pero la revocación remota de bloqueo solo se enviaba cuando la copia local marcaba el chat como bloqueado. Si memoriaBACKEND o una relación previa conservaban un bloqueo residual no reflejado localmente, el usuario podía eliminar el contacto/chat y luego encontrar fricción al recrearlo.
+
+Cambios aplicados:
+
+- `js/app.js` ahora genera una revocación defensiva de bloqueo en toda eliminación de chat/contacto, aunque `conversation.blocked` local ya sea `false`.
+- Después de ocultar el chat para el actor, `js/app.js` sincroniza la relación del contacto con `status: deleted` y `blocked: false`, manteniendo el borrado como visibilidad por participante y no como eliminación física prematura de Redis.
+- Al restaurar o recrear un contacto eliminado, `js/app.js` vuelve a enviar limpieza defensiva de bloqueo antes de sincronizar la relación activa y de hidratar el historial del chat Redis existente.
+- Se conserva la regla previa de archivado: abrir un chat archivado no lo restaura, restaurarlo no lo rearchiva automáticamente y solo una acción manual de archivar puede devolverlo a Archivados.
+- `app-version.json` y `service-worker.js` quedan sincronizados en `2026-07-04-chat-lifecycle-clean-delete-140` para invalidar la caché PWA del shell estático.
+
+Validación ejecutada:
+
+- `node --check js/app.js` ejecutado correctamente.
+- `node --check service-worker.js` ejecutado correctamente.
+- `node --check js/pwa.js` ejecutado correctamente.
+- `app-version.json` validado como JSON correcto.
+
+Alcance preservado:
+
+- No se modifica autenticación, Google/Gmail, QR, permisos, compresión WebP, mensajes, adjuntos, llamadas, estados, herramientas, búsqueda ni módulos visuales no relacionados. La mejora queda limitada a limpieza de bloqueo/relación, eliminación por participante, restauración/recreación de contactos y versión/cache PWA.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
