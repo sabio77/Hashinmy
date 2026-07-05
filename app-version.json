@@ -1,0 +1,17 @@
+{
+  "version": "2026-07-04-realtime-events-autoupdate-130",
+  "buildTime": "2026-07-04T17:53:00-05:00",
+  "channel": "render-static-site",
+  "app": "ChatER",
+  "description": "ChatER aplica cambios de app, logo, conversaciones, perfiles y estados desde eventos de memoriaBACKEND sin polling hacia memoriaBACKEND ni botón de actualización obligatorio.",
+  "build": "realtime-events-autoupdate-130",
+  "updatedAt": "2026-07-04T17:53:00-05:00",
+  "notes": "La PWA instalada queda conectada a eventos STREMEx para refrescar shell, manifest e iconos/logos automáticamente. La UI procesa eventos realtime de conversaciones, chats, avatares, perfiles, estados y llamadas sin consultas periódicas hacia memoriaBACKEND.",
+  "changes": [
+    "js/app.js agrega handlers STREMEx para conversaciones/chats creados, actualizados, archivados, restaurados y eliminados.",
+    "js/app.js actualiza perfiles, avatares, estados y llamadas desde eventos de memoriaBACKEND y re-renderiza la sección activa sin polling.",
+    "js/app.js notifica a la PWA eventos app.version.changed y app.logo.updated para refrescar shell, manifest, iconos y logo automáticamente.",
+    "js/pwa.js elimina la vigilancia periódica de app-version y aplica actualizaciones por eventos de memoriaBACKEND o service worker sin exigir botón.",
+    "service-worker.js refresca también assets/chater-logo.png como asset opcional con fallback geométrico, junto con iconos instalables."
+  ]
+}

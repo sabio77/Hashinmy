@@ -1,1 +1,0 @@
-Prompt para logo Design & 3D International: recrear o preparar el logo oficial de Design & 3D International respetando su isotipo circular, referencia 2D/3D/1D, tipografía y distribución original. Debe guardarse como assets/logo_design_&_3D_international.png, con buena nitidez, fondo limpio, legibilidad completa y sin elementos inventados.

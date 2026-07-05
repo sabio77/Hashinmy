@@ -1,1 +1,0 @@
-Prompt para logo Maxpunz: recrear o preparar el logo oficial de Maxpunz respetando el símbolo M, marco redondeado, composición monocromática y tipografía inferior. Debe guardarse como assets/logo_maxpunz.png, con fondo limpio, alta legibilidad y sin rediseñar la identidad.

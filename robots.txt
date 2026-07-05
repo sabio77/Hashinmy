@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://hashinmy.com/sitemap.xml
-
-# Hashinmy mantiene rutas HTML estáticas para productos, industrias, formas de pago, proceso y glosario.

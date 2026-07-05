@@ -1,1 +1,0 @@
-Prompt para logo Robots Colombia: recrear o preparar el logo oficial de Robots Colombia respetando el brazo robótico rojo, texto ROBOTS COLOMBIA, proporción horizontal, contraste y registro visual. Debe guardarse como assets/logo_robots-colombia.png, nítido, centrado y listo para tarjetas web.

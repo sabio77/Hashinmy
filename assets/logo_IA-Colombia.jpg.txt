@@ -1,1 +1,0 @@
-Prompt para logo IA Colombia: recrear o preparar el logo oficial de IA Colombia respetando las letras IA, el texto Colombia, el color azul principal, el equilibrio visual y el fondo limpio. Debe guardarse como assets/logo_IA-Colombia.jpg, centrado, nítido y sin añadir información no presente en el logo original.
