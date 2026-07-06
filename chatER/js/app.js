@@ -147,12 +147,106 @@ const CHATER_IMAGE_UPLOAD_MAX_DIMENSION = 4096;
 const CHATER_EPHEMERAL_TTL_SECONDS = 24 * 60 * 60;
 const CHATER_EPHEMERAL_TTL_MS = CHATER_EPHEMERAL_TTL_SECONDS * 1000;
 
+function parseChatEphemeralTimestampMs(value = '') {
+  const parsed = value instanceof Date
+    ? value.getTime()
+    : (Number.isFinite(Number(value)) ? Number(value) : Date.parse(String(value || '')));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function coerceChatEphemeralExpiresAtIso(expiresAt = '', baseTime = Date.now()) {
+  const baseMs = parseChatEphemeralTimestampMs(baseTime) || Date.now();
+  const maxExpiresMs = baseMs + CHATER_EPHEMERAL_TTL_MS;
+  const requestedMs = parseChatEphemeralTimestampMs(expiresAt);
+  const finalMs = requestedMs > 0 ? Math.min(requestedMs, maxExpiresMs) : maxExpiresMs;
+  return new Date(finalMs).toISOString();
+}
+
 function getChatEphemeralExpiresAtIso(baseTime = Date.now()) {
-  const baseMs = baseTime instanceof Date
-    ? baseTime.getTime()
-    : (Number.isFinite(Number(baseTime)) ? Number(baseTime) : Date.parse(String(baseTime || '')));
-  const safeBaseMs = Number.isFinite(baseMs) && baseMs > 0 ? baseMs : Date.now();
-  return new Date(safeBaseMs + CHATER_EPHEMERAL_TTL_MS).toISOString();
+  return coerceChatEphemeralExpiresAtIso('', baseTime);
+}
+
+function getChatMessageCreatedAtIso(message = {}, fallbackIso = new Date().toISOString()) {
+  const candidate = message.createdAt
+    || message.clientTime
+    || message.sentAt
+    || message.timestamp
+    || message.backendReceivedAt
+    || message.metadata?.createdAt
+    || message.metadata?.clientTime
+    || '';
+  const candidateMs = parseChatEphemeralTimestampMs(candidate);
+  if (candidateMs) return new Date(candidateMs).toISOString();
+  const fallbackMs = parseChatEphemeralTimestampMs(fallbackIso) || Date.now();
+  return new Date(fallbackMs).toISOString();
+}
+
+function normalizeChatMessageEphemeralFields(message = {}, options = {}) {
+  if (!message || typeof message !== 'object') return message;
+  const nowIso = options.nowIso || new Date().toISOString();
+  const createdAt = getChatMessageCreatedAtIso(message, nowIso);
+  const expiresAt = coerceChatEphemeralExpiresAtIso(
+    message.expiresAt
+      || message.expiryAt
+      || message.expireAt
+      || message.expiresAtAt
+      || message.metadata?.expiresAt
+      || message.metadata?.expiryAt
+      || '',
+    createdAt
+  );
+  return {
+    ...message,
+    createdAt,
+    clientTime: message.clientTime || createdAt,
+    expiresAt,
+    ttlSeconds: Number(message.ttlSeconds || message.ephemeralTtlSeconds || message.metadata?.ephemeralTtlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS
+  };
+}
+
+function isChatMessageExpired(message = {}, nowMs = Date.now()) {
+  const expiresAtMs = parseChatEphemeralTimestampMs(
+    message.expiresAt
+      || message.expiryAt
+      || message.expireAt
+      || message.expiresAtAt
+      || message.metadata?.expiresAt
+      || ''
+  );
+  return Boolean(expiresAtMs && expiresAtMs <= nowMs);
+}
+
+function normalizeAndPruneChatMessages(messages = []) {
+  if (!Array.isArray(messages) || !messages.length) return [];
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
+  return messages
+    .map((message) => normalizeChatMessageEphemeralFields(message, { nowIso }))
+    .filter((message) => !isChatMessageExpired(message, nowMs));
+}
+
+function pruneExpiredChatMessagesFromConversation(conversation = {}) {
+  if (!conversation || !Array.isArray(conversation.messages)) return false;
+  const beforeCount = conversation.messages.length;
+  const nextMessages = normalizeAndPruneChatMessages(conversation.messages);
+  if (nextMessages.length === beforeCount) {
+    conversation.messages = nextMessages;
+    return false;
+  }
+  conversation.messages = nextMessages;
+  conversation.messagesHydrated = Boolean(conversation.messagesHydrated);
+  conversation.status = conversation.status === 'Enviando...' ? 'Mensajes expirados depurados' : (conversation.status || 'Sincronizado');
+  return true;
+}
+
+function pruneExpiredChatMessagesFromState(state = null) {
+  const targetState = state || (typeof appState !== 'undefined' ? appState : null);
+  if (!targetState || !Array.isArray(targetState.conversations)) return false;
+  let changed = false;
+  targetState.conversations.forEach((conversation) => {
+    if (pruneExpiredChatMessagesFromConversation(conversation)) changed = true;
+  });
+  return changed;
 }
 
 function clampImageUploadMaxBytes(value) {
@@ -998,6 +1092,80 @@ function resolveConversationArchivedForCurrentUser(raw = {}, metadata = {}) {
   ], false);
 }
 
+function normalizeProfileAvatarImage(value = '') {
+  return normalizeAssetImagePath(value);
+}
+
+function readProfileAvatarCandidate(source = {}) {
+  if (!source || typeof source !== 'object') return '';
+  const publicData = source.publicData && typeof source.publicData === 'object' ? source.publicData : {};
+  const metadata = source.metadata && typeof source.metadata === 'object' ? source.metadata : {};
+  const profile = source.profile && typeof source.profile === 'object' ? source.profile : {};
+  const contact = source.contact && typeof source.contact === 'object' ? source.contact : {};
+  return normalizeProfileAvatarImage(
+    source.avatarImage
+    || source.avatarAsset
+    || source.profileImage
+    || source.avatarUrl
+    || source.photoUrl
+    || source.photoURL
+    || source.picture
+    || source.imageUrl
+    || source.profileImageUrl
+    || publicData.avatarImage
+    || publicData.avatarAsset
+    || publicData.profileImage
+    || publicData.avatarUrl
+    || publicData.photoUrl
+    || publicData.photoURL
+    || publicData.picture
+    || publicData.imageUrl
+    || publicData.profileImageUrl
+    || metadata.avatarImage
+    || metadata.avatarAsset
+    || metadata.profileImage
+    || metadata.avatarUrl
+    || metadata.photoUrl
+    || metadata.photoURL
+    || metadata.picture
+    || metadata.imageUrl
+    || metadata.profileImageUrl
+    || profile.avatarImage
+    || profile.avatarAsset
+    || profile.profileImage
+    || profile.avatarUrl
+    || profile.photoUrl
+    || profile.photoURL
+    || profile.picture
+    || profile.imageUrl
+    || profile.profileImageUrl
+    || contact.avatarImage
+    || contact.avatarAsset
+    || contact.profileImage
+    || contact.avatarUrl
+    || contact.photoUrl
+    || contact.photoURL
+    || contact.picture
+    || contact.imageUrl
+    || contact.profileImageUrl
+    || ''
+  );
+}
+
+function withProfileAvatarAliases(base = {}, avatarImage = '') {
+  const normalizedAvatar = normalizeProfileAvatarImage(avatarImage);
+  if (!normalizedAvatar) return base;
+  return {
+    ...base,
+    avatarImage: normalizedAvatar,
+    profileImage: normalizedAvatar,
+    avatarUrl: normalizedAvatar,
+    photoUrl: normalizedAvatar,
+    picture: normalizedAvatar,
+    profileImageUrl: normalizedAvatar
+  };
+}
+
 function normalizeConversationParticipantForApi(participant = {}, fallbackRole = 'participant') {
   if (!participant || typeof participant !== 'object') return null;
 
@@ -1022,15 +1190,16 @@ function normalizeConversationParticipantForApi(participant = {}, fallbackRole =
     || email
     || ''
   ).trim();
+  const avatarImage = readProfileAvatarCandidate(participant);
 
   if (!email && !userId && !displayName) return null;
 
-  return {
+  return withProfileAvatarAliases({
     ...(userId ? { userId } : {}),
     ...(email ? { email, userEmail: email } : {}),
     ...(displayName ? { displayName, name: displayName } : {}),
     role: participant.role || participant.kind || fallbackRole
-  };
+  }, avatarImage);
 }
 
 function normalizeConversationParticipantsForApi(participants = [], fallbackEmail = '', fallbackName = '') {
@@ -1128,12 +1297,12 @@ function buildConversationCreateParticipants(contact = {}) {
       displayName: getSessionEmail(),
       role: 'owner'
     },
-    {
+    withProfileAvatarAliases({
       ...(contactUserId ? { userId: contactUserId } : {}),
       email: contactEmail,
       displayName: contactDisplayName,
       role: 'contact'
-    }
+    }, readProfileAvatarCandidate(contact))
   ]);
 }
 
@@ -2180,7 +2349,8 @@ const apiClient = {
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
     const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
-    const expiresAt = getChatEphemeralExpiresAtIso();
+    const clientTime = options.clientTime || options.createdAt || new Date().toISOString();
+    const expiresAt = coerceChatEphemeralExpiresAtIso(options.expiresAt || '', clientTime);
 
     return this.request('/api/v1/mensajes', {
       method: 'POST',
@@ -2198,7 +2368,7 @@ const apiClient = {
         recipientUserEmail: firstRecipient.email || '',
         text,
         status: 'sent',
-        clientTime: new Date().toISOString(),
+        clientTime,
         expiresAt,
         ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
@@ -2489,16 +2659,21 @@ const apiClient = {
     });
   },
   getMediaReadUrl(mediaId, options = {}) {
-    const params = new URLSearchParams({
-      mediaId,
-      userId: options.userId || getCurrentUserIdentifier(),
-      userEmail: options.userEmail || getSessionEmail()
-    });
-    if (options.entityType) params.set('entityType', options.entityType);
-    if (options.entityId) params.set('entityId', options.entityId);
-    if (options.conversationId) params.set('conversationId', options.conversationId);
-    return this.request(`/api/v1/media-firmada/${encodeURIComponent(mediaId)}/leer?${params.toString()}`, {
-      timeoutMs: CHATER_CONFIG.mediaUploadTimeoutMs
+    const clientMutationId = options.clientMutationId || generateClientMutationId();
+    return this.request(`/api/v1/media-firmada/${encodeURIComponent(mediaId)}/url-lectura`, {
+      method: 'POST',
+      timeoutMs: CHATER_CONFIG.mediaUploadTimeoutMs,
+      idempotencyKey: clientMutationId,
+      body: JSON.stringify(withMemoriaSitePayload({
+        mediaId,
+        userId: options.userId || getCurrentUserIdentifier(),
+        userEmail: options.userEmail || getSessionEmail(),
+        entityType: options.entityType || 'mensaje',
+        entityId: options.entityId || '',
+        conversationId: options.conversationId || '',
+        ttlSeconds: options.ttlSeconds || 900,
+        clientMutationId
+      }))
     });
   },
   async createR2xImageIntent(file, options = {}, clientMutationId = generateClientMutationId()) {
@@ -2595,7 +2770,8 @@ const apiClient = {
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
     const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
-    const expiresAt = getChatEphemeralExpiresAtIso();
+    const clientTime = payload.clientTime || payload.createdAt || new Date().toISOString();
+    const expiresAt = coerceChatEphemeralExpiresAtIso(payload.expiresAt || '', clientTime);
     return this.request('/api/v1/mensajes', {
       method: 'POST',
       idempotencyKey: clientMutationId,
@@ -2620,8 +2796,8 @@ const apiClient = {
         }],
         media: payload,
         status: 'sent',
-        clientTime: payload.clientTime || new Date().toISOString(),
-        expiresAt: payload.expiresAt || expiresAt,
+        clientTime,
+        expiresAt,
         ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
           source: 'chater-static-site',
@@ -2631,7 +2807,7 @@ const apiClient = {
           recipientUserEmail: firstRecipient.email || '',
           recipients,
           ...lifecycle,
-          expiresAt: payload.expiresAt || expiresAt,
+          expiresAt,
           ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
           channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
           userInboxChannel: getCurrentUserStremeInboxChannel(),
@@ -3746,9 +3922,43 @@ function shouldDiscardQueuedArchiveOperation(operation = {}) {
   return false;
 }
 
+function isQueuedEphemeralMessageOperationExpired(operation = {}) {
+  if (!['sendMessage', 'createMediaMessage'].includes(operation?.type)) return false;
+  const payload = operation.payload || {};
+  const mediaPayload = payload.mediaMessagePayload || {};
+  const createdAt = payload.createdAt
+    || payload.clientTime
+    || mediaPayload.createdAt
+    || mediaPayload.clientTime
+    || operation.createdAt
+    || '';
+  const explicitExpiresAt = payload.expiresAt
+    || mediaPayload.expiresAt
+    || mediaPayload.metadata?.expiresAt
+    || '';
+  if (!explicitExpiresAt && !createdAt) return false;
+  const expiresAt = explicitExpiresAt || coerceChatEphemeralExpiresAtIso('', createdAt);
+  return isChatMessageExpired({ expiresAt });
+}
+
+function removeQueuedEphemeralMessageFromLocalState(operation = {}) {
+  const payload = operation.payload || {};
+  const conversationId = String(payload.conversationId || '').trim();
+  const messageId = String(payload.clientMessageId || payload.mediaMessagePayload?.clientMutationId || '').trim();
+  if (!conversationId || !messageId || typeof appState === 'undefined') return false;
+  const conversation = appState.conversations?.find?.((item) => String(item.id || '') === conversationId);
+  if (!conversation || !Array.isArray(conversation.messages)) return false;
+  const beforeCount = conversation.messages.length;
+  conversation.messages = conversation.messages.filter((message) => {
+    const ids = getMessageIdentityCandidates(message);
+    return !ids.includes(messageId);
+  });
+  return conversation.messages.length !== beforeCount;
+}
+
 function compactBackendOutboxQueue(queue = []) {
   const items = Array.isArray(queue)
-    ? queue.filter((operation) => operation && operation.id && operation.type && operation.payload)
+    ? queue.filter((operation) => operation && operation.id && operation.type && operation.payload && !isQueuedEphemeralMessageOperationExpired(operation))
     : [];
   const latestArchiveOperationByConversation = new Map();
 
@@ -4275,6 +4485,10 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'sendMessage') {
+    if (isQueuedEphemeralMessageOperationExpired(operation)) {
+      removeQueuedEphemeralMessageFromLocalState(operation);
+      return;
+    }
     if (operation.payload.requiresConversationSync && isConversationWaitingForBackendSync(operation.payload.conversationId)) {
       throw new Error('conversation_sync_pending');
     }
@@ -4285,7 +4499,12 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
       operation.payload.conversationId,
       operation.payload.text,
       operation.payload.clientMessageId,
-      { conversation }
+      {
+        conversation,
+        createdAt: operation.payload.createdAt || operation.payload.clientTime || '',
+        clientTime: operation.payload.clientTime || operation.payload.createdAt || '',
+        expiresAt: operation.payload.expiresAt || ''
+      }
     );
     if (!isSessionGuardCurrent(sessionGuard)) return;
     markQueuedMessageSynced(operation.payload.conversationId, operation.payload.clientMessageId, payload);
@@ -4296,6 +4515,10 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'createMediaMessage') {
+    if (isQueuedEphemeralMessageOperationExpired(operation)) {
+      removeQueuedEphemeralMessageFromLocalState(operation);
+      return;
+    }
     const payload = await apiClient.createMediaMessage(
       operation.payload.conversationId,
       operation.payload.mediaMessagePayload
@@ -5199,7 +5422,7 @@ function normalizeLoadedState(saved) {
   };
 
   state.conversations.forEach((conversation) => {
-    conversation.messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+    conversation.messages = normalizeAndPruneChatMessages(Array.isArray(conversation.messages) ? conversation.messages : []);
     conversation.avatar = conversation.avatar || getInitials(conversation.name || conversation.email);
     conversation.avatarImage = normalizeAssetImagePath(conversation.avatarImage || conversation.avatarAsset);
     conversation.archived = coerceFirstBooleanFlag([conversation.archived, conversation.isArchived], false);
@@ -5670,6 +5893,7 @@ async function syncUserPreferencesToBackend(reason = 'sync') {
 }
 
 function persistState() {
+  pruneExpiredChatMessagesFromState(appState);
   const ownerEmail = normalizeStorageIdentity(getSessionEmail());
   const storageKey = getStateStorageKey(ownerEmail);
   try {
@@ -8698,6 +8922,11 @@ function renderConversation() {
   // Un chat archivado sigue siendo abrible y operable; archivado solo controla su visibilidad en la lista principal.
   setComposerEnabled(!conversation.blocked);
   ensureStremeConversationSubscription(conversation.id);
+  const removedExpiredMessages = pruneExpiredChatMessagesFromConversation(conversation);
+  if (removedExpiredMessages) {
+    persistState();
+    renderChatList(searchInput.value);
+  }
 
   messagesContainer.innerHTML = '';
   conversation.messages.forEach((message) => {
@@ -9604,10 +9833,16 @@ function renderMessageAttachment(container, message = {}, mediaKind = getMessage
     return;
   }
 
-  const chip = document.createElement('span');
+  const chip = document.createElement(mediaSrc ? 'a' : 'span');
   chip.className = `attachment-chip attachment-chip-${mediaKind || 'file'}`;
   chip.title = mediaName;
   chip.textContent = `${getMessageMediaIcon(mediaKind)} ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}`;
+  if (mediaSrc) {
+    chip.href = mediaSrc;
+    chip.download = mediaName || 'adjunto';
+    chip.rel = 'noopener';
+    chip.target = '_blank';
+  }
   container.appendChild(chip);
 }
 
@@ -9706,7 +9941,15 @@ function getMessageMediaStatusLabel(status = '') {
 function normalizeMessageMediaSource(value = '') {
   const source = String(value || '').trim();
   if (!source) return '';
-  if (/^(data:(image|video|audio)\/|blob:|https?:\/\/|\.\/|\/)/i.test(source)) return source;
+  if (/^data:(image|video|audio|application|text)\//i.test(source) || /^blob:/i.test(source) || /^https?:\/\//i.test(source) || /^\.\//.test(source)) return source;
+  if (source.startsWith('/api/') && CHATER_CONFIG.backendBaseUrl) {
+    try {
+      return buildApiUrl(source, { siteScoped: true });
+    } catch (error) {
+      return source;
+    }
+  }
+  if (source.startsWith('/')) return source;
   return '';
 }
 
@@ -9972,12 +10215,17 @@ async function sendMessage(text) {
   if (!conversationReady || !isSessionGuardCurrent(sessionGuard)) return;
 
   const clientMessageId = generateClientMutationId();
+  const sentAt = new Date().toISOString();
   const outgoing = {
     id: clientMessageId,
     clientMutationId: clientMessageId,
     type: 'outgoing',
     text,
     time: getCurrentTime(),
+    createdAt: sentAt,
+    clientTime: sentAt,
+    expiresAt: getChatEphemeralExpiresAtIso(sentAt),
+    ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
     status: 'local',
     receiptStatus: 'local',
     senderUserId: getCurrentUserIdentifier(),
@@ -10009,7 +10257,7 @@ async function sendMessage(text) {
       type: 'sendMessage',
       dedupeKey: `message:${clientMessageId}`,
       replaceExisting: true,
-      payload: { conversationId: conversation.id, text, clientMessageId, requiresConversationSync: true }
+      payload: { conversationId: conversation.id, text, clientMessageId, createdAt: outgoing.createdAt, clientTime: outgoing.clientTime, expiresAt: outgoing.expiresAt, requiresConversationSync: true }
     });
     persistState();
     renderChatList(searchInput.value);
@@ -10035,7 +10283,7 @@ async function sendMessage(text) {
     enqueueBackendOperation({
       type: 'sendMessage',
       dedupeKey: `message:${clientMessageId}`,
-      payload: { conversationId: conversation.id, text, clientMessageId }
+      payload: { conversationId: conversation.id, text, clientMessageId, createdAt: outgoing.createdAt, clientTime: outgoing.clientTime, expiresAt: outgoing.expiresAt }
     });
     showToast('Mensaje guardado localmente y en cola de sincronización.');
   } finally {
@@ -11525,7 +11773,8 @@ function normalizeContactCreationInput(contact = {}) {
   const email = normalizeStorageIdentity(contact.email || contact.userEmail || contact.contactEmail || contact.mail || '');
   const userId = normalizeBackendUserId(contact.userId || contact.contactUserId || contact.uid || contact.id || '');
   const name = String(contact.name || contact.displayName || contact.alias || (email ? email.split('@')[0] : '') || 'Contacto').trim();
-  return {
+  const avatarImage = readProfileAvatarCandidate(contact);
+  return withProfileAvatarAliases({
     name,
     displayName: name,
     email,
@@ -11533,7 +11782,7 @@ function normalizeContactCreationInput(contact = {}) {
     source: contact.source || 'manual',
     backendQrResolvedAt: contact.backendQrResolvedAt || contact.resolvedAt || '',
     relationId: contact.relationId || contact.relation?.id || ''
-  };
+  }, avatarImage);
 }
 
 function findConversationByContactIdentity(contact = {}) {
@@ -11584,7 +11833,7 @@ function createLocalContactConversation(contact = {}) {
 
   const participants = normalizeConversationParticipantsForApi([
     { email: getSessionEmail(), userId: getSessionUserId() || getCurrentUserIdentifier(), role: 'owner', displayName: getSessionEmail() },
-    { email: normalizedContact.email, userId: normalizedContact.userId || '', role: 'contact', displayName: normalizedContact.name }
+    withProfileAvatarAliases({ email: normalizedContact.email, userId: normalizedContact.userId || '', role: 'contact', displayName: normalizedContact.name }, normalizedContact.avatarImage)
   ], normalizedContact.email, normalizedContact.name);
   const lifecycle = buildSharedConversationLifecycleMetadata(participants, { type: 'direct' });
 
@@ -11595,7 +11844,7 @@ function createLocalContactConversation(contact = {}) {
     contactEmail: normalizedContact.email,
     contactUserId: normalizedContact.userId || '',
     avatar: getInitials(normalizedContact.name),
-    avatarImage: '',
+    avatarImage: normalizedContact.avatarImage || '',
     status: normalizedContact.source === 'profile-qr' ? 'Contacto creado desde QR' : 'Nuevo contacto',
     section: 'chats',
     archived: false,
@@ -11623,6 +11872,11 @@ function createLocalContactConversation(contact = {}) {
     deleteFinalOnlyWhenAllParticipantsDeleted: true,
     metadata: {
       source: 'chater-static-site',
+      contactProfile: withProfileAvatarAliases({
+        email: normalizedContact.email,
+        userId: normalizedContact.userId || '',
+        displayName: normalizedContact.name
+      }, normalizedContact.avatarImage),
       ...lifecycle
     },
     lastReadAt: new Date().toISOString(),
@@ -11644,6 +11898,8 @@ async function createBackendConfirmedContactConversation(normalizedContact = {},
     name: normalizedContact.name,
     email: normalizedContact.email,
     userId: normalizedContact.userId,
+    avatarImage: normalizedContact.avatarImage || '',
+    avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
     source: normalizedContact.source,
     clientMutationId: createConversationMutationId
   }).catch((error) => {
@@ -11681,6 +11937,8 @@ async function createBackendConfirmedContactConversation(normalizedContact = {},
     name: normalizedContact.name,
     email: normalizedContact.email,
     userId: normalizedContact.userId,
+    avatarImage: normalizedContact.avatarImage || '',
+    avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
     conversationId: remoteConversationId || syncedConversation.id,
     source: normalizedContact.source,
     clientMutationId: createConversationMutationId
@@ -11717,6 +11975,8 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
         name: normalizedContact.name,
         email: normalizedContact.email,
         userId: normalizedContact.userId,
+        avatarImage: normalizedContact.avatarImage || '',
+        avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
         clientMutationId: createConversationMutationId
       });
       if (!isSessionGuardCurrent(sessionGuard)) return;
@@ -11733,6 +11993,8 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
           name: normalizedContact.name,
           email: normalizedContact.email,
           userId: normalizedContact.userId,
+          avatarImage: normalizedContact.avatarImage || '',
+          avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
           conversationId: remoteConversationId,
           source: normalizedContact.source,
           clientMutationId: createConversationMutationId
@@ -11758,6 +12020,8 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
             name: normalizedContact.name,
             email: normalizedContact.email,
             userId: normalizedContact.userId,
+            avatarImage: normalizedContact.avatarImage || '',
+            avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
             source: normalizedContact.source,
             clientMutationId: createConversationMutationId
           }
@@ -11767,6 +12031,8 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
         name: normalizedContact.name,
         email: normalizedContact.email,
         userId: normalizedContact.userId,
+        avatarImage: normalizedContact.avatarImage || '',
+        avatarUrl: normalizedContact.avatarUrl || normalizedContact.avatarImage || '',
         conversationId: conversation.id,
         source: normalizedContact.source,
         clientMutationId: createConversationMutationId
@@ -12001,6 +12267,8 @@ function normalizeContactFromQrResolverResponse(payload = {}, fallbackContact = 
     name: profile.displayName || profile.name || relation.displayName || relation.alias || fallbackContact.name || fallbackContact.displayName || '',
     email: profile.userEmail || profile.email || relation.contactEmail || relation.toUserEmail || fallbackContact.email || fallbackContact.contactEmail || '',
     userId: profile.userId || relation.contactUserId || relation.toUserId || fallbackContact.userId || fallbackContact.contactUserId || '',
+    avatarImage: readProfileAvatarCandidate(profile) || readProfileAvatarCandidate(relation) || readProfileAvatarCandidate(fallbackContact),
+    avatarUrl: readProfileAvatarCandidate(profile) || readProfileAvatarCandidate(relation) || readProfileAvatarCandidate(fallbackContact),
     source: 'profile-qr',
     backendQrResolvedAt: data?.resolvedAt || '',
     relationId: relation.id || ''
@@ -14397,6 +14665,7 @@ async function sendMediaAttachment(conversation, file, options = {}) {
   const clientMessageId = generateClientMutationId();
   const mediaKind = getMessageMediaKind({ attachmentMimeType: file.type, attachmentName: file.name });
   const localPreviewDataUrl = await createLocalMessageMediaPreview(file);
+  const createdAt = new Date().toISOString();
   const explicitCaption = Object.prototype.hasOwnProperty.call(options, 'caption')
     ? String(options.caption || '').trim()
     : '';
@@ -14416,6 +14685,10 @@ async function sendMediaAttachment(conversation, file, options = {}) {
     mediaCaption: caption,
     mediaSyncStatus: CHATER_CONFIG.backendBaseUrl ? 'uploading' : 'local',
     time: getCurrentTime(),
+    createdAt,
+    clientTime: createdAt,
+    expiresAt: getChatEphemeralExpiresAtIso(createdAt),
+    ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
     status: CHATER_CONFIG.backendBaseUrl ? 'uploading' : 'local',
     receiptStatus: 'local',
     senderUserId: getCurrentUserIdentifier(),
@@ -14563,7 +14836,10 @@ async function sendMediaAttachment(conversation, file, options = {}) {
       originalFilename: uploadFile === file ? '' : file.name,
       originalMimeType: uploadFile === file ? '' : (file.type || ''),
       provider: preparedUpload.provider || 'media-firmada',
-      imageCompression: outgoing.imageCompression || null
+      imageCompression: outgoing.imageCompression || null,
+      createdAt: outgoing.createdAt,
+      clientTime: outgoing.clientTime,
+      expiresAt: outgoing.expiresAt
     });
     outgoing.mediaUrl = preparedUpload.publicUrl || outgoing.mediaUrl || '';
     outgoing.mediaSyncStatus = 'creating-media-message';
@@ -14595,7 +14871,10 @@ async function sendMediaAttachment(conversation, file, options = {}) {
         originalFilename: uploadFile === file ? '' : file.name,
         originalMimeType: uploadFile === file ? '' : (file.type || ''),
         provider: preparedUpload.provider || 'media-firmada',
-        imageCompression: outgoing.imageCompression || null
+        imageCompression: outgoing.imageCompression || null,
+        createdAt: outgoing.createdAt,
+        clientTime: outgoing.clientTime,
+        expiresAt: outgoing.expiresAt
       });
       enqueueBackendOperation({
         type: 'createMediaMessage',
@@ -14777,7 +15056,10 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
       originalFilename: uploadFile === originalFile ? '' : originalFile.name,
       originalMimeType: uploadFile === originalFile ? '' : (originalFile.type || ''),
       provider: preparedUpload.provider || 'media-firmada',
-      imageCompression: message.imageCompression || null
+      imageCompression: message.imageCompression || null,
+      createdAt: message.createdAt || message.clientTime || new Date().toISOString(),
+      clientTime: message.clientTime || message.createdAt || new Date().toISOString(),
+      expiresAt: message.expiresAt || ''
     });
     message.mediaUrl = preparedUpload.publicUrl || message.mediaUrl || '';
     message.mediaSyncStatus = 'creating-media-message';
@@ -14809,7 +15091,10 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
         originalFilename: uploadFile === originalFile ? '' : originalFile.name,
         originalMimeType: uploadFile === originalFile ? '' : (originalFile.type || ''),
         provider: preparedUpload.provider || 'media-firmada',
-        imageCompression: message.imageCompression || null
+        imageCompression: message.imageCompression || null,
+        createdAt: message.createdAt || message.clientTime || new Date().toISOString(),
+        clientTime: message.clientTime || message.createdAt || new Date().toISOString(),
+        expiresAt: message.expiresAt || ''
       });
       enqueueBackendOperation({
         type: 'createMediaMessage',
@@ -14832,14 +15117,27 @@ async function retryPendingMediaAttachment(conversation, message, retryEntry = {
   }
 }
 
+function extractQueryParamFromUrl(rawUrl = '', key = '') {
+  try {
+    const parsedUrl = new URL(String(rawUrl || ''), CHATER_CONFIG.backendBaseUrl || window.location.origin);
+    return parsedUrl.searchParams.get(key) || '';
+  } catch (error) {
+    return '';
+  }
+}
+
 function normalizeMediaUploadPreparation(payload = {}) {
-  const upload = extractNestedObject(payload, ['upload', 'media', 'file', 'asset']) || {};
   const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};
+  const upload = payload.upload || data.upload || extractNestedObject(payload, ['upload', 'subida', 'signedUpload', 'carga']) || {};
+  const media = payload.media || data.media || upload.media || extractNestedObject(payload, ['media', 'file', 'asset']) || {};
   const headers = upload.headers || data.headers || payload.headers || {};
   const fields = upload.fields || data.fields || payload.fields || {};
-  const uploadUrl = upload.uploadUrl || upload.signedUrl || upload.url || data.uploadUrl || data.signedUrl || data.url || payload.uploadUrl || payload.signedUrl || '';
+  const uploadUrl = upload.uploadUrl || upload.signedUrl || upload.url || media.uploadUrl || media.signedUrl || media.url || data.uploadUrl || data.signedUrl || data.url || payload.uploadUrl || payload.signedUrl || '';
   const method = String(upload.method || data.method || payload.method || (Object.keys(fields).length ? 'POST' : 'PUT')).toUpperCase();
-  const mediaId = String(upload.mediaId || upload.id || upload.fileId || data.mediaId || data.id || payload.mediaId || payload.fileId || '').trim();
+  const mediaId = String(
+    upload.mediaId || upload.id || upload.fileId || media.mediaId || media.id || media.fileId || data.mediaId || data.id || payload.mediaId || payload.fileId || ''
+  ).trim();
+  const uploadToken = String(upload.token || upload.uploadToken || media.token || data.token || payload.token || extractQueryParamFromUrl(uploadUrl, 'token') || '').trim();
 
   return {
     uploadUrl,
@@ -14847,8 +15145,9 @@ function normalizeMediaUploadPreparation(payload = {}) {
     headers: headers && typeof headers === 'object' ? headers : {},
     fields: fields && typeof fields === 'object' ? fields : {},
     mediaId,
-    publicUrl: upload.publicUrl || upload.readUrl || data.publicUrl || data.readUrl || payload.publicUrl || '',
-    provider: upload.provider || data.provider || payload.provider || 'media-firmada',
+    uploadToken,
+    publicUrl: upload.publicUrl || upload.readUrl || media.publicUrl || media.readUrl || data.publicUrl || data.readUrl || payload.publicUrl || '',
+    provider: upload.provider || media.provider || data.provider || payload.provider || 'media-firmada',
     mediaUploaded: Boolean(upload.mediaUploaded || data.mediaUploaded || payload.mediaUploaded),
     mediaConfirmed: Boolean(upload.mediaConfirmed || data.mediaConfirmed || payload.mediaConfirmed || upload.confirmed || data.confirmed || payload.confirmed)
   };
@@ -14893,8 +15192,10 @@ async function completeMediaFirmadaUploadForBackend(preparedUpload, file, option
     filename: file.name,
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
+    contentType: file.type || 'application/octet-stream',
     size: file.size,
     sizeBytes: file.size,
+    token: completedUpload.uploadToken || extractQueryParamFromUrl(completedUpload.uploadUrl || '', 'token') || '',
     status: 'uploaded',
     uploaded: true
   }, `${clientMutationId}:media-confirm`);
@@ -14906,7 +15207,8 @@ async function completeMediaFirmadaUploadForBackend(preparedUpload, file, option
       const readPayload = await apiClient.getMediaReadUrl(completedUpload.mediaId, {
         entityType,
         entityId,
-        conversationId
+        conversationId,
+        clientMutationId: `${clientMutationId}:media-read`
       });
       completedUpload = normalizeMediaReadPayload(readPayload, completedUpload);
     } catch (error) {
@@ -14915,6 +15217,31 @@ async function completeMediaFirmadaUploadForBackend(preparedUpload, file, option
   }
 
   return completedUpload;
+}
+
+function isMemoriaBackendMediaFirmadaUploadUrl(rawUrl = '') {
+  try {
+    if (!rawUrl || !CHATER_CONFIG.backendBaseUrl) return false;
+    const uploadUrl = new URL(String(rawUrl), CHATER_CONFIG.backendBaseUrl || window.location.origin);
+    const backendUrl = new URL(CHATER_CONFIG.backendBaseUrl, window.location.origin);
+    return uploadUrl.origin === backendUrl.origin && /\/media-firmada\//.test(uploadUrl.pathname);
+  } catch (error) {
+    return false;
+  }
+}
+
+function decorateMemoriaBackendUploadHeaders(rawUrl = '', headers = {}) {
+  const decorated = { ...(headers || {}) };
+  if (!isMemoriaBackendMediaFirmadaUploadUrl(rawUrl)) return decorated;
+  const token = getAccessToken();
+  if (token && !Object.keys(decorated).some((key) => key.toLowerCase() === 'authorization')) {
+    decorated.Authorization = `Bearer ${token}`;
+  }
+  if (getMemoriaSiteId() && !Object.keys(decorated).some((key) => key.toLowerCase() === 'x-mb-site')) {
+    decorated['X-MB-Site'] = getMemoriaSiteId();
+  }
+  decorated['X-Hashinmy-Action'] = decorated['X-Hashinmy-Action'] || 'webapp';
+  return decorated;
 }
 
 async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
@@ -14931,6 +15258,9 @@ async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
       const xhr = new XMLHttpRequest();
       xhr.open(preparedUpload.method || (Object.keys(preparedUpload.fields || {}).length ? 'POST' : 'PUT'), preparedUpload.uploadUrl, true);
       xhr.timeout = CHATER_CONFIG.mediaUploadTimeoutMs;
+      if (isMemoriaBackendMediaFirmadaUploadUrl(preparedUpload.uploadUrl)) {
+        xhr.withCredentials = true;
+      }
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) emitProgress(event.loaded, event.total);
@@ -14955,7 +15285,7 @@ async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
         return;
       }
 
-      const headers = { ...(preparedUpload.headers || {}) };
+      const headers = decorateMemoriaBackendUploadHeaders(preparedUpload.uploadUrl, preparedUpload.headers || {});
       if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
         headers['Content-Type'] = file.type || 'application/octet-stream';
       }
@@ -14976,6 +15306,8 @@ async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
       formData.append('file', file);
       const response = await fetchWithTimeout(preparedUpload.uploadUrl, {
         method: preparedUpload.method || 'POST',
+        headers: decorateMemoriaBackendUploadHeaders(preparedUpload.uploadUrl, preparedUpload.headers || {}),
+        credentials: isMemoriaBackendMediaFirmadaUploadUrl(preparedUpload.uploadUrl) ? 'include' : 'same-origin',
         body: formData
       }, CHATER_CONFIG.mediaUploadTimeoutMs);
       if (!response.ok) throw new Error(`Subida de adjunto respondió ${response.status}`);
@@ -14983,7 +15315,7 @@ async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
       return;
     }
 
-    const headers = { ...(preparedUpload.headers || {}) };
+    const headers = decorateMemoriaBackendUploadHeaders(preparedUpload.uploadUrl, preparedUpload.headers || {});
     if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
       headers['Content-Type'] = file.type || 'application/octet-stream';
     }
@@ -14991,6 +15323,7 @@ async function uploadMediaFileToSignedUrl(file, preparedUpload, options = {}) {
     const response = await fetchWithTimeout(preparedUpload.uploadUrl, {
       method: preparedUpload.method || 'PUT',
       headers,
+      credentials: isMemoriaBackendMediaFirmadaUploadUrl(preparedUpload.uploadUrl) ? 'include' : 'same-origin',
       body: file
     }, CHATER_CONFIG.mediaUploadTimeoutMs);
 
@@ -15010,6 +15343,8 @@ function canQueueMediaMessageAfterUpload(preparedUpload = null) {
 }
 
 function buildMediaMessagePayload(file, preparedUpload, clientMessageId, caption = '', metadata = {}) {
+  const clientTime = metadata.clientTime || metadata.createdAt || new Date().toISOString();
+  const expiresAt = coerceChatEphemeralExpiresAtIso(metadata.expiresAt || '', clientTime);
   return {
     mediaId: preparedUpload.mediaId || '',
     mediaUrl: preparedUpload.publicUrl || '',
@@ -15021,8 +15356,18 @@ function buildMediaMessagePayload(file, preparedUpload, clientMessageId, caption
     originalFilename: metadata.originalFilename || '',
     originalMimeType: metadata.originalMimeType || '',
     imageCompression: metadata.imageCompression || null,
-    clientMutationId: clientMessageId,
-    clientTime: new Date().toISOString()
+    createdAt: clientTime,
+    clientTime,
+    expiresAt,
+    ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
+    metadata: {
+      source: 'chater-static-site',
+      createdAt: clientTime,
+      clientTime,
+      expiresAt,
+      ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS
+    },
+    clientMutationId: clientMessageId
   };
 }
 
@@ -16667,6 +17012,9 @@ function updateExistingMessageFromRealtime(existingMessage, normalizedMessage) {
   existingMessage.mediaPreviewDataUrl = normalizedMessage.mediaPreviewDataUrl || existingMessage.mediaPreviewDataUrl || '';
   existingMessage.mediaSyncStatus = normalizedMessage.mediaSyncStatus || existingMessage.mediaSyncStatus || normalizedMessage.status || '';
   existingMessage.createdAt = normalizedMessage.createdAt || existingMessage.createdAt || '';
+  existingMessage.clientTime = normalizedMessage.clientTime || existingMessage.clientTime || existingMessage.createdAt || '';
+  existingMessage.expiresAt = normalizedMessage.expiresAt || existingMessage.expiresAt || coerceChatEphemeralExpiresAtIso('', existingMessage.clientTime || existingMessage.createdAt || new Date().toISOString());
+  existingMessage.ttlSeconds = Number(normalizedMessage.ttlSeconds || existingMessage.ttlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS;
   if (existingMessage.type !== 'outgoing' || normalizedMessage.type === 'system') {
     existingMessage.type = normalizedMessage.type || existingMessage.type;
   }
@@ -16681,10 +17029,10 @@ function mergeMessagesByIdentity(primaryMessages = [], secondaryMessages = []) {
       updateExistingMessageFromRealtime(existingMessage, message);
       return;
     }
-    mergedMessages.push({ ...message });
+    mergedMessages.push(normalizeChatMessageEphemeralFields({ ...message }));
   });
 
-  return mergedMessages;
+  return normalizeAndPruneChatMessages(mergedMessages);
 }
 
 
@@ -16835,7 +17183,7 @@ function normalizeConversationFromApi(raw = {}) {
     contactEmail: email,
     contactUserId: normalizeBackendUserId(raw.contactUserId || raw.remoteUserId || metadata.contactUserId || metadata.remoteUserId || participant?.userId || ''),
     avatar: raw.avatar || getInitials(name),
-    avatarImage: normalizeAssetImagePath(raw.avatarImage || raw.avatarAsset),
+    avatarImage: readProfileAvatarCandidate(raw) || readProfileAvatarCandidate(participant) || readProfileAvatarCandidate(metadata),
     status: raw.statusLabel || raw.status || raw.presence || 'Sincronizado',
     section: 'chats',
     archived: archivedForCurrentUser,
@@ -17012,7 +17360,10 @@ function normalizeMessageFromApi(raw = {}) {
     mediaUrl,
     mediaPreviewDataUrl: raw.mediaPreviewDataUrl || '',
     mediaSyncStatus: raw.mediaSyncStatus || raw.status || '',
-    createdAt
+    createdAt,
+    clientTime: raw.clientTime || createdAt,
+    expiresAt: coerceChatEphemeralExpiresAtIso(raw.expiresAt || raw.expiryAt || raw.expireAt || metadata.expiresAt || '', raw.clientTime || createdAt || new Date().toISOString()),
+    ttlSeconds: Number(raw.ttlSeconds || raw.ephemeralTtlSeconds || metadata.ephemeralTtlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS
   };
 }
 

@@ -396,7 +396,7 @@ Devuelve URL temporal de lectura cuando la confirmación no incluye una URL cons
 
 ### POST `/api/v1/media-firmada?s={siteId}`
 
-Reserva `mediaId` y entrega `uploadUrl`/`signedUrl` para archivos genéricos. El cliente sube el binario directamente a esa URL firmada y no guarda binarios en `localStorage`.
+Reserva `mediaId` y entrega `data.upload.url`, `data.upload.method`, `data.upload.headers` y `data.upload.token` para archivos genéricos. Si esa URL apunta a `mapsx.app`, el cliente sube el binario real directamente a esa URL firmada; memoriaBACKEND lo guarda como contenido efímero Redis (`storageMode=redis_inline`) con el mismo TTL del mensaje. El cliente no guarda binarios en `localStorage`.
 
 Request mínimo:
 ```json
@@ -412,11 +412,15 @@ Request mínimo:
 
 ### PATCH `/api/v1/media-firmada/{mediaId}?s={siteId}`
 
-Confirma la subida genérica con estado `uploaded`, metadata de archivo y entidad destino. Si la confirmación falla, ChatER no encola un mensaje que apunte a media no finalizada.
+Confirma o completa metadata de la subida genérica con estado `uploaded`, metadata de archivo y entidad destino. Si la URL firmada interna ya consumió el token al recibir el binario, este `PATCH` solo actualiza metadata; no reenvía el archivo ni reutiliza el token. Si la confirmación falla, ChatER no encola un mensaje que apunte a media no finalizada.
 
-### GET `/api/v1/media-firmada/{mediaId}/leer?s={siteId}`
+### POST `/api/v1/media-firmada/{mediaId}/url-lectura?s={siteId}`
 
-Entrega URL segura de lectura si el backend no la devolvió durante la confirmación.
+Emite una URL segura corta en `data.read.url`. ChatER debe pedir esta URL con `POST` y luego usar la URL devuelta como `mediaUrl`.
+
+### GET `/api/v1/media-firmada/{mediaId}/leer?token=...&s={siteId}`
+
+Consume una URL segura ya emitida. Si `storageMode=redis_inline`, responde el binario con `Content-Type` y `Content-Disposition`, por lo que puede usarse en `<img>`, `<audio>`, `<video>` o descarga de archivo.
 
 ### POST `/api/v1/mensajes?s={siteId}` con adjunto confirmado
 
@@ -2153,7 +2157,7 @@ Cambios aplicados:
 - La extracción de entidades creadas o actualizadas ahora acepta aliases en español para `conversacion`, `mensaje`, `estado`, `publicacion`, `sesion`, `llamada`, `promocion`, `imagen`, `subida`, `archivo` y `descarga`.
 - Las consultas iniciales a perfil, conversaciones, estados y llamadas agregan `userId`/`participantUserId` además de correo, porque `APIS de memoriaBACKEND` documenta filtros comunes por `userId` y algunos bloques pueden resolver identidad por ese campo.
 - Se preservan las rutas ya adaptadas a memoriaBACKEND, la cola local, el modo demo, STREME, R2x, media firmada, push, service worker e interfaz visual.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-response-aliases-43` para que una PWA instalada refresque `js/app.js` y no conserve la normalización anterior en cache.
 
 Validación funcional:
@@ -2184,7 +2188,7 @@ Cambios aplicados:
 
 Validación funcional:
 
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - La integración usa una API existente del catálogo adjunto (`VERSIONESapi`) y mantiene el proyecto como static site de Render.com.
 - El modo demo local sigue funcionando sin llamadas remotas cuando `MEMORIA_BACKEND_URL` está vacío.
 - La verificación del manifiesto es informativa y no rompe login, `streme`, cola idempotente, conversaciones, estados, llamadas, adjuntos, notificaciones ni herramientas.
@@ -2195,16 +2199,16 @@ Estado:
 
 ## 73. Revisión de punto débil: cierre completo de MEDIAfirmadaX para adjuntos no R2x
 
-En esta iteración se identificó como punto débil principal que el static site ya reservaba adjuntos genéricos con `POST /api/v1/media-firmada`, pero no completaba el contrato canónico documentado en `APIS de memoriaBACKEND/apis.txt`: después de subir el binario a la URL firmada faltaba confirmar el recurso con `PATCH /api/v1/media-firmada/{mediaId}` y pedir la URL segura de lectura con `GET /api/v1/media-firmada/{mediaId}/leer` cuando el backend no devolvía `readUrl` en la confirmación. En producción eso podía dejar audio, video, documentos, GIF o SVG subidos en storage pero sin estado confirmado, sin URL de lectura inmediata o con mensajes en cola apuntando a media todavía no finalizada.
+En esta iteración se identificó como punto débil principal que el static site ya reservaba adjuntos genéricos con `POST /api/v1/media-firmada`, pero el contrato interno de memoriaBACKEND necesitaba cerrar dos cosas: subir el binario real a la URL firmada de `MEDIAfirmadaX` cuando no hay proveedor externo y pedir la URL segura con `POST /url-lectura`, no consumiendo directamente `GET /leer` sin token. En producción eso podía dejar audio, video, documentos, GIF o SVG con metadata confirmada pero sin contenido legible, o con una ruta relativa que `hashinmy.com` intentaba leer desde el static site en vez de `mapsx.app`.
 
 Cambios aplicados:
 
 - `js/app.js` agrega `apiClient.confirmMediaUpload()` sobre `PATCH /api/v1/media-firmada/{mediaId}?s={siteId}` con `X-MB-Site`, `X-Hashinmy-Action:webapp`, `X-MB-Idempotency-Key`, metadata de archivo, entidad destino y estado `uploaded`.
-- `js/app.js` agrega `apiClient.getMediaReadUrl()` sobre `GET /api/v1/media-firmada/{mediaId}/leer?s={siteId}` para obtener una URL segura de lectura si la confirmación no la incluye.
+- `js/app.js` actualiza `apiClient.getMediaReadUrl()` para usar `POST /api/v1/media-firmada/{mediaId}/url-lectura?s={siteId}` y después usar `data.read.url` como URL segura consumible.
 - El flujo genérico de adjuntos de chat conserva `POST /api/v1/media-firmada`, realiza la subida directa existente, confirma el `mediaId`, pide URL de lectura cuando falta y solo encola la creación del mensaje si la media quedó confirmada.
 - El flujo genérico de estados visuales aplica la misma finalización de `MEDIAfirmadaX` antes de construir el payload de `POST /api/v1/publicaciones-efimeras`.
 - `ImagenesCloudflareR2x` no se altera: las imágenes convertibles siguen usando intención, subida R2, confirmación R2x y URL de descarga R2x.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-mediafirmada-confirm-read-45` para forzar refresco de la PWA instalada.
 
 Mapa actualizado de media:
@@ -2212,7 +2216,7 @@ Mapa actualizado de media:
 | Tipo de recurso | API usada |
 |---|---|
 | Imagen convertible desde navegador | `POST /api/v1/imagenes-r2x/intenciones` + subida R2 + `POST /api/v1/imagenes-r2x/{imageId}/confirmar` + `POST /api/v1/imagenes-r2x/{imageId}/url-descarga` si hace falta |
-| Audio, video, documentos, GIF/SVG y archivos no convertibles | `POST /api/v1/media-firmada` + subida directa + `PATCH /api/v1/media-firmada/{mediaId}` + `GET /api/v1/media-firmada/{mediaId}/leer` si hace falta |
+| Audio, video, documentos, GIF/SVG y archivos no convertibles | `POST /api/v1/media-firmada` + subida binaria a `data.upload.url` + `PATCH /api/v1/media-firmada/{mediaId}` + `POST /api/v1/media-firmada/{mediaId}/url-lectura` + consumo de `data.read.url` |
 
 Validación funcional:
 
@@ -2280,7 +2284,7 @@ Cambios aplicados:
 
 Validación funcional:
 
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - La promoción de estado ya no debe tratarse como ruta sin equivalencia: el contrato vigente la resuelve como `PATCH /api/v1/publicaciones-efimeras/{stateId}` dentro de `PUBLICACIONESefimerasX`.
 - Las demás APIs ya adaptadas a `/api/v1` y `/auth` se preservan sin cambios.
 - El proyecto sigue siendo static site de Render.com y no incorpora backend local.
@@ -2347,7 +2351,7 @@ Cambios aplicados:
 
 Validación funcional:
 
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - La conversación sigue siendo la operación principal; la relación se sincroniza como apoyo idempotente y no rompe el modo demo local.
 - El proyecto sigue siendo static site de Render.com y no incorpora backend local.
 
@@ -2369,7 +2373,7 @@ Cambios aplicados:
 
 Validación funcional:
 
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - El envío de adjuntos existente se preserva; la mejora actúa sobre la rehidratación y reconciliación remota, que era el punto débil detectado.
 - Las rutas canónicas `/api/v1/mensajes`, `/api/v1/publicaciones-efimeras`, `MEDIAfirmadaX`, `ImagenesCloudflareR2x` y `STREMEx` permanecen sincronizadas sin agregar backend local.
 - El proyecto sigue siendo static site de Render.com y no incorpora dependencias de servidor.
@@ -2416,7 +2420,7 @@ Validación funcional:
 
 - `node --check js/app.js` ejecutado correctamente.
 - `node --check service-worker.js` ejecutado correctamente.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 - Se preservó la lógica existente de autenticación Google/Gmail, conversaciones, mensajes, estados, llamadas, adjuntos, herramientas comerciales, notificaciones, cola local, R2x, MEDIAfirmadaX, STREMEx y service worker.
 
 ## 83. Revisión de punto débil: validación de bloques sincronizados no consumida desde el static site
@@ -2431,7 +2435,7 @@ Cambios aplicados:
 - El botón visual de verificación pasa a **Verificar APIs y bloques** para reflejar que ahora se auditan tanto `/api/v1/versiones/manifest` como `BLOQUESsincronizadosX`.
 - La matriz de capacidades críticas agrega `BLOQUESsincronizadosX` como señal esperada del backend publicado.
 - La lectura es defensiva: si memoriaBACKEND responde con alertas estructuradas (`missingMounts`, duplicados, inválidos, errores o validaciones falsas), la UI las muestra sin bloquear el modo local ni inventar rutas alternativas.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2453,7 +2457,7 @@ Cambios aplicados:
 - `buildStremeUrl()` aplica esos parámetros tanto para SSE/EventSource como para WebSocket antes de agregar token y `lastEventId`, preservando cualquier `s`, `canal`, `channel`, `clientId` o `clienteId` que ya venga explícito en la URL configurada.
 - `js/config.js` documenta que una URL manual de `STREME_REALTIME_URL` no necesita traer esos parámetros porque el static site los agrega de forma defensiva.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-streme-url-scope-56` para que una PWA instalada descargue el cliente corregido.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2479,7 +2483,7 @@ Cambios aplicados:
 - La matriz de capacidades críticas del modal **Estado memoriaBACKEND** agrega `BUSQUEDAx`, de modo que `/api/v1/versiones/manifest` también confirme la disponibilidad de búsqueda federada.
 - `docs/memoriaBACKEND_APIS.md` reemplaza el contrato vigente `/search` por `GET /api/v1/busqueda/buscar`, manteniendo las rutas heredadas solo como historial de iteraciones antiguas.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-busquedax-search-58` para que una PWA instalada refresque el cliente y no conserve la búsqueda solo local.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2505,7 +2509,7 @@ Cambios aplicados:
 - La matriz de capacidades críticas acepta tanto el bloque `BUSQUEDAx` como `/api/v1/busqueda/buscar`, sin perder compatibilidad con manifiestos que solo reporten el montaje base `/api/v1/busqueda`.
 - `docs/memoriaBACKEND_APIS.md` actualiza el contrato vigente de búsqueda para que Nova no vuelva a integrar el montaje base como endpoint ejecutable.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-busquedax-route-59` para invalidar el cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2530,7 +2534,7 @@ Cambios aplicados:
 - No se fuerza `userId` con el correo cuando el backend todavía no lo conoce; si no existe API o identificador canónico, se conserva el contrato actual por correo.
 - `docs/memoriaBACKEND_APIS.md` actualiza el ejemplo vigente de creación de conversación para reflejar el identificador canónico del propietario sin exigirlo al contacto.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-conversaciones-owner-id-60` para invalidar el cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2577,7 +2581,7 @@ Cambios aplicados:
 - El modal **Estado de memoriaBACKEND** muestra el estado de la visita y la matriz de capacidades críticas ahora valida también `VISITASstaticSITEx` y `/api/v1/visitas/apertura`.
 - `js/config.js` agrega `ENABLE_STATIC_VISIT_TRACKING` para permitir desactivar este apoyo por despliegue sin recompilar el static site.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-visitas-apertura-62` para que una PWA instalada descargue el cliente corregido.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2603,7 +2607,7 @@ Cambios aplicados:
 - `replayBackendOperation()` ahora reproduce de forma controlada las operaciones encoladas de reconciliación y cursor sin alterar la cola existente de conversaciones, mensajes, estados, llamadas ni lecturas.
 - El modal **Estado de memoriaBACKEND** muestra el estado del cursor de sincronización y la matriz de capacidades críticas valida `CURSOResincronizacionX`, `/api/v1/cursor-sincronizacion`, `RECONCILIACIONidsX` y `/api/v1/reconciliacion-ids`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-reconciliacion-cursor-63` para invalidar el cache PWA anterior y asegurar que el static site instalado cargue esta sincronización.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2629,7 +2633,7 @@ Cambios aplicados:
 - El modal **Estado de memoriaBACKEND** muestra el estado de preferencias de usuario y la matriz de capacidades críticas valida `PREFERENCIASusuarioX` y `/api/v1/preferencias-usuario`.
 - `js/config.js` agrega `ENABLE_REMOTE_USER_PREFERENCES` para poder desactivar esta sincronización por despliegue sin recompilar el static site.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-preferencias-usuario-64` para invalidar el cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2653,7 +2657,7 @@ Cambios aplicados:
 - El reintento de cola `createCall` conserva el mismo comportamiento: cuando una llamada pendiente logra crearse en memoriaBACKEND, también dispara la señal `invite` y el evento realtime con datos normalizados de participantes.
 - La matriz del modal **Estado de memoriaBACKEND** valida ahora `SIGNALINGtiempoRealX` y `/api/v1/signaling-tiempo-real`, además de `SESIONEScomunicacionX`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-signaling-tiempo-real-65` para invalidar el cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2676,7 +2680,7 @@ Cambios aplicados:
 - `publishCallInviteThroughMemoria()` ahora construye un `signalPayload` estable para `SIGNALINGtiempoRealX` y, si `apiClient.sendCallSignal()` falla, encola la misma señal con `dedupeKey` determinística `call-signal:{callId}:invite:{clientMutationId}`.
 - El reintento conserva `sessionId`, `callId`, `conversationId`, emisor, receptor, `signalType: invite`, `communicationType`, payload de llamada, metadata y `clientMutationId`, sin duplicar llamadas ni alterar la sesión ya creada.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-signaling-outbox-66` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2700,7 +2704,7 @@ Cambios aplicados:
 - `replayBackendOperation()` reproduce operaciones `publishStremeEvent` sin duplicar llamadas, mensajes, estados ni señales de presencia/escritura.
 - La cola durable se limita a la invitación realtime de llamada; `typing`, presencia y eventos efímeros siguen sin encolarse para evitar estados obsoletos.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-streme-call-invite-outbox-67` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2727,7 +2731,7 @@ Cambios aplicados:
 - El modal de estado de memoriaBACKEND ahora muestra “Token Google/Gmail temporal de pestaña” cuando el token compatible está activo.
 - `docs/memoriaBACKEND_APIS.md` actualiza el contrato vigente de autenticación para reemplazar OTP por Google/Gmail con `AUTENTICACIONx` y documentar la regla de no persistir `tk`/`signedSession` en `localStorage`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-google-gmail-auth-69` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2751,7 +2755,7 @@ Cambios aplicados:
 - `restoreGoogleGmailSessionFromBackend()` limpia sesión cuando recibe `ok:0`, payload inválido o error de autenticación, evitando que el correo local sobreviva como bypass.
 - `isBackendAuthError()` ahora reconoce errores por código/mensaje (`login_requerido`, sesión inválida, token expirado, credencial revocada, no autorizado) además de HTTP 401/403.
 - `refreshSession()` y `logout()` agregan `clientMutationId` e `X-MB-Idempotency-Key` para alinearse con el contrato de mutaciones de `AUTENTICACIONx`.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2774,7 +2778,7 @@ Cambios aplicados:
 - `prepareR2xTemporaryImageForBackend()` convierte errores recuperables de intención, endpoint no encontrado, R2 no configurado o bloque deshabilitado en `R2X_POLICY_UNAVAILABLE`, que los flujos de adjuntos y estados ya capturan para continuar con `MEDIAfirmadaX`.
 - Los errores de autenticación siguen sin fallback para no permitir subir media sin sesión Google/Gmail válida.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-google-gmail-auth-71` para invalidar cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2800,7 +2804,7 @@ Cambios aplicados:
 - Se agregó `activeGoogleLoginAttemptGuard` para que `restoreGoogleGmailSessionFromBackend()`, `startGoogleGmailLogin()` y el evento `memoriaBACKEND:login` solo completen sesión si el intento Google/Gmail vigente no fue cancelado, reemplazado por otro intento o invalidado por cierre de sesión/modal.
 - Los eventos tardíos de `/login.js`, `/auth/check` o `/auth/firebase/session` ya no pueden abrir ChatER después de que el usuario cerró el acceso, inició otro intento o la sesión fue limpiada.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-firebase-session-guard-73` para invalidar cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2825,7 +2829,7 @@ Cambios aplicados:
 - El token candidato del SDK se conserva solo como credencial de intercambio/compatibilidad; no sustituye la confirmación de `AUTENTICACIONx`.
 - Si memoriaBACKEND devuelve correo pero no confirma proveedor Google/Gmail, `validateGoogleGmailAuthPayload()` mantiene el bloqueo y vuelve al acceso seguro.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-provider-backend-evidence-74` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2849,7 +2853,7 @@ Cambios aplicados:
 - La restauración por `GET /auth/check` queda alineada con la validación estricta ya existente: sigue exigiendo proveedor Google/Gmail confirmado por memoriaBACKEND, pero ya no descarta nombres de campo canónicos del propio backend.
 - No se reduce la seguridad del acceso: el payload local del SDK sigue sin sustituir la confirmación backend dentro de `verifyGoogleGmailPayloadAgainstBackend()`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-provider-normalize-75` para invalidar cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2877,7 +2881,7 @@ Cambios aplicados:
 - `normalizeLoadedState()` y `normalizeConversationFromApi()` preservan campos de privacidad, bloqueo y reporte para no perder estado entre recargas o respuestas parciales del backend.
 - La documentación ejecutable corrige el bloque 16 para reemplazar las rutas heredadas por `BLOQUEOSusuarioX`, `REPORTESmoderacionX` y `PRIVACIDADusuarioX`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-privacy-block-report-76` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2904,7 +2908,7 @@ Cambios aplicados:
 - El estado local de notificaciones distingue `pending_revoke`, `revoked` y `revoked_local`, y se mantiene sincronizable con preferencias de usuario sin conservar tokens obsoletos.
 - La documentación del contrato de notificaciones reemplaza la ruta imprecisa `DELETE /api/v1/push/suscripciones/{deviceId}` por el contrato real `DELETE /api/v1/push/suscripciones` publicado en `APIS de memoriaBACKEND`.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-push-unsubscribe-77` para invalidar cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2931,7 +2935,7 @@ Cambios aplicados:
 - La telemetría de errores no queda en cola local: si memoriaBACKEND está caído, se descarta silenciosamente para no llenar el almacenamiento con errores de observabilidad.
 - `docs/memoriaBACKEND_APIS.md` reemplaza la referencia ejecutable heredada de errores del cliente por el contrato canónico `EVENTOSx` y mantiene `VERSIONESapi`/`BLOQUESsincronizadosX` para salud de contratos.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-client-telemetry-eventos-78` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2956,7 +2960,7 @@ Cambios aplicados:
 - Si una petición protegida recibe `401` e intenta renovar con `/auth/refresh`, un fallo de refresh también invalida la sesión capturada antes de que la mutación pueda quedarse en cola como si fuera un problema transitorio.
 - El comportamiento se limita a rutas protegidas como perfil, preferencias, conversaciones, mensajes, relaciones, privacidad, bloqueos, reportes, presencia, media, estados, llamadas, señalización, push, reconciliación, cursor, búsqueda y `streme` de conversación. No afecta visitas públicas, telemetría técnica, manifiestos, validación de bloques ni eventos comerciales de static site.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-failure-guard-79` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -2982,7 +2986,7 @@ Cambios aplicados:
 - Las actualizaciones de operaciones existentes y las nuevas persistencias pasan explícitamente el correo propietario a `persistBackendOutbox()`, preservando el aislamiento por cuenta ya implementado.
 - Se preserva el modo sin backend: si `MEMORIA_BACKEND_URL` está vacío, no se crea cola remota, como antes.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-outbox-session-owner-80` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3031,7 +3035,7 @@ Cambios aplicados:
 - Los estados 24h y su promoción quedan descritos con `PUBLICACIONESefimerasX`: `GET/POST/PATCH /api/v1/publicaciones-efimeras`.
 - Los adjuntos y estados visuales quedan descritos con `ImagenesCloudflareR2x` para imágenes WebP temporales optimizadas y `MEDIAfirmadaX` para media genérica, antes de crear mensajes o publicaciones en `/api/v1/mensajes` o `/api/v1/publicaciones-efimeras`.
 - La publicación realtime queda descrita con `POST /api/v1/streme/eventos`, preservando SSE/WebSocket del static site y sin introducir polling.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3056,7 +3060,7 @@ Cambios aplicados:
 - La promoción de estados queda documentada únicamente contra `PATCH /api/v1/publicaciones-efimeras/{stateId}`.
 - La lectura de conversaciones queda documentada únicamente contra `POST /api/v1/interacciones-mensaje`.
 - Las notificaciones, telemetría, versión, bloques, media y realtime quedan referenciadas por sus bloques canónicos: `APInotificacionesPUSHx`, `EVENTOSx`, `VERSIONESapi`, `BLOQUESsincronizadosX`, `MEDIAfirmadaX`, `ImagenesCloudflareR2x` y `STREMEx`.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3081,7 +3085,7 @@ Cambios aplicados:
 - El evento `memoriaBACKEND:login` ahora siempre pasa por `verifyGoogleGmailPayloadAgainstBackend()`, que valida contra `AUTENTICACIONx` usando `POST /auth/firebase/session` cuando llega un token Google/Firebase o `GET /auth/check` cuando debe confirmarse cookie/bearer compatible.
 - ChatER sigue sin aceptar identidad local como prueba de acceso: `completeAuthenticatedSession()` mantiene la validación estricta de proveedor Google/Gmail, correo Gmail permitido y confirmación real de memoriaBACKEND antes de mostrar la interfaz.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-login-event-bridge-82` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3104,7 +3108,7 @@ Cambios aplicados:
 - `js/app.js` endurece `shouldRequireGoogleGmailAuth()` para devolver siempre `true`; la autenticación Google/Gmail queda como requisito duro de producto antes de renderizar `chatER`.
 - `js/config.js` conserva la bandera histórica solo como compatibilidad documental, pero aclara que el runtime ya no permite usarla como bypass.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-03-memoriabackend-auth-required-non-optional-83` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3128,7 +3132,7 @@ Cambios aplicados:
 - Se mantiene el bypass de cache para SSE mediante `Accept: text/event-stream`, preservando `STREMEx` sin polling.
 - Se eliminan de la política runtime de cache los prefijos heredados de chats, mensajes, estados, llamadas, media, dispositivos, notificaciones, búsqueda, usuarios, reportes, privacidad, errores de cliente y versión.
 - `CHATER_SW_VERSION` y `app-version.json` suben a `2026-07-03-memoriabackend-sw-canonical-runtime-prefixes-84` para que una PWA instalada refresque el service worker anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3154,7 +3158,7 @@ Cambios aplicados:
 - La creación por correo y el escaneo QR ahora cumplen la regla: si el contacto ya existe, incluso oculto por eliminación reversible, se abre el chat; si no existe, se crea y se abre.
 - `APIs necesarias.txt` amplía `ACCIONESchatX` con el concepto `restore_conversation` para que memoriaBACKEND tenga contrato auditable cuando no exista endpoint dedicado.
 - `app-version.json` y `CHATER_SW_VERSION` suben a `2026-07-04-contact-restore-97` para invalidar la cache PWA anterior.
-- No se modificó ningún archivo dentro de `APIS de memoriaBACKEND`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con el contrato real: subida binaria interna, `storageMode=redis_inline`, `POST /url-lectura` y lectura binaria con `GET /leer?token=...`.
 
 Validación funcional:
 
@@ -3600,3 +3604,22 @@ Alcance preservado:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+## 74. Revisión de punto débil: MEDIAfirmadaX interno ahora almacena binario real efímero
+
+Punto débil corregido: el flujo genérico de adjuntos de ChatER dependía de `MEDIAfirmadaX`, pero la URL firmada interna de memoriaBACKEND podía actuar solo como confirmación de metadata. Ahora el backend acepta el body binario en `POST|PUT /api/v1/media-firmada/{mediaId}/confirmar?token=...&s=...`, lo guarda en Redis con TTL alineado al mensaje y devuelve lectura binaria segura mediante una URL corta emitida por `POST /url-lectura`.
+
+Cambios sincronizados:
+
+- `js/app.js` conserva la subida directa existente, pero cuando la URL firmada pertenece a `mapsx.app` agrega credenciales de sesión, `Authorization`, `X-MB-Site` y `X-Hashinmy-Action` sin enviar esos headers a proveedores externos.
+- `js/app.js` corrige la lectura: primero solicita `POST /media-firmada/{mediaId}/url-lectura` y luego usa `data.read.url`; ya no intenta consumir `GET /leer` como si emitiera la URL.
+- `js/app.js` convierte rutas `/api/` de media a URL absoluta de memoriaBACKEND para que el static site `hashinmy.com` no intente resolver adjuntos desde su propio origen.
+- Los chips de archivo ahora son enlaces descargables cuando existe `mediaUrl` segura.
+- `service-worker.js` y `app-version.json` elevan la versión a `2026-07-05-media-firmada-binary-142` para invalidar caché PWA.
+
+Validación funcional esperada:
+
+- Texto, imagen, audio, video o archivo siguen creando mensajes `MENSAJESx` con `ttlSeconds=86400` y `expiresAt` de máximo 24 horas.
+- Si el adjunto se guardó por `MEDIAfirmadaX` interno, su contenido Redis se elimina por TTL, por eliminación del mensaje o por borrado final de conversación cuando ya no quedan participantes.
+- `ImagenesCloudflareR2x` no se altera: las imágenes WebP temporales siguen usando R2 cuando la política está disponible.
+

@@ -1,18 +1,18 @@
 {
-  "version": "2026-07-04-chat-lifecycle-clean-delete-141",
-  "buildTime": "2026-07-04T23:59:00-05:00",
+  "version": "2026-07-05-media-firmada-binary-142",
+  "buildTime": "2026-07-05T18:45:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER corrige la limpieza de bloqueo residual al eliminar, restaurar o recrear chats para que el flujo no falle y el chat Redis compartido pueda reutilizarse sin bloqueo.",
-  "build": "chat-lifecycle-clean-delete-141",
-  "updatedAt": "2026-07-04T23:59:00-05:00",
-  "notes": "Se define de forma explícita el estado previo de bloqueo antes de limpiar, eliminar o restaurar conversaciones; así la revocación de bloqueo no rompe el flujo por variables indefinidas y la caché PWA se invalida con la nueva versión.",
+  "description": "ChatER corrige el flujo de adjuntos genericos con MEDIAfirmadaX para subir el binario real al backend y leerlo con URL segura efimera.",
+  "build": "media-firmada-binary-142",
+  "updatedAt": "2026-07-05T18:45:00-05:00",
+  "notes": "Se sincroniza el contrato de media firmada: la reserva devuelve URL firmada interna, el frontend sube el archivo real a mapsx.app, pide URL de lectura por POST /url-lectura y el backend sirve contenido efimero Redis con TTL maximo de 24 horas para ChatER.",
   "changes": [
-    "js/app.js envía limpieza defensiva de bloqueo en cada eliminación de chat/contacto, incluso si la copia local no indica bloqueo activo.",
-    "js/app.js sincroniza la relación del contacto como deleted y blocked:false después de ocultar el chat para el actor.",
-    "js/app.js vuelve a revocar bloqueos residuales al restaurar o recrear un contacto eliminado antes de hidratar el historial Redis existente.",
-    "js/app.js preserva la apertura de chats archivados sin restauración automática y la restauración manual sin rearchivado posterior.",
-    "service-worker.js y app-version.json elevan la versión publicada para invalidar la caché PWA del shell estático.",
-    "js/app.js define wasBlocked antes de limpiar bloqueo residual en eliminación y restauración, evitando errores de ejecución que impedían recrear contactos o chats eliminados."
+    "js/app.js normaliza correctamente data.media y data.upload de MEDIAfirmadaX para no perder mediaId ni token de subida.",
+    "js/app.js solicita la URL de lectura con POST /api/v1/media-firmada/:mediaId/url-lectura antes de usar GET /leer.",
+    "js/app.js envia Authorization, X-MB-Site y credenciales solo cuando la URL firmada pertenece a memoriaBACKEND, sin contaminar subidas externas como R2.",
+    "js/app.js resuelve rutas /api/ de media hacia el dominio mapsx.app para que hashinmy.com no intente leer adjuntos desde su propio static site.",
+    "js/app.js permite descargar adjuntos de archivo mediante enlaces cuando existe mediaUrl segura.",
+    "service-worker.js y app-version.json elevan la version publicada para invalidar la cache PWA del shell estatico."
   ]
 }
