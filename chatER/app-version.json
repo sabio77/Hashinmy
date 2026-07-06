@@ -1,15 +1,15 @@
 {
-  "version": "2026-07-06-auth-session-restore-149",
-  "buildTime": "2026-07-06T10:25:00-05:00",
+  "version": "2026-07-06-auth-session-restore-150",
+  "buildTime": "2026-07-06T10:45:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar y evita quedar bloqueado en la pantalla de preparación cuando la verificación inicial necesita delegarse a login.js.",
-  "build": "auth-session-restore-149",
-  "updatedAt": "2026-07-06T10:25:00-05:00",
-  "notes": "La puerta de autenticación mantiene el token de sesión restaurable, permite que login.js revalide una sesión ya emitida con Authorization y solo limpia credenciales cuando memoriaBACKEND rechaza la sesión.",
+  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar y evita quedar bloqueado en la pantalla de preparación cuando login.js reconstruye la sesión guardada.",
+  "build": "auth-session-restore-150",
+  "updatedAt": "2026-07-06T10:45:00-05:00",
+  "notes": "La puerta de autenticación acepta la API oficial reconstruida por login.js solo cuando proviene de una sesión guardada y el token coincide con la sesión restaurable; además actualiza el cache del service worker.",
   "changes": [
-    "auth-gate.js preserva temporalmente la sesión guardada cuando /auth/check no pudo confirmarla por red, timeout o respuesta no autorizativa no concluyente.",
-    "auth-gate.js permite una revalidación controlada de /auth/check desde login.js solo si existe Authorization Bearer de una sesión previa.",
-    "service-worker.js actualiza la versión del cache para que el navegador no mantenga la puerta de autenticación anterior."
+    "auth-gate.js acepta una sesión restaurada por login.js durante un refresco sin tratarla como apertura implícita insegura.",
+    "auth-gate.js valida que el token expuesto por login.js coincida con el token guardado antes de liberar la interfaz.",
+    "service-worker.js actualiza la versión del cache para publicar la corrección de autenticación."
   ]
 }

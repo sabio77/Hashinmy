@@ -423,6 +423,37 @@
     return !!(value && typeof value === 'object' && value.ok === 1);
   }
 
+  function getBackendApiSessionToken(value = {}) {
+    return String(value?.tk || value?.token || value?.accessToken || '').trim();
+  }
+
+  function canTrustBackendApiFromStoredSession(value) {
+    if (!STATE.allowBackendScriptSessionRestore || !isMemoriaBackendApi(value)) return false;
+
+    const apiToken = getBackendApiSessionToken(value);
+    const storedToken = readStoredSessionToken();
+    if (apiToken && storedToken && apiToken !== storedToken) return false;
+
+    // Este permiso solo se activa después de detectar una sesión previa real.
+    // Si login.js logra reconstruir window.memoriaBACKEND desde esa sesión,
+    // no debe quedar atrapado por el guard de apertura implícita al refrescar.
+    return Boolean(apiToken || storedToken || value.u || value.user);
+  }
+
+  function acceptBackendApiFromStoredSession(value) {
+    if (!canTrustBackendApiFromStoredSession(value)) return false;
+
+    STATE.sessionRestoreAllowed = true;
+    STATE.sessionRestoredFromStorage = true;
+    STATE.backendApiValue = value;
+    STATE.blockedImplicitBackendApi = undefined;
+    STATE.allowBackendScriptSessionRestore = false;
+
+    const apiToken = getBackendApiSessionToken(value);
+    if (apiToken || value.u || value.user) writeStoredSessionToken(apiToken || readStoredSessionToken(), value.u || value.user || null);
+    return true;
+  }
+
   function installBackendApiExposureGate() {
     if (STATE.backendApiGateInstalled || CONFIG.forceGoogleLogin === false) return;
 
@@ -445,6 +476,10 @@
         },
         set(value) {
           if (isMemoriaBackendApi(value) && !hasExplicitGoogleUnlockPermission()) {
+            if (acceptBackendApiFromStoredSession(value)) {
+              clearImplicitUnlockTimer();
+              return;
+            }
             STATE.blockedImplicitBackendApi = value;
             STATE.forcedAuthCheckBlocked = true;
             scheduleImplicitAuthenticatedOpenPrevention();
@@ -1101,12 +1136,10 @@
 
   function handleBackendLoginEvent(event) {
     const detail = event?.detail && typeof event.detail === 'object' ? event.detail : null;
-    if (STATE.allowBackendScriptSessionRestore && isMemoriaBackendApi(detail)) {
-      STATE.sessionRestoreAllowed = true;
-      STATE.sessionRestoredFromStorage = true;
-      STATE.backendApiValue = detail;
-      STATE.blockedImplicitBackendApi = undefined;
-      STATE.allowBackendScriptSessionRestore = false;
+    const eventApi = isMemoriaBackendApi(detail) ? detail : window.memoriaBACKEND;
+    if (acceptBackendApiFromStoredSession(eventApi)) {
+      // La API fue reconstruida por login.js a partir de una sesión guardada;
+      // se marca como restauración válida antes de evaluar el guard anti-apertura.
     }
     if (!STATE.sessionRestoreAllowed) STATE.sessionRestoredFromStorage = false;
     rememberBackendLoginFromEvent(event);
@@ -1170,6 +1203,7 @@
         return;
       }
       if (isAuthenticated()) {
+        acceptBackendApiFromStoredSession(window.memoriaBACKEND);
         markAuthenticated();
         if (STATE.resolved) return;
       }
