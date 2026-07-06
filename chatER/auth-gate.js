@@ -431,13 +431,16 @@
     if (!STATE.allowBackendScriptSessionRestore || !isMemoriaBackendApi(value)) return false;
 
     const apiToken = getBackendApiSessionToken(value);
-    const storedToken = readStoredSessionToken();
+    const storedRecord = readPersistentAuthRecord();
+    const storedToken = storedRecord?.tk || readStoredSessionToken();
     if (apiToken && storedToken && apiToken !== storedToken) return false;
 
     // Este permiso solo se activa después de detectar una sesión previa real.
     // Si login.js logra reconstruir window.memoriaBACKEND desde esa sesión,
     // no debe quedar atrapado por el guard de apertura implícita al refrescar.
-    return Boolean(apiToken || storedToken || value.u || value.user);
+    // En despliegues con cookie HttpOnly memoriaBACKEND puede no publicar tk en JS;
+    // por eso también se acepta un auth-record fresco con usuario aunque el token no sea legible.
+    return Boolean(apiToken || storedToken || storedRecord || value.u || value.user);
   }
 
   function acceptBackendApiFromStoredSession(value) {
@@ -478,6 +481,7 @@
           if (isMemoriaBackendApi(value) && !hasExplicitGoogleUnlockPermission()) {
             if (acceptBackendApiFromStoredSession(value)) {
               clearImplicitUnlockTimer();
+              window.setTimeout(() => markAuthenticated(), 0);
               return;
             }
             STATE.blockedImplicitBackendApi = value;
@@ -676,8 +680,9 @@
       });
 
       if (response.ok && data?.ok === 1) {
+        const responseToken = getBackendApiSessionToken(data) || getBackendApiSessionToken(data?.session || {}) || token;
         exposeRestoredBackendSession(
-          { tk: token, u: data.u || persistentRecord?.u || null },
+          { tk: responseToken, u: data.u || data.user || persistentRecord?.u || null },
           { keepStoredSessionAge: !!persistentRecord }
         );
         return true;
@@ -686,11 +691,11 @@
       if (response.status === 401 || data?.ok === 0) {
         STATE.allowBackendScriptSessionRestore = false;
         clearKnownStoredAuth();
-      } else if (token) {
+      } else if (token || persistentRecord) {
         STATE.allowBackendScriptSessionRestore = true;
       }
     } catch (error) {
-      if (token) STATE.allowBackendScriptSessionRestore = true;
+      if (token || persistentRecord) STATE.allowBackendScriptSessionRestore = true;
       console.warn(`[${cleanText(CONFIG.brandName, 'ChatER')}] No se pudo verificar la sesión guardada:`, error);
     }
 
@@ -707,7 +712,11 @@
     const backendBaseUrl = getBackendBaseUrl();
     const siteId = getSiteId();
     const storedToken = readStoredSessionToken();
-    const preserveStoredSessionForLoginScript = Boolean(STATE.allowBackendScriptSessionRestore && storedToken);
+    const persistentRecord = readPersistentAuthRecord();
+    const hasStoredSessionEvidence = Boolean(storedToken || persistentRecord);
+    const preserveStoredSessionForLoginScript = Boolean(
+      hasStoredSessionEvidence && (STATE.allowBackendScriptSessionRestore || persistentRecord || storedToken)
+    );
     clearKnownStoredAuth({
       preserveRedirect: STATE.redirectReturnPending || preserveStoredSessionForLoginScript,
       preserveLoginFlow: STATE.redirectReturnPending || preserveStoredSessionForLoginScript,
@@ -715,7 +724,10 @@
     });
     clearInjectedBackendApi();
 
-    if (preserveStoredSessionForLoginScript) return;
+    if (preserveStoredSessionForLoginScript) {
+      STATE.allowBackendScriptSessionRestore = true;
+      return;
+    }
     if (!backendBaseUrl || !siteId || !window.fetch) return;
 
     const headers = { 'Content-Type': 'application/json', 'X-MB-Site': siteId };
@@ -792,7 +804,9 @@
   }
 
   function shouldAllowBackendScriptSessionCheck(init = {}) {
-    return Boolean(STATE.allowBackendScriptSessionRestore && requestHasAuthorizationHeader(init));
+    if (!STATE.allowBackendScriptSessionRestore) return false;
+    if (requestHasAuthorizationHeader(init)) return true;
+    return Boolean(readPersistentAuthRecord());
   }
 
   function shouldBlockImplicitBackendSessionRequest(value, init = {}) {

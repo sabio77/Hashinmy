@@ -1,15 +1,16 @@
 {
-  "version": "2026-07-06-auth-session-restore-150",
-  "buildTime": "2026-07-06T10:45:00-05:00",
+  "version": "2026-07-06-auth-session-restore-151",
+  "buildTime": "2026-07-06T10:58:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar y evita quedar bloqueado en la pantalla de preparación cuando login.js reconstruye la sesión guardada.",
-  "build": "auth-session-restore-150",
-  "updatedAt": "2026-07-06T10:45:00-05:00",
-  "notes": "La puerta de autenticación acepta la API oficial reconstruida por login.js solo cuando proviene de una sesión guardada y el token coincide con la sesión restaurable; además actualiza el cache del service worker.",
+  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar, incluyendo sesiones HttpOnly/cookie donde el token no es legible desde JavaScript.",
+  "build": "auth-session-restore-151",
+  "updatedAt": "2026-07-06T10:58:00-05:00",
+  "notes": "La puerta de autenticación conserva un auth-record fresco y permite que login.js reconstruya la sesión guardada cuando memoriaBACKEND usa cookie HttpOnly; además libera la interfaz apenas se acepta una API restaurada confiable.",
   "changes": [
-    "auth-gate.js acepta una sesión restaurada por login.js durante un refresco sin tratarla como apertura implícita insegura.",
-    "auth-gate.js valida que el token expuesto por login.js coincida con el token guardado antes de liberar la interfaz.",
-    "service-worker.js actualiza la versión del cache para publicar la corrección de autenticación."
+    "auth-gate.js ya no descarta una sesión restaurable solo porque el token tk no sea legible en JavaScript.",
+    "auth-gate.js permite /auth/check de login.js durante restauración si existe un auth-record fresco de memoriaBACKEND.",
+    "auth-gate.js libera la interfaz en cuanto acepta una API memoriaBACKEND restaurada desde sesión guardada.",
+    "service-worker.js actualiza la versión del cache para publicar la corrección de persistencia de sesión."
   ]
 }
