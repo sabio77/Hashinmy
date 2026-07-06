@@ -116,6 +116,15 @@
     }
   }
 
+  function buildCurrentPageUrl(projectOrigin) {
+    var safeOrigin = normalizeOrigin(projectOrigin) || window.location.origin;
+    try {
+      return new URL(window.location.pathname + window.location.search + window.location.hash, safeOrigin).toString();
+    } catch (error) {
+      return safeOrigin || window.location.href;
+    }
+  }
+
   function buildMemoriaLoginScriptUrl(options) {
     var backendUrl = normalizeOrigin(options.backendUrl);
     var siteId = normalizeText(options.siteId);
@@ -126,10 +135,40 @@
       loginUrl.searchParams.set('s', siteId);
       loginUrl.searchParams.set('n', options.brandName || 'ChatER');
       loginUrl.searchParams.set('c', options.accentColor || '#25d366');
+      if (options.nextUrl) loginUrl.searchParams.set('next', options.nextUrl);
       return loginUrl.toString();
     } catch (error) {
       return '';
     }
+  }
+
+  function uniqueUrls(urls) {
+    var seen = Object.create(null);
+    return urls.map(function (url) { return normalizeText(url); }).filter(function (url) {
+      if (!url || seen[url]) return false;
+      seen[url] = true;
+      return true;
+    });
+  }
+
+  function buildLoginScriptUrlCandidates(options) {
+    var candidates = [];
+    var currentOrigin = normalizeOrigin(window.location.origin);
+    var projectOrigin = normalizeOrigin(options.projectOrigin);
+    var backendUrl = normalizeOrigin(options.backendUrl);
+    var nextUrl = buildCurrentPageUrl(projectOrigin || currentOrigin);
+    var baseOptions = Object.assign({}, options, { nextUrl: nextUrl });
+
+    // ChatER corre en hashinmy.com con CSP estricta. Si el backend también está
+    // montado en el mismo origen público, probar primero /login.js same-origin evita
+    // que script-src bloquee la puerta de Google antes de que memoriaBACKEND cargue.
+    if (currentOrigin && projectOrigin && currentOrigin === projectOrigin && currentOrigin !== backendUrl) {
+      candidates.push(buildMemoriaLoginScriptUrl(Object.assign({}, baseOptions, { backendUrl: currentOrigin })));
+    }
+
+    candidates.push(buildMemoriaLoginScriptUrl(Object.assign({}, baseOptions, { backendUrl: backendUrl })));
+
+    return uniqueUrls(candidates);
   }
 
   function publishRuntimeConfig(jsonConfig) {
@@ -140,12 +179,14 @@
     var siteId = readFirst(jsonConfig, ['MEMORIA_SITE_ID', 'SITE_ID', 'siteId']);
     var brandName = existingPlatformConfig.brandName || existingConfig.GOOGLE_LOGIN_BRAND_NAME || 'ChatER';
     var accentColor = existingPlatformConfig.accentColor || existingConfig.GOOGLE_LOGIN_THEME_COLOR || '#25d366';
-    var loginScriptUrl = buildMemoriaLoginScriptUrl({
+    var loginScriptUrlCandidates = buildLoginScriptUrlCandidates({
+      projectOrigin: projectOrigin,
       backendUrl: backendUrl,
       siteId: siteId,
       brandName: brandName,
       accentColor: accentColor
     });
+    var loginScriptUrl = loginScriptUrlCandidates[0] || '';
 
     if (!projectOrigin || !backendUrl || !siteId || !loginScriptUrl) {
       throw new Error('CONFIGmemoriaBACKEND.json debe definir ORIGEN_PROYECTO, MEMORIA_BACKEND_URL y MEMORIA_SITE_ID válidos.');
@@ -168,6 +209,7 @@
       backendBaseUrl: backendUrl,
       siteId: siteId,
       loginScriptUrl: loginScriptUrl,
+      loginScriptUrlCandidates: Object.freeze(loginScriptUrlCandidates.slice()),
       memoriaBackendConfig: Object.freeze({
         origenProyecto: projectOrigin,
         memoriaBackendUrl: backendUrl,
@@ -194,6 +236,7 @@
       ENABLE_GOOGLE_LOGIN_SCRIPT: existingConfig.ENABLE_GOOGLE_LOGIN_SCRIPT !== false,
       AUTOLOAD_GOOGLE_LOGIN_SCRIPT: existingConfig.AUTOLOAD_GOOGLE_LOGIN_SCRIPT !== false,
       GOOGLE_LOGIN_SCRIPT_URL: loginScriptUrl,
+      GOOGLE_LOGIN_SCRIPT_URL_CANDIDATES: Object.freeze(loginScriptUrlCandidates.slice()),
       GOOGLE_LOGIN_BRAND_NAME: brandName,
       GOOGLE_LOGIN_THEME_COLOR: accentColor,
       GOOGLE_LOGIN_LOGO_URL: existingConfig.GOOGLE_LOGIN_LOGO_URL || '',
