@@ -238,6 +238,54 @@
     }
   }
 
+  function readBrowserStorageValue(storage, key) {
+    const normalizedKey = String(key || '').trim();
+    if (!storage || !normalizedKey) return '';
+    try {
+      return String(storage.getItem(normalizedKey) || '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getAppSessionHintKeys() {
+    const configured = CONFIG.sessionRestoreHintKeys;
+    const keys = Array.isArray(configured) ? configured : [];
+    return uniqueUrls([
+      ...keys,
+      'chater.session.email',
+      'chater.session.authProvider',
+      'chater.session.backendVerifiedAt'
+    ]);
+  }
+
+  function hasLocalSessionRestoreHint() {
+    if (CONFIG.rememberSession === false) return false;
+
+    const keys = getAppSessionHintKeys();
+    const now = Date.now();
+    const maxAge = Math.max(60 * 1000, Number(CONFIG.browserSessionTtlMs) || 24 * 60 * 60 * 1000);
+
+    try {
+      for (const key of keys) {
+        const localValue = readBrowserStorageValue(window.localStorage, key);
+        const sessionValue = readBrowserStorageValue(window.sessionStorage, key);
+        const value = localValue || sessionValue;
+        if (!value) continue;
+
+        if (/backendVerifiedAt$/i.test(key)) {
+          const verifiedAt = Number(value);
+          if (Number.isFinite(verifiedAt) && verifiedAt > 0 && now - verifiedAt >= 0 && now - verifiedAt <= maxAge) return true;
+          continue;
+        }
+
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
   function getPersistentAuthRecordKey() {
     return getLocalStorageKey('auth');
   }
@@ -440,7 +488,7 @@
     // no debe quedar atrapado por el guard de apertura implícita al refrescar.
     // En despliegues con cookie HttpOnly memoriaBACKEND puede no publicar tk en JS;
     // por eso también se acepta un auth-record fresco con usuario aunque el token no sea legible.
-    return Boolean(apiToken || storedToken || storedRecord || value.u || value.user);
+    return Boolean(apiToken || storedToken || storedRecord || value.u || value.user || hasLocalSessionRestoreHint());
   }
 
   function acceptBackendApiFromStoredSession(value) {
@@ -658,9 +706,10 @@
     const persistentRecord = readPersistentAuthRecord();
     const sessionToken = readSessionStorageTokenOnly();
     const token = persistentRecord?.tk || sessionToken || '';
-    STATE.allowBackendScriptSessionRestore = false;
+    const localSessionHint = hasLocalSessionRestoreHint();
+    STATE.allowBackendScriptSessionRestore = localSessionHint;
 
-    if (!persistentRecord && !sessionToken && STATE.storedSessionExpired) return false;
+    if (!persistentRecord && !sessionToken && STATE.storedSessionExpired && !localSessionHint) return false;
 
     const url = new URL('/auth/check', backendBaseUrl);
     url.searchParams.set('s', siteId);
@@ -689,13 +738,17 @@
       }
 
       if (response.status === 401 || data?.ok === 0) {
-        STATE.allowBackendScriptSessionRestore = false;
-        clearKnownStoredAuth();
-      } else if (token || persistentRecord) {
+        if (localSessionHint) {
+          STATE.allowBackendScriptSessionRestore = true;
+        } else {
+          STATE.allowBackendScriptSessionRestore = false;
+          clearKnownStoredAuth();
+        }
+      } else if (token || persistentRecord || localSessionHint) {
         STATE.allowBackendScriptSessionRestore = true;
       }
     } catch (error) {
-      if (token || persistentRecord) STATE.allowBackendScriptSessionRestore = true;
+      if (token || persistentRecord || localSessionHint) STATE.allowBackendScriptSessionRestore = true;
       console.warn(`[${cleanText(CONFIG.brandName, 'ChatER')}] No se pudo verificar la sesión guardada:`, error);
     }
 
@@ -713,9 +766,10 @@
     const siteId = getSiteId();
     const storedToken = readStoredSessionToken();
     const persistentRecord = readPersistentAuthRecord();
-    const hasStoredSessionEvidence = Boolean(storedToken || persistentRecord);
+    const localSessionHint = hasLocalSessionRestoreHint();
+    const hasStoredSessionEvidence = Boolean(storedToken || persistentRecord || localSessionHint);
     const preserveStoredSessionForLoginScript = Boolean(
-      hasStoredSessionEvidence && (STATE.allowBackendScriptSessionRestore || persistentRecord || storedToken)
+      hasStoredSessionEvidence && (STATE.allowBackendScriptSessionRestore || persistentRecord || storedToken || localSessionHint)
     );
     clearKnownStoredAuth({
       preserveRedirect: STATE.redirectReturnPending || preserveStoredSessionForLoginScript,
@@ -806,7 +860,7 @@
   function shouldAllowBackendScriptSessionCheck(init = {}) {
     if (!STATE.allowBackendScriptSessionRestore) return false;
     if (requestHasAuthorizationHeader(init)) return true;
-    return Boolean(readPersistentAuthRecord());
+    return Boolean(readPersistentAuthRecord() || hasLocalSessionRestoreHint());
   }
 
   function shouldBlockImplicitBackendSessionRequest(value, init = {}) {

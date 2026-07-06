@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-06-auth-session-restore-151",
-  "buildTime": "2026-07-06T10:58:00-05:00",
+  "version": "2026-07-06-auth-session-restore-152",
+  "buildTime": "2026-07-06T11:08:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar, incluyendo sesiones HttpOnly/cookie donde el token no es legible desde JavaScript.",
-  "build": "auth-session-restore-151",
-  "updatedAt": "2026-07-06T10:58:00-05:00",
-  "notes": "La puerta de autenticación conserva un auth-record fresco y permite que login.js reconstruya la sesión guardada cuando memoriaBACKEND usa cookie HttpOnly; además libera la interfaz apenas se acepta una API restaurada confiable.",
+  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar, incluyendo sesiones HttpOnly/cookie y restauraciones realizadas por login.js sin token visible en JavaScript.",
+  "build": "auth-session-restore-152",
+  "updatedAt": "2026-07-06T11:08:00-05:00",
+  "notes": "La puerta de autenticación ahora usa señales locales de sesión de ChatER para permitir que login.js reconstruya una sesión válida después de refrescar sin fabricar credenciales ni omitir la validación oficial de memoriaBACKEND.",
   "changes": [
-    "auth-gate.js ya no descarta una sesión restaurable solo porque el token tk no sea legible en JavaScript.",
-    "auth-gate.js permite /auth/check de login.js durante restauración si existe un auth-record fresco de memoriaBACKEND.",
-    "auth-gate.js libera la interfaz en cuanto acepta una API memoriaBACKEND restaurada desde sesión guardada.",
-    "service-worker.js actualiza la versión del cache para publicar la corrección de persistencia de sesión."
+    "auth-gate.js detecta señales locales de sesión de ChatER y permite restauración segura por login.js aunque no exista tk visible.",
+    "auth-gate.js no ejecuta logout preventivo cuando hay evidencia local de sesión que debe ser reconstruida por memoriaBACKEND.",
+    "auth-gate.js acepta una API memoriaBACKEND restaurada por login.js cuando existe una señal local previa y la API oficial reporta ok=1.",
+    "service-worker.js cambia la versión de cache para publicar la corrección de restauración de sesión."
   ]
 }
