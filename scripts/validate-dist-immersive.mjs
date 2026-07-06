@@ -11,6 +11,11 @@ const REQUIRED_SCENES = ['intro', 'serviceFamily', 'buildType', 'automationType'
 const MEMORIA_BACKEND_CONFIG = await loadMemoriaBackendProjectConfig(root);
 const PUBLIC_SITE_URL = MEMORIA_BACKEND_CONFIG.ORIGEN_PROYECTO;
 const PUBLIC_SITE_HOST = getConfiguredPublicHost(MEMORIA_BACKEND_CONFIG);
+const REQUIRED_SOCIAL_PREVIEW_TITLE = 'Financiacion 100% - Software a la medida';
+const REQUIRED_SOCIAL_PREVIEW_DESCRIPTION = 'Desarrollamos software personalizado para automatizar tu empresa';
+const REQUIRED_SOCIAL_PREVIEW_TEXT = `${REQUIRED_SOCIAL_PREVIEW_TITLE}. ${REQUIRED_SOCIAL_PREVIEW_DESCRIPTION}`;
+const REQUIRED_SOCIAL_PREVIEW_IMAGE = `${PUBLIC_SITE_URL}assets/miniVISTA.png`;
+const REQUIRED_SOCIAL_PREVIEW_FALLBACK_IMAGE = `${PUBLIC_SITE_URL}assets/hashinmy-logo-emblem.png`;
 const REQUIRED_SEO_UI_LABEL_KEYS = ['productsLabel', 'allLabel', 'closeLabel', 'backToProductsLabel', 'viewSolutionLabel', 'classicViewLabel', 'classicViewAriaLabel', 'modernViewLabel', 'modernViewAriaLabel', 'categoryNavLabel', 'simpleLabel', 'whoLabel', 'technicalLabel', 'includesLabel', 'glossaryLabel', 'guideLabel', 'faqLabel', 'detailTitle', 'detailLead', 'scopeCatalogLabel', 'glossarySetLabel'];
 const LANGUAGE_PATH_PREFIX = 'l';
 
@@ -1673,6 +1678,43 @@ assert(
   assert(indexHtml.includes(`type="text/plain" title="Hashinmy llms.txt" href="${PUBLIC_SITE_URL}llms.txt"`), 'dist/index.html debe exponer llms.txt desde el head como señal directa para rastreadores de IA.');
   assert(indexHtml.includes(`<title>${spanishBundle.meta.title}</title>`) && indexHtml.includes(`content="${spanishBundle.meta.description}"`), 'dist/index.html debe salir del build con title y description españoles hidratados desde textX/es.json para SEO sin JS.');
   assert(indexHtml.includes(`content="${spanishBundle.meta.ogTitle}"`) && indexHtml.includes(`content="${spanishBundle.meta.ogDescription}"`), 'dist/index.html debe publicar OG title/description estáticos desde textX/es.json para previews sociales sin JS.');
+  assert(
+    indexHtml.includes(`property="og:title" content="${REQUIRED_SOCIAL_PREVIEW_TITLE}" data-i18n-content="meta.ogTitle"`)
+      && indexHtml.includes(`property="og:description" content="${REQUIRED_SOCIAL_PREVIEW_DESCRIPTION}" data-i18n-content="meta.ogDescription"`)
+      && indexHtml.includes(`name="twitter:title" content="${REQUIRED_SOCIAL_PREVIEW_TITLE}" data-i18n-content="meta.ogTitle"`)
+      && indexHtml.includes(`name="twitter:description" content="${REQUIRED_SOCIAL_PREVIEW_DESCRIPTION}" data-i18n-content="meta.ogDescription"`),
+    'dist/index.html debe publicar el copy exacto de la vista previa social para hashinmy.com sin depender del runtime.'
+  );
+  assert(
+    indexHtml.includes(`property="og:image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes(`property="og:image:secure_url" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes('property="og:image:type" content="image/png"')
+      && indexHtml.includes('property="og:image:width" content="1200"')
+      && indexHtml.includes('property="og:image:height" content="630"')
+      && indexHtml.includes(`property="og:image:alt" content="${REQUIRED_SOCIAL_PREVIEW_TEXT}"`)
+      && indexHtml.includes(`property="og:image" content="${REQUIRED_SOCIAL_PREVIEW_FALLBACK_IMAGE}" data-hashinmy-preview-fallback="logo"`)
+      && indexHtml.includes(`name="twitter:image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes(`name="twitter:image:alt" content="${REQUIRED_SOCIAL_PREVIEW_TEXT}"`),
+    'dist/index.html debe conservar miniVISTA.png como imagen social principal y el logo de Hashinmy como fallback declarado.'
+  );
+  {
+    const socialPreviewBundlePosition = indexHtml.indexOf('id="hmInitialTextBundle"');
+    const criticalPreviewPositions = [
+      indexHtml.indexOf('<title>'),
+      indexHtml.indexOf('name="description"'),
+      indexHtml.indexOf('property="og:title"'),
+      indexHtml.indexOf('property="og:description"'),
+      indexHtml.indexOf('property="og:image"'),
+      indexHtml.indexOf('name="twitter:card"'),
+      indexHtml.indexOf('name="twitter:title"'),
+      indexHtml.indexOf('rel="canonical"')
+    ];
+    assert(
+      socialPreviewBundlePosition > 0
+        && criticalPreviewPositions.every((position) => position > 0 && position < socialPreviewBundlePosition),
+      'dist/index.html debe ubicar title, canonical y metadatos Open Graph/Twitter antes del bundle hmInitialTextBundle para que WhatsApp y otros crawlers los lean al inicio del HTML.'
+    );
+  }
   assert((indexHtml.match(/data-hashinmy-hreflang="static"/g) || []).length >= REQUIRED_LANGUAGE_COUNT + 1 && indexHtml.includes('hreflang="x-default"') && indexHtml.includes('/en/'), 'dist/index.html debe incluir hreflang estáticos del build para los idiomas detectados y x-default usando entradas HTML localizadas, no solo query params con HTML español.');
   assert(indexHtml.includes('data-i18n-text="ui.skip"') && indexHtml.includes('hmLanguageSelect'), 'dist/index.html debe consumir textos desde textX y conservar selector de idioma.');
   assert(indexHtml.includes('id="hmTopActions"') && indexHtml.includes('<a class="hm-seo-entry" id="hmSeoHubButton"') && indexHtml.includes('href="/es/productos/"') && indexHtml.indexOf('id="hmSeoHubButton"') < indexHtml.indexOf('id="hmLanguageSelectorWrap"'), 'dist/index.html debe mantener el acceso Productos como enlace crawlable agrupado a la izquierda real del selector de idioma.');

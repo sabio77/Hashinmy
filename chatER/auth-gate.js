@@ -1,5 +1,3 @@
-// Puerta de autenticación Google/Gmail manejada por memoriaBACKEND.
-// Adaptado del proyecto de referencia que autentica correctamente con login.js.
 (() => {
   'use strict';
 
@@ -47,9 +45,7 @@
     loginInteractionStartedAt: 0,
     implicitUnlockRestarts: 0,
     implicitUnlockTimer: 0,
-    loginScriptUrlCandidates: [],
-    loginScriptCandidateIndex: 0,
-    loginScriptAttemptedUrls: []
+    loginScriptCandidateIndex: 0
   };
 
   const readyPromise = new Promise((resolve) => {
@@ -71,51 +67,29 @@
     }
   }
 
-  function uniqueUrls(urls = []) {
-    const seen = new Set();
-    return urls.map((url) => String(url || '').trim()).filter((url) => {
-      if (!url || seen.has(url)) return false;
-      seen.add(url);
-      return true;
-    });
-  }
-
-  function decorateLoginScriptUrl(rawUrl) {
-    const url = new URL(rawUrl, window.location.href);
-    const siteId = getSiteId();
-    if (siteId && !url.searchParams.has('s')) url.searchParams.set('s', siteId);
-    if (!url.searchParams.has('n')) url.searchParams.set('n', CONFIG.brandName || 'ChatER');
-    if (!url.searchParams.has('c')) url.searchParams.set('c', CONFIG.accentColor || '#25d366');
-    return url.toString();
-  }
-
-  function getLoginScriptUrlCandidates() {
-    if (STATE.loginScriptUrlCandidates.length) return STATE.loginScriptUrlCandidates;
-
-    const candidates = [];
-    if (Array.isArray(CONFIG.loginScriptUrlCandidates)) candidates.push(...CONFIG.loginScriptUrlCandidates);
-    if (CONFIG.loginScriptUrl) candidates.push(CONFIG.loginScriptUrl);
+  function getLoginScriptUrl() {
+    const configured = String(CONFIG.loginScriptUrl || '').trim();
+    if (configured) return configured;
 
     const backendBaseUrl = getBackendBaseUrl();
     const siteId = getSiteId();
-    if (backendBaseUrl && siteId) {
-      try {
-        const url = new URL('/login.js', backendBaseUrl);
-        url.searchParams.set('s', siteId);
-        url.searchParams.set('n', CONFIG.brandName || 'ChatER');
-        url.searchParams.set('c', CONFIG.accentColor || '#25d366');
-        candidates.push(url.toString());
-      } catch (_) {}
-    }
+    if (!backendBaseUrl || !siteId) return '';
 
-    STATE.loginScriptUrlCandidates = uniqueUrls(candidates.map((url) => {
-      try { return decorateLoginScriptUrl(url); } catch (_) { return ''; }
-    }));
-    return STATE.loginScriptUrlCandidates;
+    const url = new URL('/login.js', backendBaseUrl);
+    url.searchParams.set('s', siteId);
+    url.searchParams.set('n', CONFIG.brandName || 'ChatER');
+    url.searchParams.set('c', CONFIG.accentColor || '#25d366');
+    return url.toString();
   }
 
-  function getLoginScriptUrl() {
-    return getLoginScriptUrlCandidates()[STATE.loginScriptCandidateIndex] || '';
+
+  function getLoginScriptUrlCandidates() {
+    const configuredCandidates = Array.isArray(CONFIG.loginScriptUrlCandidates) ? CONFIG.loginScriptUrlCandidates : [];
+    const runtimeCandidates = Array.isArray(window.CHATER_CONFIG?.loginScriptUrlCandidates) ? window.CHATER_CONFIG.loginScriptUrlCandidates : [];
+    const candidates = [...configuredCandidates, ...runtimeCandidates, getLoginScriptUrl()]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    return [...new Set(candidates)];
   }
 
   function getRuntimeLoginScriptUrl(loginScriptUrl = getLoginScriptUrl()) {
@@ -297,6 +271,45 @@
     }
   }
 
+
+  function preserveAuthRecord(record = readPersistentAuthRecord()) {
+    if (!record?.tk) return null;
+    const sessionTokenKey = getSessionStorageKey('tk');
+    try {
+      if (sessionTokenKey) window.sessionStorage?.setItem(sessionTokenKey, record.tk);
+    } catch (_) {}
+    return record;
+  }
+
+  function allowBackendScriptSessionRestore(record = readPersistentAuthRecord()) {
+    const preservedRecord = preserveAuthRecord(record);
+    STATE.sessionRestoreAllowed = !!preservedRecord;
+    return preservedRecord;
+  }
+
+  function getHeaderValueFromInit(init = {}, headerName = '') {
+    const name = String(headerName || '').toLowerCase();
+    const headers = init?.headers || {};
+    if (!name || !headers) return '';
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) return String(headers.get(headerName) || '').trim();
+    if (Array.isArray(headers)) {
+      const row = headers.find(([key]) => String(key || '').toLowerCase() === name);
+      return String(row?.[1] || '').trim();
+    }
+    if (typeof headers === 'object') {
+      const key = Object.keys(headers).find((item) => String(item || '').toLowerCase() === name);
+      return String(key ? headers[key] : '').trim();
+    }
+    return '';
+  }
+
+  function shouldAllowBackendScriptSessionCheck(value, init = {}) {
+    if (!isBackendAuthCheckUrl(value)) return true;
+    const preservedRecord = preserveAuthRecord();
+    const authorization = getHeaderValueFromInit(init, 'Authorization');
+    return Boolean(preservedRecord?.tk && /^Bearer\s+\S+/i.test(authorization));
+  }
+
   function writeStoredSessionToken(token, user = null) {
     const normalizedToken = String(token || '').trim();
     const sessionTokenKey = getSessionStorageKey('tk');
@@ -473,13 +486,14 @@
     const siteId = getSiteId();
     const preserveRedirect = !!options.preserveRedirect;
     const preserveLoginFlow = !!options.preserveLoginFlow;
+    const preserveStoredAuth = !!options.preserveAuthRecord;
     try {
       if (window.sessionStorage && siteId) {
-        sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:tk`);
+        if (!preserveStoredAuth) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:tk`);
         if (!preserveRedirect) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:redirect`);
         if (!preserveLoginFlow) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:google-flow-started-at`);
       }
-      if (!preserveRedirect && !preserveLoginFlow) clearPersistentAuthRecord();
+      if (!preserveStoredAuth && !preserveRedirect && !preserveLoginFlow) clearPersistentAuthRecord();
     } catch (_) {}
   }
 
@@ -615,6 +629,7 @@
     const persistentRecord = readPersistentAuthRecord();
     const sessionToken = readSessionStorageTokenOnly();
     const token = persistentRecord?.tk || sessionToken || '';
+    if (persistentRecord?.tk) allowBackendScriptSessionRestore(persistentRecord);
 
     if (!persistentRecord && !sessionToken && STATE.storedSessionExpired) return false;
 
@@ -625,8 +640,8 @@
       updateMessage(
         'Verificando sesión guardada...',
         isInstalledAppRuntime()
-          ? 'Si tu cuenta ya fue validada en la app, ChatER se abrirá automáticamente.'
-          : 'Si tu cuenta fue validada recientemente, ChatER se abrirá sin pedir Google otra vez.'
+          ? 'Si tu cuenta ya fue validada en la app, PL Stories se abrirá automáticamente.'
+          : 'Si tu cuenta fue validada recientemente, PL Stories se abrirá sin pedir Google otra vez.'
       );
       const { response, data } = await fetchJsonWithTimeout(url.toString(), {
         method: 'GET',
@@ -660,10 +675,12 @@
 
     const backendBaseUrl = getBackendBaseUrl();
     const siteId = getSiteId();
-    const storedToken = readStoredSessionToken();
+    const preservedRecord = preserveAuthRecord();
+    const storedToken = preservedRecord?.tk || readStoredSessionToken();
     clearKnownStoredAuth({
       preserveRedirect: STATE.redirectReturnPending,
-      preserveLoginFlow: STATE.redirectReturnPending
+      preserveLoginFlow: STATE.redirectReturnPending,
+      preserveAuthRecord: !!storedToken
     });
     clearInjectedBackendApi();
 
@@ -716,9 +733,9 @@
     }
   }
 
-  function shouldBlockImplicitBackendSessionRequest(value) {
+  function shouldBlockImplicitBackendSessionRequest(value, init = {}) {
     if (CONFIG.forceGoogleLogin === false || STATE.resolved) return false;
-    if (isBackendAuthCheckUrl(value)) return true;
+    if (isBackendAuthCheckUrl(value)) return !shouldAllowBackendScriptSessionCheck(value, init);
     return isBackendFirebaseSessionUrl(value) && !hasExplicitGoogleUnlockPermission();
   }
 
@@ -747,7 +764,7 @@
 
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : String(input?.url || '');
-      if (shouldBlockImplicitBackendSessionRequest(url)) {
+      if (shouldBlockImplicitBackendSessionRequest(url, init || {})) {
         STATE.forcedAuthCheckBlocked = true;
         STATE.sessionAuthCheckBlocked = true;
         return blockedLoginRequiredResponse();
@@ -807,7 +824,7 @@
         justify-content: center;
         padding: 24px;
         background:
-          radial-gradient(circle at top left, rgba(37, 211, 102, .24), transparent 34%),
+          radial-gradient(circle at top left, rgba(229, 9, 20, .28), transparent 34%),
           linear-gradient(135deg, rgba(5, 5, 9, .98), rgba(13, 13, 23, .98));
         color: #fff;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -883,7 +900,7 @@
       root.setAttribute('aria-live', 'polite');
       root.innerHTML = `
         <section id="platform-auth-gate-card" aria-label="Inicio de sesión requerido">
-          <div id="platform-auth-gate-mark" aria-hidden="true">CE</div>
+          <div id="platform-auth-gate-mark" aria-hidden="true">H</div>
           <h1 id="platform-auth-gate-title">${cleanText(CONFIG.brandName, 'ChatER')}</h1>
           <p id="platform-auth-gate-message">Preparando inicio de sesión seguro...</p>
           <p id="platform-auth-gate-detail">La plataforma se abrirá después de validar tu cuenta de Google.</p>
@@ -1122,35 +1139,15 @@
         syncBackendLoginUiState();
         return;
       }
-      if (tryNextLoginScriptCandidate('La ruta anterior de login.js cargó, pero no mostró la ventana segura de Google.')) return;
-      showError(`El script de autenticación no mostró la ventana de Google. Verifica en ${cleanText(CONFIG.backendName, 'memoriaBACKEND')} que el dominio actual esté dentro de origins para el site usado por esta plataforma y que la política CSP permita login.js.`);
+      if (!tryNextLoginScriptCandidate('login-ui-timeout')) {
+        showError(`El script de autenticación no mostró la ventana de Google. Verifica en ${cleanText(CONFIG.backendName, 'memoriaBACKEND')} que el dominio actual esté dentro de origins para el site usado por esta plataforma.`);
+      }
     }, Math.max(2500, Number(CONFIG.fallbackDelayMs) || 7000));
   }
 
   function markBackendScriptLoaded() {
     STATE.backendScriptLoaded = true;
     scheduleBackendFallback();
-  }
-
-  function tryNextLoginScriptCandidate(reason = '') {
-    const candidates = getLoginScriptUrlCandidates();
-    const nextIndex = STATE.loginScriptCandidateIndex + 1;
-    if (nextIndex >= candidates.length) return false;
-
-    STATE.loginScriptCandidateIndex = nextIndex;
-    STATE.backendScriptLoaded = false;
-    STATE.backendScriptRequested = false;
-    clearTimeout(STATE.fallbackTimer);
-
-    const existingScript = document.getElementById('memoriaBackendLoginScript');
-    if (existingScript) existingScript.remove();
-
-    updateMessage(
-      'Probando ruta alternativa de inicio de sesión...',
-      reason || 'El primer cargador de Google no quedó disponible; ChatER intentará una ruta autorizada de memoriaBACKEND.'
-    );
-    window.setTimeout(loadBackendLoginScript, 0);
-    return true;
   }
 
   async function bootBackendLoginScript() {
@@ -1169,19 +1166,38 @@
     return STATE.backendBootPromise;
   }
 
+
+  function removeRequestedBackendLoginScript() {
+    const script = document.getElementById('memoriaBackendLoginScript');
+    if (script?.parentNode) script.parentNode.removeChild(script);
+  }
+
+  function tryNextLoginScriptCandidate(reason = 'fallback') {
+    const candidates = getLoginScriptUrlCandidates();
+    const nextIndex = Number(STATE.loginScriptCandidateIndex || 0) + 1;
+    if (nextIndex >= candidates.length) return false;
+    STATE.loginScriptCandidateIndex = nextIndex;
+    STATE.backendScriptRequested = false;
+    STATE.backendScriptLoaded = false;
+    removeRequestedBackendLoginScript();
+    loadBackendLoginScript();
+    return true;
+  }
+
   function loadBackendLoginScript() {
     if (STATE.backendScriptRequested) return;
     if (isAuthenticated() && CONFIG.forceGoogleLogin === false) return;
     if (CONFIG.forceGoogleLogin !== false) clearInjectedBackendApi();
 
-    const loginScriptUrl = getRuntimeLoginScriptUrl();
+    const loginScriptCandidates = getLoginScriptUrlCandidates();
+    const candidateIndex = Math.max(0, Math.min(Number(STATE.loginScriptCandidateIndex || 0), Math.max(loginScriptCandidates.length - 1, 0)));
+    const loginScriptUrl = getRuntimeLoginScriptUrl(loginScriptCandidates[candidateIndex] || getLoginScriptUrl());
     if (!loginScriptUrl) {
       showError('Falta configurar loginScriptUrl, backendBaseUrl o siteId para cargar memoriaBACKEND.');
       return;
     }
 
     STATE.backendScriptRequested = true;
-    STATE.loginScriptAttemptedUrls.push(loginScriptUrl);
     const script = document.createElement('script');
     script.id = 'memoriaBackendLoginScript';
     script.src = loginScriptUrl;
@@ -1189,8 +1205,9 @@
     script.defer = false;
     script.onload = markBackendScriptLoaded;
     script.onerror = () => {
-      if (tryNextLoginScriptCandidate('El navegador no pudo cargar la primera ruta de login.js.')) return;
-      showError('No se pudo cargar login.js desde memoriaBACKEND. Revisa que el backend esté publicado, accesible y permitido por la política CSP del dominio.');
+      if (!tryNextLoginScriptCandidate('script-error')) {
+        showError('No se pudo cargar login.js desde memoriaBACKEND. Revisa que el backend esté publicado y accesible.');
+      }
     };
     (document.head || document.documentElement).appendChild(script);
   }
@@ -1214,7 +1231,8 @@
     markAuthenticated,
     showWaiting,
     showError,
-    markBackendScriptLoaded
+    markBackendScriptLoaded,
+    getSessionToken: readStoredSessionToken
   });
 
   installStyle();

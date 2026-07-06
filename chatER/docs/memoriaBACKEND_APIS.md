@@ -3757,3 +3757,45 @@ Validación esperada:
 - Abrir un chat archivado debe permitir leer y enviar mensajes sin desarchivarlo automáticamente.
 - Restaurar/desarchivar debe mover el chat al grupo principal y mantener intactos mensajes, avatar, participantes, sharedConversationKey y eventos STREMEx.
 - No se debe usar polling ni crear otra conversación para Archivados.
+
+## Iteración ChatER - eliminación de keepalive periódico hacia memoriaBACKEND
+
+Punto débil identificado: ChatER ya recibía mensajes por STREMEx/EventSource sin polling de mensajes, pero el frontend todavía hacía un `keepalive` automático a `/vida` cada 4 minutos. Ese ping no ordenaba ni entregaba mensajes, pero sí era tráfico periódico de backend y a escala masiva contradice la regla de desgaste mínimo.
+
+Cambios aplicados:
+
+- `js/app.js` elimina el intervalo `MEMORIA_BACKEND_KEEPALIVE_INTERVAL_MS`.
+- `startMemoriaBackendKeepalive()` queda desactivado por defecto y solo se habilita si `CHATER_CONFIG.ENABLE_MEMORIA_BACKEND_KEEPALIVE === true`.
+- Incluso cuando se habilita manualmente para diagnóstico privado, no crea intervalos periódicos; solo ejecuta el ping al activarse y al volver la pestaña a primer plano.
+- La ruta eficiente para chats sigue siendo STREMEx multiplexado por `chater-user-*` y `chater-conversacion-*`, con replay por `lastEventId`/`lastEventIds` y sin polling.
+
+Validación ejecutable:
+
+- `node --check chatER/js/app.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js`
+- `npm test` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+
+## Iteración ChatER - envío por un solo POST canónico de mensaje
+
+Punto débil identificado: aunque ChatER ya recibía mensajes por STREMEx sin polling, el envío de texto todavía publicaba un evento durable `message.outgoing.pending` desde el cliente antes de llamar a `/api/v1/mensajes`. Ese evento no era la fuente canónica del mensaje, no lo procesaba el destinatario como `message.created` y agregaba una solicitud STREMEx extra por cada mensaje, justo antes del camino backend que ya publica inmediatamente.
+
+Cambios aplicados:
+
+- `chatER/js/app.js` elimina la publicación previa `message.outgoing.pending` y el `dedupeKey: streme-message:${clientMessageId}` asociado.
+- El flujo eficiente queda igual al patrón observado en `estadisponible`: el cliente hace un solo POST de envío, el backend persiste el mensaje y `MENSAJESx` publica `message.created` por STREMEx apenas queda guardado.
+- Se preserva el render optimista local del remitente, el orden se mantiene con `normalizeAndPruneChatMessages`, y los checks siguen avanzando por eventos canónicos `backend_received`, `delivered` y `read`.
+- `chaterStaticContractChecks.js` bloquea la regresión de volver a publicar un evento durable previo al mensaje.
+- `app-version.json` y `service-worker.js` suben a `2026-07-06-chater-streme-single-message-post-147`.
+
+Validación ejecutable:
+
+- `node --check chatER/js/app.js`
+- `node --check memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js`
+- `npm test` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.

@@ -1,0 +1,45 @@
+{
+  "asset": "miniVISTA.png",
+  "formato_final": "Formato final: miniVISTA.png",
+  "uso": "Imagen principal para miniaturas de enlaces sociales de https://hashinmy.com/ en WhatsApp, Twitter/X, Facebook, LinkedIn y previsualizadores Open Graph.",
+  "tamano_recomendado": {
+    "ancho_px": 1200,
+    "alto_px": 630,
+    "relacion": "1.91:1"
+  },
+  "concepto": "Portada premium de Hashinmy para comunicar financiación 100% y software a la medida para automatización empresarial.",
+  "texto_visual_obligatorio": "Financiacion 100% - Software a la medida. Desarrollamos software personalizado para automatizar tu empresa",
+  "composicion": {
+    "reticula": "retícula 12x8 con eje diagonal principal ascendente desde la esquina inferior izquierda hacia la esquina superior derecha",
+    "zona_segura": "mantener textos y logo dentro del 80% central para evitar recortes en miniaturas de chat",
+    "lado_izquierdo": "bloque de texto principal con jerarquía fuerte, legible a tamaño pequeño",
+    "lado_derecho": "emblema H de Hashinmy o símbolo tecnológico abstracto con profundidad sutil",
+    "fondo": "degradado navy profundo con acentos cyan, emerald y violet, líneas finas de circuito y módulos geométricos suaves"
+  },
+  "estilo": {
+    "marca": "Hashinmy enterprise, ingeniería digital, IA, automatización, software a medida",
+    "sensacion": "confiable, financiero, moderno, tecnológico, premium, claro para empresarios",
+    "iluminacion": "brillo controlado tipo glassmorphism, sin saturación excesiva",
+    "tipografia": "sans serif geométrica, alto contraste, peso bold para Financiacion 100% y peso semibold para el resto",
+    "colores": [
+      "navy",
+      "cyan",
+      "emerald",
+      "violet",
+      "white"
+    ]
+  },
+  "fallback": {
+    "si_no_existe_miniVISTA_png": "usar el logo de Hashinmy como imagen alternativa en los metadatos sociales",
+    "logo_referencia": "assets/hashinmy-logo-emblem.png",
+    "si_no_existe_logo": "la interfaz debe conservar fallback geométrico ya existente de la marca"
+  },
+  "restricciones": [
+    "no usar fotografías genéricas de oficina",
+    "no incluir precios ni promesas legales diferentes a financiación 100%",
+    "no agregar textos de creador, borrador o instrucciones internas",
+    "no colocar información sensible o datos de contacto inventados",
+    "debe seguir funcionando aunque el PNG real aún no esté pegado en assets"
+  ],
+  "descripcion_detallada": "Crear una imagen horizontal 1200x630 para preview social. El texto debe leerse claramente: Financiacion 100% - Software a la medida. Desarrollamos software personalizado para automatizar tu empresa. Usar una composición empresarial de alto nivel, con el emblema H de Hashinmy en un panel visual a la derecha, acompañado por módulos abstractos que sugieran IA, automatización, CRM, procesos y nube. El fondo debe ser oscuro elegante con gradientes cyan, emerald y violet, líneas de circuito discretas y figuras geométricas alineadas a una retícula 12x8 y a un eje diagonal principal. La imagen debe comunicar confianza, financiación y desarrollo de software personalizado, sin verse como plantilla genérica. Mantener zonas de aire para que WhatsApp y otros chats no recorten el mensaje principal."
+}
