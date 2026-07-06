@@ -12595,6 +12595,36 @@ function getCurrentProfileQrData() {
   return { email, userId, displayName, name: displayName };
 }
 
+function isExpectedQrCameraFallbackError(error = {}) {
+  const name = String(error?.name || '').toLowerCase();
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || error || '').toLowerCase();
+  const expectedTokens = [
+    'notallowed',
+    'permission',
+    'denied',
+    'notfound',
+    'notreadable',
+    'overconstrained',
+    'abort',
+    'cancel',
+    'insecure',
+    'barcode',
+    'detector',
+    'camera',
+    'cámara',
+    'camara',
+    'no se pudo iniciar barcode',
+    'no se pudo acceder a la cámara'
+  ];
+  return expectedTokens.some((token) => name.includes(token) || code.includes(token) || message.includes(token));
+}
+
+function reportUnexpectedQrScannerError(error, message = 'No se pudo completar el flujo de QR.') {
+  if (isExpectedQrCameraFallbackError(error)) return;
+  console.warn(message, error);
+}
+
 function renderProfileQrForCurrentUser(container) {
   const target = container?.querySelector?.('[data-profile-qr-code]');
   const payloadTarget = container?.querySelector?.('[data-profile-qr-payload]');
@@ -12752,7 +12782,8 @@ function openScanContactQrModal() {
         feedback.textContent = 'Leyendo imagen del QR...';
         const result = await window.ChatERQRCodeLego.scanFromImage(file, {
           emptyMessage: 'No se detectó un QR en la imagen seleccionada.',
-          invalidMessage: 'La imagen no contiene un QR de perfil ChatER válido.'
+          invalidMessage: 'La imagen no contiene un QR de perfil ChatER válido.',
+          allowRawPayload: Boolean(CHATER_CONFIG.backendBaseUrl)
         });
         await processDetectedContactQr(result.contact, result.rawValue || '');
       } catch (error) {
@@ -12813,7 +12844,7 @@ function openScanContactQrModal() {
           stopped = false;
           feedback.textContent = error?.message || 'El QR detectado no pertenece a un perfil ChatER válido.';
         }
-      }, { intervalMs: 700 }).then((cleanup) => {
+      }, { intervalMs: 700, allowRawPayload: Boolean(CHATER_CONFIG.backendBaseUrl) }).then((cleanup) => {
         const stopStream = activeQrScannerCleanup;
         activeQrScannerCleanup = () => {
           cleanup?.();
@@ -12821,12 +12852,12 @@ function openScanContactQrModal() {
         };
       }).catch((error) => {
         feedback.textContent = 'No se pudo activar la lectura automática. Selecciona una imagen del QR o pega el contenido manualmente.';
-        console.warn('No se pudo iniciar BarcodeDetector para QR.', error);
+        reportUnexpectedQrScannerError(error, 'No se pudo iniciar BarcodeDetector para QR.');
       });
     })
     .catch((error) => {
       feedback.textContent = 'No se pudo acceder a la cámara. Selecciona una imagen del QR o pega el contenido manualmente.';
-      console.warn('Permiso de cámara no disponible para QR.', error);
+      reportUnexpectedQrScannerError(error, 'Permiso de cámara no disponible para QR.');
     });
 }
 

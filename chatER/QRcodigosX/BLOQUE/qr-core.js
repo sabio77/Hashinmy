@@ -306,8 +306,8 @@
     var rawValue = codes && codes[0] && codes[0].rawValue;
     if (!rawValue) throw new Error(options.emptyMessage || 'No se detectó un QR de contacto en la imagen.');
     var contact = parsePayload(rawValue);
-    if (!contact) throw new Error(options.invalidMessage || 'El QR detectado no pertenece a un perfil ChatER válido.');
-    return { contact: contact, rawValue: rawValue };
+    if (!contact && !options.allowRawPayload) throw new Error(options.invalidMessage || 'El QR detectado no pertenece a un perfil ChatER válido.');
+    return { contact: contact || null, rawValue: rawValue };
   }
 
   function loadImageElementFromFile(file) {
@@ -377,8 +377,8 @@
       lastScanAt = timestamp;
       try {
         var result = await scanFromImage(video, options);
-        if (result && result.contact) {
-          onDetected(result.contact, result.rawValue);
+        if (result && (result.contact || (options.allowRawPayload && result.rawValue))) {
+          onDetected(result.contact || null, result.rawValue);
           stopped = true;
           return;
         }
@@ -396,7 +396,7 @@
   }
 
   window.QRcodigosXBloque = {
-    version: '1.2.0',
+    version: '1.2.1',
     maxPayloadBytes: MAX_PAYLOAD_BYTES,
     buildProfilePayload: buildProfilePayload,
     parsePayload: parsePayload,

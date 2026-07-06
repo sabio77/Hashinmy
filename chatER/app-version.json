@@ -1,15 +1,15 @@
 {
-  "version": "2026-07-05-local-ttl-purge-147",
-  "buildTime": "2026-07-05T21:22:00-05:00",
+  "version": "2026-07-06-config-bootstrap-148",
+  "buildTime": "2026-07-06T08:05:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER programa autodestruccion visual local para mensajes y adjuntos cargados, sin polling de red.",
-  "build": "local-ttl-purge-147",
-  "updatedAt": "2026-07-05T21:22:00-05:00",
-  "notes": "La app calcula el proximo expiresAt local, depura mensajes vencidos al llegar su hora y cancela temporizadores al cambiar o cerrar sesion para preservar aislamiento por Gmail.",
+  "description": "ChatER carga CONFIGmemoriaBACKEND.json sin XMLHttpRequest síncrono y arranca login, QR y realtime solo después de publicar la configuración runtime.",
+  "build": "config-bootstrap-148",
+  "updatedAt": "2026-07-06T08:05:00-05:00",
+  "notes": "El static site evita advertencias de consola por XHR síncrono, muestra un estado de configuración fallida en pantalla si falta el JSON y mantiene la cadena de autenticación Google/Gmail antes de QR/contactos y STREMEx.",
   "changes": [
-    "js/app.js agrega scheduleNextEphemeralLocalPurge para borrar visualmente mensajes cargados cuando vence su TTL individual.",
-    "persistState reprograma el siguiente vencimiento y bootstrap activa el temporizador sin consultar memoriaBACKEND.",
-    "Las pruebas de contrato y apis.txt documentan la autodestruccion local sin polling y la cancelacion del temporizador por sesion."
+    "js/config.js reemplaza la lectura síncrona de CONFIGmemoriaBACKEND.json por fetch no-store con timeout y promesa CHATER_CONFIG_READY.",
+    "index.html delega la carga ordenada de auth-gate, compresión, QR, permisos, app y PWA al bootstrap de configuración para evitar carreras de arranque.",
+    "Las pruebas de contrato bloquean regresiones que reintroduzcan XMLHttpRequest síncrono o scripts dependientes antes de la configuración runtime."
   ]
 }
