@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-06-auth-session-restore-152",
-  "buildTime": "2026-07-06T11:08:00-05:00",
+  "version": "2026-07-06-auth-reference-6",
+  "buildTime": "2026-07-06T11:55:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar, incluyendo sesiones HttpOnly/cookie y restauraciones realizadas por login.js sin token visible en JavaScript.",
-  "build": "auth-session-restore-152",
-  "updatedAt": "2026-07-06T11:08:00-05:00",
-  "notes": "La puerta de autenticación ahora usa señales locales de sesión de ChatER para permitir que login.js reconstruya una sesión válida después de refrescar sin fabricar credenciales ni omitir la validación oficial de memoriaBACKEND.",
+  "description": "ChatER usa el mismo patrón de Google y persistencia de autenticación del ZIP de referencia: auth-gate.js y memoria-backend-config.js son los únicos dueños del login persistente.",
+  "build": "auth-reference-6",
+  "updatedAt": "2026-07-06T11:55:00-05:00",
+  "notes": "La app espera platformAuthGate.whenReady() igual que el proyecto de referencia; ChatER solo copia a memoria runtime el correo entregado por window.memoriaBACKEND.ok === 1 para aislar datos de la interfaz, sin crear persistencia propia de autenticación.",
   "changes": [
-    "auth-gate.js detecta señales locales de sesión de ChatER y permite restauración segura por login.js aunque no exista tk visible.",
-    "auth-gate.js no ejecuta logout preventivo cuando hay evidencia local de sesión que debe ser reconstruida por memoriaBACKEND.",
-    "auth-gate.js acepta una API memoriaBACKEND restaurada por login.js cuando existe una señal local previa y la API oficial reporta ok=1.",
-    "service-worker.js cambia la versión de cache para publicar la corrección de restauración de sesión."
+    "js/app.js elimina la validación propia de payload Google/Gmail y deja que auth-gate.js maneje autenticación y persistencia igual que el ZIP de referencia.",
+    "js/app.js conserva únicamente identidad runtime derivada de window.memoriaBACKEND.ok === 1 para separar datos locales de ChatER por usuario.",
+    "auth-gate.js y js/memoria-backend-config.js permanecen como únicos dueños del login persistente.",
+    "index.html y service-worker.js actualizan versión para evitar que Render/PWA sirvan el js/app.js anterior desde caché."
   ]
 }
