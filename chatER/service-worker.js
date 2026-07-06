@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-06-config-bootstrap-148';
+const CHATER_SW_VERSION = '2026-07-06-auth-reference-6';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -9,7 +9,7 @@ const APP_SHELL = [
   './manifest.json',
   './app-version.json',
   './css/styles.css',
-  './js/config.js',
+  './js/memoria-backend-config.js',
   './js/theme-bootstrap.js',
   './auth-gate.js',
   './js/CONFIGmemoriaBACKEND.json',
