@@ -1,16 +1,15 @@
 {
-  "version": "2026-07-06-auth-reference-6",
-  "buildTime": "2026-07-06T11:55:00-05:00",
+  "version": "2026-07-06-config-bootstrap-148",
+  "buildTime": "2026-07-06T08:05:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER usa el mismo patrón de Google y persistencia de autenticación del ZIP de referencia: auth-gate.js y memoria-backend-config.js son los únicos dueños del login persistente.",
-  "build": "auth-reference-6",
-  "updatedAt": "2026-07-06T11:55:00-05:00",
-  "notes": "La app espera platformAuthGate.whenReady() igual que el proyecto de referencia; ChatER solo copia a memoria runtime el correo entregado por window.memoriaBACKEND.ok === 1 para aislar datos de la interfaz, sin crear persistencia propia de autenticación.",
+  "description": "ChatER carga CONFIGmemoriaBACKEND.json sin XMLHttpRequest síncrono y arranca login, QR y realtime solo después de publicar la configuración runtime.",
+  "build": "config-bootstrap-148",
+  "updatedAt": "2026-07-06T08:05:00-05:00",
+  "notes": "El static site evita advertencias de consola por XHR síncrono, muestra un estado de configuración fallida en pantalla si falta el JSON y mantiene la cadena de autenticación Google/Gmail antes de QR/contactos y STREMEx.",
   "changes": [
-    "js/app.js elimina la validación propia de payload Google/Gmail y deja que auth-gate.js maneje autenticación y persistencia igual que el ZIP de referencia.",
-    "js/app.js conserva únicamente identidad runtime derivada de window.memoriaBACKEND.ok === 1 para separar datos locales de ChatER por usuario.",
-    "auth-gate.js y js/memoria-backend-config.js permanecen como únicos dueños del login persistente.",
-    "index.html y service-worker.js actualizan versión para evitar que Render/PWA sirvan el js/app.js anterior desde caché."
+    "js/config.js reemplaza la lectura síncrona de CONFIGmemoriaBACKEND.json por fetch no-store con timeout y promesa CHATER_CONFIG_READY.",
+    "index.html delega la carga ordenada de auth-gate, compresión, QR, permisos, app y PWA al bootstrap de configuración para evitar carreras de arranque.",
+    "Las pruebas de contrato bloquean regresiones que reintroduzcan XMLHttpRequest síncrono o scripts dependientes antes de la configuración runtime."
   ]
 }
