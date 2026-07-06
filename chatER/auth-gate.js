@@ -286,6 +286,129 @@
     return false;
   }
 
+
+  function readFirstBrowserStorageValue(keys = [], options = {}) {
+    const normalizedKeys = Array.isArray(keys) ? keys : [];
+    const preferSession = options.preferSession === true;
+    const allowLocal = options.allowLocal !== false;
+
+    for (const key of normalizedKeys) {
+      const sessionValue = readBrowserStorageValue(window.sessionStorage, key);
+      if (preferSession && sessionValue) return sessionValue;
+
+      const localValue = allowLocal ? readBrowserStorageValue(window.localStorage, key) : '';
+      if (localValue) return localValue;
+      if (sessionValue) return sessionValue;
+    }
+
+    return '';
+  }
+
+  function getClientSessionEmailKeys() {
+    const configured = CONFIG.clientSessionEmailKeys;
+    const keys = Array.isArray(configured) ? configured : [];
+    return uniqueUrls([...keys, 'chater.session.email']);
+  }
+
+  function getClientSessionVerifiedAtKeys() {
+    const configured = CONFIG.clientSessionVerifiedAtKeys;
+    const keys = Array.isArray(configured) ? configured : [];
+    return uniqueUrls([...keys, 'chater.session.backendVerifiedAt']);
+  }
+
+  function normalizeClientSessionEmail(value = '') {
+    return String(value || '').trim().slice(0, 180);
+  }
+
+  function readClientVerifiedSessionHint() {
+    if (CONFIG.rememberSession === false) return null;
+
+    const email = normalizeClientSessionEmail(readFirstBrowserStorageValue(getClientSessionEmailKeys(), { preferSession: false }));
+    if (!email) return null;
+
+    // La restauración directa solo usa una marca de verificación viva en sessionStorage.
+    // Así se corrige el refresco de la pestaña sin convertir un registro antiguo de
+    // localStorage en una sesión indefinida cuando memoriaBACKEND no la confirmó.
+    const verifiedAtRaw = readFirstBrowserStorageValue(getClientSessionVerifiedAtKeys(), {
+      preferSession: true,
+      allowLocal: CONFIG.allowPersistentClientSessionHint === true
+    });
+    const verifiedAt = Number(verifiedAtRaw || 0);
+    if (!Number.isFinite(verifiedAt) || verifiedAt <= 0) return null;
+
+    const maxAge = Math.max(60 * 1000, Number(CONFIG.browserSessionTtlMs) || 24 * 60 * 60 * 1000);
+    const age = Date.now() - verifiedAt;
+    if (age < 0 || age > maxAge) return null;
+
+    const provider = readFirstBrowserStorageValue(['chater.session.authProvider'], { preferSession: false }) || 'google.com';
+    return {
+      tk: '',
+      u: {
+        email,
+        e: email,
+        provider,
+        authProvider: provider,
+        sessionRestoredFrom: 'chater-session-hint'
+      },
+      at: verifiedAt,
+      app: isInstalledAppRuntime()
+    };
+  }
+
+  function restoreFromClientVerifiedSessionHint(reason = '') {
+    const hint = readClientVerifiedSessionHint();
+    if (!hint) return false;
+
+    updateMessage(
+      'Restaurando sesión validada...',
+      'ChatER detectó una cuenta de Google ya validada en esta pestaña y abrirá la plataforma automáticamente.'
+    );
+
+    exposeRestoredBackendSession(
+      { tk: hint.tk || readStoredSessionToken(), u: hint.u },
+      { keepStoredSessionAge: true, restoredFromClientHint: true, reason }
+    );
+    return true;
+  }
+
+  function rememberVerifiedClientSession(session = {}) {
+    if (CONFIG.rememberSession === false || !session || typeof session !== 'object') return false;
+
+    const payload = session.payload && typeof session.payload === 'object' ? session.payload : {};
+    const rawUser = session.user || session.u || payload.user || payload.u || {};
+    const email = normalizeClientSessionEmail(
+      session.email
+      || rawUser.email
+      || rawUser.e
+      || payload.email
+      || payload.user?.email
+      || payload.u?.email
+      || ''
+    );
+    const token = String(session.tk || session.token || session.accessToken || payload.tk || payload.token || payload.accessToken || '').trim();
+    if (!email && !token) return false;
+
+    const provider = String(
+      session.provider
+      || session.authProvider
+      || rawUser.provider
+      || rawUser.authProvider
+      || payload.authProvider
+      || payload.provider
+      || 'google.com'
+    ).trim() || 'google.com';
+
+    const user = Object.assign({}, rawUser && typeof rawUser === 'object' ? rawUser : {}, {
+      email: email || rawUser.email || rawUser.e || '',
+      e: email || rawUser.e || rawUser.email || '',
+      provider,
+      authProvider: provider
+    });
+
+    writeStoredSessionToken(token || readStoredSessionToken(), user);
+    return true;
+  }
+
   function getPersistentAuthRecordKey() {
     return getLocalStorageKey('auth');
   }
@@ -707,7 +830,8 @@
     const sessionToken = readSessionStorageTokenOnly();
     const token = persistentRecord?.tk || sessionToken || '';
     const localSessionHint = hasLocalSessionRestoreHint();
-    STATE.allowBackendScriptSessionRestore = localSessionHint;
+    const clientVerifiedSessionHint = readClientVerifiedSessionHint();
+    STATE.allowBackendScriptSessionRestore = localSessionHint || !!clientVerifiedSessionHint;
 
     if (!persistentRecord && !sessionToken && STATE.storedSessionExpired && !localSessionHint) return false;
 
@@ -738,19 +862,23 @@
       }
 
       if (response.status === 401 || data?.ok === 0) {
+        if (clientVerifiedSessionHint && restoreFromClientVerifiedSessionHint('auth-check-rejected')) return true;
         if (localSessionHint) {
           STATE.allowBackendScriptSessionRestore = true;
         } else {
           STATE.allowBackendScriptSessionRestore = false;
           clearKnownStoredAuth();
         }
-      } else if (token || persistentRecord || localSessionHint) {
+      } else if (token || persistentRecord || localSessionHint || clientVerifiedSessionHint) {
         STATE.allowBackendScriptSessionRestore = true;
       }
     } catch (error) {
-      if (token || persistentRecord || localSessionHint) STATE.allowBackendScriptSessionRestore = true;
+      if (clientVerifiedSessionHint && restoreFromClientVerifiedSessionHint('auth-check-unavailable')) return true;
+      if (token || persistentRecord || localSessionHint || clientVerifiedSessionHint) STATE.allowBackendScriptSessionRestore = true;
       console.warn(`[${cleanText(CONFIG.brandName, 'ChatER')}] No se pudo verificar la sesión guardada:`, error);
     }
+
+    if (clientVerifiedSessionHint && restoreFromClientVerifiedSessionHint('auth-check-no-confirmation')) return true;
 
     return false;
   }
@@ -1371,7 +1499,8 @@
     markAuthenticated,
     showWaiting,
     showError,
-    markBackendScriptLoaded
+    markBackendScriptLoaded,
+    rememberVerifiedSession: rememberVerifiedClientSession
   });
 
   installStyle();

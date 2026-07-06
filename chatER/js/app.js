@@ -3562,6 +3562,28 @@ function getPlatformAuthGate() {
   return gate;
 }
 
+
+function rememberVerifiedSessionInPlatformAuthGate(email = '', payload = {}) {
+  const gate = getPlatformAuthGate();
+  if (!gate || typeof gate.rememberVerifiedSession !== 'function') return;
+
+  try {
+    const normalizedPayload = normalizeAuthPayload(payload, email);
+    gate.rememberVerifiedSession({
+      email,
+      payload: normalizedPayload,
+      user: normalizedPayload.user || normalizedPayload.u || {},
+      tk: normalizedPayload.tk || normalizedPayload.token || normalizedPayload.accessToken || '',
+      token: normalizedPayload.token || normalizedPayload.tk || normalizedPayload.accessToken || '',
+      accessToken: normalizedPayload.accessToken || normalizedPayload.token || normalizedPayload.tk || '',
+      authProvider: normalizedPayload.authProvider || normalizedPayload.provider || normalizedPayload.user?.provider || 'google.com',
+      verifiedAt: chaterRuntimeAuth.verifiedAt || Date.now()
+    });
+  } catch (error) {
+    console.warn('No se pudo sincronizar la sesión verificada con auth-gate.js.', error);
+  }
+}
+
 function isPlatformAuthGateAvailable() {
   return Boolean(getPlatformAuthGate());
 }
@@ -7092,6 +7114,7 @@ function completeAuthenticatedSession(email, payload = {}, authGuard = null) {
   invalidateAuthAttempts();
   persistAuthTokens({ ...authoritativePayload, sessionVerified: true });
   setSessionEmail(resolvedEmail);
+  rememberVerifiedSessionInPlatformAuthGate(resolvedEmail, { ...authoritativePayload, sessionVerified: true });
   advanceSessionRuntime(resolvedEmail);
   activateSessionState(resolvedEmail, true);
   setAuthFeedback('');
