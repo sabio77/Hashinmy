@@ -42,6 +42,7 @@
     redirectReturnPending: false,
     sessionRestoreAllowed: false,
     sessionRestoredFromStorage: false,
+    allowBackendScriptSessionRestore: false,
     storedSessionExpired: false,
     loginInteractionObserved: false,
     loginInteractionStartedAt: 0,
@@ -395,6 +396,7 @@
     if (CONFIG.forceGoogleLogin === false) return true;
     if (STATE.ready || STATE.resolved) return true;
     if (STATE.sessionRestoreAllowed) return true;
+    if (STATE.allowBackendScriptSessionRestore) return true;
     if (STATE.redirectReturnPending) return true;
     syncBackendLoginUiState();
     return STATE.backendLoginWindowSeen && STATE.backendLoginUiShown && hasFreshLoginInteraction();
@@ -473,13 +475,14 @@
     const siteId = getSiteId();
     const preserveRedirect = !!options.preserveRedirect;
     const preserveLoginFlow = !!options.preserveLoginFlow;
+    const preserveAuthRecord = !!options.preserveAuthRecord;
     try {
       if (window.sessionStorage && siteId) {
-        sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:tk`);
+        if (!preserveAuthRecord) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:tk`);
         if (!preserveRedirect) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:redirect`);
         if (!preserveLoginFlow) sessionStorage.removeItem(`${CONFIG.backendName}:${siteId}:google-flow-started-at`);
       }
-      if (!preserveRedirect && !preserveLoginFlow) clearPersistentAuthRecord();
+      if (!preserveAuthRecord && !preserveRedirect && !preserveLoginFlow) clearPersistentAuthRecord();
     } catch (_) {}
   }
 
@@ -590,6 +593,7 @@
   function exposeRestoredBackendSession(session, options = {}) {
     STATE.sessionRestoreAllowed = true;
     STATE.sessionRestoredFromStorage = !!options.keepStoredSessionAge;
+    STATE.allowBackendScriptSessionRestore = false;
     const api = createMemoriaBackendApi(session);
     STATE.backendApiValue = api;
     STATE.blockedImplicitBackendApi = undefined;
@@ -615,6 +619,7 @@
     const persistentRecord = readPersistentAuthRecord();
     const sessionToken = readSessionStorageTokenOnly();
     const token = persistentRecord?.tk || sessionToken || '';
+    STATE.allowBackendScriptSessionRestore = false;
 
     if (!persistentRecord && !sessionToken && STATE.storedSessionExpired) return false;
 
@@ -643,8 +648,14 @@
         return true;
       }
 
-      if (response.status === 401 || data?.ok === 0) clearKnownStoredAuth();
+      if (response.status === 401 || data?.ok === 0) {
+        STATE.allowBackendScriptSessionRestore = false;
+        clearKnownStoredAuth();
+      } else if (token) {
+        STATE.allowBackendScriptSessionRestore = true;
+      }
     } catch (error) {
+      if (token) STATE.allowBackendScriptSessionRestore = true;
       console.warn(`[${cleanText(CONFIG.brandName, 'ChatER')}] No se pudo verificar la sesión guardada:`, error);
     }
 
@@ -661,12 +672,15 @@
     const backendBaseUrl = getBackendBaseUrl();
     const siteId = getSiteId();
     const storedToken = readStoredSessionToken();
+    const preserveStoredSessionForLoginScript = Boolean(STATE.allowBackendScriptSessionRestore && storedToken);
     clearKnownStoredAuth({
-      preserveRedirect: STATE.redirectReturnPending,
-      preserveLoginFlow: STATE.redirectReturnPending
+      preserveRedirect: STATE.redirectReturnPending || preserveStoredSessionForLoginScript,
+      preserveLoginFlow: STATE.redirectReturnPending || preserveStoredSessionForLoginScript,
+      preserveAuthRecord: preserveStoredSessionForLoginScript
     });
     clearInjectedBackendApi();
 
+    if (preserveStoredSessionForLoginScript) return;
     if (!backendBaseUrl || !siteId || !window.fetch) return;
 
     const headers = { 'Content-Type': 'application/json', 'X-MB-Site': siteId };
@@ -716,9 +730,39 @@
     }
   }
 
-  function shouldBlockImplicitBackendSessionRequest(value) {
+  function getHeaderValue(headers, name) {
+    if (!headers || !name) return '';
+    const normalizedName = String(name).toLowerCase();
+
+    try {
+      if (typeof headers.get === 'function') return String(headers.get(name) || '').trim();
+    } catch (_) {}
+
+    if (Array.isArray(headers)) {
+      const entry = headers.find((item) => Array.isArray(item) && String(item[0] || '').toLowerCase() === normalizedName);
+      return String(entry?.[1] || '').trim();
+    }
+
+    if (typeof headers === 'object') {
+      const key = Object.keys(headers).find((item) => String(item || '').toLowerCase() === normalizedName);
+      return key ? String(headers[key] || '').trim() : '';
+    }
+
+    return '';
+  }
+
+  function requestHasAuthorizationHeader(init = {}) {
+    const value = getHeaderValue(init?.headers, 'Authorization');
+    return /^Bearer\s+\S+/i.test(value);
+  }
+
+  function shouldAllowBackendScriptSessionCheck(init = {}) {
+    return Boolean(STATE.allowBackendScriptSessionRestore && requestHasAuthorizationHeader(init));
+  }
+
+  function shouldBlockImplicitBackendSessionRequest(value, init = {}) {
     if (CONFIG.forceGoogleLogin === false || STATE.resolved) return false;
-    if (isBackendAuthCheckUrl(value)) return true;
+    if (isBackendAuthCheckUrl(value)) return !shouldAllowBackendScriptSessionCheck(init);
     return isBackendFirebaseSessionUrl(value) && !hasExplicitGoogleUnlockPermission();
   }
 
@@ -747,7 +791,7 @@
 
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : String(input?.url || '');
-      if (shouldBlockImplicitBackendSessionRequest(url)) {
+      if (shouldBlockImplicitBackendSessionRequest(url, init)) {
         STATE.forcedAuthCheckBlocked = true;
         STATE.sessionAuthCheckBlocked = true;
         return blockedLoginRequiredResponse();
@@ -979,6 +1023,7 @@
     STATE.loginInteractionStartedAt = 0;
     STATE.sessionRestoreAllowed = false;
     STATE.sessionRestoredFromStorage = false;
+    STATE.allowBackendScriptSessionRestore = false;
     clearTrustedLoginFlow();
 
     const existingScript = document.getElementById('memoriaBackendLoginScript');
@@ -996,6 +1041,7 @@
     clearTrustedLoginFlow();
     STATE.sessionRestoreAllowed = false;
     STATE.sessionRestoredFromStorage = false;
+    STATE.allowBackendScriptSessionRestore = false;
     clearInjectedBackendApi();
     updateMessage(
       'Inicio de sesión con Google requerido.',
@@ -1033,6 +1079,7 @@
     }
 
     clearImplicitUnlockTimer();
+    STATE.allowBackendScriptSessionRestore = false;
     STATE.resolved = true;
     STATE.ready = true;
     releaseBackendApiExposureGate();
@@ -1053,6 +1100,14 @@
   }
 
   function handleBackendLoginEvent(event) {
+    const detail = event?.detail && typeof event.detail === 'object' ? event.detail : null;
+    if (STATE.allowBackendScriptSessionRestore && isMemoriaBackendApi(detail)) {
+      STATE.sessionRestoreAllowed = true;
+      STATE.sessionRestoredFromStorage = true;
+      STATE.backendApiValue = detail;
+      STATE.blockedImplicitBackendApi = undefined;
+      STATE.allowBackendScriptSessionRestore = false;
+    }
     if (!STATE.sessionRestoreAllowed) STATE.sessionRestoredFromStorage = false;
     rememberBackendLoginFromEvent(event);
     if (CONFIG.forceGoogleLogin !== false && !hasExplicitGoogleUnlockPermission()) {

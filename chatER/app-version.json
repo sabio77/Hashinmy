@@ -1,15 +1,15 @@
 {
-  "version": "2026-07-06-config-bootstrap-148",
-  "buildTime": "2026-07-06T08:05:00-05:00",
+  "version": "2026-07-06-auth-session-restore-149",
+  "buildTime": "2026-07-06T10:25:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER carga CONFIGmemoriaBACKEND.json sin XMLHttpRequest síncrono y arranca login, QR y realtime solo después de publicar la configuración runtime.",
-  "build": "config-bootstrap-148",
-  "updatedAt": "2026-07-06T08:05:00-05:00",
-  "notes": "El static site evita advertencias de consola por XHR síncrono, muestra un estado de configuración fallida en pantalla si falta el JSON y mantiene la cadena de autenticación Google/Gmail antes de QR/contactos y STREMEx.",
+  "description": "ChatER conserva la sesión Google/Gmail validada por memoriaBACKEND al refrescar y evita quedar bloqueado en la pantalla de preparación cuando la verificación inicial necesita delegarse a login.js.",
+  "build": "auth-session-restore-149",
+  "updatedAt": "2026-07-06T10:25:00-05:00",
+  "notes": "La puerta de autenticación mantiene el token de sesión restaurable, permite que login.js revalide una sesión ya emitida con Authorization y solo limpia credenciales cuando memoriaBACKEND rechaza la sesión.",
   "changes": [
-    "js/config.js reemplaza la lectura síncrona de CONFIGmemoriaBACKEND.json por fetch no-store con timeout y promesa CHATER_CONFIG_READY.",
-    "index.html delega la carga ordenada de auth-gate, compresión, QR, permisos, app y PWA al bootstrap de configuración para evitar carreras de arranque.",
-    "Las pruebas de contrato bloquean regresiones que reintroduzcan XMLHttpRequest síncrono o scripts dependientes antes de la configuración runtime."
+    "auth-gate.js preserva temporalmente la sesión guardada cuando /auth/check no pudo confirmarla por red, timeout o respuesta no autorizativa no concluyente.",
+    "auth-gate.js permite una revalidación controlada de /auth/check desde login.js solo si existe Authorization Bearer de una sesión previa.",
+    "service-worker.js actualiza la versión del cache para que el navegador no mantenga la puerta de autenticación anterior."
   ]
 }
