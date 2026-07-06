@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-05-media-firmada-binary-142';
+const CHATER_SW_VERSION = '2026-07-05-expired-outbox-cleanup-146';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.
@@ -10,6 +10,7 @@ const APP_SHELL = [
   './app-version.json',
   './css/styles.css',
   './js/config.js',
+  './js/theme-bootstrap.js',
   './auth-gate.js',
   './js/CONFIGmemoriaBACKEND.json',
   './IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js',

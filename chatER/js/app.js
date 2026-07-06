@@ -7,6 +7,7 @@ const chaterRuntimeAuth = {
 };
 let chaterStorageWarningShown = false;
 let chaterSessionStorageWarningShown = false;
+let chaterEphemeralPurgeTimer = null;
 
 function getBrowserLocalStorage() {
   try {
@@ -146,6 +147,8 @@ const CHATER_IMAGE_UPLOAD_MAX_BYTES = 200 * 1024;
 const CHATER_IMAGE_UPLOAD_MAX_DIMENSION = 4096;
 const CHATER_EPHEMERAL_TTL_SECONDS = 24 * 60 * 60;
 const CHATER_EPHEMERAL_TTL_MS = CHATER_EPHEMERAL_TTL_SECONDS * 1000;
+const CHATER_LOCAL_EPHEMERAL_PURGE_MIN_DELAY_MS = 1000;
+const CHATER_LOCAL_EPHEMERAL_PURGE_MAX_DELAY_MS = 2147480000;
 
 function parseChatEphemeralTimestampMs(value = '') {
   const parsed = value instanceof Date
@@ -249,6 +252,73 @@ function pruneExpiredChatMessagesFromState(state = null) {
   return changed;
 }
 
+function getNextChatEphemeralExpiryMsFromState(state = null, nowMs = Date.now()) {
+  const targetState = state || (typeof appState !== 'undefined' ? appState : null);
+  if (!targetState || !Array.isArray(targetState.conversations)) return 0;
+
+  let nextExpiryMs = 0;
+  targetState.conversations.forEach((conversation) => {
+    const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+    messages.forEach((message) => {
+      const normalizedMessage = normalizeChatMessageEphemeralFields(message);
+      const expiresAtMs = parseChatEphemeralTimestampMs(normalizedMessage.expiresAt);
+      if (expiresAtMs > nowMs && (!nextExpiryMs || expiresAtMs < nextExpiryMs)) {
+        nextExpiryMs = expiresAtMs;
+      }
+    });
+  });
+
+  return nextExpiryMs;
+}
+
+function clearEphemeralLocalPurgeTimer() {
+  if (!chaterEphemeralPurgeTimer) return;
+  clearTimeout(chaterEphemeralPurgeTimer);
+  chaterEphemeralPurgeTimer = null;
+}
+
+function scheduleNextEphemeralLocalPurge(reason = 'state-change') {
+  if (typeof window === 'undefined' || !window.setTimeout) return false;
+  clearEphemeralLocalPurgeTimer();
+
+  const nowMs = Date.now();
+  const nextExpiryMs = getNextChatEphemeralExpiryMsFromState(appState, nowMs);
+  if (!nextExpiryMs) return false;
+
+  const delayMs = Math.max(
+    CHATER_LOCAL_EPHEMERAL_PURGE_MIN_DELAY_MS,
+    Math.min(CHATER_LOCAL_EPHEMERAL_PURGE_MAX_DELAY_MS, nextExpiryMs - nowMs + 100)
+  );
+
+  chaterEphemeralPurgeTimer = window.setTimeout(() => {
+    runScheduledEphemeralLocalPurge(reason);
+  }, delayMs);
+  return true;
+}
+
+function refreshInterfaceAfterEphemeralLocalPurge() {
+  if (!chatView || chatView.hidden) return;
+  if (activeSection === 'chats') {
+    renderChatList(searchInput?.value || '');
+    renderConversation();
+    return;
+  }
+  renderNavigationState();
+}
+
+function runScheduledEphemeralLocalPurge(reason = 'timer') {
+  chaterEphemeralPurgeTimer = null;
+  const changed = pruneExpiredChatMessagesFromState(appState);
+
+  if (changed) {
+    persistState();
+    refreshInterfaceAfterEphemeralLocalPurge();
+    return;
+  }
+
+  scheduleNextEphemeralLocalPurge(`after-${reason}`);
+}
+
 function clampImageUploadMaxBytes(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return CHATER_IMAGE_UPLOAD_MAX_BYTES;
@@ -283,6 +353,7 @@ const CHATER_CONFIG = {
   googleLoginLogoUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_LOGO_URL || '',
   googleLoginBackgroundUrl: window.CHATER_CONFIG?.GOOGLE_LOGIN_BACKGROUND_URL || '',
   enableRemoteUserPreferences: window.CHATER_CONFIG?.ENABLE_REMOTE_USER_PREFERENCES !== false,
+  enableLocalDemoSeed: window.CHATER_CONFIG?.ENABLE_LOCAL_DEMO_SEED === true,
   apiTimeoutMs: resolvePositiveConfigNumber(window.CHATER_CONFIG?.API_TIMEOUT_MS, 15000),
   mediaUploadTimeoutMs: resolvePositiveConfigNumber(window.CHATER_CONFIG?.MEDIA_UPLOAD_TIMEOUT_MS, 60000),
   r2xImageMaxBytes: clampImageUploadMaxBytes(resolvePositiveConfigNumber(window.CHATER_CONFIG?.TEMP_IMAGE_R2X_MAX_BYTES, CHATER_IMAGE_UPLOAD_MAX_BYTES)),
@@ -299,6 +370,7 @@ const CHATER_CONFIG = {
   backendSessionVerifiedAtKey: 'chater.session.backendVerifiedAt',
   deviceKey: 'chater.device.id',
   stremeLastEventKey: 'chater.streme.lastEventId',
+  stremeLastEventByChannelKey: 'chater.streme.lastEventId.byChannel',
   stateKey: 'chater.demo.state.v2',
   outboxKey: 'chater.backend.outbox.v1',
   emojiRecentsKey: 'chater.emoji.recents.v1',
@@ -1659,6 +1731,51 @@ function getDefaultStremeChannel() {
     || 'chater-general';
 }
 
+function normalizeStremeChannelList(channels = [], fallback = '') {
+  const rawList = Array.isArray(channels)
+    ? channels
+    : String(channels || '').split(/[\n,;|]+/);
+  const normalized = [];
+
+  rawList.forEach((channel) => {
+    const cleanChannel = sanitizeLocalStremeChannel(channel, '');
+    if (cleanChannel && !normalized.includes(cleanChannel)) normalized.push(cleanChannel);
+  });
+
+  if (!normalized.length && fallback) {
+    const fallbackChannel = sanitizeLocalStremeChannel(fallback, '');
+    if (fallbackChannel) normalized.push(fallbackChannel);
+  }
+
+  return normalized.slice(0, 8);
+}
+
+function getConversationSubscriptionChannels(conversationId = '') {
+  const conversation = appState?.conversations?.find((item) => String(item.id || '') === String(conversationId || '')) || {};
+  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  return normalizeStremeChannelList([
+    getConversationStremeChannel(conversationId),
+    lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : ''
+  ]);
+}
+
+function getDesiredStremeSubscriptionChannels(conversationId = activeConversationId) {
+  const inboxChannel = getCurrentUserStremeInboxChannel();
+  const defaultChannel = getDefaultStremeChannel();
+  const conversationChannels = conversationId ? getConversationSubscriptionChannels(conversationId) : [];
+
+  return normalizeStremeChannelList([
+    inboxChannel,
+    defaultChannel,
+    ...conversationChannels
+  ], defaultChannel || 'chater-general');
+}
+
+function getStremeMultiplexSourceKey(channels = []) {
+  const normalizedChannels = normalizeStremeChannelList(channels);
+  return normalizedChannels.length ? `${STREME_MULTIPLEX_SOURCE_KEY_PREFIX}${normalizedChannels.join('|')}` : '';
+}
+
 function createDemoStateTiming(minutesAgo = 0) {
   const createdAt = new Date(Date.now() - Math.max(0, Number(minutesAgo || 0)) * 60 * 1000).toISOString();
   const expiresAtIso = new Date(Date.parse(createdAt) + STATE_VISIBLE_MS).toISOString();
@@ -1881,12 +1998,15 @@ const stickerQuickActions = [
 let appState = loadState(initialSessionEmail);
 let activeConversationId = getVisibleConversations()[0]?.id || appState.conversations[0]?.id || null;
 let activeSection = 'chats';
+let activeChatListGroup = 'main';
 let activeStateId = appState.states[0]?.id || null;
 let activeStateStorageEmail = normalizeStorageIdentity(initialSessionEmail);
 let chaterBrandLogoVersion = readStorageItem('chater.brand.logo.version', '');
 let stremeSocket = null;
 let stremeEventSource = null;
 const stremeEventSourcesByChannel = new Map();
+let stremeActiveSseChannelsKey = '';
+const STREME_MULTIPLEX_SOURCE_KEY_PREFIX = '__multiplex__:';
 let stremeActiveTransport = 'none';
 let stremeReconnectTimer = null;
 let stremeReconnectAttempts = 0;
@@ -2626,6 +2746,8 @@ const apiClient = {
       body: JSON.stringify(withMemoriaSitePayload({
         entityType: 'mensaje',
         entityId: clientMutationId,
+        userId: getCurrentUserIdentifier(),
+        userEmail: getSessionEmail(),
         filename: file.name,
         fileName: file.name,
         mimeType: file.type || 'application/octet-stream',
@@ -2636,6 +2758,8 @@ const apiClient = {
         ttlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
         metadata: {
           source: 'chater-static-site',
+          userId: getCurrentUserIdentifier(),
+          userEmail: getSessionEmail(),
           expiresAt,
           ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS
         },
@@ -2651,6 +2775,9 @@ const apiClient = {
       body: JSON.stringify(withMemoriaSitePayload({
         ...payload,
         mediaId,
+        source: 'chater-static-site',
+        userId: payload.userId || getCurrentUserIdentifier(),
+        userEmail: payload.userEmail || getSessionEmail(),
         status: payload.status || 'uploaded',
         uploaded: payload.uploaded !== false,
         uploadedAt: payload.uploadedAt || new Date().toISOString(),
@@ -2666,6 +2793,7 @@ const apiClient = {
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         mediaId,
+        source: 'chater-static-site',
         userId: options.userId || getCurrentUserIdentifier(),
         userEmail: options.userEmail || getSessionEmail(),
         entityType: options.entityType || 'mensaje',
@@ -3956,10 +4084,38 @@ function removeQueuedEphemeralMessageFromLocalState(operation = {}) {
   return conversation.messages.length !== beforeCount;
 }
 
+function cleanupExpiredQueuedEphemeralOperation(operation = {}, options = {}) {
+  if (!isQueuedEphemeralMessageOperationExpired(operation)) return false;
+  const localStateChanged = removeQueuedEphemeralMessageFromLocalState(operation);
+  if (localStateChanged && typeof options.onLocalStateChanged === 'function') {
+    options.onLocalStateChanged(operation);
+  }
+  if (localStateChanged && options.persist !== false) {
+    persistState();
+    if (options.render !== false) renderCurrentSection();
+  }
+  return true;
+}
+
 function compactBackendOutboxQueue(queue = []) {
+  let expiredLocalStateChanged = false;
   const items = Array.isArray(queue)
-    ? queue.filter((operation) => operation && operation.id && operation.type && operation.payload && !isQueuedEphemeralMessageOperationExpired(operation))
+    ? queue.filter((operation) => {
+        if (!operation || !operation.id || !operation.type || !operation.payload) return false;
+        if (cleanupExpiredQueuedEphemeralOperation(operation, {
+          persist: false,
+          render: false,
+          onLocalStateChanged: () => { expiredLocalStateChanged = true; }
+        })) {
+          return false;
+        }
+        return true;
+      })
     : [];
+  if (expiredLocalStateChanged) {
+    persistState();
+    renderCurrentSection();
+  }
   const latestArchiveOperationByConversation = new Map();
 
   items.forEach((operation, index) => {
@@ -4485,8 +4641,7 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'sendMessage') {
-    if (isQueuedEphemeralMessageOperationExpired(operation)) {
-      removeQueuedEphemeralMessageFromLocalState(operation);
+    if (cleanupExpiredQueuedEphemeralOperation(operation)) {
       return;
     }
     if (operation.payload.requiresConversationSync && isConversationWaitingForBackendSync(operation.payload.conversationId)) {
@@ -4515,8 +4670,7 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'createMediaMessage') {
-    if (isQueuedEphemeralMessageOperationExpired(operation)) {
-      removeQueuedEphemeralMessageFromLocalState(operation);
+    if (cleanupExpiredQueuedEphemeralOperation(operation)) {
       return;
     }
     const payload = await apiClient.createMediaMessage(
@@ -5144,11 +5298,69 @@ function getSyncCursorStatusLabel() {
   return 'Cursor local pendiente de confirmar';
 }
 
+function readStremeLastEventIdsByChannel(email = getSessionEmail()) {
+  const raw = readStorageItem(getStremeLastEventByChannelStorageKey(email), '{}');
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.entries(parsed).reduce((acc, [channel, eventId]) => {
+      const safeChannel = sanitizeLocalStremeChannel(channel, '');
+      const safeEventId = String(eventId || '').trim();
+      if (safeChannel && safeEventId) acc[safeChannel] = safeEventId;
+      return acc;
+    }, {});
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeStremeLastEventIdsByChannel(cursors = {}, email = getSessionEmail()) {
+  const normalized = {};
+  Object.entries(cursors && typeof cursors === 'object' ? cursors : {}).forEach(([channel, eventId]) => {
+    const safeChannel = sanitizeLocalStremeChannel(channel, '');
+    const safeEventId = String(eventId || '').trim();
+    if (safeChannel && safeEventId) normalized[safeChannel] = safeEventId;
+  });
+  writeStorageItem(getStremeLastEventByChannelStorageKey(email), JSON.stringify(normalized));
+  return normalized;
+}
+
+function getStremeLastEventIdsForChannels(channels = []) {
+  const normalizedChannels = normalizeStremeChannelList(channels);
+  if (!normalizedChannels.length) return {};
+  const cursors = readStremeLastEventIdsByChannel();
+  return normalizedChannels.reduce((acc, channel) => {
+    if (cursors[channel]) acc[channel] = cursors[channel];
+    return acc;
+  }, {});
+}
+
+function serializeStremeLastEventIdsForChannels(channels = []) {
+  const cursors = getStremeLastEventIdsForChannels(channels);
+  return Object.keys(cursors).length ? JSON.stringify(cursors) : '';
+}
+
 function persistStremeLastEventId(lastEventId = '', metadata = {}) {
   const normalizedLastEventId = String(lastEventId || '').trim();
   if (!normalizedLastEventId) return;
+
+  const channel = sanitizeLocalStremeChannel(
+    metadata.channel || metadata.canal || metadata.stremeChannel || metadata.eventChannel || '',
+    ''
+  );
+
   writeStorageItem(getStremeLastEventStorageKey(), normalizedLastEventId);
-  scheduleSyncCursorUpdate(normalizedLastEventId, metadata);
+
+  if (channel) {
+    const cursors = readStremeLastEventIdsByChannel();
+    cursors[channel] = normalizedLastEventId;
+    writeStremeLastEventIdsByChannel(cursors);
+  }
+
+  scheduleSyncCursorUpdate(normalizedLastEventId, {
+    ...(metadata && typeof metadata === 'object' ? metadata : {}),
+    ...(channel ? { channel, lastEventIdsByChannel: getStremeLastEventIdsForChannels([channel]) } : {})
+  });
 }
 
 function getStremeEventIdCandidate(payload = {}) {
@@ -5171,6 +5383,37 @@ function getStremeEventIdCandidate(payload = {}) {
     || data.id
     || ''
   ).trim();
+}
+
+function getStremeChannelCandidate(payload = {}, metadata = {}) {
+  if (!payload || typeof payload !== 'object') return sanitizeLocalStremeChannel(metadata.channel || metadata.canal || '', '');
+  const data = payload.data && typeof payload.data === 'object' ? payload.data : {};
+  const event = payload.event && typeof payload.event === 'object' ? payload.event : {};
+  const message = payload.message && typeof payload.message === 'object' ? payload.message : {};
+  const innerPayload = payload.payload && typeof payload.payload === 'object' ? payload.payload : {};
+  const rawChannel = payload.channel
+    || payload.canal
+    || event.channel
+    || event.canal
+    || message.channel
+    || message.canal
+    || data.channel
+    || data.canal
+    || innerPayload.channel
+    || innerPayload.canal
+    || metadata.channel
+    || metadata.canal
+    || '';
+  return sanitizeLocalStremeChannel(rawChannel, '');
+}
+
+function persistStremeCursorFromParsedPayload(payload = {}, metadata = {}) {
+  const lastEventId = getStremeEventIdCandidate(payload) || metadata.lastEventId || metadata.eventId || '';
+  const channel = getStremeChannelCandidate(payload, metadata);
+  persistStremeLastEventId(lastEventId, {
+    ...(metadata && typeof metadata === 'object' ? metadata : {}),
+    ...(channel ? { channel } : {})
+  });
 }
 
 function scheduleSyncCursorUpdate(lastEventId = '', metadata = {}) {
@@ -5371,6 +5614,10 @@ function getStremeLastEventStorageKey(email = getSessionEmail()) {
   return getScopedStorageKey(CHATER_CONFIG.stremeLastEventKey, email);
 }
 
+function getStremeLastEventByChannelStorageKey(email = getSessionEmail()) {
+  return getScopedStorageKey(CHATER_CONFIG.stremeLastEventByChannelKey, email);
+}
+
 function getEmojiRecentsStorageKey(email = getSessionEmail()) {
   return getScopedStorageKey(CHATER_CONFIG.emojiRecentsKey, email);
 }
@@ -5384,16 +5631,44 @@ function shouldAdoptLegacyStorage(email = '') {
   return Boolean(identity && identity === normalizeStorageIdentity(initialSessionEmail));
 }
 
+function isPersistedChaterStateShape(saved = null) {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return false;
+  return Array.isArray(saved.conversations)
+    || Array.isArray(saved.states)
+    || Array.isArray(saved.calls)
+    || (saved.business && typeof saved.business === 'object')
+    || (saved.privacy && typeof saved.privacy === 'object')
+    || Object.prototype.hasOwnProperty.call(saved, 'ownerEmail');
+}
+
 function readStoredStateFromKey(storageKey) {
   try {
     const saved = JSON.parse(readStorageItem(storageKey, 'null'));
-    if (saved?.conversations?.length) {
+    if (isPersistedChaterStateShape(saved)) {
       return normalizeLoadedState(saved);
     }
   } catch (error) {
     console.warn('No se pudo cargar el estado local de ChatER.', error);
   }
   return null;
+}
+
+function shouldUseLocalDemoSeedState() {
+  // Producción no debe inventar chats: hashinmy.com debe mostrar solo datos del
+  // perfil Gmail y de memoriaBACKEND. La semilla queda disponible únicamente
+  // para demos locales activadas explícitamente por configuración.
+  return CHATER_CONFIG.enableLocalDemoSeed === true;
+}
+
+function createProductionEmptyChatERState() {
+  return normalizeLoadedState({
+    conversations: [],
+    states: [],
+    calls: [],
+    business: seedState.business,
+    privacy: seedState.privacy,
+    ownerEmail: normalizeStorageIdentity(getSessionEmail())
+  });
 }
 
 function loadState(email = getSessionEmail()) {
@@ -5409,14 +5684,49 @@ function loadState(email = getSessionEmail()) {
     }
   }
 
-  return JSON.parse(JSON.stringify(seedState));
+  if (shouldUseLocalDemoSeedState()) {
+    return normalizeLoadedState(JSON.parse(JSON.stringify(seedState)));
+  }
+
+  return createProductionEmptyChatERState();
+}
+
+function isLocalDemoSeedConversation(conversation = {}) {
+  const id = String(conversation.id || '').trim();
+  const email = normalizeStorageIdentity(conversation.email || conversation.contactEmail || conversation.userEmail || '');
+  const source = String(conversation.metadata?.source || conversation.source || '').trim();
+  if (source === 'local-demo-seed') return true;
+  return (id === 'familia' && email === 'familia@chater.local')
+    || (id === 'trabajo' && email === 'equipo@empresa.com')
+    || (id === 'soporte' && email === 'soporte@chater.app')
+    || (id === 'carlos' && email === 'carlos@example.com');
+}
+
+function isLocalDemoSeedState(statusItem = {}) {
+  const id = String(statusItem.id || '').trim();
+  const email = normalizeStorageIdentity(statusItem.contactEmail || statusItem.email || statusItem.ownerEmail || statusItem.userEmail || '');
+  const source = String(statusItem.metadata?.source || statusItem.source || '').trim();
+  if (source === 'local-demo-seed') return true;
+  return (id === 'estado-familia' && email === 'familia@chater.local')
+    || (id === 'estado-carlos' && email === 'carlos@example.com')
+    || (id === 'estado-equipo' && email === 'equipo@empresa.com');
+}
+
+function isLocalDemoSeedCall(call = {}) {
+  const id = String(call.id || '').trim();
+  const source = String(call.metadata?.source || call.source || '').trim();
+  return source === 'local-demo-seed' || ['call-1', 'call-2', 'call-3'].includes(id);
 }
 
 function normalizeLoadedState(saved) {
+  const allowLocalDemoSeed = shouldUseLocalDemoSeedState();
+  const sourceConversations = Array.isArray(saved.conversations) ? saved.conversations : [];
+  const sourceStates = Array.isArray(saved.states) ? saved.states : [];
+  const sourceCalls = Array.isArray(saved.calls) ? saved.calls : [];
   const state = {
-    conversations: Array.isArray(saved.conversations) ? saved.conversations : [],
-    states: Array.isArray(saved.states) ? saved.states : [],
-    calls: Array.isArray(saved.calls) ? saved.calls : [],
+    conversations: allowLocalDemoSeed ? sourceConversations : sourceConversations.filter((conversation) => !isLocalDemoSeedConversation(conversation)),
+    states: allowLocalDemoSeed ? sourceStates : sourceStates.filter((statusItem) => !isLocalDemoSeedState(statusItem)),
+    calls: allowLocalDemoSeed ? sourceCalls : sourceCalls.filter((call) => !isLocalDemoSeedCall(call)),
     business: normalizeBusinessState(saved.business),
     privacy: normalizePrivacyState(saved.privacy)
   };
@@ -5909,6 +6219,7 @@ function persistState() {
       console.warn('Se guardó ChatER en modo compacto de emergencia para evitar que el almacenamiento local bloquee la app.', compactError);
     }
   }
+  scheduleNextEphemeralLocalPurge('persist-state');
 }
 
 function createPersistableState(ownerEmail = '') {
@@ -5985,8 +6296,8 @@ function compactStateForPersistence(state = {}) {
 }
 
 function resetActivePointers() {
-  activeConversationId = appState.conversations[0]?.id || null;
-  activeStateId = appState.states[0]?.id || null;
+  activeConversationId = getFirstVisibleConversationId() || appState.conversations.find((conversation) => !conversation.deleted)?.id || null;
+  activeStateId = getActiveStates()[0]?.id || appState.states[0]?.id || null;
   activeSection = 'chats';
   messageHistoryHydration.inFlight.clear();
   contactConversationSyncState.inFlight.clear();
@@ -5995,9 +6306,11 @@ function resetActivePointers() {
 function activateSessionState(email, forceReload = false) {
   const identity = normalizeStorageIdentity(email);
   if (!forceReload && activeStateStorageEmail === identity) return;
+  clearEphemeralLocalPurgeTimer();
   appState = loadState(identity);
   activeStateStorageEmail = identity;
   resetActivePointers();
+  scheduleNextEphemeralLocalPurge('session-state-activated');
 }
 
 function getSessionEmail() {
@@ -6134,12 +6447,14 @@ function clearAuthTokens(email = getSessionEmail()) {
   removeStorageItem(CHATER_CONFIG.authProviderKey);
   removeStorageItem(CHATER_CONFIG.backendSessionVerifiedAtKey);
   removeStorageItem(getStremeLastEventStorageKey(email));
+  removeStorageItem(getStremeLastEventByChannelStorageKey(email));
   removeStorageItem(CHATER_CONFIG.stremeLastEventKey);
 }
 
 function clearSession() {
   const sessionEmail = getSessionEmail();
   disconnectStremeRealtime();
+  clearEphemeralLocalPurgeTimer();
   resetTypingStateForSessionEnd();
   closeTransientUiForSessionEnd();
   clearAuthTokens(sessionEmail);
@@ -6320,6 +6635,18 @@ function getArchivedConversations() {
   return appState.conversations
     .filter((conversation) => conversation.archived && !conversation.deleted)
     .sort(compareConversationsForList);
+}
+
+function isArchivedChatListOpen() {
+  return activeSection === 'chats' && activeChatListGroup === 'archived';
+}
+
+function setActiveChatListGroup(group = 'main') {
+  activeChatListGroup = group === 'archived' ? 'archived' : 'main';
+}
+
+function getCurrentChatListConversations() {
+  return isArchivedChatListOpen() ? getArchivedConversations() : getVisibleConversations();
 }
 
 function getFirstVisibleConversationId(excludeConversationId = '') {
@@ -7001,7 +7328,7 @@ async function handleSectionMenuAction(action) {
   }
 
   if (action === 'archived') {
-    openArchivedChatsModal();
+    openArchivedChatsList();
     return;
   }
 
@@ -7302,6 +7629,7 @@ function selectSection(section) {
     if (searchInput) searchInput.value = '';
   }
   activeSection = section;
+  if (section !== 'chats') activeChatListGroup = 'main';
   chatView.classList.remove('chat-open');
   renderCurrentSection();
 }
@@ -7374,8 +7702,9 @@ function getMessagePreviewText(message = null, emptyText = 'Sin mensajes todaví
 
 function renderChatList(filter = '') {
   const normalizedFilter = normalizeUiSearchText(filter);
-  const visibleConversations = getVisibleConversations();
-  const filteredConversations = visibleConversations.filter((conversation) => {
+  const archivedListOpen = isArchivedChatListOpen();
+  const sourceConversations = getCurrentChatListConversations();
+  const filteredConversations = sourceConversations.filter((conversation) => {
     const participants = Array.isArray(conversation.participants) ? conversation.participants : [];
     const participantSearchValues = participants.flatMap((participant) => [
       participant.name,
@@ -7406,20 +7735,25 @@ function renderChatList(filter = '') {
 
   chatList.innerHTML = '';
 
-  if (!normalizedFilter) {
+  if (archivedListOpen) {
+    chatList.appendChild(createArchivedChatListHeader());
+  } else if (!normalizedFilter && getArchivedConversations().length) {
     chatList.appendChild(createArchivedChatsShortcut());
   }
 
   if (!filteredConversations.length) {
     const searchTerm = filter.trim();
     const canCreateFromEmail = Boolean(searchTerm && isValidEmailAddress(searchTerm));
-    const archivedHint = getArchivedConversations().length ? 'También puedes revisar Archivados si buscas una conversación guardada.' : '';
+    const archivedHint = !archivedListOpen && getArchivedConversations().length ? 'También puedes revisar Archivados si buscas una conversación guardada.' : '';
+    const emptyTitle = searchTerm ? 'Sin resultados' : (archivedListOpen ? 'No hay chats archivados' : 'No hay conversaciones activas');
     const emptyCopy = searchTerm
       ? `No hay coincidencias para “${escapeHTML(searchTerm)}”. ${archivedHint}`.trim()
-      : (getArchivedConversations().length ? 'Revisa Archivados o usa el botón + para iniciar un chat por correo electrónico.' : 'Usa el botón + para crear un contacto por correo electrónico.');
+      : (archivedListOpen
+        ? 'Los chats que archives aparecerán aquí con la misma estructura de la lista principal.'
+        : (getArchivedConversations().length ? 'Revisa Archivados o usa el botón + para iniciar un chat por correo electrónico.' : 'Usa el botón + para crear un contacto por correo electrónico.'));
     chatList.insertAdjacentHTML('beforeend', `
       <div class="empty-state list-empty">
-        <strong>${searchTerm ? 'Sin resultados' : 'No hay conversaciones activas'}</strong>
+        <strong>${emptyTitle}</strong>
         <span>${emptyCopy}</span>
         ${canCreateFromEmail ? `<button class="primary-button inline-empty-action" type="button" data-create-chat-from-search="${escapeHTML(normalizeStorageIdentity(searchTerm))}">Crear contacto con ${escapeHTML(normalizeStorageIdentity(searchTerm))}</button>` : ''}
         ${searchTerm && !canCreateFromEmail ? '<button class="secondary-button inline-empty-action" type="button" data-open-new-chat-from-search>Crear contacto por correo</button>' : ''}
@@ -7491,14 +7825,45 @@ function createArchivedChatsShortcut() {
   const button = document.createElement('button');
   button.className = 'archive-shortcut';
   button.type = 'button';
-  button.setAttribute('aria-label', 'Abrir conversaciones archivadas');
+  button.setAttribute('aria-label', 'Abrir lista de conversaciones archivadas');
   button.innerHTML = `
     <span class="archive-shortcut-icon" aria-hidden="true">▣</span>
     <span class="archive-shortcut-label">Archivados</span>
     <span class="archive-shortcut-count">${archivedUnread || archivedCount}</span>
   `;
-  button.addEventListener('click', openArchivedChatsModal);
+  button.addEventListener('click', openArchivedChatsList);
   return button;
+}
+
+function createArchivedChatListHeader() {
+  const archivedCount = getArchivedConversations().length;
+  const header = document.createElement('div');
+  header.className = 'archive-list-header';
+  header.innerHTML = `
+    <button class="archive-list-back" type="button" aria-label="Volver a chats principales">‹</button>
+    <span class="archive-list-title">Archivados</span>
+    <small>${archivedCount} ${archivedCount === 1 ? 'chat' : 'chats'}</small>
+  `;
+  header.querySelector('.archive-list-back')?.addEventListener('click', closeArchivedChatsList);
+  return header;
+}
+
+function openArchivedChatsList() {
+  closeTransientPanels();
+  closeModal();
+  closeChatSelectionMode({ render: false });
+  setActiveChatListGroup('archived');
+  activeSection = 'chats';
+  if (searchInput) searchInput.value = '';
+  chatView.classList.remove('chat-open');
+  renderCurrentSection();
+}
+
+function closeArchivedChatsList() {
+  setActiveChatListGroup('main');
+  if (searchInput) searchInput.value = '';
+  closeChatSelectionMode({ render: false });
+  renderCurrentSection();
 }
 
 function renderStatesList() {
@@ -10363,6 +10728,7 @@ function openArchivedConversation(conversation) {
 
   activeConversationId = conversation.id;
   activeSection = 'chats';
+  setActiveChatListGroup('archived');
   if (searchInput) searchInput.value = '';
   closeTransientPanels();
   closeModal();
@@ -10936,6 +11302,10 @@ async function setConversationArchived(conversation, archived, options = {}) {
   if (archived && activeConversationId === conversation.id && !options.keepActive) {
     activeConversationId = getFirstVisibleConversationId(conversation.id);
     chatView.classList.remove('chat-open');
+  }
+
+  if (!archived && isArchivedChatListOpen() && !options.keepArchivedList) {
+    setActiveChatListGroup('main');
   }
 
   persistState();
@@ -17472,12 +17842,13 @@ function getEffectiveRealtimeUrl() {
   return buildApiUrl('/api/v1/streme/eventos', { siteScoped: true });
 }
 
-function buildStremeUrl(transport = resolveStremeTransport(), channelOverride = '') {
+function buildStremeUrl(transport = resolveStremeTransport(), channelOverride = '', channelsOverride = []) {
   const effectiveRealtimeUrl = getEffectiveRealtimeUrl();
   try {
     const url = new URL(effectiveRealtimeUrl, window.location.origin);
     const token = getAccessToken();
     const lastEventId = readStorageItem(getStremeLastEventStorageKey(), '');
+    const lastEventIdsByChannel = serializeStremeLastEventIdsForChannels(channelsOverride);
 
     if (transport === 'websocket') {
       if (url.protocol === 'http:') url.protocol = 'ws:';
@@ -17489,9 +17860,10 @@ function buildStremeUrl(transport = resolveStremeTransport(), channelOverride = 
       if (url.protocol === 'wss:') url.protocol = 'https:';
     }
 
-    applyStremeUrlScopeParams(url, channelOverride);
+    applyStremeUrlScopeParams(url, channelOverride, channelsOverride);
 
     if (token) url.searchParams.set('token', token);
+    if (lastEventIdsByChannel) url.searchParams.set('lastEventIds', lastEventIdsByChannel);
     if (lastEventId) url.searchParams.set('lastEventId', lastEventId);
     return url.toString();
   } catch (error) {
@@ -17499,7 +17871,7 @@ function buildStremeUrl(transport = resolveStremeTransport(), channelOverride = 
   }
 }
 
-function applyStremeUrlScopeParams(url, channelOverride = '') {
+function applyStremeUrlScopeParams(url, channelOverride = '', channelsOverride = []) {
   if (!url?.searchParams) return;
 
   const siteId = getMemoriaSiteId();
@@ -17507,8 +17879,18 @@ function applyStremeUrlScopeParams(url, channelOverride = '') {
     url.searchParams.set('s', siteId);
   }
 
-  if (!url.searchParams.has('canal') && !url.searchParams.has('channel')) {
-    url.searchParams.set('canal', sanitizeLocalStremeChannel(channelOverride, '') || getDefaultStremeChannel());
+  const multiplexChannels = normalizeStremeChannelList(channelsOverride);
+  const hasChannelParam = url.searchParams.has('canal')
+    || url.searchParams.has('channel')
+    || url.searchParams.has('canales')
+    || url.searchParams.has('channels');
+
+  if (!hasChannelParam) {
+    if (multiplexChannels.length > 1) {
+      url.searchParams.set('canales', multiplexChannels.join(','));
+    } else {
+      url.searchParams.set('canal', multiplexChannels[0] || sanitizeLocalStremeChannel(channelOverride, '') || getDefaultStremeChannel());
+    }
   }
 
   if (!url.searchParams.has('clientId') && !url.searchParams.has('clienteId')) {
@@ -17559,7 +17941,7 @@ function connectStremeRealtime() {
   }
 
   if (transport === 'sse') {
-    connectStremeEventSource(getCurrentUserStremeInboxChannel() || getDefaultStremeChannel());
+    connectStremeMultiplexEventSource(getDesiredStremeSubscriptionChannels());
   }
 }
 
@@ -17603,6 +17985,104 @@ function connectStremeWebSocket() {
   }
 }
 
+function closeStremeSseSourcesExcept(sourceKeyToKeep = '') {
+  stremeEventSourcesByChannel.forEach((source, sourceKey) => {
+    if (sourceKey === sourceKeyToKeep) return;
+    source?.close?.();
+    stremeEventSourcesByChannel.delete(sourceKey);
+    if (stremeEventSource === source) stremeEventSource = null;
+  });
+  if (!stremeEventSource && sourceKeyToKeep) {
+    stremeEventSource = stremeEventSourcesByChannel.get(sourceKeyToKeep) || null;
+  }
+}
+
+function connectStremeMultiplexEventSource(channels = []) {
+  const connectionGuard = stremeSessionGuard || captureSessionGuard();
+  const normalizedChannels = normalizeStremeChannelList(channels, getDefaultStremeChannel());
+  const sourceKey = getStremeMultiplexSourceKey(normalizedChannels);
+  if (!sourceKey) return;
+
+  if (typeof EventSource === 'undefined') {
+    if (isSessionGuardCurrent(connectionGuard)) {
+      console.warn('Este navegador no soporta EventSource para streme.');
+      scheduleStremeReconnect('', normalizedChannels);
+    }
+    return;
+  }
+
+  const existingSource = stremeEventSourcesByChannel.get(sourceKey);
+  if (existingSource && existingSource.readyState !== EventSource.CLOSED) {
+    closeStremeSseSourcesExcept(sourceKey);
+    stremeActiveSseChannelsKey = sourceKey;
+    stremeEventSource = existingSource;
+    return;
+  }
+
+  closeStremeSseSourcesExcept('');
+
+  try {
+    const source = new EventSource(buildStremeUrl('sse', '', normalizedChannels), { withCredentials: true });
+    stremeEventSourcesByChannel.set(sourceKey, source);
+    stremeEventSource = source;
+    stremeActiveSseChannelsKey = sourceKey;
+
+    source.addEventListener('open', () => {
+      if (!isSessionGuardCurrent(connectionGuard)) return;
+      stremeReconnectAttempts = 0;
+      sendPresenceHeartbeat('online');
+      if (normalizedChannels.includes(getCurrentUserStremeInboxChannel())) {
+        syncRealtimeConversationInboxFromBackend({ reason: 'streme-multiplex-open' });
+      }
+      if (activeConversationId) {
+        sendStremeEvent({
+          type: 'chat.opened',
+          chatId: activeConversationId,
+          channels: normalizedChannels
+        });
+      }
+    });
+
+    const handleSsePayload = (event) => {
+      if (!isSessionGuardCurrent(connectionGuard)) return;
+      if (event.data) {
+        handleRawStremeMessage(event.data, {
+          source: 'sse-multiplex-event',
+          channels: normalizedChannels.join(','),
+          lastEventId: event.lastEventId || ''
+        });
+      }
+    };
+
+    const handleSseControl = (event) => {
+      if (!isSessionGuardCurrent(connectionGuard)) return;
+      if (event.lastEventId) {
+        persistStremeLastEventId(event.lastEventId, { source: 'sse-multiplex-control', channels: normalizedChannels.join(',') });
+      }
+    };
+
+    source.addEventListener('message', handleSsePayload);
+    source.addEventListener('streme-event', handleSsePayload);
+    source.addEventListener('streme-message', handleSsePayload);
+    source.addEventListener('streme-ready', handleSseControl);
+    source.addEventListener('streme-heartbeat', handleSseControl);
+    source.addEventListener('error', () => {
+      if (!isSessionGuardCurrent(connectionGuard)) return;
+      source.close();
+      stremeEventSourcesByChannel.delete(sourceKey);
+      if (stremeEventSource === source) stremeEventSource = stremeEventSourcesByChannel.values().next().value || null;
+      if (stremeActiveSseChannelsKey === sourceKey) stremeActiveSseChannelsKey = '';
+      if (!stremeManualDisconnect) scheduleStremeReconnect('', normalizedChannels);
+    });
+  } catch (error) {
+    if (!isSessionGuardCurrent(connectionGuard)) return;
+    stremeEventSourcesByChannel.delete(sourceKey);
+    if (stremeActiveSseChannelsKey === sourceKey) stremeActiveSseChannelsKey = '';
+    if (stremeEventSource?.readyState === EventSource.CLOSED) stremeEventSource = stremeEventSourcesByChannel.values().next().value || null;
+    scheduleStremeReconnect('', normalizedChannels);
+  }
+}
+
 function connectStremeEventSource(channelOverride = '') {
   const connectionGuard = stremeSessionGuard || captureSessionGuard();
   const channel = sanitizeLocalStremeChannel(channelOverride, '') || getDefaultStremeChannel();
@@ -17637,18 +18117,15 @@ function connectStremeEventSource(channelOverride = '') {
     });
     const handleSsePayload = (event) => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
-      if (event.lastEventId) {
-        persistStremeLastEventId(event.lastEventId, { source: 'sse-event', channel });
-      }
       if (event.data) {
-        handleRawStremeMessage(event.data);
+        handleRawStremeMessage(event.data, { source: 'sse-event', channel, lastEventId: event.lastEventId || '' });
       }
     };
 
     const handleSseControl = (event) => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       if (event.lastEventId) {
-        persistStremeLastEventId(event.lastEventId, { source: 'sse-event', channel });
+        persistStremeLastEventId(event.lastEventId, { source: 'sse-control', channel });
       }
     };
 
@@ -17691,24 +18168,14 @@ function pruneStremeConversationSubscriptions(activeChannel = '') {
 
 function ensureStremeConversationSubscription(conversationId = '') {
   if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail() || resolveStremeTransport() !== 'sse') return;
-  const conversation = appState.conversations.find((item) => String(item.id || '') === String(conversationId || '')) || {};
-  const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
-  const channels = [
-    getConversationStremeChannel(conversationId),
-    lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : ''
-  ].filter(Boolean);
-
-  [...new Set(channels)].forEach((channel) => {
-    pruneStremeConversationSubscriptions(channel);
-    connectStremeEventSource(channel);
-  });
+  connectStremeMultiplexEventSource(getDesiredStremeSubscriptionChannels(conversationId));
 }
 
-function handleRawStremeMessage(rawMessage) {
+function handleRawStremeMessage(rawMessage, cursorMetadata = {}) {
   if (stremeSessionGuard && !isSessionGuardCurrent(stremeSessionGuard)) return;
   try {
     const parsedMessage = JSON.parse(rawMessage);
-    persistStremeLastEventId(getStremeEventIdCandidate(parsedMessage), { source: 'streme-payload' });
+    persistStremeCursorFromParsedPayload(parsedMessage, { source: 'streme-payload', ...(cursorMetadata || {}) });
     handleStremeEvent(parsedMessage);
   } catch (error) {
     console.warn('Evento streme inválido.', error);
@@ -17827,12 +18294,18 @@ function normalizeStremeInboundPayload(payload = {}) {
   };
 }
 
-function scheduleStremeReconnect(channel = '') {
+function scheduleStremeReconnect(channel = '', channels = []) {
   if (!getEffectiveRealtimeUrl() || stremeManualDisconnect) return;
   clearTimeout(stremeReconnectTimer);
   const delay = Math.min(30000, 1000 * (2 ** stremeReconnectAttempts));
   stremeReconnectAttempts += 1;
   stremeReconnectTimer = setTimeout(() => {
+    const multiplexChannels = normalizeStremeChannelList(channels);
+    if (multiplexChannels.length && resolveStremeTransport() === 'sse') {
+      connectStremeMultiplexEventSource(multiplexChannels);
+      return;
+    }
+
     const cleanChannel = sanitizeLocalStremeChannel(channel, '');
     if (cleanChannel && resolveStremeTransport() === 'sse') {
       connectStremeEventSource(cleanChannel);
@@ -17855,6 +18328,7 @@ function disconnectStremeRealtime() {
   }
   stremeEventSourcesByChannel.forEach((source) => source?.close?.());
   stremeEventSourcesByChannel.clear();
+  stremeActiveSseChannelsKey = '';
   stremeActiveTransport = 'none';
   stremeSessionGuard = null;
 }
@@ -17931,6 +18405,34 @@ function getRealtimeArchiveFlagForCurrentUser(raw = {}, metadata = {}, data = {}
 function getRealtimeActorIdentityKey(data = {}) {
   const raw = getRealtimeRecord(data, ['conversation', 'chat']);
   const metadata = getRealtimeMergedMetadata(raw, data);
+  const directActorIdentityKey = [
+    raw.actorIdentityKey,
+    raw.actorParticipantIdentityKey,
+    raw.lastActorScopedArchiveIdentityKey,
+    raw.archivedForActorIdentityKey,
+    raw.restoredArchiveForActorIdentityKey,
+    raw.restoredActorIdentityKey,
+    raw.hiddenForActorIdentityKey,
+    raw.deletedForActorIdentityKey,
+    metadata.actorIdentityKey,
+    metadata.actorParticipantIdentityKey,
+    metadata.lastActorScopedArchiveIdentityKey,
+    metadata.archivedForActorIdentityKey,
+    metadata.restoredArchiveForActorIdentityKey,
+    metadata.restoredActorIdentityKey,
+    metadata.hiddenForActorIdentityKey,
+    metadata.deletedForActorIdentityKey,
+    data.actorIdentityKey,
+    data.actorParticipantIdentityKey,
+    data.lastActorScopedArchiveIdentityKey,
+    data.archivedForActorIdentityKey,
+    data.restoredArchiveForActorIdentityKey,
+    data.restoredActorIdentityKey,
+    data.hiddenForActorIdentityKey,
+    data.deletedForActorIdentityKey
+  ].map(normalizeLifecycleIdentityKeyFromValue).find(Boolean);
+  if (directActorIdentityKey) return directActorIdentityKey;
+
   const actor = getFirstObjectCandidate(
     raw.actor,
     raw.archivedBy,
@@ -18309,6 +18811,7 @@ function buildRealtimeArchivePatchForCurrentUser(data = {}, archived = false) {
     archivedForMe: nextArchived,
     archiveVisibilityScope: scope || 'actor_only',
     visibilityScope: scope || 'actor_only',
+    actorIdentityKey: actorKey || selfKey || '',
     archiveChangedAt,
     archiveClientMutationId
   };
@@ -19204,6 +19707,7 @@ setInterval(() => {
     renderCurrentSection();
   }
 }, STATE_EXPIRY_SWEEP_INTERVAL_MS);
+scheduleNextEphemeralLocalPurge('bootstrap');
 renderEmojiPanel();
 updateComposerActionState();
 registerMemoriaBackendLoginListeners();

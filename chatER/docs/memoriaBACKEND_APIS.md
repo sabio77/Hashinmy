@@ -20,11 +20,13 @@ window.CHATER_CONFIG = {
   API_TIMEOUT_MS: 15000,
   MEDIA_UPLOAD_TIMEOUT_MS: 60000,
   MESSAGE_MEDIA_PREVIEW_MAX_BYTES: 1500000,
-  PUSH_PUBLIC_KEY: ''
+  PUSH_PUBLIC_KEY: '',
+  // Producción: false. Solo demos locales explícitas pueden activar conversaciones semilla.
+  ENABLE_LOCAL_DEMO_SEED: false
 };
 ```
 
-Si `MEMORIA_BACKEND_URL` no está configurada, ChatER funciona en modo demostración local con `localStorage` para no romper la interfaz. Si existe, la interfaz envía `s={MEMORIA_SITE_ID}`, `X-MB-Site`, `X-Hashinmy-Action:webapp` en mutaciones e idempotencia por `X-MB-Idempotency-Key` cuando corresponde. La interfaz intenta hidratar perfil, conversaciones, mensajes, estados y llamadas desde las rutas canónicas de memoriaBACKEND. `STREME_TRANSPORT` puede ser `auto`, `websocket` o `sse`; en `auto`, una URL `ws/wss` explícita usa WebSocket y la integración derivada desde `MEMORIA_BACKEND_URL` usa SSE/EventSource en `/api/v1/streme/eventos`.
+En producción, ChatER no debe inventar conversaciones, estados ni llamadas locales. Una cuenta Gmail nueva inicia con listas vacías y después se llena solo con datos reales de `memoriaBACKEND` o con contactos confirmados por perfil existente. `ENABLE_LOCAL_DEMO_SEED` queda desactivado por defecto y solo puede usarse en demos locales explícitas. Si `MEMORIA_BACKEND_URL` no está configurada, la interfaz puede operar de forma local para no romper la UI, pero sin sembrar chats falsos salvo que esa bandera esté activa. Si existe backend, la interfaz envía `s={MEMORIA_SITE_ID}`, `X-MB-Site`, `X-Hashinmy-Action:webapp` en mutaciones e idempotencia por `X-MB-Idempotency-Key` cuando corresponde. La interfaz intenta hidratar perfil, conversaciones, mensajes, estados y llamadas desde las rutas canónicas de memoriaBACKEND. `STREME_TRANSPORT` puede ser `auto`, `websocket` o `sse`; en `auto`, una URL `ws/wss` explícita usa WebSocket y la integración derivada desde `MEMORIA_BACKEND_URL` usa SSE/EventSource en `/api/v1/streme/eventos`.
 
 `ENABLE_REMOTE_USER_PREFERENCES` permite desactivar por despliegue la sincronización de preferencias privadas con `PREFERENCIASusuarioX` sin tocar el código de la PWA.
 
@@ -982,7 +984,7 @@ Para evitar regresiones, ChatER debe cumplir simultáneamente estas condiciones 
 - Las respuestas tardías de login Google/Gmail deben descartarse si el intento ya no está vigente.
 - El tema se calcula automáticamente por hora local desde la carga inicial para evitar parpadeo visual.
 - La comunicación nueva en tiempo real se canaliza por `streme` con reconexión y `lastEventId`; debe funcionar con WebSocket o SSE/EventSource y no se debe introducir polling para mensajes nuevos.
-- Al iniciar sesión con `MEMORIA_BACKEND_URL`, el cliente debe leer `/api/v1/perfil-usuario`, `/api/v1/conversaciones`, `/api/v1/publicaciones-efimeras` y `/api/v1/sesiones-comunicacion` para reemplazar o complementar los datos semilla con datos reales.
+- Al iniciar sesión con `MEMORIA_BACKEND_URL`, el cliente debe leer `/api/v1/perfil-usuario`, `/api/v1/conversaciones`, `/api/v1/publicaciones-efimeras` y `/api/v1/sesiones-comunicacion` para llenar las listas desde datos reales de memoriaBACKEND; una cuenta nueva puede permanecer vacía hasta crear o recibir conversaciones reales.
 - Al abrir una conversación real, el cliente debe hidratar `GET /api/v1/mensajes?conversationId={chatId}` si el historial no fue entregado incrustado en `/api/v1/conversaciones`.
 - Los eventos `streme` de creación, edición y eliminación de mensajes deben actualizar la conversación local para evitar desalineación visual y deben deduplicarse con mensajes optimistas por `clientMutationId`.
 - Al limpiar o invalidar una sesión debe cerrarse la conexión `streme` activa, cancelarse su reconexión y permitirse que el siguiente correo abra una conexión nueva sin quedar bloqueado por sockets antiguos.
@@ -1732,7 +1734,7 @@ En esta iteración se identificó como punto débil principal que la sección **
 Mejora aplicada:
 
 - `js/app.js` incorpora una duración local explícita de 24 horas para estados (`STATE_VISIBLE_HOURS`) y guarda `expiresAtIso` absoluto al crear un estado nuevo, conservando `expiresAtAt` solo como alias legado.
-- Los estados semilla de demostración ahora tienen `createdAt` y `expiresAtIso`, además del alias `expiresAtAt`, por lo que la lista inicial refleja tiempos restantes reales como `24 h`, `18 h` o `12 h` sin depender de datos antiguos persistidos.
+- Los estados creados localmente o recibidos desde memoriaBACKEND deben tener `createdAt` y `expiresAtIso`, además del alias legado `expiresAtAt` cuando aplique; la lista de producción no depende de estados semilla.
 - La normalización de estados locales y remotos reconoce variantes de expiración de memoriaBACKEND como `expiresAtIso`, `expiresAtAt`, `expiryAt`, `expireAt`, `endsAt` o `expiresAt` cuando son fechas válidas, priorizando el nombre canónico `expiresAtIso`.
 - La lista de Estados, el panel de detalle, los indicadores de actividad y las métricas de Herramientas filtran estados vencidos antes de renderizar.
 - Se agregó limpieza periódica local cada minuto para retirar estados expirados mientras la app está abierta, sin introducir polling de mensajes ni consultas repetitivas a memoriaBACKEND.
@@ -1774,7 +1776,7 @@ En esta iteración se identificó como punto débil que el contrato de estados 2
 
 Mejora aplicada:
 
-- `js/app.js` ahora usa `expiresAtIso` como campo canónico para nuevos estados locales, estados semilla y normalización remota.
+- `js/app.js` ahora usa `expiresAtIso` como campo canónico para nuevos estados locales y normalización remota; cualquier semilla solo existe si `ENABLE_LOCAL_DEMO_SEED=true`.
 - Se conserva `expiresAtAt` como alias legado en lectura y escritura local para no romper estados ya persistidos en `localStorage` ni respuestas antiguas de memoriaBACKEND.
 - La resolución de caducidad prioriza `expiresAtIso` y solo después revisa `expiresAtAt`, `expiryAt`, `expireAt`, `endsAt` o `expiresAt`.
 - La documentación de `GET/POST /api/v1/publicaciones-efimeras` pasa a recomendar `expiresAtIso`, dejando explícita la compatibilidad con `expiresAtAt` únicamente como transición.
@@ -3623,3 +3625,135 @@ Validación funcional esperada:
 - Si el adjunto se guardó por `MEDIAfirmadaX` interno, su contenido Redis se elimina por TTL, por eliminación del mensaje o por borrado final de conversación cuando ya no quedan participantes.
 - `ImagenesCloudflareR2x` no se altera: las imágenes WebP temporales siguen usando R2 cuando la política está disponible.
 
+## 135. Refuerzo de punto débil: prueba ejecutable del contrato ChatER contra memoriaBACKEND
+
+En esta iteración se detectó un punto débil residual de validación: el contrato entre `chatER` y `memoriaBACKEND` estaba documentado y parcialmente cubierto por comprobaciones de sintaxis/tokens, pero no existía una prueba ejecutable dedicada que cruzara en un solo punto los endpoints usados por `chatER/js/app.js`, los montajes reales de `server.js`, el manifiesto `VERSIONESapi` y las reglas críticas de ciclo de vida del chat.
+
+Cambios aplicados:
+
+- Se agregó `memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js` como validación ejecutable específica para el staticsite `hashinmy.com` y el backend `mapsx.app`.
+- La prueba verifica dominios, Gmail obligatorio, endpoints usados por `chatER`, montajes backend, manifiesto `VERSIONESapi`, QR/contactos solo con perfil real, TTL máximo de 24 horas, chat Redis único por participantes, salida por participante y borrado final solo cuando no quedan participantes.
+- La prueba bloquea una regresión crítica: `chatER` no debe usar `DELETE /api/v1/conversaciones/:id` para eliminar chats de la lista; debe usar acciones de ciclo de vida por participante mediante `/api/v1/acciones-chat`.
+- La prueba valida que Archivados sea solo clasificación actor-only y que la foto de perfil permanente siga disponible en ventana flotante.
+- `productionReadinessChecks.js` ahora ejecuta este contrato como grupo obligatorio dentro de `npm run check`.
+- `memoriaBACKEND/apis.txt` queda sincronizado con la nueva prueba para que cualquier IA pueda implementar y validar el contrato ChatER sin contexto adicional.
+
+Validación ejecutada:
+
+- `node --check PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js` ejecutado correctamente.
+- `node PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js` ejecutado correctamente.
+- `npm test` en `memoriaBACKEND` debe ejecutar sintaxis global, contrato ChatER y readiness general.
+
+Alcance preservado:
+
+- No se modifica la lógica runtime de autenticación, mensajes, adjuntos, QR, conversaciones, archivados, realtime, UI ni service worker. La mejora queda limitada a pruebas ejecutables y documentación sincronizada.
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+
+### Actualización STREMEx para ChatER: un solo SSE con varios canales
+
+Punto débil corregido: el tiempo real de ChatER ya funcionaba por STREMEx sin polling, pero podía abrir una conexión `EventSource` por canal. Para escala alta, el cliente ahora calcula inbox + canal default + conversación activa y abre un solo stream usando `GET /api/v1/streme/eventos?s={siteId}&canales=...`.
+
+Reglas de integración:
+- `canales` o `channels` acepta hasta 8 canales separados por coma.
+- Si el backend o un static site antiguo envía solo `canal`, el contrato anterior sigue funcionando.
+- ChatER reemplaza el stream cuando cambia el conjunto de canales, evitando acumular conexiones por conversación.
+- Los eventos siguen llegando con su `channel` en el payload, de forma que el cliente actualiza mensajes, archivados, perfiles, estados y versión de app por evento real.
+
+## 136. Refuerzo de punto débil: cursores STREMEx por canal en SSE multiplexado
+
+En esta iteración se detectó un punto débil de sincronización realtime a escala: ChatER ya abre un solo `EventSource` con varios canales (`inbox`, canal general y conversación activa), pero el replay usaba un único `lastEventId`. Ese cursor único puede pertenecer a un canal distinto al que está recuperando historial. En reconexiones de varios dispositivos, un canal podía no recuperar eventos recientes si el cursor global no existía dentro de su historial Redis.
+
+Cambios aplicados:
+
+- `chatER/js/app.js` guarda cursores STREMEx por canal además del cursor global legacy.
+- La URL SSE multiplexada agrega `lastEventIds` con un mapa JSON por canal cuando existen cursores locales, y mantiene `lastEventId` para compatibilidad.
+- `STREMEx/BLOQUE/stremeRoutes.js` acepta `lastEventIds`, `lastEventIdsByChannel`, `last_event_ids`, `cursores` y `X-Streme-Last-Event-Ids`.
+- `STREMEx/BLOQUE/stremeStore.js` aplica primero el cursor del canal actual y solo usa `lastEventId` global como fallback.
+- Las pruebas de contrato y replay ahora validan la prioridad del cursor por canal y la documentación de `replayCursorMapQueryParam`.
+
+Validación ejecutable esperada:
+
+- `node --check chatER/js/app.js`
+- `node --check memoriaBACKEND/STREMEx/BLOQUE/stremeRoutes.js`
+- `node --check memoriaBACKEND/STREMEx/BLOQUE/stremeStore.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStremeReplayRegressionChecks.js`
+- `npm test` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+## 137. Refuerzo de punto débil: limpieza local de cola efímera vencida
+
+En esta iteración se detectó un punto débil residual en el flujo offline de ChatER: los mensajes y adjuntos pendientes ya tenían `expiresAt` de 24 horas, pero la compactación de la cola local podía retirar una operación vencida antes de que el replay ejecutara la limpieza del mensaje asociado. En ese caso, el envío ya no se sincronizaba con `memoriaBACKEND`, pero podía quedar visible localmente como mensaje pendiente vencido.
+
+Cambios aplicados:
+
+- `chatER/js/app.js` agrega `cleanupExpiredQueuedEphemeralOperation` como ruta única para detectar operaciones `sendMessage` y `createMediaMessage` vencidas.
+- `compactBackendOutboxQueue` usa esa ruta antes de conservar operaciones en la cola; si encuentra una operación efímera vencida, elimina el mensaje local asociado, persiste el estado y refresca la interfaz solo cuando hubo cambio real.
+- `replayBackendOperation` usa la misma limpieza para texto y adjuntos antes de llamar APIs de `memoriaBACKEND`, evitando reintentos de envíos que ya superaron las 24 horas.
+- `app-version.json` y `service-worker.js` suben a `2026-07-05-expired-outbox-cleanup-146` para invalidar cache PWA y servir el shell corregido.
+- `memoriaBACKEND/apis.txt` y `chaterStaticContractChecks.js` quedan sincronizados para que el contrato pueda validarse sin contexto adicional.
+
+Validación ejecutable esperada:
+
+- `node --check chatER/js/app.js`
+- `node --check memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js`
+- `npm test` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+
+## Autodestrucción visual local sin polling
+
+Punto débil corregido: aunque memoriaBACKEND mantiene el TTL autoritativo en Redis, un dispositivo con ChatER abierto podía conservar en pantalla un mensaje ya cargado hasta que ocurriera otro render. Ahora `chatER/js/app.js` programa `scheduleNextEphemeralLocalPurge` con el `expiresAt` más cercano de los mensajes visibles o almacenados localmente.
+
+La tarea local no consulta memoriaBACKEND ni hace polling: solo despierta al vencimiento conocido, ejecuta `pruneExpiredChatMessagesFromState`, persiste el estado depurado y refresca lista/conversación si la interfaz está abierta. `persistState` reprograma el próximo vencimiento y el cierre/cambio de sesión cancela el temporizador para no mezclar cuentas Gmail.
+
+## 138. Refuerzo de punto débil: identidad Gmail y acciones concurrentes del chat
+
+En esta iteración se detectó un punto débil residual de concurrencia que no dependía de la interfaz: ChatER usa Gmail como identidad única y usa una conversación Redis compartida entre dos participantes. Si dos altas de perfil o dos acciones de ciclo de vida ocurrían casi al mismo tiempo desde dispositivos distintos, el backend podía quedar expuesto a carreras de lectura/escritura.
+
+Cambios aplicados:
+
+- `PERFILusuarioX/BLOQUE/pERFILusuarioXStore.js` reserva el correo Gmail con `reserveProfileEmailForCreate` antes de crear un perfil nuevo.
+- Si otro proceso ya reservó el mismo correo, el backend responde `PERFIL_EMAIL_UNIQUE_LOCKED` como conflicto reintentable y no crea un segundo perfil.
+- `readRecordByEmail` limpia índices de correo obsoletos cuando el índice apunta a un perfil inexistente o incompatible.
+- `CONVERSACIONESx/BLOQUE/cONVERSACIONESxStore.js` serializa acciones sensibles con `acquireConversationLifecycleLock` por conversación compartida.
+- Si otro dispositivo ya procesa una acción de ciclo de vida del mismo chat, el backend responde `CHATER_CONVERSATION_LIFECYCLE_BUSY` como conflicto reintentable.
+- Tras tomar el lock, el store relee el chat como `freshConversationAfterLock` antes de borrar, archivar, desarchivar o restaurar, evitando pérdida de actualizaciones entre participantes.
+- `memoriaBACKEND/apis.txt` y las pruebas ChatER quedan sincronizadas para que una IA integradora entienda estos contratos sin contexto adicional.
+
+Validación ejecutable esperada:
+
+- `node --check memoriaBACKEND/PERFILusuarioX/BLOQUE/pERFILusuarioXStore.js`
+- `node --check memoriaBACKEND/CONVERSACIONESx/BLOQUE/cONVERSACIONESxStore.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterStaticContractChecks.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterFunctionalRegressionChecks.js`
+- `npm test` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes del cierre final.
+
+## 126. Revisión de punto débil: Archivados como lista equivalente a Chats
+
+Punto débil identificado en esta iteración: Archivados ya funcionaba como clasificación actor-only y permitía abrir/restaurar conversaciones, pero seguía dependiendo de un modal con filas propias. Eso no cumplía completamente la regla de que Archivados sea una lista de chats exactamente equivalente a la lista principal, donde la única diferencia sea el grupo visual al que pertenece el chat.
+
+Cambios aplicados:
+
+- `js/app.js` agrega `activeChatListGroup`, `openArchivedChatsList()`, `closeArchivedChatsList()` y `createArchivedChatListHeader()` para abrir Archivados dentro de la misma pantalla de listas, no como flujo separado.
+- `renderChatList()` ahora consume `getCurrentChatListConversations()`: cuando el grupo activo es `main` renderiza chats visibles; cuando el grupo activo es `archived` renderiza chats archivados con el mismo renderer `.chat-item`, el mismo avatar, la misma vista previa, los mismos indicadores y la misma lógica de apertura.
+- Al desarchivar desde una conversación archivada, ChatER vuelve al grupo principal con `setActiveChatListGroup('main')`, preservando la regla de que desarchivar cambia solo la clasificación visual y no crea otro chat Redis.
+- El acceso **Archivados** de la lista principal y del menú de chats abre esta lista equivalente, manteniendo el modal anterior como compatibilidad interna no usada por el acceso principal.
+- `css/styles.css` agrega el encabezado visual de la lista Archivados sin alterar la estructura ni los eventos de las filas de chat.
+
+Validación esperada:
+
+- Una conversación archivada debe aparecer en la lista Archivados usando la misma estructura visual que un chat principal.
+- Abrir un chat archivado debe permitir leer y enviar mensajes sin desarchivarlo automáticamente.
+- Restaurar/desarchivar debe mover el chat al grupo principal y mantener intactos mensajes, avatar, participantes, sharedConversationKey y eventos STREMEx.
+- No se debe usar polling ni crear otra conversación para Archivados.
