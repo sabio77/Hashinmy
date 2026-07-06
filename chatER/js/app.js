@@ -1750,13 +1750,153 @@ function normalizeStremeChannelList(channels = [], fallback = '') {
   return normalized.slice(0, 8);
 }
 
+function collectConversationRealtimeAliasValues(conversation = {}, data = {}, message = {}) {
+  const aliases = [];
+  const pushAlias = (value) => {
+    const cleanValue = String(value || '').trim();
+    if (cleanValue && !aliases.includes(cleanValue)) aliases.push(cleanValue);
+  };
+  const conversationMetadata = conversation?.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const dataMetadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const messageMetadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+
+  [
+    conversation?.id,
+    conversation?.chatId,
+    conversation?.conversationId,
+    conversation?.remoteConversationId,
+    conversation?.remoteChatId,
+    conversation?.sharedConversationKey,
+    conversation?.redisConversationKey,
+    conversation?.redisChatKey,
+    conversationMetadata.id,
+    conversationMetadata.chatId,
+    conversationMetadata.conversationId,
+    conversationMetadata.remoteConversationId,
+    conversationMetadata.canonicalConversationId,
+    conversationMetadata.originalConversationId,
+    conversationMetadata.sharedConversationKey,
+    conversationMetadata.redisConversationKey,
+    conversationMetadata.redisChatKey,
+    data?.id,
+    data?.chatId,
+    data?.conversationId,
+    data?.remoteConversationId,
+    data?.sharedConversationKey,
+    data?.redisConversationKey,
+    data?.redisChatKey,
+    dataMetadata.id,
+    dataMetadata.chatId,
+    dataMetadata.conversationId,
+    dataMetadata.remoteConversationId,
+    dataMetadata.sharedConversationKey,
+    dataMetadata.redisConversationKey,
+    dataMetadata.redisChatKey,
+    message?.id && String(message.id || '').startsWith('chat-') ? message.id : '',
+    message?.chatId,
+    message?.conversationId,
+    message?.remoteConversationId,
+    message?.sharedConversationKey,
+    message?.redisConversationKey,
+    message?.redisChatKey,
+    messageMetadata.chatId,
+    messageMetadata.conversationId,
+    messageMetadata.remoteConversationId,
+    messageMetadata.sharedConversationKey,
+    messageMetadata.redisConversationKey,
+    messageMetadata.redisChatKey
+  ].forEach(pushAlias);
+
+  [
+    conversation?.remoteConversationIds,
+    conversationMetadata.remoteConversationIds,
+    data?.remoteConversationIds,
+    dataMetadata.remoteConversationIds,
+    message?.remoteConversationIds,
+    messageMetadata.remoteConversationIds
+  ].forEach((list) => {
+    if (Array.isArray(list)) list.forEach(pushAlias);
+  });
+
+  return aliases.slice(0, 16);
+}
+
+function mergeRealtimeConversationAliases(conversation = {}, data = {}, message = {}) {
+  if (!conversation || typeof conversation !== 'object') return conversation;
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const dataMetadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const messageMetadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  const canonicalId = String(conversation.id || '').trim();
+  const remoteConversationIds = collectConversationRealtimeAliasValues(conversation, data, message)
+    .filter((alias) => alias && alias !== canonicalId)
+    .slice(0, 12);
+  const sharedConversationKey = conversation.sharedConversationKey || metadata.sharedConversationKey || data?.sharedConversationKey || dataMetadata.sharedConversationKey || message?.sharedConversationKey || messageMetadata.sharedConversationKey || '';
+  const redisConversationKey = conversation.redisConversationKey || metadata.redisConversationKey || data?.redisConversationKey || dataMetadata.redisConversationKey || message?.redisConversationKey || messageMetadata.redisConversationKey || '';
+  const redisChatKey = conversation.redisChatKey || metadata.redisChatKey || data?.redisChatKey || dataMetadata.redisChatKey || message?.redisChatKey || messageMetadata.redisChatKey || '';
+
+  conversation.remoteConversationIds = remoteConversationIds;
+  if (sharedConversationKey && !conversation.sharedConversationKey) conversation.sharedConversationKey = sharedConversationKey;
+  if (redisConversationKey && !conversation.redisConversationKey) conversation.redisConversationKey = redisConversationKey;
+  if (redisChatKey && !conversation.redisChatKey) conversation.redisChatKey = redisChatKey;
+  conversation.metadata = {
+    ...metadata,
+    remoteConversationIds,
+    ...(sharedConversationKey ? { sharedConversationKey } : {}),
+    ...(redisConversationKey ? { redisConversationKey } : {}),
+    ...(redisChatKey ? { redisChatKey } : {}),
+    realtimeAliasUpdatedAt: new Date().toISOString()
+  };
+  return conversation;
+}
+
+function findConversationByRealtimeAlias(conversationId = '') {
+  const normalizedId = String(conversationId || '').trim();
+  if (!normalizedId) return null;
+  return appState?.conversations?.find((item) => {
+    if (String(item.id || '') === normalizedId) return true;
+    const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+    const remoteIds = [
+      ...(Array.isArray(item.remoteConversationIds) ? item.remoteConversationIds : []),
+      ...(Array.isArray(metadata.remoteConversationIds) ? metadata.remoteConversationIds : []),
+      item.chatId,
+      item.conversationId,
+      item.remoteConversationId,
+      item.sharedConversationKey,
+      item.redisConversationKey,
+      item.redisChatKey,
+      metadata.chatId,
+      metadata.conversationId,
+      metadata.remoteConversationId,
+      metadata.sharedConversationKey,
+      metadata.redisConversationKey,
+      metadata.redisChatKey
+    ].map((value) => String(value || '').trim()).filter(Boolean);
+    return remoteIds.includes(normalizedId);
+  }) || null;
+}
+
 function getConversationSubscriptionChannels(conversationId = '') {
-  const conversation = appState?.conversations?.find((item) => String(item.id || '') === String(conversationId || '')) || {};
+  const conversation = findConversationByRealtimeAlias(conversationId) || {};
   const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+  const realtimeAliases = collectConversationRealtimeAliasValues(conversation, { conversationId });
   return normalizeStremeChannelList([
     getConversationStremeChannel(conversationId),
-    lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : ''
+    ...realtimeAliases.map((alias) => getConversationStremeChannel(alias)),
+    lifecycle.sharedConversationKey ? getConversationStremeChannel(lifecycle.sharedConversationKey) : '',
+    lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : '',
+    lifecycle.redisChatKey ? getConversationStremeChannel(lifecycle.redisChatKey) : ''
   ]);
+}
+
+function ensureStremeSubscriptionsForRealtimeMessage(conversation = {}, data = {}, message = {}) {
+  const mergedConversation = mergeRealtimeConversationAliases(conversation, data, message);
+  if (!mergedConversation?.id) return;
+  if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail() || resolveStremeTransport() !== 'sse') return;
+  const channels = normalizeStremeChannelList([
+    ...getDesiredStremeSubscriptionChannels(mergedConversation.id),
+    ...collectConversationRealtimeAliasValues(mergedConversation, data, message).map((alias) => getConversationStremeChannel(alias))
+  ], getDefaultStremeChannel() || 'chater-general');
+  connectStremeMultiplexEventSource(channels);
 }
 
 function getDesiredStremeSubscriptionChannels(conversationId = activeConversationId) {
@@ -5080,23 +5220,54 @@ function markQueuedConversationPatchSynced(conversationId, patch = {}) {
 }
 
 function applyRemoteConversationId(localConversationId, remoteConversationId) {
+  const localId = String(localConversationId || '').trim();
+  const remoteId = String(remoteConversationId || '').trim();
+  if (!localId || !remoteId) return;
+
   appState.conversations.forEach((conversation) => {
-    if (conversation.id === localConversationId) conversation.id = remoteConversationId;
+    if (String(conversation.id || '') !== localId) return;
+    const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+    const remoteConversationIds = [
+      ...(Array.isArray(conversation.remoteConversationIds) ? conversation.remoteConversationIds : []),
+      ...(Array.isArray(metadata.remoteConversationIds) ? metadata.remoteConversationIds : []),
+      localId,
+      remoteId
+    ].map((value) => String(value || '').trim())
+      .filter((value, index, list) => value && value !== remoteId && list.indexOf(value) === index)
+      .slice(0, 12);
+
+    conversation.id = remoteId;
+    conversation.remoteConversationIds = remoteConversationIds;
+    conversation.metadata = {
+      ...metadata,
+      canonicalConversationId: remoteId,
+      previousLocalConversationId: localId,
+      remoteConversationIds,
+      realtimeAliasUpdatedAt: new Date().toISOString()
+    };
   });
 
   appState.calls.forEach((call) => {
-    if (call.conversationId === localConversationId) call.conversationId = remoteConversationId;
+    if (call.conversationId === localId) call.conversationId = remoteId;
   });
 
-  if (activeConversationId === localConversationId) {
-    activeConversationId = remoteConversationId;
+  if (activeConversationId === localId) {
+    activeConversationId = remoteId;
   }
 
   const updatedQueue = readBackendOutbox().map((operation) => ({
     ...operation,
-    payload: replaceConversationIdInPayload(operation.payload, localConversationId, remoteConversationId)
+    payload: replaceConversationIdInPayload(operation.payload, localId, remoteId)
   }));
   persistBackendOutbox(updatedQueue);
+
+  // Al reconciliar un ID local con el ID canónico de memoriaBACKEND, el stream
+  // activo debe cambiar al canal real del chat sin exigir que el usuario cierre,
+  // elimine o vuelva a agregar la conversación. También conserva el ID local como
+  // alias para seguir escuchando eventos antiguos ya emitidos por STREMEx.
+  if (remoteId && activeConversationId === remoteId) {
+    ensureStremeConversationSubscription(remoteId);
+  }
 }
 
 function reconcileRemoteConversationIdentityBySharedKey(remoteConversation = {}) {
@@ -9881,8 +10052,8 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
       || message.conversationId
       || ''
   ).trim();
-  let conversation = appState.conversations.find((item) => conversationId && String(item.id || '') === conversationId);
-  if (conversation) return conversation;
+  let conversation = findConversationByRealtimeAlias(conversationId);
+  if (conversation) return mergeRealtimeConversationAliases(conversation, data, message);
 
   const incomingSharedKey = getConversationSharedMergeKey({
     ...rawConversation,
@@ -9894,7 +10065,7 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
     conversation = appState.conversations.find((item) => getConversationSharedMergeKey(item) === incomingSharedKey);
     if (conversation) {
       if (conversationId && conversation.id !== conversationId) applyRemoteConversationId(conversation.id, conversationId);
-      return conversation;
+      return mergeRealtimeConversationAliases(conversation, data, message);
     }
   }
 
@@ -9911,7 +10082,7 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
     if (conversationId && conversation.id !== conversationId) {
       applyRemoteConversationId(conversation.id, conversationId);
     }
-    return conversation;
+    return mergeRealtimeConversationAliases(conversation, data, message);
   }
 
   if (!conversationId && !remoteEmail && !remoteUserId && !incomingSharedKey) return null;
@@ -9967,7 +10138,9 @@ function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
       ...lifecycle
     }
   };
+  mergeRealtimeConversationAliases(conversation, data, message);
   appState.conversations.unshift(conversation);
+  ensureStremeSubscriptionsForRealtimeMessage(conversation, data, message);
 
   if (remoteEmail && CHATER_CONFIG.backendBaseUrl) {
     syncContactRelation({
@@ -10001,11 +10174,13 @@ function applyRealtimeMessageReceipt(data = {}, forcedStatus = '') {
   if (!identitySet.size && !conversationId) return;
 
   let changed = false;
+  const aliasedConversation = conversationId ? findConversationByRealtimeAlias(conversationId) : null;
   appState.conversations.forEach((conversation) => {
     const conversationHasMatchingMessage = identitySet.size
       ? (conversation.messages || []).some((message) => getMessageIdentityCandidates(message).some((identity) => identitySet.has(identity)))
       : false;
-    if (conversationId && String(conversation.id || '') !== conversationId && !conversationHasMatchingMessage) return;
+    const conversationIdMatchesAlias = aliasedConversation && aliasedConversation === conversation;
+    if (conversationId && String(conversation.id || '') !== conversationId && !conversationIdMatchesAlias && !conversationHasMatchingMessage) return;
     (conversation.messages || []).forEach((message) => {
       if (message.type !== 'outgoing') return;
       const matches = !identitySet.size || getMessageIdentityCandidates(message).some((identity) => identitySet.has(identity));
@@ -18941,12 +19116,59 @@ function handleStremeEvent(payload) {
   }
 }
 
+function restoreConversationVisibilityForIncomingRealtimeMessage(conversation = {}, message = {}, data = {}) {
+  if (!conversation || message.type === 'outgoing') return false;
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const wasHidden = coerceFirstBooleanFlag([
+    conversation.deleted,
+    conversation.deletedForCurrentUser,
+    conversation.isDeletedForCurrentUser,
+    conversation.hiddenForCurrentUser,
+    metadata.deletedForCurrentUser,
+    metadata.isDeletedForCurrentUser,
+    metadata.hiddenForCurrentUser
+  ], false);
+  if (!wasHidden) return false;
+
+  const restoredAt = data.createdAt || message.createdAt || message.clientTime || new Date().toISOString();
+  conversation.deleted = false;
+  conversation.deletedForCurrentUser = false;
+  conversation.isDeletedForCurrentUser = false;
+  conversation.hiddenForCurrentUser = false;
+  conversation.deletedAt = '';
+  conversation.localDeletionRegistry = null;
+  conversation.deletionRegistry = stripCurrentParticipantFromDeletionSource(conversation.deletionRegistry || null);
+  conversation.participantDeletionRegistry = stripCurrentParticipantFromDeletionSource(conversation.participantDeletionRegistry || null);
+  conversation.deletedParticipants = stripCurrentParticipantFromDeletionSource(conversation.deletedParticipants || []);
+  conversation.deletedParticipantIdentityKeys = stripCurrentParticipantFromDeletionSource(conversation.deletedParticipantIdentityKeys || []);
+  conversation.deleteDesiredDeleted = false;
+  conversation.deleteChangedAt = restoredAt;
+  conversation.deleteLocalChangedAt = restoredAt;
+  conversation.deleteSyncStatus = 'local:incoming_realtime_restore';
+  conversation.actionSyncStatus = 'local:incoming_realtime_restore';
+  conversation.restoredAt = restoredAt;
+  conversation.status = 'Nuevo mensaje';
+  conversation.metadata = {
+    ...metadata,
+    deletedForCurrentUser: false,
+    isDeletedForCurrentUser: false,
+    hiddenForCurrentUser: false,
+    restoredByIncomingRealtimeMessage: true,
+    restoredByIncomingRealtimeAt: restoredAt
+  };
+  return true;
+}
+
 function receiveRealtimeMessage(data = {}) {
   const message = data.message || data;
   const conversationId = data.chatId || data.conversationId || message.chatId || message.conversationId;
   const conversation = findOrCreateConversationForRealtimeMessage(data, message);
   if (!conversation) return;
+  ensureStremeSubscriptionsForRealtimeMessage(conversation, data, message);
 
+  const messageMetadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  const dataMetadata = data.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const realtimeAliases = collectConversationRealtimeAliasValues(conversation, data, message);
   const normalizedMessage = normalizeMessageFromApi({
     ...message,
     senderUserId: message.senderUserId || data.senderUserId || '',
@@ -18954,8 +19176,22 @@ function receiveRealtimeMessage(data = {}) {
     recipientUserId: message.recipientUserId || data.recipientUserId || '',
     recipientUserEmail: message.recipientUserEmail || data.recipientUserEmail || '',
     chatId: conversation.id,
-    conversationId: conversation.id
+    conversationId: conversation.id,
+    remoteConversationId: conversationId || message.remoteConversationId || data.remoteConversationId || '',
+    sharedConversationKey: message.sharedConversationKey || data.sharedConversationKey || messageMetadata.sharedConversationKey || dataMetadata.sharedConversationKey || conversation.sharedConversationKey || '',
+    redisConversationKey: message.redisConversationKey || data.redisConversationKey || messageMetadata.redisConversationKey || dataMetadata.redisConversationKey || conversation.redisConversationKey || '',
+    redisChatKey: message.redisChatKey || data.redisChatKey || messageMetadata.redisChatKey || dataMetadata.redisChatKey || conversation.redisChatKey || '',
+    metadata: {
+      ...messageMetadata,
+      realtimeConversationAliases: realtimeAliases,
+      remoteConversationId: conversationId || message.remoteConversationId || data.remoteConversationId || '',
+      sharedConversationKey: message.sharedConversationKey || data.sharedConversationKey || messageMetadata.sharedConversationKey || dataMetadata.sharedConversationKey || conversation.sharedConversationKey || '',
+      redisConversationKey: message.redisConversationKey || data.redisConversationKey || messageMetadata.redisConversationKey || dataMetadata.redisConversationKey || conversation.redisConversationKey || '',
+      redisChatKey: message.redisChatKey || data.redisChatKey || messageMetadata.redisChatKey || dataMetadata.redisChatKey || conversation.redisChatKey || ''
+    }
   });
+  restoreConversationVisibilityForIncomingRealtimeMessage(conversation, normalizedMessage, data);
+
   const existingMessage = findExistingMessageByIdentity(
     conversation.messages,
     normalizedMessage,
@@ -18992,7 +19228,7 @@ function receiveRealtimeMessage(data = {}) {
 function updateRealtimeMessage(data = {}) {
   const message = data.message || data;
   const conversationId = data.chatId || data.conversationId || message.chatId || message.conversationId;
-  const conversation = appState.conversations.find((item) => item.id === conversationId);
+  const conversation = findConversationByRealtimeAlias(conversationId);
   if (!conversation) return;
 
   const messageId = message.id || data.messageId;
@@ -19018,7 +19254,7 @@ function updateRealtimeMessage(data = {}) {
 function deleteRealtimeMessage(data = {}) {
   const conversationId = data.chatId || data.conversationId;
   const messageId = data.messageId || data.id;
-  const conversation = appState.conversations.find((item) => item.id === conversationId);
+  const conversation = findConversationByRealtimeAlias(conversationId);
   if (!conversation || !messageId) return;
 
   const identitySet = new Set(getMessageIdentityCandidates({ id: messageId, clientMutationId: data.clientMutationId }));
