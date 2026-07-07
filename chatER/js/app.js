@@ -2144,6 +2144,8 @@ let chatRealtimeReconnectTimer = null;
 let chatRealtimeReconnectAttempts = 0;
 let chatRealtimeManualDisconnect = false;
 let chatRealtimeSessionGuard = null;
+let chatRealtimeRecoveryTimer = null;
+const CHAT_REALTIME_RECOVERY_INTERVAL_MS = 12000;
 let pushConfigCache = null;
 let pushConfigInFlight = null;
 let toastTimer = null;
@@ -7081,6 +7083,7 @@ function renderShell() {
     renderConversation();
   }
   connectStremeRealtime();
+  startChatRealtimeRecoveryLoop();
   syncInitialDataFromBackend();
   flushBackendOutbox();
 }
@@ -9244,7 +9247,7 @@ function renderConversation() {
   });
 
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  hydrateConversationMessages(conversation.id);
+  hydrateConversationMessages(conversation.id, conversationNeedsMessageRefresh(conversation) ? { force: true, refreshLatest: true } : {});
 }
 
 function shouldHydrateConversationMessages(conversation, options = {}) {
@@ -9286,7 +9289,7 @@ async function hydrateConversationMessages(conversationId, options = {}) {
   try {
     const payload = await apiClient.getMessages(conversation.id, {
       limit: 50,
-      before: conversation.messagesHistoryCursor || '',
+      before: options.refreshLatest ? '' : (conversation.messagesHistoryCursor || ''),
       conversation
     });
 
@@ -9301,8 +9304,9 @@ async function hydrateConversationMessages(conversationId, options = {}) {
         });
       }
       conversation.messagesHydrated = true;
-      conversation.messagesHistoryCursor = payload.nextCursor || payload.cursor || payload.data?.nextCursor || '';
+      conversation.messagesHistoryCursor = options.refreshLatest ? (payload.nextCursor || payload.cursor || payload.data?.nextCursor || conversation.messagesHistoryCursor || '') : (payload.nextCursor || payload.cursor || payload.data?.nextCursor || '');
       conversation.messagesHistoryLastErrorAt = '';
+      clearConversationMessageRefreshFlag(conversation);
       if (!previousStatus || previousStatus === 'Cargando historial...') {
         conversation.status = 'Sincronizado';
       } else {
@@ -9329,6 +9333,21 @@ async function hydrateConversationMessages(conversationId, options = {}) {
     if (conversation.id && conversation.id !== hydrationKey) {
       messageHistoryHydration.inFlight.delete(conversation.id);
     }
+  }
+}
+
+
+function reconcileVisibleChatMessagesFromBackend(reason = 'resume') {
+  if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail()) return;
+  const now = Date.now();
+  if (!realtimeConversationSyncState.lastResumeRefreshAt) realtimeConversationSyncState.lastResumeRefreshAt = 0;
+  if (now - Number(realtimeConversationSyncState.lastResumeRefreshAt || 0) < 1500) return;
+  realtimeConversationSyncState.lastResumeRefreshAt = now;
+
+  syncRealtimeConversationInboxFromBackend({ reason, force: true });
+  const conversation = getActiveConversation();
+  if (conversation?.id && activeSection === 'chats') {
+    hydrateConversationMessages(conversation.id, { force: true, refreshLatest: true });
   }
 }
 
@@ -16889,9 +16908,11 @@ function normalizeChatOrchestratorHydratedConversation(item = {}) {
   if (!conversationId) return null;
 
   const inboxLastMessage = buildChatOrchestratorLastMessageFromInboxCard({ ...inboxCard, conversationId });
-  const rawMessages = extractArrayFromPayload(item, ['lastMessages', 'messages', 'items'])
+  const rawMessageCandidates = extractArrayFromPayload(item, ['lastMessages', 'messages', 'items'])
     .concat(Array.isArray(rawConversation.messages) ? rawConversation.messages : [])
     .filter(Boolean);
+  const hydratedFromInboxPreviewOnly = !rawMessageCandidates.length && Boolean(inboxLastMessage);
+  const rawMessages = [...rawMessageCandidates];
   if (!rawMessages.length && inboxLastMessage) rawMessages.push(inboxLastMessage);
 
   const normalizedMessages = rawMessages
@@ -16909,20 +16930,21 @@ function normalizeChatOrchestratorHydratedConversation(item = {}) {
     hiddenForCurrentUser: false,
     lastMessage: rawConversation.lastMessage || inboxLastMessage || undefined,
     messages: normalizedMessages,
-    messagesHydrated: normalizedMessages.length > 0,
+    messagesHydrated: normalizedMessages.length > 0 && !hydratedFromInboxPreviewOnly,
     metadata: {
       ...(rawConversation.metadata || {}),
       chatOrchestratorInitialSync: true,
       uiIntent: inboxCard.uiIntentHint || rawConversation.metadata?.uiIntent || '',
       lastEventId: inboxCard.lastEventId || rawConversation.metadata?.lastEventId || '',
-      lastSequence: inboxCard.lastSequence || rawConversation.metadata?.lastSequence || null
+      lastSequence: inboxCard.lastSequence || rawConversation.metadata?.lastSequence || null,
+      lastMessagePreviewOnly: hydratedFromInboxPreviewOnly
     }
   });
 
   normalizedConversation.messages = normalizeAndPruneChatMessages(
     mergeMessagesByIdentity(normalizedMessages, normalizedConversation.messages || [])
   );
-  normalizedConversation.messagesHydrated = normalizedConversation.messages.length > 0 || Boolean(normalizedConversation.messagesHydrated);
+  normalizedConversation.messagesHydrated = hydratedFromInboxPreviewOnly ? false : (normalizedConversation.messages.length > 0 || Boolean(normalizedConversation.messagesHydrated));
   normalizedConversation.deleted = false;
   normalizedConversation.deletedForCurrentUser = false;
   normalizedConversation.hiddenForCurrentUser = false;
@@ -17533,6 +17555,8 @@ function mergeConversationsById(remoteConversations = [], localConversations = [
     const mergedViewerScopedName = getExplicitViewerScopedConversationDisplayName(remoteConversation)
       || getExplicitViewerScopedConversationDisplayName(localConversation)
       || '';
+    const mergedMessages = mergeMessagesByIdentity(remoteConversation.messages, localConversation.messages);
+    const needsMessageRefresh = shouldRefreshConversationMessagesAfterRemoteMerge(remoteConversation, localConversation, mergedMessages);
     const mergedConversation = {
       ...localConversation,
       ...remoteConversation,
@@ -17553,9 +17577,9 @@ function mergeConversationsById(remoteConversations = [], localConversations = [
         }
       } : {}),
       ...resolveConversationArchiveMergeState(remoteConversation, localConversation),
-      messages: mergeMessagesByIdentity(remoteConversation.messages, localConversation.messages),
-      messagesHydrated: Boolean(remoteConversation.messagesHydrated || localConversation.messagesHydrated),
-      messagesHistoryCursor: remoteConversation.messagesHistoryCursor || localConversation.messagesHistoryCursor || '',
+      messages: mergedMessages,
+      messagesHydrated: needsMessageRefresh ? false : Boolean(remoteConversation.messagesHydrated || localConversation.messagesHydrated),
+      messagesHistoryCursor: needsMessageRefresh ? '' : (remoteConversation.messagesHistoryCursor || localConversation.messagesHistoryCursor || ''),
       messagesHistoryLastErrorAt: localConversation.messagesHistoryLastErrorAt || '',
       ...resolveConversationDeleteMergeState(remoteConversation, localConversation),
       ...resolveConversationBlockMergeState(remoteConversation, localConversation),
@@ -17565,6 +17589,15 @@ function mergeConversationsById(remoteConversations = [], localConversations = [
       muted: Boolean(localConversation.muted || remoteConversation.muted),
       mutedUntil: localConversation.mutedUntil || remoteConversation.mutedUntil || ''
     };
+
+    if (needsMessageRefresh) {
+      mergedConversation.metadata = {
+        ...(mergedConversation.metadata && typeof mergedConversation.metadata === 'object' ? mergedConversation.metadata : {}),
+        needsMessageRefresh: true,
+        needsMessageRefreshReason: 'remote-last-message-not-present-locally',
+        needsMessageRefreshAt: new Date().toISOString()
+      };
+    }
 
     if (localIdBySharedKey && localIdBySharedKey !== effectiveId) {
       conversationsById.delete(localIdBySharedKey);
@@ -17598,6 +17631,109 @@ function getMessageIdentityCandidates(...sources) {
     });
   });
   return [...new Set(candidates.filter(Boolean))];
+}
+
+function getConversationLastMessageIdentityCandidates(conversation = {}) {
+  if (!conversation || typeof conversation !== 'object') return [];
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const candidates = [
+    conversation.lastMessageId,
+    conversation.messageId,
+    metadata.lastMessageId,
+    metadata.messageId,
+    conversation.lastMessage?.id,
+    conversation.lastMessage?.messageId,
+    conversation.latestMessage?.id,
+    conversation.latestMessage?.messageId,
+    ...getMessageIdentityCandidates(conversation.lastMessage, conversation.latestMessage, conversation.message, conversation.record)
+  ];
+  return [...new Set(candidates.map((candidate) => String(candidate || '').trim()).filter(Boolean))];
+}
+
+function hasMessageIdentity(messages = [], identityCandidates = []) {
+  const identitySet = new Set(identityCandidates.map((candidate) => String(candidate || '').trim()).filter(Boolean));
+  if (!identitySet.size) return false;
+  return messages.some((message) => getMessageIdentityCandidates(message).some((identity) => identitySet.has(identity)));
+}
+
+function isConversationPreviewPlaceholderMessage(message = {}) {
+  const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  return Boolean(
+    message?.previewOnly
+      || message?.lastMessagePreviewOnly
+      || metadata.previewOnly
+      || metadata.lastMessagePreviewOnly
+      || metadata.source === 'CONVERSACIONESx'
+  );
+}
+
+function hasHydratedMessageIdentity(messages = [], identityCandidates = []) {
+  const identitySet = new Set(identityCandidates.map((candidate) => String(candidate || '').trim()).filter(Boolean));
+  if (!identitySet.size) return false;
+  return messages.some((message) => {
+    if (isConversationPreviewPlaceholderMessage(message)) return false;
+    return getMessageIdentityCandidates(message).some((identity) => identitySet.has(identity));
+  });
+}
+
+function getConversationLastMessageTimestampMs(conversation = {}) {
+  if (!conversation || typeof conversation !== 'object') return 0;
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const lastMessage = conversation.lastMessage || conversation.latestMessage || {};
+  const rawTimestamp = conversation.lastMessageAt
+    || metadata.lastMessageAt
+    || lastMessage.createdAt
+    || lastMessage.clientTime
+    || lastMessage.time
+    || conversation.lastActivityAt
+    || conversation.updatedAt
+    || metadata.lastActivityAt
+    || metadata.updatedAt
+    || '';
+  const parsed = Date.parse(rawTimestamp);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getNewestMessageTimestampMs(messages = []) {
+  return messages.reduce((latest, message = {}) => {
+    const rawTimestamp = message.createdAt || message.clientTime || message.backendReceivedAt || '';
+    const parsed = Date.parse(rawTimestamp);
+    return Number.isFinite(parsed) ? Math.max(latest, parsed) : latest;
+  }, 0);
+}
+
+function getNewestHydratedMessageTimestampMs(messages = []) {
+  return getNewestMessageTimestampMs(messages.filter((message) => !isConversationPreviewPlaceholderMessage(message)));
+}
+
+function shouldRefreshConversationMessagesAfterRemoteMerge(remoteConversation = {}, localConversation = {}, mergedMessages = []) {
+  const lastMessageIdentityCandidates = getConversationLastMessageIdentityCandidates(remoteConversation);
+  const remoteMetadata = remoteConversation.metadata && typeof remoteConversation.metadata === 'object' ? remoteConversation.metadata : {};
+  const remotePreviewOnly = Boolean(remoteConversation.lastMessagePreviewOnly || remoteMetadata.lastMessagePreviewOnly);
+  const hasHydratedLastMessage = hasHydratedMessageIdentity(mergedMessages, lastMessageIdentityCandidates);
+  if (lastMessageIdentityCandidates.length && !hasMessageIdentity(mergedMessages, lastMessageIdentityCandidates)) return true;
+  if (remotePreviewOnly && lastMessageIdentityCandidates.length && !hasHydratedLastMessage) return true;
+
+  const remoteLastMessageAtMs = getConversationLastMessageTimestampMs(remoteConversation);
+  if (!remoteLastMessageAtMs) return false;
+
+  const newestLocalMessageAtMs = getNewestHydratedMessageTimestampMs(mergedMessages);
+  const remoteHasEmbeddedMessages = Array.isArray(remoteConversation.messages)
+    && remoteConversation.messages.some((message) => !isConversationPreviewPlaceholderMessage(message));
+  if (!newestLocalMessageAtMs && !remoteHasEmbeddedMessages) return true;
+  if (remotePreviewOnly && Boolean(localConversation.messagesHydrated) && !hasHydratedLastMessage) return true;
+  return !remoteHasEmbeddedMessages && remoteLastMessageAtMs > newestLocalMessageAtMs + 1000 && Boolean(localConversation.messagesHydrated);
+}
+
+function conversationNeedsMessageRefresh(conversation = {}) {
+  return Boolean(conversation?.metadata && typeof conversation.metadata === 'object' && conversation.metadata.needsMessageRefresh);
+}
+
+function clearConversationMessageRefreshFlag(conversation = {}) {
+  if (!conversation?.metadata || typeof conversation.metadata !== 'object') return;
+  delete conversation.metadata.needsMessageRefresh;
+  delete conversation.metadata.needsMessageRefreshReason;
+  delete conversation.metadata.needsMessageRefreshAt;
 }
 
 function findExistingMessageByIdentity(messages = [], ...sources) {
@@ -17708,6 +17844,21 @@ function updateExistingMessageFromRealtime(existingMessage, normalizedMessage) {
   existingMessage.clientTime = normalizedMessage.clientTime || existingMessage.clientTime || existingMessage.createdAt || '';
   existingMessage.expiresAt = normalizedMessage.expiresAt || existingMessage.expiresAt || coerceChatEphemeralExpiresAtIso('', existingMessage.clientTime || existingMessage.createdAt || new Date().toISOString());
   existingMessage.ttlSeconds = Number(normalizedMessage.ttlSeconds || existingMessage.ttlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS;
+  existingMessage.previewOnly = Boolean(normalizedMessage.previewOnly);
+  existingMessage.lastMessagePreviewOnly = Boolean(normalizedMessage.lastMessagePreviewOnly);
+  if (normalizedMessage.metadata && typeof normalizedMessage.metadata === 'object') {
+    existingMessage.metadata = {
+      ...(existingMessage.metadata && typeof existingMessage.metadata === 'object' ? existingMessage.metadata : {}),
+      ...normalizedMessage.metadata
+    };
+  }
+  if (!normalizedMessage.previewOnly && existingMessage.metadata && typeof existingMessage.metadata === 'object') {
+    delete existingMessage.metadata.previewOnly;
+    delete existingMessage.metadata.lastMessagePreviewOnly;
+    if (existingMessage.metadata.source === 'CONVERSACIONESx') {
+      delete existingMessage.metadata.source;
+    }
+  }
   if (existingMessage.type !== 'outgoing' || normalizedMessage.type === 'system') {
     existingMessage.type = normalizedMessage.type || existingMessage.type;
   }
@@ -17864,9 +18015,36 @@ function normalizeConversationFromApi(raw = {}) {
   const email = rawEmail && rawEmail !== selfEmail ? rawEmail : (participant?.email || rawEmail || '');
   const name = resolveConversationDisplayNameForCurrentViewer(raw, { metadata, participants, remoteParticipant: participant, email });
   const hasEmbeddedMessages = Array.isArray(raw.messages) && raw.messages.length > 0;
+  const lastMessageId = String(raw.lastMessageId || metadata.lastMessageId || '').trim();
+  const lastMessagePreview = String(raw.lastMessagePreview || metadata.lastMessagePreview || '').trim();
+  const lastMessageAt = raw.lastMessageAt || metadata.lastMessageAt || raw.lastActivityAt || metadata.lastActivityAt || raw.updatedAt || metadata.updatedAt || '';
   const messages = hasEmbeddedMessages ? raw.messages.map(normalizeMessageFromApi) : [];
-  if (!messages.length && raw.lastMessage) {
-    messages.push(normalizeMessageFromApi(raw.lastMessage));
+  const lastMessagePreviewOnly = Boolean(!hasEmbeddedMessages && !raw.lastMessage && !raw.latestMessage && (lastMessageId || lastMessagePreview));
+  const remoteLastMessage = raw.lastMessage || raw.latestMessage || (lastMessageId || lastMessagePreview ? {
+    id: lastMessageId || `${raw.id || raw.chatId || raw.conversationId || 'chat'}:last`,
+    messageId: lastMessageId,
+    chatId: raw.chatId || raw.conversationId || raw.id || '',
+    conversationId: raw.conversationId || raw.chatId || raw.id || '',
+    text: lastMessagePreview,
+    createdAt: lastMessageAt,
+    clientTime: lastMessageAt,
+    time: lastMessageAt,
+    senderUserId: metadata.lastMessageSenderUserId || raw.lastMessageSenderUserId || '',
+    senderUserEmail: metadata.lastMessageSenderUserEmail || raw.lastMessageSenderUserEmail || '',
+    receiptStatus: metadata.lastMessageReceiptStatus || raw.lastMessageReceiptStatus || 'backend_received',
+    status: 'synced',
+    previewOnly: lastMessagePreviewOnly,
+    lastMessagePreviewOnly,
+    metadata: {
+      source: 'CONVERSACIONESx',
+      previewOnly: lastMessagePreviewOnly,
+      lastMessagePreviewOnly,
+      lastMessageId,
+      lastMessageAt
+    }
+  } : null);
+  if (!messages.length && remoteLastMessage) {
+    messages.push(normalizeMessageFromApi(remoteLastMessage));
   }
 
   return {
@@ -17892,7 +18070,10 @@ function normalizeConversationFromApi(raw = {}) {
       ? coerceBooleanFlag(raw.archiveDesiredArchived, archivedForCurrentUser)
       : archivedForCurrentUser,
     updatedAt: raw.updatedAt || raw.modifiedAt || metadata.updatedAt || metadata.modifiedAt || '',
-    lastActivityAt: raw.lastActivityAt || metadata.lastActivityAt || '',
+    lastActivityAt: raw.lastActivityAt || metadata.lastActivityAt || lastMessageAt || '',
+    lastMessageId,
+    lastMessagePreview,
+    lastMessageAt,
     pinned: Boolean(raw.pinned || raw.isPinned),
     deleted: deletedForCurrentUser,
     deleteChangedAt,
@@ -17946,7 +18127,11 @@ function normalizeConversationFromApi(raw = {}) {
     messagesHistoryCursor: raw.messagesCursor || raw.nextCursor || raw.nextMessagesCursor || '',
     metadata: {
       ...metadata,
-      ...lifecycle
+      ...lifecycle,
+      lastMessageId: lastMessageId || metadata.lastMessageId || '',
+      lastMessagePreview: lastMessagePreview || metadata.lastMessagePreview || '',
+      lastMessageAt: lastMessageAt || metadata.lastMessageAt || '',
+      lastMessagePreviewOnly: Boolean(metadata.lastMessagePreviewOnly || lastMessagePreviewOnly)
     },
     sharedConversationKey: lifecycle.sharedConversationKey,
     redisConversationKey: lifecycle.redisConversationKey,
@@ -18060,7 +18245,10 @@ function normalizeMessageFromApi(raw = {}) {
     createdAt,
     clientTime: raw.clientTime || createdAt,
     expiresAt: coerceChatEphemeralExpiresAtIso(raw.expiresAt || raw.expiryAt || raw.expireAt || metadata.expiresAt || '', raw.clientTime || createdAt || new Date().toISOString()),
-    ttlSeconds: Number(raw.ttlSeconds || raw.ephemeralTtlSeconds || metadata.ephemeralTtlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS
+    ttlSeconds: Number(raw.ttlSeconds || raw.ephemeralTtlSeconds || metadata.ephemeralTtlSeconds || CHATER_EPHEMERAL_TTL_SECONDS) || CHATER_EPHEMERAL_TTL_SECONDS,
+    previewOnly: Boolean(raw.previewOnly || raw.lastMessagePreviewOnly || metadata.previewOnly || metadata.lastMessagePreviewOnly),
+    lastMessagePreviewOnly: Boolean(raw.lastMessagePreviewOnly || metadata.lastMessagePreviewOnly),
+    metadata
   };
 }
 
@@ -18718,6 +18906,35 @@ function handleChatRealtimeEventPayload(payload = {}) {
   }
 }
 
+function isChatRealtimeRecoveryAllowed() {
+  if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail() || !hasBackendSessionCredentials()) return false;
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  if (chatView?.hidden) return false;
+  return true;
+}
+
+function runChatRealtimeRecoveryProbe(reason = 'chat-realtime-recovery') {
+  if (!isChatRealtimeRecoveryAllowed()) return;
+  syncRealtimeConversationInboxFromBackend({ reason });
+  const conversation = getActiveConversation();
+  if (conversation?.id && activeSection === 'chats') {
+    hydrateConversationMessages(conversation.id, { force: true, refreshLatest: true });
+  }
+}
+
+function startChatRealtimeRecoveryLoop() {
+  if (chatRealtimeRecoveryTimer || typeof window === 'undefined') return;
+  chatRealtimeRecoveryTimer = window.setInterval(() => {
+    runChatRealtimeRecoveryProbe('chat-realtime-recovery-loop');
+  }, CHAT_REALTIME_RECOVERY_INTERVAL_MS);
+}
+
+function stopChatRealtimeRecoveryLoop() {
+  if (!chatRealtimeRecoveryTimer || typeof window === 'undefined') return;
+  window.clearInterval(chatRealtimeRecoveryTimer);
+  chatRealtimeRecoveryTimer = null;
+}
+
 function connectChatRealtimeStream() {
   if (!getEffectiveChatRealtimeUrl() || !getSessionEmail() || typeof EventSource === 'undefined') return;
   if (chatRealtimeEventSource && chatRealtimeEventSource.readyState !== EventSource.CLOSED) return;
@@ -18787,6 +19004,7 @@ function scheduleStremeReconnect(channel = '', channels = []) {
 }
 
 function disconnectStremeRealtime() {
+  stopChatRealtimeRecoveryLoop();
   disconnectChatRealtimeStream();
   stremeManualDisconnect = true;
   clearTimeout(stremeReconnectTimer);
@@ -20175,7 +20393,14 @@ window.addEventListener('beforeunload', () => {
   sendPresenceHeartbeat('offline', { force: true, keepalive: true });
 });
 
-window.addEventListener('online', flushBackendOutbox);
+window.addEventListener('online', () => {
+  flushBackendOutbox();
+  reconcileVisibleChatMessagesFromBackend('network-online');
+});
+window.addEventListener('focus', () => reconcileVisibleChatMessagesFromBackend('window-focus'));
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) reconcileVisibleChatMessagesFromBackend('visibility-visible');
+}, { passive: true });
 window.addEventListener('hashchange', () => applyDeepLinkFromLocation({ source: 'hashchange' }));
 navigator.serviceWorker?.addEventListener('message', (event) => handleNotificationClientMessage(event.data || {}));
 
