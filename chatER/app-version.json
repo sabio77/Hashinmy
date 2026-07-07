@@ -1,17 +1,17 @@
 {
-  "version": "2026-07-06-chater-streme-outbox-idempotency-148",
-  "buildTime": "2026-07-06T16:20:00-05:00",
+  "version": "2026-07-06-chater-direct-open-replay-149",
+  "buildTime": "2026-07-06T16:55:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER mantiene /api/v1/mensajes como envío canónico y sanea la outbox STREMEx para evitar reintentos legacy con conflictos 409.",
-  "build": "streme-outbox-idempotency-148",
-  "updatedAt": "2026-07-06T16:20:00-05:00",
-  "notes": "El envío eficiente conserva un solo POST a /api/v1/mensajes; MENSAJESx publica el message.created canónico y la outbox STREMEx descarta eventos legacy de mensajes, usando idempotencia estable por evento/canales sin polling.",
+  "description": "ChatER reentrega mensajes directos recientes al abrir el stream SSE y restaura chats eliminados localmente cuando llega un mensaje realtime entrante.",
+  "build": "direct-open-replay-149",
+  "updatedAt": "2026-07-06T16:55:00-05:00",
+  "notes": "El flujo directo compatible con estadisponible conserva un solo POST a /api/v1/chats/send; CHATrealtimeX guarda eventos en Redis y hace replay inmediato al abrir /stream para los alias del receptor, sin polling ni verificaciones extra.",
   "changes": [
-    "js/app.js descarta de la outbox local eventos STREMEx legacy de mensajes ya delegados a MENSAJESx.",
-    "Las publicaciones STREMEx durables usan una clave idempotente estable por dedupe/canales para no chocar por clientMutationId reutilizado.",
-    "La replay de outbox trata conflictos idempotentes STREMEx como no-op seguro y evita reintentos infinitos visibles en consola.",
-    "STREMEx responde no-op 200 ante conflictos idempotentes de /api/v1/streme/eventos para no repetir efectos realtime ni generar 409 en Chrome.",
+    "CHATrealtimeX reentrega desde Redis eventos recientes del destinatario al abrir el EventSource /api/v1/chats/stream.",
+    "chatER/js/app.js limpia flags locales de chat eliminado/oculto cuando entra un mensaje realtime nuevo.",
+    "Se agrega regresión funcional para mensaje directo guardado antes de abrir el stream del receptor.",
+    "El flujo sigue usando MENSAJESx + Redis + CHATrealtimeX, sin STREMEx como transporte intermedio del mensaje directo.",
     "service-worker.js actualiza versión para evitar caché PWA del flujo anterior."
   ]
 }

@@ -9512,6 +9512,52 @@ function sendReadReceiptsForConversation(conversation = {}, options = {}) {
   }
 }
 
+function restoreConversationVisibilityForIncomingRealtimeMessage(conversation = {}, message = {}) {
+  if (!conversation || typeof conversation !== 'object' || message?.type === 'outgoing') return false;
+
+  let changed = false;
+  const clearFlag = (field) => {
+    if (conversation[field]) {
+      conversation[field] = false;
+      changed = true;
+    }
+  };
+
+  [
+    'deleted',
+    'deletedForCurrentUser',
+    'isDeletedForCurrentUser',
+    'hiddenForCurrentUser'
+  ].forEach(clearFlag);
+
+  if (conversation.deletedAt) {
+    conversation.deletedAt = '';
+    changed = true;
+  }
+  if (conversation.deleteDesiredDeleted) {
+    conversation.deleteDesiredDeleted = false;
+    changed = true;
+  }
+  if (conversation.deleteSyncStatus && String(conversation.deleteSyncStatus).includes('delete')) {
+    conversation.deleteSyncStatus = 'restored_by_incoming_realtime';
+    changed = true;
+  }
+  if (conversation.actionSyncStatus && String(conversation.actionSyncStatus).includes('delete')) {
+    conversation.actionSyncStatus = 'restored_by_incoming_realtime';
+    changed = true;
+  }
+  if (String(conversation.status || '').toLowerCase().includes('eliminado')) {
+    conversation.status = 'Nuevo mensaje';
+    changed = true;
+  }
+  if (!Array.isArray(conversation.messages)) {
+    conversation.messages = [];
+    changed = true;
+  }
+
+  return changed;
+}
+
 function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
   const rawConversation = getRealtimeRecord(data, ['conversation', 'chat']);
   const rawMetadata = rawConversation.metadata && typeof rawConversation.metadata === 'object' ? rawConversation.metadata : {};
@@ -18699,6 +18745,7 @@ function receiveRealtimeMessage(data = {}) {
   }
 
   const storedMessage = existingMessage || normalizedMessage;
+  restoreConversationVisibilityForIncomingRealtimeMessage(conversation, storedMessage);
   if (storedMessage.type !== 'outgoing') {
     sendDeliveredReceiptForMessage(conversation, storedMessage);
     if (conversation.id === activeConversationId && activeSection === 'chats') {

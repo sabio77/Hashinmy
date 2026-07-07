@@ -1,4 +1,4 @@
-const CHATER_SW_VERSION = '2026-07-06-chater-streme-outbox-idempotency-148';
+const CHATER_SW_VERSION = '2026-07-06-chater-direct-open-replay-149';
 const CHATER_CACHE = `chater-static-${CHATER_SW_VERSION}`;
 // APP_SHELL solo contiene archivos obligatorios que deben existir en el ZIP funcional.
 // Las imágenes de proyecto son PNG opcionales cubiertos por prompts en assets.

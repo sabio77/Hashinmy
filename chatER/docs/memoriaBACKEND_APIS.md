@@ -3799,3 +3799,24 @@ Validación ejecutable:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+## Iteración ChatER - replay directo de apertura y restauración visible
+
+Punto débil identificado: el backend ya guardaba los mensajes en Redis y publicaba `chat.message`, pero el receptor podía no verlos si su EventSource no estaba conectado justo al publicar o si su conversación local estaba marcada como eliminada/oculta. Al borrar y recrear el chat por QR se forzaba otra hidratación, por eso los mensajes aparecían después.
+
+Cambios aplicados:
+
+- `CHATrealtimeX` reentrega al abrir `/api/v1/chats/stream` los eventos recientes guardados en Redis para los alias del receptor, usando el mismo formato SSE `chat_event` del flujo directo.
+- `chatER/js/app.js` restaura la visibilidad local de una conversación eliminada por el usuario cuando entra un mensaje nuevo por realtime.
+- No se agregó una verificación previa de contacto/conversación ni un transporte extra: el proceso sigue siendo guardar mensaje, publicar evento Redis/SSE y mostrarlo.
+- Se agregó una regresión funcional que cubre el caso exacto: mensaje directo guardado antes de abrir el stream del receptor y replay inmediato al conectar.
+
+Validación ejecutable:
+
+- `node --check chatER/js/app.js`
+- `node --check memoriaBACKEND/CHATrealtimeX/BLOQUE/chatRealtimeStore.js`
+- `node memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterFunctionalRegressionChecks.js`
+- `npm run check` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
