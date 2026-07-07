@@ -31,10 +31,10 @@
             <p id="userEmailLabel">Sesión activa</p>
           </div>
           <div class="header-actions" aria-label="Acciones principales">
-            <button id="newChatButton" class="icon-button" type="button" aria-label="Nuevo chat">＋</button>
-            <button id="headerCameraButton" class="icon-button" type="button" aria-label="Crear estado rápido">▣</button>
-            <button id="headerSearchButton" class="icon-button" type="button" aria-label="Buscar en esta sección">⌕</button>
-            <button id="toolsButton" class="icon-button" type="button" aria-label="Abrir herramientas">⋮</button>
+            <button id="newChatButton" class="icon-button" type="button" aria-label="Nuevo chat" data-icon="plus"></button>
+            <button id="headerCameraButton" class="icon-button" type="button" aria-label="Crear estado rápido" data-icon="camera"></button>
+            <button id="headerSearchButton" class="icon-button" type="button" aria-label="Buscar en esta sección" data-icon="search"></button>
+            <button id="toolsButton" class="icon-button" type="button" aria-label="Abrir herramientas" data-icon="more-vertical"></button>
           </div>
         </header>
 
@@ -53,18 +53,18 @@
 
       <section class="chat-panel" aria-label="Conversación actual">
         <header class="chat-header">
-          <button id="backButton" class="icon-button mobile-only" type="button" aria-label="Volver a la lista">‹</button>
+          <button id="backButton" class="icon-button mobile-only" type="button" aria-label="Volver a la lista" data-icon="chevron-left"></button>
           <div id="activeAvatar" class="contact-avatar" aria-hidden="true">A</div>
           <div class="chat-contact-info">
             <h2 id="activeName">Selecciona un chat</h2>
             <p id="activeStatus">Elige una conversación para comenzar</p>
           </div>
           <div class="chat-header-actions">
-            <button id="audioCallButton" class="icon-button" type="button" aria-label="Iniciar llamada de voz">☎</button>
-            <button id="videoCallButton" class="icon-button" type="button" aria-label="Iniciar videollamada">▣</button>
-            <button id="pinConversationButton" class="icon-button" type="button" aria-label="Fijar conversación">⌖</button>
-            <button id="archiveConversationButton" class="icon-button" type="button" aria-label="Archivar conversación">⇩</button>
-            <button id="conversationMenuButton" class="icon-button" type="button" aria-label="Abrir opciones de conversación">⋮</button>
+            <button id="audioCallButton" class="icon-button" type="button" aria-label="Iniciar llamada de voz" data-icon="phone"></button>
+            <button id="videoCallButton" class="icon-button" type="button" aria-label="Iniciar videollamada" data-icon="video"></button>
+            <button id="pinConversationButton" class="icon-button" type="button" aria-label="Fijar conversación" data-icon="pin"></button>
+            <button id="archiveConversationButton" class="icon-button" type="button" aria-label="Archivar conversación" data-icon="archive"></button>
+            <button id="conversationMenuButton" class="icon-button" type="button" aria-label="Abrir opciones de conversación" data-icon="more-vertical"></button>
           </div>
         </header>
 
@@ -73,13 +73,13 @@
         <section id="statusPanel" class="status-panel" aria-label="Estados de 24 horas" hidden></section>
 
         <form id="messageForm" class="message-form" autocomplete="off">
-          <button id="emojiButton" class="icon-button" type="button" aria-label="Abrir emojis">☻</button>
+          <button id="emojiButton" class="icon-button" type="button" aria-label="Abrir emojis" data-icon="smile"></button>
           <input id="messageInput" type="text" placeholder="Mensaje" disabled />
-          <button id="attachButton" class="icon-button" type="button" aria-label="Adjuntar archivo">📎</button>
-          <button id="cameraComposerButton" class="icon-button" type="button" aria-label="Abrir cámara o galería">📷</button>
-          <button id="quickComposerButton" class="icon-button" type="button" aria-label="Abrir acciones rápidas">⚡</button>
-          <button id="voiceNoteButton" class="icon-button voice-note-button" type="button" aria-label="Grabar nota de voz">🎤</button>
-          <button id="sendButton" class="send-button" type="submit" aria-label="Enviar mensaje" disabled hidden>➤</button>
+          <button id="attachButton" class="icon-button" type="button" aria-label="Adjuntar archivo" data-icon="paperclip"></button>
+          <button id="cameraComposerButton" class="icon-button" type="button" aria-label="Abrir cámara o galería" data-icon="camera"></button>
+          <button id="quickComposerButton" class="icon-button" type="button" aria-label="Abrir acciones rápidas" data-icon="bolt"></button>
+          <button id="voiceNoteButton" class="icon-button voice-note-button" type="button" aria-label="Grabar nota de voz" data-icon="mic"></button>
+          <button id="sendButton" class="send-button" type="submit" aria-label="Enviar mensaje" data-icon="send" disabled hidden></button>
         </form>
 
         <section id="emojiPanel" class="emoji-panel" aria-label="Panel de emojis" hidden></section>
@@ -87,24 +87,24 @@
 
       <nav id="bottomNavigation" class="bottom-navigation" aria-label="Navegación principal">
         <button class="bottom-nav-item active" type="button" data-bottom-section="chats" aria-label="Abrir chats">
-          <span aria-hidden="true">💬</span>
+          <span data-icon="message-circle" aria-hidden="true"></span>
           <strong>Chats</strong>
         </button>
         <button class="bottom-nav-item" type="button" data-bottom-section="calls" aria-label="Abrir llamadas">
-          <span aria-hidden="true">☎</span>
+          <span data-icon="phone" aria-hidden="true"></span>
           <strong>Llamadas</strong>
         </button>
         <button class="bottom-nav-item" type="button" data-bottom-section="states" aria-label="Abrir estados">
-          <span aria-hidden="true">◉</span>
+          <span data-icon="circle-dot" aria-hidden="true"></span>
           <strong>Novedades</strong>
         </button>
         <button class="bottom-nav-item" type="button" data-bottom-section="tools" aria-label="Abrir herramientas">
-          <span aria-hidden="true">⚙</span>
+          <span data-icon="settings" aria-hidden="true"></span>
           <strong>Herramientas</strong>
         </button>
       </nav>
 
-      <button id="floatingActionButton" class="floating-action-button" type="button" aria-label="Acción principal" hidden>＋</button>
+      <button id="floatingActionButton" class="floating-action-button" type="button" aria-label="Acción principal" data-icon="plus" hidden></button>
     </section>
   </main>
 
@@ -112,7 +112,7 @@
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <header class="modal-header">
         <h2 id="modalTitle">Acción</h2>
-        <button id="modalCloseButton" class="icon-button" type="button" aria-label="Cerrar">×</button>
+        <button id="modalCloseButton" class="icon-button" type="button" aria-label="Cerrar" data-icon="x"></button>
       </header>
       <div id="modalBody" class="modal-body"></div>
     </section>
@@ -126,7 +126,7 @@
 
   <div id="pwaInstallPrompt" class="pwa-install-floating" role="dialog" aria-live="polite" aria-label="Instalar ChatER" hidden>
     <div class="pwa-install-card">
-      <span class="pwa-install-icon" aria-hidden="true">⬇</span>
+      <span class="pwa-install-icon" data-icon="download" aria-hidden="true"></span>
       <div class="pwa-install-copy">
         <strong>Instalar ChatER</strong>
         <small>Agrega la app a tu pantalla principal para abrirla como aplicación instalada.</small>

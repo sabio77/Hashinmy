@@ -297,6 +297,87 @@ button {
   transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.ui-icon {
+  width: 1.25em;
+  height: 1.25em;
+  display: inline-block;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.uses-professional-icon,
+.icon-button .ui-icon,
+.send-button .ui-icon,
+.bottom-nav-item .ui-icon,
+.tool-icon .ui-icon,
+.quick-composer-icon .ui-icon,
+.emoji-mode-button .ui-icon,
+.emoji-category-button .ui-icon,
+.pwa-install-icon .ui-icon,
+.contact-avatar .ui-icon {
+  color: currentColor;
+}
+
+.icon-button .ui-icon,
+.send-button .ui-icon,
+.floating-action-button .ui-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.tool-icon .ui-icon,
+.quick-composer-icon .ui-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.bottom-nav-item .ui-icon,
+.emoji-mode-button .ui-icon,
+.emoji-category-button .ui-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.pwa-install-icon .ui-icon,
+.contact-avatar .ui-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.state-add-avatar .ui-icon,
+.archive-shortcut-icon .ui-icon,
+.call-hub-icon .ui-icon,
+.state-promo-icon .ui-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.pinned-badge .ui-icon,
+.attachment-chip .ui-icon,
+.message-media-fallback-icon .ui-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
 .icon-button:hover,
 .icon-button.active,
 #sendButton:not(:disabled):hover,
@@ -2071,8 +2152,9 @@ button {
   font-weight: 800;
 }
 
-.emoji-mode-button span {
-  font-size: 15px;
+.emoji-mode-button .emoji-mode-icon {
+  display: inline-grid;
+  place-items: center;
   line-height: 1;
 }
 

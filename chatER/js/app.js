@@ -1757,34 +1757,34 @@ const seedState = {
 };
 
 const emojiModes = [
-  { id: 'emoji', label: 'Emojis', icon: '☻' },
-  { id: 'gif', label: 'GIF', icon: 'GIF' },
-  { id: 'sticker', label: 'Stickers', icon: '▧' }
+  { id: 'emoji', label: 'Emojis', icon: 'smile' },
+  { id: 'gif', label: 'GIF', icon: 'image' },
+  { id: 'sticker', label: 'Stickers', icon: 'sticker' }
 ];
 
 const emojiCategories = [
   {
     id: 'smileys',
     label: 'Caras y emociones',
-    icon: '😊',
+    icon: 'smileys',
     emojis: ['😀', '😃', '😄', '😁', '😆', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😍', '😘', '😋', '😎', '🥳', '😢', '😭', '😡', '😱', '🤔', '😴', '🤗']
   },
   {
     id: 'gestures',
     label: 'Gestos',
-    icon: '👍',
+    icon: 'gestures',
     emojis: ['👍', '👎', '👌', '👏', '🙌', '🙏', '🤝', '💪', '👋', '✌️', '☝️', '👇', '👉', '👈', '🤙', '🫶']
   },
   {
     id: 'symbols',
     label: 'Símbolos',
-    icon: '❤️',
+    icon: 'symbols',
     emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🤍', '🔥', '✨', '⭐', '✅', '❌', '⚠️', '📌', '💬', '🚀']
   },
   {
     id: 'objects',
     label: 'Objetos y actividad',
-    icon: '☕',
+    icon: 'objects',
     emojis: ['☕', '🎉', '🎁', '📷', '🎧', '💻', '📱', '🕘', '📍', '📝', '📎', '🔔', '🔒', '🛒', '🚗', '🏠']
   }
 ];
@@ -1835,6 +1835,157 @@ const emojiSearchAliases = {
   '🔔': 'notificación alerta',
   '🔒': 'seguro privado bloqueo'
 };
+
+const PROFESSIONAL_ICON_SVGS = Object.freeze({
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  camera: '<path d="M14.5 5.5 13 3H9L7.5 5.5H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-8a3 3 0 0 0-3-3h-4.5Z"/><circle cx="12" cy="12.5" r="3.5"/>',
+  video: '<rect x="3" y="6" width="12" height="12" rx="3"/><path d="m15 10 5-3v10l-5-3"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/>',
+  'more-vertical': '<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>',
+  'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1A19.5 19.5 0 0 1 5.2 12 19.8 19.8 0 0 1 2.1 3.4 2 2 0 0 1 4.1 1h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.5 2.1L8 8.5a16 16 0 0 0 7.5 7.5l1.2-1.2a2 2 0 0 1 2.1-.5c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2Z"/>',
+  pin: '<path d="m15 4 5 5-4 1-4 8-2-2 8-4 1-4-5-5Z"/><path d="m8 16-5 5"/>',
+  archive: '<path d="M4 7h16"/><path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 11h6"/><path d="M10 3h4l2 4H8l2-4Z"/>',
+  smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+  paperclip: '<path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v4"/><path d="M8 22h8"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+  settings: '<path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 3V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 21 10h.1a2 2 0 0 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z"/>',
+  server: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01"/><path d="M7 17h.01"/>',
+  'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+  'arrow-up-right': '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
+  calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  keypad: '<rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/>',
+  bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+  'bell-off': '<path d="M13.7 21a2 2 0 0 1-3.4 0"/><path d="M18.6 13.7C18.2 12.4 18 10.6 18 8a6 6 0 0 0-9.3-5"/><path d="M6.3 6.3A6.6 6.6 0 0 0 6 8c0 7-3 7-3 9h14"/><path d="m2 2 20 20"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 15h10l1-15"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M3 21v-6h6"/><path d="M21 3v6h-6"/>',
+  square: '<rect x="7" y="7" width="10" height="10" rx="1.5"/>',
+  qr: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2z"/><path d="M18 14h2v6h-6v-2h4z"/><path d="M14 20h.01"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  megaphone: '<path d="M3 11v3a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2Z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6a8 8 0 0 1 0 12"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  'map-pin': '<path d="M12 21s7-5.2 7-12a7 7 0 0 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>',
+  sparkles: '<path d="M12 3 9.5 9.5 3 12l6.5 2.5L12 21l2.5-6.5L21 12l-6.5-2.5L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2 7.5 14 3 9.6l6.2-.9L12 3Z"/>',
+  'message-circle': '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-4-.9L3 20l1.1-4.5a8.4 8.4 0 1 1 16.9-4Z"/>',
+  'circle-dot': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>',
+  image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.5"/><path d="m21 15-5-5L5 19"/>',
+  sticker: '<path d="M7 3h8l5 5v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Z"/><path d="M15 3v5h5"/><path d="M8 13h.01"/><path d="M15 13h.01"/><path d="M9 17c1.5 1 4.5 1 6 0"/>',
+  catalog: '<path d="M4 5h16v14H4z"/><path d="M8 5v14"/><path d="M12 8h5"/><path d="M12 12h5"/><path d="M12 16h3"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  storefront: '<path d="M4 10h16l-1-5H5l-1 5Z"/><path d="M5 10v9h14v-9"/><path d="M9 19v-5h6v5"/>',
+  list: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+  circle: '<circle cx="12" cy="12" r="9"/>'
+});
+
+const PROFESSIONAL_ICON_ALIASES = Object.freeze({
+  '+': 'plus', '＋': 'plus', new: 'plus', add: 'plus', nuevo: 'plus',
+  '📷': 'camera', camera: 'camera', foto: 'camera',
+  '▣': 'video', video: 'video', ads: 'video',
+  '⌕': 'search', search: 'search', buscar: 'search',
+  '⋮': 'more-vertical', more: 'more-vertical', menu: 'more-vertical',
+  '‹': 'chevron-left', back: 'chevron-left', volver: 'chevron-left',
+  '☎': 'phone', '☎+': 'phone', call: 'phone', llamada: 'phone',
+  '⌖': 'pin', '📌': 'pin', pin: 'pin',
+  '⇩': 'archive', '↥': 'archive', archive: 'archive', archivados: 'archive',
+  '☻': 'smile', '😊': 'smile', smile: 'smile', emoji: 'smile', smileys: 'smile', gestures: 'sparkles',
+  '📎': 'paperclip', attach: 'paperclip', adjunto: 'paperclip',
+  '⚡': 'bolt', quick: 'bolt',
+  '🎤': 'mic', mic: 'mic', voice: 'mic',
+  '➤': 'send', send: 'send', enviar: 'send',
+  '×': 'x', close: 'x', cerrar: 'x',
+  '⬇': 'download', download: 'download', install: 'download',
+  '⚙': 'settings', settings: 'settings', tools: 'settings', herramientas: 'settings',
+  api: 'server', server: 'server', status: 'clock',
+  '↩': 'log-out', logout: 'log-out', salir: 'log-out',
+  '↗': 'arrow-up-right', outgoing: 'arrow-up-right', promote: 'arrow-up-right',
+  '↙': 'message-circle', incoming: 'message-circle',
+  '▦': 'calendar', schedule: 'calendar', 'schedule-call': 'calendar', catalog: 'catalog',
+  '⌗': 'keypad', keypad: 'keypad',
+  '🔔': 'bell', notifications: 'bell',
+  '🔕': 'bell-off', mute: 'bell-off', silenciar: 'bell-off', muted: 'bell-off',
+  '🗑': 'trash', trash: 'trash', delete: 'trash', eliminar: 'trash',
+  '↻': 'refresh', update: 'refresh',
+  '■': 'square', stop: 'square', detener: 'square',
+  qr: 'qr', 'scan-qr': 'qr',
+  'ℹ': 'info', info: 'info', details: 'info',
+  '⊘': 'ban', block: 'ban',
+  '✓': 'check', '✅': 'check', confirm: 'check',
+  '!': 'alert', report: 'alert', alert: 'alert',
+  '📣': 'megaphone', broadcasts: 'megaphone', broadcast: 'megaphone',
+  '☀': 'sun', theme: 'sun',
+  '24': 'clock', '🕘': 'clock', recent: 'clock',
+  ce: 'user', profile: 'user', user: 'user',
+  '@': 'mail', mail: 'mail', email: 'mail',
+  '📍': 'map-pin', location: 'map-pin',
+  '👋': 'sparkles', hello: 'sparkles',
+  '❤️': 'heart', symbols: 'heart',
+  objects: 'briefcase', business: 'briefcase', orders: 'list',
+  '◎': 'target', verified: 'target', 'business-verified': 'target',
+  '☊': 'megaphone', adscreate: 'megaphone', 'ads-create': 'megaphone',
+  '▤': 'list', 'ads-manage': 'list',
+  gif: 'image', sticker: 'sticker', stickers: 'sticker',
+  '💬': 'message-circle', chat: 'message-circle', chats: 'message-circle',
+  '◉': 'circle-dot', states: 'circle-dot'
+});
+
+function normalizeProfessionalIconToken(icon = '') {
+  return String(icon || '').trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function resolveProfessionalIconKey(icon = '') {
+  const raw = String(icon || '').trim();
+  const normalized = normalizeProfessionalIconToken(raw);
+  return PROFESSIONAL_ICON_ALIASES[raw]
+    || PROFESSIONAL_ICON_ALIASES[normalized]
+    || (PROFESSIONAL_ICON_SVGS[normalized] ? normalized : 'circle');
+}
+
+function sanitizeIconClassName(className = 'ui-icon') {
+  const clean = String(className || 'ui-icon').replace(/[^a-z0-9_:\-\s]/gi, ' ').trim();
+  return clean || 'ui-icon';
+}
+
+function renderProfessionalIcon(icon = '', label = '', className = 'ui-icon') {
+  const key = resolveProfessionalIconKey(icon);
+  const body = PROFESSIONAL_ICON_SVGS[key] || PROFESSIONAL_ICON_SVGS.circle;
+  const safeClassName = sanitizeIconClassName(className);
+  const accessibleLabel = label ? `<span class="visually-hidden">${escapeHTML(label)}</span>` : '';
+  return `<svg class="${safeClassName}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>${accessibleLabel}`;
+}
+
+function setProfessionalIconButton(target, icon = '', label = '') {
+  if (!target) return;
+  const resolvedKey = resolveProfessionalIconKey(icon || target.dataset?.icon || 'circle');
+  const fallbackLabel = label || target.getAttribute?.('aria-label') || target.title || '';
+  target.innerHTML = renderProfessionalIcon(resolvedKey, fallbackLabel);
+  target.dataset.icon = resolvedKey;
+  target.classList?.add('uses-professional-icon');
+  if (fallbackLabel) {
+    target.setAttribute?.('aria-label', fallbackLabel);
+    if ('title' in target) target.title = fallbackLabel;
+  }
+}
+
+function applyStaticProfessionalIcons(root = document) {
+  root.querySelectorAll?.('[data-icon]').forEach((target) => {
+    const icon = target.dataset.icon;
+    const label = target.getAttribute('aria-label') || target.title || target.textContent.trim();
+    setProfessionalIconButton(target, icon, label);
+  });
+}
 
 const gifQuickActions = [
   { id: 'gif-gracias', label: 'Gracias', token: '🎬 GIF: gracias' },
@@ -6813,25 +6964,25 @@ function updateSectionChrome() {
 
 function getPrimaryActionMeta(section = activeSection) {
   if (section === 'states') {
-    return { icon: '📷', label: 'Crear estado', action: 'createStatus' };
+    return { icon: 'camera', label: 'Crear estado', action: 'createStatus' };
   }
 
   if (section === 'calls') {
-    return { icon: '☎+', label: 'Nueva llamada', action: 'startCall' };
+    return { icon: 'phone', label: 'Nueva llamada', action: 'startCall' };
   }
 
   if (section === 'tools') {
-    return { icon: 'API', label: 'Estado memoriaBACKEND', action: 'apiStatus' };
+    return { icon: 'server', label: 'Estado memoriaBACKEND', action: 'apiStatus' };
   }
 
-  return { icon: '＋', label: 'Nuevo chat', action: 'newChat' };
+  return { icon: 'plus', label: 'Nuevo chat', action: 'newChat' };
 }
 
 function updateSectionPrimaryActions() {
   const actionMeta = getPrimaryActionMeta();
 
   if (floatingActionButton) {
-    floatingActionButton.textContent = actionMeta.icon;
+    setProfessionalIconButton(floatingActionButton, actionMeta.icon, actionMeta.label);
     floatingActionButton.dataset.action = actionMeta.action;
     floatingActionButton.setAttribute('aria-label', actionMeta.label);
     floatingActionButton.title = actionMeta.label;
@@ -6839,13 +6990,12 @@ function updateSectionPrimaryActions() {
   }
 
   if (headerCameraButton) {
-    headerCameraButton.setAttribute('aria-label', activeSection === 'calls' ? 'Iniciar llamada desde conversaciones' : 'Crear estado rápido');
-    headerCameraButton.title = activeSection === 'calls' ? 'Nueva llamada' : 'Crear estado';
+    const headerCameraLabel = activeSection === 'calls' ? 'Iniciar llamada desde conversaciones' : 'Crear estado rápido';
+    setProfessionalIconButton(headerCameraButton, activeSection === 'calls' ? 'phone' : 'camera', headerCameraLabel);
   }
 
   if (toolsButton) {
-    toolsButton.setAttribute('aria-label', 'Abrir menú de opciones');
-    toolsButton.title = 'Más opciones';
+    setProfessionalIconButton(toolsButton, 'more-vertical', 'Abrir menú de opciones');
   }
 }
 
@@ -6894,46 +7044,46 @@ function handleFloatingAction() {
 
 function getSectionMenuActions(section = activeSection) {
   const commonActions = [
-    { id: 'profile', icon: 'CE', title: 'Perfil y sesión', description: 'Ver correo activo, tema automático y sesión local.' },
-    { id: 'tools', icon: '⚙', title: 'Abrir herramientas', description: 'Ir a instalación, APIs, notificaciones y herramientas comerciales.' },
-    { id: 'api', icon: 'API', title: 'Estado memoriaBACKEND', description: 'Revisar conexión configurada, streme y modo demo.' }
+    { id: 'profile', icon: 'user', title: 'Perfil y sesión', description: 'Ver correo activo, tema automático y sesión local.' },
+    { id: 'tools', icon: 'settings', title: 'Abrir herramientas', description: 'Ir a instalación, APIs, notificaciones y herramientas comerciales.' },
+    { id: 'api', icon: 'server', title: 'Estado memoriaBACKEND', description: 'Revisar conexión configurada, streme y modo demo.' }
   ];
 
   if (section === 'states') {
     return [
-      { id: 'create-status', icon: '📷', title: 'Añadir estado', description: 'Publica una novedad visible durante 24 horas.' },
-      { id: 'promote-status', icon: '↗', title: 'Promocionar estado', description: 'Prepara la promoción del estado activo.' },
+      { id: 'create-status', icon: 'camera', title: 'Añadir estado', description: 'Publica una novedad visible durante 24 horas.' },
+      { id: 'promote-status', icon: 'arrow-up-right', title: 'Promocionar estado', description: 'Prepara la promoción del estado activo.' },
       ...commonActions,
-      { id: 'logout', icon: '↩', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
+      { id: 'logout', icon: 'log-out', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
     ];
   }
 
   if (section === 'calls') {
     return [
-      { id: 'start-call', icon: '☎', title: 'Nueva llamada', description: 'Iniciar llamada de voz o video desde una conversación.' },
-      { id: 'schedule-call', icon: '▦', title: 'Programar llamada', description: 'Agendar una llamada futura por correo electrónico.' },
-      { id: 'call-keypad', icon: '⌗', title: 'Teclado por correo', description: 'Llamar creando o reutilizando un chat por correo.' },
+      { id: 'start-call', icon: 'phone', title: 'Nueva llamada', description: 'Iniciar llamada de voz o video desde una conversación.' },
+      { id: 'schedule-call', icon: 'calendar', title: 'Programar llamada', description: 'Agendar una llamada futura por correo electrónico.' },
+      { id: 'call-keypad', icon: 'keypad', title: 'Teclado por correo', description: 'Llamar creando o reutilizando un chat por correo.' },
       ...commonActions,
-      { id: 'logout', icon: '↩', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
+      { id: 'logout', icon: 'log-out', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
     ];
   }
 
   if (section === 'tools') {
     return [
-      { id: 'install', icon: '⬇', title: 'Instalar app', description: 'Agregar ChatER a la pantalla principal cuando el navegador lo permita.' },
-      { id: 'update', icon: '↻', title: 'Actualizar app', description: 'Buscar y aplicar cambios publicados del static site.' },
-      { id: 'notifications', icon: '🔔', title: 'Notificaciones', description: 'Configurar avisos locales o push para este dispositivo.' },
+      { id: 'install', icon: 'download', title: 'Instalar app', description: 'Agregar ChatER a la pantalla principal cuando el navegador lo permita.' },
+      { id: 'update', icon: 'refresh', title: 'Actualizar app', description: 'Buscar y aplicar cambios publicados del static site.' },
+      { id: 'notifications', icon: 'bell', title: 'Notificaciones', description: 'Configurar avisos locales o push para este dispositivo.' },
       ...commonActions.filter((action) => action.id !== 'tools'),
-      { id: 'logout', icon: '↩', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
+      { id: 'logout', icon: 'log-out', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
     ];
   }
 
   return [
-    { id: 'new-chat', icon: '＋', title: 'Nuevo chat', description: 'Iniciar una conversación usando correo electrónico.' },
-    { id: 'archived', icon: '⇩', title: 'Archivados', description: 'Ver, restaurar o abrir conversaciones archivadas.' },
-    { id: 'create-status', icon: '📷', title: 'Crear estado', description: 'Publica una novedad desde el encabezado.' },
+    { id: 'new-chat', icon: 'plus', title: 'Nuevo chat', description: 'Iniciar una conversación usando correo electrónico.' },
+    { id: 'archived', icon: 'archive', title: 'Archivados', description: 'Ver, restaurar o abrir conversaciones archivadas.' },
+    { id: 'create-status', icon: 'camera', title: 'Crear estado', description: 'Publica una novedad desde el encabezado.' },
     ...commonActions,
-    { id: 'logout', icon: '↩', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
+    { id: 'logout', icon: 'log-out', title: 'Cerrar sesión', description: 'Salir de este navegador.' }
   ];
 }
 
@@ -6961,7 +7111,7 @@ function openSectionMenuModal() {
     button.type = 'button';
     button.dataset.sectionMenuAction = action.id;
     button.innerHTML = `
-      <span class="tool-icon">${escapeHTML(action.icon)}</span>
+      <span class="tool-icon">${renderProfessionalIcon(action.icon, action.title)}</span>
       <span><strong>${escapeHTML(action.title)}</strong><br><small>${escapeHTML(action.description)}</small></span>
     `;
     actionsContainer.appendChild(button);
@@ -7440,7 +7590,16 @@ function renderChatList(filter = '') {
 
     const meta = document.createElement('span');
     meta.className = 'chat-item-time';
-    meta.innerHTML = `${lastMessage ? `<span>${escapeHTML(lastMessage.time)}</span>` : ''}${conversation.pinned ? '<span class="pinned-badge" aria-label="Chat fijado" title="Chat fijado">📌</span>' : ''}${conversation.muted ? '<span class="pinned-badge" aria-label="Chat silenciado" title="Chat silenciado">🔕</span>' : ''}${conversation.favorite ? '<span class="pinned-badge" aria-label="Chat favorito" title="Chat favorito">⭐</span>' : ''}${conversation.customListName ? '<span class="pinned-badge" aria-label="Chat en lista" title="Chat en lista">☰</span>' : ''}${conversation.restricted ? '<span class="pinned-badge" aria-label="Chat restringido" title="Chat restringido">⛔</span>' : ''}${conversation.unread ? `<strong class="unread-badge">${conversation.unread}</strong>` : ''}`;
+    const metaBadges = [
+      lastMessage ? `<span>${escapeHTML(lastMessage.time)}</span>` : '',
+      conversation.pinned ? `<span class="pinned-badge" aria-label="Chat fijado" title="Chat fijado">${renderProfessionalIcon('pin', 'Chat fijado')}</span>` : '',
+      conversation.muted ? `<span class="pinned-badge" aria-label="Chat silenciado" title="Chat silenciado">${renderProfessionalIcon('bell-off', 'Chat silenciado')}</span>` : '',
+      conversation.favorite ? `<span class="pinned-badge" aria-label="Chat favorito" title="Chat favorito">${renderProfessionalIcon('star', 'Chat favorito')}</span>` : '',
+      conversation.customListName ? `<span class="pinned-badge" aria-label="Chat en lista" title="Chat en lista">${renderProfessionalIcon('list', 'Chat en lista')}</span>` : '',
+      conversation.restricted ? `<span class="pinned-badge" aria-label="Chat restringido" title="Chat restringido">${renderProfessionalIcon('ban', 'Chat restringido')}</span>` : '',
+      conversation.unread ? `<strong class="unread-badge">${conversation.unread}</strong>` : ''
+    ];
+    meta.innerHTML = metaBadges.filter(Boolean).join('');
 
     button.append(avatar, content, meta);
     button.addEventListener('click', (event) => {
@@ -7484,7 +7643,7 @@ function createArchivedChatsShortcut() {
   button.type = 'button';
   button.setAttribute('aria-label', 'Abrir lista de conversaciones archivadas');
   button.innerHTML = `
-    <span class="archive-shortcut-icon" aria-hidden="true">▣</span>
+    <span class="archive-shortcut-icon" aria-hidden="true">${renderProfessionalIcon('archive', 'Archivados')}</span>
     <span class="archive-shortcut-label">Archivados</span>
     <span class="archive-shortcut-count">${archivedUnread || archivedCount}</span>
   `;
@@ -7497,7 +7656,7 @@ function createArchivedChatListHeader() {
   const header = document.createElement('div');
   header.className = 'archive-list-header';
   header.innerHTML = `
-    <button class="archive-list-back" type="button" aria-label="Volver a chats principales">‹</button>
+    <button class="archive-list-back" type="button" aria-label="Volver a chats principales">${renderProfessionalIcon('chevron-left', 'Volver', 'ui-icon')}</button>
     <span class="archive-list-title">Archivados</span>
     <small>${archivedCount} ${archivedCount === 1 ? 'chat' : 'chats'}</small>
   `;
@@ -7539,7 +7698,7 @@ function renderStatesList() {
   createButton.className = 'state-item action-item';
   createButton.type = 'button';
   createButton.innerHTML = `
-    <div class="state-avatar state-add-avatar" aria-hidden="true">＋</div>
+    <div class="state-avatar state-add-avatar" aria-hidden="true">${renderProfessionalIcon('plus', 'Añadir estado', 'ui-icon state-add-icon')}</div>
     <div>
       <p class="state-name">Añadir estado</p>
       <p class="state-preview">Desaparece después de 24 horas.</p>
@@ -7552,7 +7711,7 @@ function renderStatesList() {
   const promoteButton = document.createElement('button');
   promoteButton.className = 'state-promo-button';
   promoteButton.type = 'button';
-  promoteButton.innerHTML = '<span aria-hidden="true">📣</span><strong>Promocionar tu estado</strong>';
+  promoteButton.innerHTML = `<span class="state-promo-icon" aria-hidden="true">${renderProfessionalIcon('megaphone', 'Promocionar estado')}</span><strong>Promocionar tu estado</strong>`;
   promoteButton.addEventListener('click', openPromoteStatusModal);
   chatList.appendChild(promoteButton);
 
@@ -7646,15 +7805,15 @@ function createCallsActionHub() {
   const actionGrid = document.createElement('div');
   actionGrid.className = 'call-action-grid';
   [
-    { action: 'start', icon: '☎', label: 'Llamar' },
-    { action: 'schedule', icon: '▦', label: 'Programar' },
-    { action: 'keypad', icon: '⌗', label: 'Teclado' }
+    { action: 'start', icon: 'phone', label: 'Llamar' },
+    { action: 'schedule', icon: 'calendar', label: 'Programar' },
+    { action: 'keypad', icon: 'keypad', label: 'Teclado' }
   ].forEach((item) => {
     const button = document.createElement('button');
     button.className = 'call-hub-button';
     button.type = 'button';
     button.dataset.callAction = item.action;
-    button.innerHTML = `<span aria-hidden="true">${escapeHTML(item.icon)}</span><strong>${escapeHTML(item.label)}</strong>`;
+    button.innerHTML = `<span class="call-hub-icon" aria-hidden="true">${renderProfessionalIcon(item.icon, item.label)}</span><strong>${escapeHTML(item.label)}</strong>`;
     actionGrid.appendChild(button);
   });
 
@@ -7734,7 +7893,7 @@ function renderStatusMediaPickerPreview(container, file = null, previewDataUrl =
   container.classList.toggle('has-media', Boolean(file));
 
   if (!file) {
-    container.innerHTML = '<span aria-hidden="true">▧</span><strong>Vista previa 9:16</strong><small>Opcional: agrega una imagen o video corto para que el estado se vea como una historia de 24 horas.</small>';
+    container.innerHTML = `${renderProfessionalIcon('image', 'Vista previa', 'ui-icon state-preview-icon')}<strong>Vista previa 9:16</strong><small>Opcional: agrega una imagen o video corto para que el estado se vea como una historia de 24 horas.</small>`;
     return;
   }
 
@@ -7754,7 +7913,7 @@ function renderStatusMediaPickerPreview(container, file = null, previewDataUrl =
   } else {
     const badge = document.createElement('span');
     badge.setAttribute('aria-hidden', 'true');
-    badge.textContent = mediaKind === 'video' ? '▶' : '▧';
+    badge.innerHTML = renderProfessionalIcon(mediaKind === 'video' ? 'video' : 'image', mediaKind === 'video' ? 'Video' : 'Imagen', 'ui-icon state-media-badge-icon');
     container.appendChild(badge);
   }
 
@@ -7807,7 +7966,7 @@ function renderStatusHeroFallback(container, state = {}) {
   container.classList.add('has-media');
   const badge = document.createElement('span');
   badge.className = 'status-hero-fallback';
-  badge.textContent = state.mediaKind === 'video' ? '▶' : '▧';
+  badge.innerHTML = renderProfessionalIcon(state.mediaKind === 'video' ? 'video' : 'image', state.mediaKind === 'video' ? 'Video' : 'Imagen', 'ui-icon state-media-badge-icon');
   const copy = document.createElement('small');
   copy.textContent = state.mediaName ? `${state.mediaName}${state.mediaSizeBytes ? ` · ${formatFileSize(state.mediaSizeBytes)}` : ''}` : 'Estado visual pendiente';
   container.append(badge, copy);
@@ -8887,19 +9046,15 @@ function renderConversation() {
     activeAvatar.textContent = 'A';
     if (pinConversationButton) {
       pinConversationButton.disabled = true;
-      pinConversationButton.textContent = '⌖';
-      pinConversationButton.setAttribute('aria-label', 'Fijar conversación');
-      pinConversationButton.title = 'Fijar conversación';
+      setProfessionalIconButton(pinConversationButton, 'pin', 'Fijar conversación');
     }
     if (archiveConversationButton) {
       archiveConversationButton.disabled = true;
-      archiveConversationButton.textContent = '⇩';
-      archiveConversationButton.setAttribute('aria-label', 'Archivar conversación');
+      setProfessionalIconButton(archiveConversationButton, 'archive', 'Archivar conversación');
     }
     if (conversationMenuButton) {
       conversationMenuButton.disabled = true;
-      conversationMenuButton.textContent = '⋮';
-      conversationMenuButton.setAttribute('aria-label', 'Abrir opciones de conversación');
+      setProfessionalIconButton(conversationMenuButton, 'more-vertical', 'Abrir opciones de conversación');
       conversationMenuButton.title = 'Opciones de conversación';
     }
     messagesContainer.innerHTML = `
@@ -8925,20 +9080,15 @@ function renderConversation() {
   renderAvatarInPlace(activeAvatar, conversation);
   if (pinConversationButton) {
     pinConversationButton.disabled = false;
-    pinConversationButton.textContent = conversation.pinned ? '📌' : '⌖';
-    pinConversationButton.setAttribute('aria-label', conversation.pinned ? 'Desfijar conversación' : 'Fijar conversación');
-    pinConversationButton.title = conversation.pinned ? 'Desfijar conversación' : 'Fijar conversación';
+    setProfessionalIconButton(pinConversationButton, 'pin', conversation.pinned ? 'Desfijar conversación' : 'Fijar conversación');
   }
   if (archiveConversationButton) {
     archiveConversationButton.disabled = false;
-    archiveConversationButton.textContent = conversation.archived ? '↥' : '⇩';
-    archiveConversationButton.setAttribute('aria-label', conversation.archived ? 'Restaurar conversación' : 'Archivar conversación');
-    archiveConversationButton.title = conversation.archived ? 'Restaurar conversación' : 'Archivar conversación';
+    setProfessionalIconButton(archiveConversationButton, 'archive', conversation.archived ? 'Restaurar conversación' : 'Archivar conversación');
   }
   if (conversationMenuButton) {
     conversationMenuButton.disabled = false;
-    conversationMenuButton.textContent = '⋮';
-    conversationMenuButton.setAttribute('aria-label', `Abrir opciones de conversación con ${conversation.name}`);
+    setProfessionalIconButton(conversationMenuButton, 'more-vertical', `Abrir opciones de conversación con ${conversation.name}`);
     conversationMenuButton.title = 'Opciones de conversación';
   }
   // Un chat archivado sigue siendo abrible y operable; archivado solo controla su visibilidad en la lista principal.
@@ -9137,7 +9287,7 @@ function createMessageRetryButton(message = {}) {
   button.dataset.messageRetry = String(message.id || message.clientMutationId || message.clientMessageId || '');
   button.setAttribute('aria-label', 'Reintentar envío');
   button.title = 'Reintentar envío';
-  button.textContent = '↻';
+  setProfessionalIconButton(button, 'refresh', 'Reintentar envío');
   return button;
 }
 
@@ -9932,7 +10082,8 @@ function renderMessageAttachment(container, message = {}, mediaKind = getMessage
   const chip = document.createElement(mediaSrc ? 'a' : 'span');
   chip.className = `attachment-chip attachment-chip-${mediaKind || 'file'}`;
   chip.title = mediaName;
-  chip.textContent = `${getMessageMediaIcon(mediaKind)} ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}`;
+  const chipLabel = `${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}`;
+  chip.innerHTML = `${renderProfessionalIcon(getMessageMediaIcon(mediaKind), mediaName || 'Adjunto', 'ui-icon attachment-chip-icon')}<span>${escapeHTML(chipLabel)}</span>`;
   if (mediaSrc) {
     chip.href = mediaSrc;
     chip.download = mediaName || 'adjunto';
@@ -9975,12 +10126,12 @@ function getVisibleMediaCaption(message = {}, mediaName = 'Adjunto', mediaSize =
     return '';
   }
 
-  return `${getMessageMediaIcon(mediaKind)} ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}${message.status ? ` · ${getMessageMediaStatusLabel(message.status)}` : ''}`;
+  return `${getMessageMediaLabel(mediaKind)} · ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}${message.status ? ` · ${getMessageMediaStatusLabel(message.status)}` : ''}`;
 }
 
 function renderMessageMediaFallback(figure, message = {}, mediaKind = 'file', mediaName = 'Adjunto', mediaSize = 0) {
   if (!figure) return;
-  const captionText = `${getMessageMediaIcon(mediaKind)} ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}${message.status ? ` · ${getMessageMediaStatusLabel(message.status)}` : ''}`;
+  const captionText = `${getMessageMediaLabel(mediaKind)} · ${mediaName}${mediaSize ? ` · ${formatFileSize(mediaSize)}` : ''}${message.status ? ` · ${getMessageMediaStatusLabel(message.status)}` : ''}`;
   const progressOverlay = mediaKind === 'image' && isMessageUploadInProgress(message)
     ? figure.querySelector('.message-media-progress')
     : null;
@@ -9988,8 +10139,9 @@ function renderMessageMediaFallback(figure, message = {}, mediaKind = 'file', me
   const fallback = document.createElement('div');
   fallback.className = 'message-media-fallback';
   const icon = document.createElement('span');
+  icon.className = 'message-media-fallback-icon';
   icon.setAttribute('aria-hidden', 'true');
-  icon.textContent = getMessageMediaIcon(mediaKind);
+  icon.innerHTML = renderProfessionalIcon(getMessageMediaIcon(mediaKind), mediaKind || 'Adjunto');
   const label = document.createElement('strong');
   label.textContent = mediaKind === 'image' ? 'Imagen pendiente' : mediaKind === 'video' ? 'Video pendiente' : mediaKind === 'audio' ? 'Audio pendiente' : 'Archivo pendiente';
   fallback.append(icon, label);
@@ -10017,10 +10169,17 @@ function getMessageMediaKind(message = {}) {
 }
 
 function getMessageMediaIcon(mediaKind = 'file') {
-  if (mediaKind === 'image') return '▧';
-  if (mediaKind === 'video') return '▶';
-  if (mediaKind === 'audio') return '🎤';
-  return '📎';
+  if (mediaKind === 'image') return 'image';
+  if (mediaKind === 'video') return 'video';
+  if (mediaKind === 'audio') return 'mic';
+  return 'paperclip';
+}
+
+function getMessageMediaLabel(mediaKind = 'file') {
+  if (mediaKind === 'image') return 'Imagen';
+  if (mediaKind === 'video') return 'Video';
+  if (mediaKind === 'audio') return 'Audio';
+  return 'Archivo';
 }
 
 function getMessageMediaStatusLabel(status = '') {
@@ -10375,7 +10534,7 @@ function openArchivedChatsModal() {
     attachConversationProfilePreview(avatar, conversation);
     const lastMessage = conversation.messages.at(-1);
     const copy = document.createElement('span');
-    copy.innerHTML = `<strong>${conversation.pinned ? '<span class="pinned-badge archived-pin" aria-label="Chat fijado" title="Chat fijado">📌</span>' : ''}${escapeHTML(conversation.name)}</strong><small>${escapeHTML(getMessagePreviewText(lastMessage, conversation.email || 'Sin mensajes todavía'))}</small>`;
+    copy.innerHTML = `<strong>${conversation.pinned ? `<span class="pinned-badge archived-pin" aria-label="Chat fijado" title="Chat fijado">${renderProfessionalIcon('pin', 'Chat fijado')}</span>` : ''}${escapeHTML(conversation.name)}</strong><small>${escapeHTML(getMessagePreviewText(lastMessage, conversation.email || 'Sin mensajes todavía'))}</small>`;
     main.append(avatar, copy);
     container.appendChild(row);
   });
@@ -10423,37 +10582,37 @@ function getConversationMenuActions(conversation = getActiveConversation()) {
   return [
     {
       id: 'info',
-      icon: 'ℹ',
+      icon: 'info',
       title: 'Información del chat',
       description: 'Ver correo, estado local y sincronización de esta conversación.'
     },
     {
       id: 'search',
-      icon: '⌕',
+      icon: 'search',
       title: 'Buscar en conversación',
       description: 'Encuentra mensajes o adjuntos dentro del historial local cargado.'
     },
     {
       id: 'pin',
-      icon: conversation.pinned ? '📌' : '⌖',
+      icon: 'pin',
       title: conversation.pinned ? 'Desfijar conversación' : 'Fijar conversación',
       description: conversation.pinned ? 'Quitar este chat de la parte superior.' : 'Mantener este chat arriba en la lista principal.'
     },
     {
       id: 'archive',
-      icon: conversation.archived ? '↥' : '⇩',
+      icon: 'archive',
       title: conversation.archived ? 'Restaurar conversación' : 'Archivar conversación',
       description: conversation.archived ? 'Devolver este chat a la lista principal.' : 'Mover este chat a Archivados sin borrar mensajes.'
     },
     {
       id: 'block',
-      icon: conversation.blocked ? '✓' : '⊘',
+      icon: conversation.blocked ? 'check' : 'ban',
       title: conversation.blocked ? 'Desbloquear contacto' : 'Bloquear contacto',
       description: conversation.blocked ? 'Permitir nuevamente mensajes y llamadas en este chat.' : 'Impedir mensajes y llamadas desde esta conversación.'
     },
     {
       id: 'report',
-      icon: '!',
+      icon: 'alert',
       title: 'Reportar conversación',
       description: 'Enviar un reporte de moderación a memoriaBACKEND con evidencia mínima.'
     }
@@ -10474,7 +10633,7 @@ function openConversationMenuModal() {
     <p class="modal-copy">Opciones de producción para este chat por correo electrónico. Los cambios locales se sincronizan con memoriaBACKEND cuando está configurado.</p>
     ${getConversationMenuActions(conversation).map((action) => `
       <button class="quick-composer-action" type="button" data-conversation-action="${escapeHTML(action.id)}">
-        <span class="quick-composer-icon">${escapeHTML(action.icon)}</span>
+        <span class="quick-composer-icon">${renderProfessionalIcon(action.icon, action.title)}</span>
         <span><strong>${escapeHTML(action.title)}</strong><small>${escapeHTML(action.description)}</small></span>
       </button>
     `).join('')}
@@ -10656,7 +10815,7 @@ function openConversationSearchModal(conversation = getActiveConversation()) {
       <p class="modal-copy">Coincidencias locales</p>
       ${matches.map(({ message, index }) => `
         <button class="quick-composer-action" type="button" data-result-index="${index}">
-          <span class="quick-composer-icon">${message.type === 'outgoing' ? '↗' : '↙'}</span>
+          <span class="quick-composer-icon">${renderProfessionalIcon(message.type === 'outgoing' ? 'arrow-up-right' : 'message-circle', message.type === 'outgoing' ? 'Mensaje enviado' : 'Mensaje recibido')}</span>
           <span><strong>${escapeHTML(message.text || message.attachmentName || 'Mensaje')}</strong><small>${escapeHTML(message.time || 'sin hora')} · ${escapeHTML(message.status || (message.type === 'outgoing' ? 'enviado' : 'recibido'))}</small></span>
         </button>
       `).join('')}
@@ -10688,7 +10847,7 @@ function openConversationSearchModal(conversation = getActiveConversation()) {
       <p class="modal-copy">Coincidencias remotas de memoriaBACKEND</p>
       ${matches.map((match, index) => `
         <button class="quick-composer-action" type="button" data-remote-result-index="${index}">
-          <span class="quick-composer-icon">API</span>
+          <span class="quick-composer-icon">${renderProfessionalIcon('server', 'Resultado remoto')}</span>
           <span><strong>${escapeHTML(match.title || match.message.text || 'Resultado remoto')}</strong><small>${escapeHTML(match.preview || match.message.attachmentName || 'Resultado de BUSQUEDAx')} · ${escapeHTML(match.time || match.message.time || 'sin hora')}</small></span>
         </button>
       `).join('')}
@@ -11132,15 +11291,16 @@ function ensureChatSelectionToolbar() {
   toolbar.setAttribute('role', 'toolbar');
   toolbar.setAttribute('aria-label', 'Acciones de chats seleccionados');
   toolbar.innerHTML = `
-    <button class="selection-toolbar-button" type="button" data-selection-action="close" aria-label="Cancelar selección">‹</button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="close" data-icon="chevron-left" aria-label="Cancelar selección"></button>
     <strong class="selection-toolbar-count" aria-live="polite">0</strong>
     <span class="selection-toolbar-spacer"></span>
-    <button class="selection-toolbar-button" type="button" data-selection-action="pin" aria-label="Fijar o desfijar chats seleccionados">⌖</button>
-    <button class="selection-toolbar-button" type="button" data-selection-action="delete" aria-label="Eliminar chats seleccionados">🗑</button>
-    <button class="selection-toolbar-button" type="button" data-selection-action="mute" aria-label="Silenciar o activar chats seleccionados">🔕</button>
-    <button class="selection-toolbar-button" type="button" data-selection-action="archive" aria-label="Archivar chats seleccionados">⇩</button>
-    <button class="selection-toolbar-button" type="button" data-selection-action="more" aria-label="Más opciones de chats seleccionados">⋮</button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="pin" data-icon="pin" aria-label="Fijar o desfijar chats seleccionados"></button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="delete" data-icon="trash" aria-label="Eliminar chats seleccionados"></button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="mute" data-icon="bell-off" aria-label="Silenciar o activar chats seleccionados"></button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="archive" data-icon="archive" aria-label="Archivar chats seleccionados"></button>
+    <button class="selection-toolbar-button" type="button" data-selection-action="more" data-icon="more-vertical" aria-label="Más opciones de chats seleccionados"></button>
   `;
+  applyStaticProfessionalIcons(toolbar);
   toolbar.addEventListener('click', handleChatSelectionToolbarClick);
   document.body.appendChild(toolbar);
   chatSelectionState.toolbar = toolbar;
@@ -11162,12 +11322,9 @@ function refreshChatSelectionToolbar() {
   const allPinned = selected.every((conversation) => conversation.pinned);
   const allArchived = selected.every((conversation) => conversation.archived);
   const allMuted = selected.every((conversation) => conversation.muted);
-  pinButton.textContent = allPinned ? '📌' : '⌖';
-  pinButton.title = allPinned ? 'Desfijar seleccionados' : 'Fijar seleccionados';
-  archiveButton.textContent = allArchived ? '↥' : '⇩';
-  archiveButton.title = allArchived ? 'Restaurar seleccionados' : 'Archivar seleccionados';
-  muteButton.textContent = allMuted ? '🔔' : '🔕';
-  muteButton.title = allMuted ? 'Activar sonido' : 'Silenciar';
+  setProfessionalIconButton(pinButton, 'pin', allPinned ? 'Desfijar seleccionados' : 'Fijar seleccionados');
+  setProfessionalIconButton(archiveButton, 'archive', allArchived ? 'Restaurar seleccionados' : 'Archivar seleccionados');
+  setProfessionalIconButton(muteButton, allMuted ? 'bell' : 'bell-off', allMuted ? 'Activar sonido' : 'Silenciar');
 }
 
 async function handleChatSelectionToolbarClick(event) {
@@ -12551,10 +12708,12 @@ function openNewChatModal(seed = {}) {
     <input id="newChatEmail" type="email" value="${escapeHTML(seedEmail)}" placeholder="contacto@correo.com" required />
     <div class="contact-create-actions">
       <button class="primary-button" type="submit">Crear contacto</button>
-      <button class="qr-icon-button" type="button" data-contact-action="scan-qr" aria-label="Escanear QR de perfil" title="Escanear QR de perfil">▦</button>
+      <button class="qr-icon-button" type="button" data-contact-action="scan-qr" data-icon="qr" aria-label="Escanear QR de perfil" title="Escanear QR de perfil"></button>
     </div>
     <p class="form-feedback" data-feedback role="status" aria-live="polite"></p>
   `;
+
+  applyStaticProfessionalIcons(form);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -12605,37 +12764,37 @@ function getBusinessToolRowsConfig() {
   return [
     {
       id: 'business-verified',
-      icon: '◎',
+      icon: 'target',
       title: 'Cuenta verificada',
       description: `${verificationLabel} para que tus contactos reconozcan tu perfil.`
     },
     {
       id: 'catalog',
-      icon: '▦',
+      icon: 'catalog',
       title: 'Catálogo',
       description: catalogCount ? `${catalogCount} producto(s) o servicio(s) listos para compartir.` : 'Muestra tus productos y servicios.'
     },
     {
       id: 'ads-create',
-      icon: '📣',
+      icon: 'megaphone',
       title: 'Anuncios publicitarios',
       description: 'Crea anuncios que dirigen conversaciones hacia ChatER.'
     },
     {
       id: 'ads-manage',
-      icon: '▣',
+      icon: 'video',
       title: 'Administra anuncios',
       description: campaignsCount ? `${campaignsCount} campaña(s) guardada(s) en esta sesión.` : 'Visualiza tus campañas en un solo lugar.'
     },
     {
       id: 'broadcasts',
-      icon: '☊',
+      icon: 'megaphone',
       title: 'Difusiones comerciales',
       description: broadcastsCount ? `${broadcastsCount} difusión(es) preparadas.` : 'Envía mensajes a varios contactos a la vez.'
     },
     {
       id: 'orders',
-      icon: '▤',
+      icon: 'list',
       title: 'Pedidos',
       description: ordersCount ? `${ordersCount} pedido(s) registrados.` : 'Registra solicitudes de clientes y su seguimiento.'
     }
@@ -12647,43 +12806,43 @@ function getTechnicalToolRowsConfig() {
   return [
     {
       id: 'theme',
-      icon: '☀',
+      icon: 'sun',
       title: 'Modo automático',
       description: `Ahora está en modo ${automaticTheme} según la hora local.`
     },
     {
       id: 'status',
-      icon: '24',
+      icon: 'clock',
       title: 'Crear estado',
       description: 'Publica una actualización visible por 24 horas.'
     },
     {
       id: 'api',
-      icon: 'API',
+      icon: 'server',
       title: 'Estado memoriaBACKEND',
       description: 'Ver conexión, tiempo real y modo demo del sitio estático.'
     },
     {
       id: 'install',
-      icon: '⬇',
+      icon: 'download',
       title: 'Instalar app',
       description: 'Agrega ChatER a la pantalla principal cuando el navegador lo permita.'
     },
     {
       id: 'notifications',
-      icon: '🔔',
+      icon: 'bell',
       title: 'Notificaciones',
       description: getNotificationToolDescription()
     },
     {
       id: 'update',
-      icon: '↻',
+      icon: 'refresh',
       title: 'Actualizar app',
       description: 'Busca cambios del static site y aplica la nueva versión instalada.'
     },
     {
       id: 'logout',
-      icon: '↩',
+      icon: 'log-out',
       title: 'Cerrar sesión',
       description: 'Salir de este navegador.'
     }
@@ -12700,7 +12859,7 @@ function createToolRow(tool) {
   button.type = 'button';
   button.dataset.tool = tool.id;
   button.innerHTML = `
-    <span class="tool-icon">${escapeHTML(tool.icon)}</span>
+    <span class="tool-icon">${renderProfessionalIcon(tool.icon, tool.title)}</span>
     <span><strong>${escapeHTML(tool.title)}</strong><br><small>${escapeHTML(tool.description)}</small></span>
   `;
   return button;
@@ -12776,7 +12935,7 @@ function renderToolsPanel() {
   const metricsData = getBusinessMetrics();
   activeName.textContent = 'Herramientas';
   activeStatus.textContent = 'Crecimiento, APIs, instalación y sesión';
-  activeAvatar.textContent = '⚙';
+  activeAvatar.innerHTML = renderProfessionalIcon('settings', 'Herramientas');
   messagesContainer.hidden = false;
   messageForm.hidden = true;
   statusPanel.hidden = true;
@@ -12784,28 +12943,28 @@ function renderToolsPanel() {
   messagesContainer.innerHTML = `
     <section class="tools-panel" aria-label="Resumen de herramientas">
       <article class="tool-panel-card business-panel-card">
-        <span class="tool-icon">▦</span>
+        <span class="tool-icon">${renderProfessionalIcon('catalog', 'Herramientas comerciales')}</span>
         <div>
           <h3>Herramientas comerciales</h3>
           <p>${metricsData.conversationsStarted7d} conversaciones iniciadas · ${metricsData.catalogViews7d || 'sin'} visualizaciones de catálogo · ${metricsData.statusViews7d || 'sin'} visualizaciones de estado.</p>
         </div>
       </article>
       <article class="tool-panel-card">
-        <span class="tool-icon">API</span>
+        <span class="tool-icon">${renderProfessionalIcon('server', 'memoriaBACKEND')}</span>
         <div>
           <h3>memoriaBACKEND</h3>
           <p>${escapeHTML(CHATER_CONFIG.backendBaseUrl ? 'API configurada para producción.' : 'Modo demo local activo hasta configurar MEMORIA_BACKEND_URL.')}</p>
         </div>
       </article>
       <article class="tool-panel-card">
-        <span class="tool-icon">↻</span>
+        <span class="tool-icon">${renderProfessionalIcon('refresh', 'App instalable')}</span>
         <div>
           <h3>App instalable</h3>
           <p>${escapeHTML(getPwaStatusLabel())}. ChatER actualiza shell, iconos y logo automáticamente cuando memoriaBACKEND emite un evento de versión o logo.</p>
         </div>
       </article>
       <article class="tool-panel-card">
-        <span class="tool-icon">☀</span>
+        <span class="tool-icon">${renderProfessionalIcon('sun', 'Modo visual automático')}</span>
         <div>
           <h3>Modo visual automático</h3>
           <p>Claro de ${CHATER_CONFIG.lightStartsAt}:00 a ${CHATER_CONFIG.darkStartsAt}:00 y oscuro durante la noche.</p>
@@ -14182,7 +14341,7 @@ function renderEmojiPanel(filterText = '') {
     button.type = 'button';
     button.dataset.emojiMode = mode.id;
     button.setAttribute('aria-label', `Abrir ${mode.label}`);
-    button.innerHTML = `<span aria-hidden="true">${escapeHTML(mode.icon)}</span><strong>${escapeHTML(mode.label)}</strong>`;
+    button.innerHTML = `<span class="emoji-mode-icon" aria-hidden="true">${renderProfessionalIcon(mode.icon, mode.label)}</span><strong>${escapeHTML(mode.label)}</strong>`;
     modeSwitcher.appendChild(button);
   });
 
@@ -14227,7 +14386,7 @@ function renderEmojiPicker(normalizedFilter = '') {
   const container = document.createElement('div');
   const recentEmojis = readRecentEmojis();
   const categoryOptions = [
-    { id: 'recent', label: 'Recientes', icon: '🕘', emojis: recentEmojis },
+    { id: 'recent', label: 'Recientes', icon: 'clock', emojis: recentEmojis },
     ...emojiCategories
   ];
 
@@ -14280,7 +14439,7 @@ function renderEmojiPicker(normalizedFilter = '') {
     button.type = 'button';
     button.dataset.emojiCategory = category.id;
     button.setAttribute('aria-label', `Abrir ${category.label}`);
-    button.textContent = category.icon;
+    button.innerHTML = renderProfessionalIcon(category.icon, category.label);
     button.addEventListener('click', () => {
       activeEmojiCategoryId = category.id;
       renderEmojiPanel('');
@@ -14438,11 +14597,11 @@ function openQuickComposerActionsModal() {
 
   const userEmail = getSessionEmail();
   const quickActions = [
-    { id: 'hello', icon: '👋', title: 'Saludo rápido', text: 'Hola, ¿cómo estás?' },
-    { id: 'details', icon: 'ℹ', title: 'Pedir detalles', text: '¿Me puedes compartir más detalles?' },
-    { id: 'confirm', icon: '✅', title: 'Confirmar recibido', text: 'Recibido, quedo atento.' },
-    { id: 'mail', icon: '@', title: 'Compartir mi correo', text: userEmail ? `Mi correo es ${userEmail}.` : 'Te comparto mi correo.' },
-    { id: 'location', icon: '📍', title: 'Solicitar ubicación', text: '¿Me puedes compartir la ubicación?' }
+    { id: 'hello', icon: 'sparkles', title: 'Saludo rápido', text: 'Hola, ¿cómo estás?' },
+    { id: 'details', icon: 'info', title: 'Pedir detalles', text: '¿Me puedes compartir más detalles?' },
+    { id: 'confirm', icon: 'check', title: 'Confirmar recibido', text: 'Recibido, quedo atento.' },
+    { id: 'mail', icon: 'mail', title: 'Compartir mi correo', text: userEmail ? `Mi correo es ${userEmail}.` : 'Te comparto mi correo.' },
+    { id: 'location', icon: 'map-pin', title: 'Solicitar ubicación', text: '¿Me puedes compartir la ubicación?' }
   ];
 
   const container = document.createElement('div');
@@ -14451,7 +14610,7 @@ function openQuickComposerActionsModal() {
     <p class="modal-copy">Elige una acción rápida para insertarla en el mensaje. Puedes editar el texto antes de enviarlo.</p>
     ${quickActions.map((action) => `
       <button class="quick-composer-action" type="button" data-template="${escapeHTML(action.id)}">
-        <span class="quick-composer-icon">${escapeHTML(action.icon)}</span>
+        <span class="quick-composer-icon">${renderProfessionalIcon(action.icon, action.title)}</span>
         <span><strong>${escapeHTML(action.title)}</strong><small>${escapeHTML(action.text)}</small></span>
       </button>
     `).join('')}
@@ -14583,9 +14742,7 @@ function renderVoiceRecorderState(isRecording = Boolean(voiceRecorderState.recor
   if (!voiceNoteButton) return;
   voiceNoteButton.classList.toggle('recording', isRecording);
   voiceNoteButton.classList.toggle('active', isRecording);
-  voiceNoteButton.textContent = isRecording ? '■' : '🎤';
-  voiceNoteButton.setAttribute('aria-label', isRecording ? 'Detener nota de voz' : 'Grabar nota de voz');
-  voiceNoteButton.title = isRecording ? 'Detener nota de voz' : 'Grabar nota de voz';
+  setProfessionalIconButton(voiceNoteButton, isRecording ? 'square' : 'mic', isRecording ? 'Detener nota de voz' : 'Grabar nota de voz');
   updateComposerActionState();
 }
 
@@ -16011,12 +16168,13 @@ function openCallStarterModal() {
         <p>${escapeHTML(conversation.email || conversation.status || 'Conversación disponible')}</p>
       </div>
       <div class="call-starter-actions">
-        <button class="icon-button" type="button" data-call-type="voice" aria-label="Llamar por voz a ${escapeHTML(conversation.name)}">☎</button>
-        <button class="icon-button" type="button" data-call-type="video" aria-label="Iniciar videollamada con ${escapeHTML(conversation.name)}">▣</button>
+        <button class="icon-button" type="button" data-call-type="voice" data-icon="phone" aria-label="Llamar por voz a ${escapeHTML(conversation.name)}"></button>
+        <button class="icon-button" type="button" data-call-type="video" data-icon="video" aria-label="Iniciar videollamada con ${escapeHTML(conversation.name)}"></button>
       </div>
     `;
 
     renderAvatarInPlace(row.querySelector('.chat-item-avatar'), conversation);
+    applyStaticProfessionalIcons(row);
 
     row.addEventListener('click', (event) => {
       const actionButton = event.target.closest('[data-call-type]');
@@ -16242,15 +16400,15 @@ function openCallDetailModal(call) {
       </div>
     </div>
     <button class="tool-row" type="button" data-action="repeat-call">
-      <span class="tool-icon">${call.type === 'video' ? '▣' : '☎'}</span>
+      <span class="tool-icon">${renderProfessionalIcon(call.type === 'video' ? 'video' : 'phone', callTypeLabel)}</span>
       <span><strong>${call.status === 'scheduled' ? 'Llamar ahora' : 'Volver a llamar'}</strong><br><small>Inicia una nueva ${callTypeLabel.toLowerCase()}.</small></span>
     </button>
     <button class="tool-row" type="button" data-action="schedule-call">
-      <span class="tool-icon">▦</span>
+      <span class="tool-icon">${renderProfessionalIcon('calendar', 'Programar otra llamada')}</span>
       <span><strong>Programar otra llamada</strong><br><small>Agenda una llamada futura con este contacto.</small></span>
     </button>
     <button class="tool-row" type="button" data-action="open-chat">
-      <span class="tool-icon">💬</span>
+      <span class="tool-icon">${renderProfessionalIcon('message-circle', 'Abrir chat')}</span>
       <span><strong>Abrir chat</strong><br><small>Vuelve a la conversación relacionada.</small></span>
     </button>
   `;
@@ -19675,6 +19833,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 applyAutomaticTheme();
+applyStaticProfessionalIcons();
 setInterval(applyAutomaticTheme, 60 * 1000);
 setInterval(() => {
   if (pruneExpiredStates() && !chatView.hidden) {
