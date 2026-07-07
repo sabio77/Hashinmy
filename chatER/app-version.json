@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-07-chater-qr-profile-confirmation-152",
-  "buildTime": "2026-07-07T11:15:00-05:00",
+  "version": "2026-07-07-chater-qr-display-alias-153",
+  "buildTime": "2026-07-07T11:45:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER confirma y materializa el perfil de memoriaBACKEND antes de mostrar el QR de perfil para que otros usuarios puedan crear el contacto sin rechazo falso.",
-  "build": "qr-profile-confirmation-152",
-  "updatedAt": "2026-07-07T11:15:00-05:00",
-  "notes": "El QR visible del perfil se solicita a memoriaBACKEND, confirma el perfil autenticado y usa un payload compatible con el lector actual; el resolver mantiene la validación estricta de perfiles reales.",
+  "description": "ChatER permite personalizar el nombre público del QR y conserva nombres visibles por usuario al abrir chats existentes.",
+  "build": "qr-display-alias-153",
+  "updatedAt": "2026-07-07T11:45:00-05:00",
+  "notes": "El nombre definido sobre el QR viaja como nombre inicial del contacto; cada usuario conserva su alias local o backend-scoped sin imponerlo al otro participante.",
   "changes": [
-    "RELACIONESusuarioX confirma o crea idempotentemente el perfil autenticado antes de emitir el QR de perfil.",
-    "El endpoint /api/v1/perfil-contacto/qr devuelve un payload QR renderizable compatible con ChatER además del token firmado backend.",
-    "js/app.js solicita el QR confirmado a memoriaBACKEND antes de mostrarlo y conserva respaldo local solo si el backend no está disponible.",
-    "El mensaje de error del QR conserva la causa real cuando memoriaBACKEND rechaza el perfil del contacto."
+    "El perfil muestra un campo editable arriba del QR para definir el nombre que recibirán quienes escaneen el código.",
+    "js/app.js persiste el nombre del QR por cuenta y lo envía a memoriaBACKEND como qrDisplayName/displayName.",
+    "RELACIONESusuarioX prioriza el nombre incluido en el QR al resolver contactos, sin reemplazarlo por el nombre global del perfil.",
+    "CONVERSACIONESx guarda nombres visibles por participante y responde cada conversación con el nombre correspondiente al usuario que consulta."
   ]
 }

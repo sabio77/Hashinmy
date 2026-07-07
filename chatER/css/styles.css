@@ -2642,6 +2642,56 @@ button {
   overflow-wrap: anywhere;
 }
 
+
+.profile-qr-name-form {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.profile-qr-name-form label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-qr-name-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.profile-qr-name-row input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--app-bg);
+  color: var(--text);
+}
+
+.profile-qr-name-row input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.profile-qr-name-feedback {
+  min-height: 18px;
+  margin: 0;
+  color: var(--brand-dark);
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .profile-qr-name-row {
+    display: grid;
+  }
+}
+
 .profile-qr-code {
   width: min(240px, 100%);
   aspect-ratio: 1;

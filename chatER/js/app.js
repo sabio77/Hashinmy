@@ -1245,15 +1245,136 @@ function normalizeConversationParticipantsForApi(participants = [], fallbackEmai
   return normalized;
 }
 
+function isCurrentUserConversationParticipant(participant = {}) {
+  if (!participant || typeof participant !== 'object') return false;
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId());
+  const selfIdentifier = normalizeBackendUserId(getCurrentUserIdentifier());
+  const selfIdentityKeys = new Set([selfUserId, selfIdentifier].filter(Boolean));
+  const participantEmail = normalizeStorageIdentity(participant.email || participant.userEmail || participant.contactEmail || participant.mail || '');
+  const participantUserId = normalizeBackendUserId(participant.userId || participant.contactUserId || participant.uid || participant.id || '');
+
+  if (selfEmail && participantEmail && participantEmail === selfEmail) return true;
+  if (participantUserId && selfIdentityKeys.has(participantUserId)) return true;
+  return false;
+}
+
 function getConversationDisplayParticipant(participants = []) {
   if (!Array.isArray(participants) || !participants.length) return null;
-  const selfEmail = normalizeStorageIdentity(getSessionEmail());
-  const nonSelf = participants.find((participant) => {
-    const participantEmail = normalizeStorageIdentity(participant.email || participant.userEmail || '');
-    return participantEmail && participantEmail !== selfEmail;
-  });
+  const nonSelf = participants.find((participant) => !isCurrentUserConversationParticipant(participant)
+    && (participant.email || participant.userEmail || participant.contactEmail || participant.userId || participant.contactUserId || participant.displayName || participant.name));
 
   return nonSelf || participants.find((participant) => participant.email || participant.displayName || participant.name) || null;
+}
+
+function getCurrentViewerIdentityLookupKeys() {
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId());
+  const selfIdentifier = normalizeBackendUserId(getCurrentUserIdentifier());
+  const keys = [];
+  const add = (value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return;
+    keys.push(normalized, normalized.toLowerCase());
+  };
+
+  if (selfEmail) {
+    add(selfEmail);
+    add(`email:${selfEmail}`);
+  }
+  if (selfUserId) {
+    add(selfUserId);
+    add(`user:${selfUserId}`);
+  }
+  if (selfIdentifier && selfIdentifier !== selfUserId && selfIdentifier !== selfEmail) {
+    add(selfIdentifier);
+    add(`user:${selfIdentifier}`);
+  }
+
+  return [...new Set(keys.filter(Boolean))];
+}
+
+function readScopedDisplayNameFromMap(map = {}) {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return '';
+  const lookupKeys = getCurrentViewerIdentityLookupKeys();
+  for (const key of lookupKeys) {
+    const value = map[key] ?? map[String(key).toLowerCase()];
+    const normalized = normalizeContactDisplayName(
+      value && typeof value === 'object' ? (value.displayName || value.name || value.alias || '') : value,
+      '',
+      80
+    );
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function getExplicitViewerScopedConversationDisplayName(source = {}) {
+  if (!source || typeof source !== 'object') return '';
+  const metadata = source.metadata && typeof source.metadata === 'object' ? source.metadata : {};
+  const scopedName = normalizeContactDisplayName(
+    source.viewerDisplayName
+      || source.currentUserContactDisplayName
+      || source.contactDisplayName
+      || source.contactAlias
+      || metadata.viewerDisplayName
+      || metadata.currentUserContactDisplayName
+      || metadata.currentUserContactAlias
+      || metadata.contactDisplayName
+      || metadata.contactAlias
+      || '',
+    '',
+    80
+  );
+  if (scopedName) return scopedName;
+
+  return readScopedDisplayNameFromMap(source.displayNameByParticipant)
+    || readScopedDisplayNameFromMap(source.nameByParticipant)
+    || readScopedDisplayNameFromMap(source.aliasByParticipant)
+    || readScopedDisplayNameFromMap(metadata.displayNameByParticipant)
+    || readScopedDisplayNameFromMap(metadata.nameByParticipant)
+    || readScopedDisplayNameFromMap(metadata.aliasByParticipant);
+}
+
+function findLocalViewerScopedConversationDisplayName(contact = {}) {
+  if (typeof appState === 'undefined' || !Array.isArray(appState?.conversations)) return '';
+  const existingConversation = findConversationByContactIdentity(contact);
+  return getExplicitViewerScopedConversationDisplayName(existingConversation || {});
+}
+
+function resolveConversationDisplayNameForCurrentViewer(raw = {}, options = {}) {
+  const metadata = options.metadata && typeof options.metadata === 'object' ? options.metadata : (raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {});
+  const participants = Array.isArray(options.participants) ? options.participants : [];
+  const remoteParticipant = options.remoteParticipant || getPrimaryRemoteParticipant(participants) || {};
+  const email = normalizeStorageIdentity(options.email || raw.contactEmail || raw.email || metadata.contactEmail || metadata.email || '');
+  const userId = normalizeBackendUserId(raw.contactUserId || raw.remoteUserId || metadata.contactUserId || metadata.remoteUserId || remoteParticipant.userId || remoteParticipant.contactUserId || remoteParticipant.uid || remoteParticipant.id || '');
+  const localScopedName = findLocalViewerScopedConversationDisplayName({ email, userId });
+  const remoteParticipantName = normalizeContactDisplayName(remoteParticipant.displayName || remoteParticipant.name || remoteParticipant.alias || '', '', 80);
+  const remotePublicName = normalizeContactDisplayName(
+    raw.remoteDisplayName
+      || raw.remoteName
+      || raw.publicDisplayName
+      || raw.profileDisplayName
+      || raw.qrDisplayName
+      || metadata.remoteDisplayName
+      || metadata.remoteName
+      || metadata.publicDisplayName
+      || metadata.profileDisplayName
+      || metadata.qrDisplayName
+      || '',
+    '',
+    80
+  );
+  const legacyRawName = normalizeContactDisplayName(raw.title || raw.displayName || raw.name || metadata.displayName || metadata.name || '', '', 80);
+
+  return getExplicitViewerScopedConversationDisplayName(raw)
+    || getExplicitViewerScopedConversationDisplayName(metadata)
+    || localScopedName
+    || remoteParticipantName
+    || remotePublicName
+    || legacyRawName
+    || email
+    || 'Chat sin nombre';
 }
 
 function buildCommunicationSessionParticipants(conversationId = '') {
@@ -1322,13 +1443,9 @@ function buildConversationCreateParticipants(contact = {}) {
 
 function getPrimaryRemoteParticipant(participants = []) {
   const displayParticipant = getConversationDisplayParticipant(participants);
-  const selfEmail = normalizeStorageIdentity(getSessionEmail());
-  const participantEmail = normalizeStorageIdentity(displayParticipant?.email || displayParticipant?.userEmail || '');
-  if (participantEmail && participantEmail !== selfEmail) return displayParticipant;
-  return participants.find((participant) => {
-    const email = normalizeStorageIdentity(participant.email || participant.userEmail || '');
-    return email && email !== selfEmail;
-  }) || null;
+  if (displayParticipant && !isCurrentUserConversationParticipant(displayParticipant)) return displayParticipant;
+  return participants.find((participant) => !isCurrentUserConversationParticipant(participant)
+    && (participant.email || participant.userEmail || participant.contactEmail || participant.userId || participant.contactUserId || participant.displayName || participant.name)) || null;
 }
 
 function normalizeApiCollectionPayload(payload = {}, collectionKey = '') {
@@ -2239,11 +2356,14 @@ const apiClient = {
   },
   getContactProfileQr() {
     const profile = getCurrentProfileQrData();
+    const displayName = profile.qrDisplayName || profile.displayName || profile.name || '';
     const params = new URLSearchParams({
       email: profile.email || getSessionEmail(),
       userEmail: profile.email || getSessionEmail(),
       userId: profile.userId || getCurrentUserIdentifier(),
-      displayName: profile.displayName || profile.name || ''
+      displayName,
+      qrDisplayName: displayName,
+      name: displayName
     });
     return this.request(`/api/v1/perfil-contacto/qr?${params.toString()}`);
   },
@@ -2532,18 +2652,26 @@ const apiClient = {
         },
         ownerUserId: normalizeBackendUserId(getSessionUserId()),
         ownerUserEmail: getSessionEmail(),
+        actorUserId: getCurrentUserIdentifier(),
+        actorUserEmail: getSessionEmail(),
         contactUserId,
         contactEmail,
         displayName,
+        contactDisplayName: displayName,
+        contactAlias: displayName,
         title: displayName,
         status: 'active',
         metadata: {
           source: 'chater-static-site',
           ownerUserId: normalizeBackendUserId(getSessionUserId()),
           ownerUserEmail: getSessionEmail(),
+          actorUserId: getCurrentUserIdentifier(),
+          actorUserEmail: getSessionEmail(),
           contactUserId,
           contactEmail,
           displayName,
+          contactDisplayName: displayName,
+          contactAlias: displayName,
           participants,
           participantEmails,
           ...lifecycle,
@@ -11983,17 +12111,81 @@ async function deleteSelectedConversations(conversations = []) {
   showToast('Chat eliminado de la lista.');
 }
 
+const PROFILE_QR_DISPLAY_NAME_MAX_LENGTH = 42;
+
+function normalizeContactDisplayName(value = '', fallback = '', maxLength = PROFILE_QR_DISPLAY_NAME_MAX_LENGTH) {
+  const clean = String(value ?? '')
+    .replace(/[<>]/g, '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, Math.max(1, Number(maxLength) || PROFILE_QR_DISPLAY_NAME_MAX_LENGTH));
+  if (clean) return clean;
+  return String(fallback || '').replace(/\s+/g, ' ').trim().slice(0, Math.max(1, Number(maxLength) || PROFILE_QR_DISPLAY_NAME_MAX_LENGTH));
+}
+
+function getDefaultProfileQrDisplayName() {
+  const email = normalizeStorageIdentity(getSessionEmail());
+  return email ? email.split('@')[0] : 'Perfil ChatER';
+}
+
+function getProfileQrDisplayNameStorageKey(email = getSessionEmail()) {
+  const ownerIdentity = normalizeStorageIdentity(email || getSessionEmail()) || normalizeBackendUserId(getSessionUserId()) || 'sin-cuenta';
+  return `chater.profileQrDisplayName.${ownerIdentity}`;
+}
+
+function readStoredProfileQrDisplayName() {
+  const fallback = getDefaultProfileQrDisplayName();
+  const stateValue = typeof appState !== 'undefined' && appState
+    ? normalizeContactDisplayName(appState.profileQrDisplayName || appState.profileQrName || '', '')
+    : '';
+  if (stateValue) return stateValue;
+
+  const storedValue = normalizeContactDisplayName(readStorageItem(getProfileQrDisplayNameStorageKey(), ''), '');
+  if (storedValue) {
+    if (typeof appState !== 'undefined' && appState) appState.profileQrDisplayName = storedValue;
+    return storedValue;
+  }
+
+  return fallback;
+}
+
+function saveProfileQrDisplayName(value = '') {
+  const displayName = normalizeContactDisplayName(value, getDefaultProfileQrDisplayName());
+  if (typeof appState !== 'undefined' && appState) {
+    appState.profileQrDisplayName = displayName;
+    appState.profileQrName = displayName;
+  }
+  writeStorageItem(getProfileQrDisplayNameStorageKey(), displayName);
+  persistState();
+  return displayName;
+}
+
+function hasExplicitContactDisplayNameInput(contact = {}) {
+  return Boolean(String(
+    contact.name || contact.displayName || contact.alias || contact.contactAlias || contact.contactDisplayName || contact.qrDisplayName || ''
+  ).replace(/\s+/g, ' ').trim());
+}
+
 function normalizeContactCreationInput(contact = {}) {
   const email = normalizeStorageIdentity(contact.email || contact.userEmail || contact.contactEmail || contact.mail || '');
   const userId = normalizeBackendUserId(contact.userId || contact.contactUserId || contact.uid || contact.id || '');
-  const name = String(contact.name || contact.displayName || contact.alias || (email ? email.split('@')[0] : '') || 'Contacto').trim();
+  const name = normalizeContactDisplayName(
+    contact.name || contact.displayName || contact.alias || contact.contactDisplayName || contact.qrDisplayName || (email ? email.split('@')[0] : '') || 'Contacto',
+    email ? email.split('@')[0] : 'Contacto',
+    80
+  );
   const avatarImage = readProfileAvatarCandidate(contact);
+  const hasExplicitDisplayName = hasExplicitContactDisplayNameInput(contact);
   return withProfileAvatarAliases({
     name,
     displayName: name,
+    alias: normalizeContactDisplayName(contact.alias || contact.contactAlias || name, name, 80),
+    contactDisplayName: name,
     email,
     userId,
     source: contact.source || 'manual',
+    hasExplicitDisplayName,
     backendQrResolvedAt: contact.backendQrResolvedAt || contact.resolvedAt || '',
     relationId: contact.relationId || contact.relation?.id || ''
   }, avatarImage);
@@ -12038,6 +12230,49 @@ function findConversationByContactIdentity(contact = {}) {
 
 function findConversationByContactEmail(email = '') {
   return findConversationByContactIdentity({ email });
+}
+
+function applyViewerScopedContactDisplayName(conversation, contact = {}, options = {}) {
+  if (!conversation || typeof conversation !== 'object') return false;
+  const normalizedContact = normalizeContactCreationInput(contact);
+  const displayName = normalizeContactDisplayName(
+    normalizedContact.name || normalizedContact.displayName || normalizedContact.alias || '',
+    '',
+    80
+  );
+  if (!displayName || displayName === 'Contacto') return false;
+  const hasExistingDisplayName = Boolean(normalizeContactDisplayName(conversation.name || conversation.displayName || conversation.title || '', '', 80));
+  if (!normalizedContact.hasExplicitDisplayName && hasExistingDisplayName && options.allowImplicitDisplayName !== true) return false;
+
+  const previousDisplayName = normalizeContactDisplayName(conversation.name || conversation.displayName || conversation.title || '', '', 80);
+  const changed = previousDisplayName !== displayName;
+  conversation.name = displayName;
+  conversation.displayName = displayName;
+  conversation.title = displayName;
+  conversation.contactDisplayName = displayName;
+  conversation.alias = displayName;
+  conversation.avatar = getInitials(displayName);
+
+  if (Array.isArray(conversation.participants)) {
+    conversation.participants = conversation.participants.map((participant) => {
+      const participantEmail = normalizeStorageIdentity(participant?.email || participant?.userEmail || participant?.contactEmail || '');
+      const participantUserId = normalizeBackendUserId(participant?.userId || participant?.contactUserId || participant?.uid || participant?.id || '');
+      const isRemoteParticipant = (normalizedContact.email && participantEmail === normalizedContact.email)
+        || (normalizedContact.userId && participantUserId === normalizedContact.userId)
+        || participant?.role === 'contact';
+      return isRemoteParticipant ? { ...participant, displayName, name: displayName, alias: displayName } : participant;
+    });
+  }
+
+  conversation.metadata = {
+    ...(conversation.metadata || {}),
+    currentUserContactDisplayName: displayName,
+    currentUserContactAlias: displayName,
+    contactDisplayNameSource: normalizedContact.source || options.source || 'contact-open',
+    contactDisplayNameUpdatedAt: new Date().toISOString()
+  };
+
+  return changed;
 }
 
 function createLocalContactConversation(contact = {}) {
@@ -12143,6 +12378,7 @@ async function createBackendConfirmedContactConversation(normalizedContact = {},
   const remoteConversationId = extractEntityId(payload, ['chat', 'conversation']) || localConversationId;
   markQueuedConversationSynced(localConversationId, payload);
   const syncedConversation = appState.conversations.find((item) => String(item.id || '') === String(remoteConversationId || '')) || conversation;
+  applyViewerScopedContactDisplayName(syncedConversation, normalizedContact, { source: 'backend-confirmed' });
   syncedConversation.contactSyncStatus = 'synced';
   syncedConversation.contactSyncedAt = new Date().toISOString();
   syncedConversation.status = 'Sincronizado';
@@ -12201,6 +12437,7 @@ async function syncNewContactConversation(conversation, contact, sessionGuard = 
         const remoteConversationId = extractEntityId(payload, ['chat', 'conversation']) || conversation.id;
         markQueuedConversationSynced(conversation.id, payload);
         const syncedConversation = appState.conversations.find((item) => String(item.id || '') === String(remoteConversationId || '')) || conversation;
+        applyViewerScopedContactDisplayName(syncedConversation, normalizedContact, { source: 'backend-sync' });
         syncedConversation.contactSyncStatus = 'synced';
         syncedConversation.contactSyncedAt = new Date().toISOString();
         await syncContactRelation({
@@ -12396,8 +12633,16 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
 
   if (existingConversation) {
     await restoreDeletedContactConversation(existingConversation, normalizedContact, options);
-    if (normalizedContact.name && normalizedContact.name !== 'Contacto' && !existingConversation.name) {
-      existingConversation.name = normalizedContact.name;
+    const contactNameChanged = applyViewerScopedContactDisplayName(existingConversation, normalizedContact, options);
+    if (contactNameChanged) {
+      await syncContactRelation({
+        ...normalizedContact,
+        conversationId: existingConversation.id,
+        alias: normalizedContact.name,
+        contactDisplayName: normalizedContact.name,
+        reason: 'contact-display-name-update',
+        relationClientMutationId: `${generateClientMutationId()}:relation-alias`
+      }, { enqueueOnFailure: true });
     }
   } else if (shouldConfirmBackendProfile) {
     conversation = await createBackendConfirmedContactConversation(normalizedContact, sessionGuard);
@@ -12435,8 +12680,8 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
 function getCurrentProfileQrData() {
   const email = normalizeStorageIdentity(getSessionEmail());
   const userId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
-  const displayName = email ? email.split('@')[0] : 'Perfil ChatER';
-  return { email, userId, displayName, name: displayName };
+  const displayName = readStoredProfileQrDisplayName();
+  return { email, userId, displayName, name: displayName, qrDisplayName: displayName };
 }
 
 function isExpectedQrCameraFallbackError(error = {}) {
@@ -13798,6 +14043,15 @@ function openProfileModal() {
         <strong>QR de perfil</strong>
         <small>Muéstralo para que te agreguen sin escribir tu correo.</small>
       </div>
+      <form class="profile-qr-name-form" data-profile-qr-name-form>
+        <label for="profileQrDisplayName">Nombre que recibirán al escanear tu QR</label>
+        <div class="profile-qr-name-row">
+          <input id="profileQrDisplayName" type="text" maxlength="${PROFILE_QR_DISPLAY_NAME_MAX_LENGTH}" autocomplete="name" value="${escapeHTML(readStoredProfileQrDisplayName())}" placeholder="Ej. Gabriel Soporte">
+          <button class="secondary-button" type="submit">Actualizar QR</button>
+        </div>
+        <small>Este nombre viaja dentro de tu QR como nombre inicial del contacto; después cada persona puede editarlo en su propia cuenta.</small>
+        <p class="profile-qr-name-feedback" data-profile-qr-name-feedback role="status" aria-live="polite"></p>
+      </form>
       <div class="profile-qr-code" data-profile-qr-code></div>
       <small class="profile-qr-payload" data-profile-qr-payload></small>
     </section>
@@ -13812,6 +14066,17 @@ function openProfileModal() {
     if (!button) return;
     if (button.dataset.profileAction === 'privacy') openPrivacySettingsModal();
     if (button.dataset.profileAction === 'notifications') openNotificationSettingsModal();
+  });
+
+  container.querySelector('[data-profile-qr-name-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const input = container.querySelector('#profileQrDisplayName');
+    const feedback = container.querySelector('[data-profile-qr-name-feedback]');
+    const savedName = saveProfileQrDisplayName(input?.value || '');
+    if (input) input.value = savedName;
+    if (feedback) feedback.textContent = `QR actualizado con el nombre: ${savedName}.`;
+    await renderProfileQrForCurrentUser(container);
+    showToast('Nombre del QR actualizado.');
   });
 
   setModal('Perfil', container, 'profile');
@@ -17265,10 +17530,28 @@ function mergeConversationsById(remoteConversations = [], localConversations = [
     }
 
     const effectiveId = remoteId || String(localConversation.id || localIdBySharedKey || '');
+    const mergedViewerScopedName = getExplicitViewerScopedConversationDisplayName(remoteConversation)
+      || getExplicitViewerScopedConversationDisplayName(localConversation)
+      || '';
     const mergedConversation = {
       ...localConversation,
       ...remoteConversation,
       id: effectiveId || localConversation.id || remoteConversation.id,
+      ...(mergedViewerScopedName ? {
+        name: mergedViewerScopedName,
+        displayName: mergedViewerScopedName,
+        title: mergedViewerScopedName,
+        viewerDisplayName: mergedViewerScopedName,
+        contactDisplayName: mergedViewerScopedName,
+        alias: mergedViewerScopedName,
+        avatar: getInitials(mergedViewerScopedName),
+        metadata: {
+          ...(localConversation.metadata && typeof localConversation.metadata === 'object' ? localConversation.metadata : {}),
+          ...(remoteConversation.metadata && typeof remoteConversation.metadata === 'object' ? remoteConversation.metadata : {}),
+          currentUserContactDisplayName: mergedViewerScopedName,
+          currentUserContactAlias: mergedViewerScopedName
+        }
+      } : {}),
       ...resolveConversationArchiveMergeState(remoteConversation, localConversation),
       messages: mergeMessagesByIdentity(remoteConversation.messages, localConversation.messages),
       messagesHydrated: Boolean(remoteConversation.messagesHydrated || localConversation.messagesHydrated),
@@ -17579,7 +17862,7 @@ function normalizeConversationFromApi(raw = {}) {
   const selfEmail = normalizeStorageIdentity(getSessionEmail());
   const rawEmail = normalizeStorageIdentity(raw.contactEmail || raw.email || metadata.contactEmail || metadata.email || '');
   const email = rawEmail && rawEmail !== selfEmail ? rawEmail : (participant?.email || rawEmail || '');
-  const name = raw.displayName || raw.name || metadata.displayName || metadata.name || raw.title || participant?.displayName || participant?.name || email || 'Chat sin nombre';
+  const name = resolveConversationDisplayNameForCurrentViewer(raw, { metadata, participants, remoteParticipant: participant, email });
   const hasEmbeddedMessages = Array.isArray(raw.messages) && raw.messages.length > 0;
   const messages = hasEmbeddedMessages ? raw.messages.map(normalizeMessageFromApi) : [];
   if (!messages.length && raw.lastMessage) {
@@ -17589,6 +17872,10 @@ function normalizeConversationFromApi(raw = {}) {
   return {
     id: String(raw.id || raw.chatId || raw.conversationId || `chat-${email || Date.now()}`),
     name,
+    displayName: name,
+    title: name,
+    viewerDisplayName: name,
+    contactDisplayName: name,
     email,
     contactEmail: email,
     contactUserId: normalizeBackendUserId(raw.contactUserId || raw.remoteUserId || metadata.contactUserId || metadata.remoteUserId || participant?.userId || ''),
