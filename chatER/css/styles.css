@@ -481,6 +481,38 @@ button {
   height: 48px;
 }
 
+.contact-avatar.has-presence-indicator,
+.chat-item-avatar.has-presence-indicator {
+  position: relative;
+  overflow: visible;
+}
+
+.contact-avatar.has-presence-indicator .avatar-image,
+.chat-item-avatar.has-presence-indicator .avatar-image {
+  border-radius: 50%;
+}
+
+.contact-avatar.has-presence-indicator::after,
+.chat-item-avatar.has-presence-indicator::after,
+.chat-presence-dot {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid var(--panel);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 10px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+}
+
+.contact-avatar.has-presence-indicator::after,
+.chat-item-avatar.has-presence-indicator::after,
+.chat-presence-dot--online {
+  background: #24d879;
+}
+
 .chat-item-name,
 .state-name,
 .call-name {

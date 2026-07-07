@@ -1180,30 +1180,73 @@ function withProfileAvatarAliases(base = {}, avatarImage = '') {
   };
 }
 
+function readParticipantEmailCandidate(candidate = {}) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return normalizeStorageIdentity(
+    candidate.email
+    || candidate.userEmail
+    || candidate.contactEmail
+    || candidate.recipientUserEmail
+    || candidate.recipientEmail
+    || candidate.senderUserEmail
+    || candidate.actorUserEmail
+    || candidate.toEmail
+    || candidate.emailAddress
+    || candidate.primaryEmail
+    || candidate.googleEmail
+    || candidate.accountEmail
+    || candidate.profileEmail
+    || candidate.correo
+    || candidate.mail
+    || candidate.e
+    || ''
+  );
+}
+
+function readParticipantUserIdCandidate(candidate = {}) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return normalizeBackendUserId(
+    candidate.userId
+    || candidate.internalUserId
+    || candidate.contactUserId
+    || candidate.remoteUserId
+    || candidate.otherUserId
+    || candidate.participantUserId
+    || candidate.recipientUserId
+    || candidate.senderUserId
+    || candidate.actorUserId
+    || candidate.toUserId
+    || candidate.googleUserId
+    || candidate.googleUid
+    || candidate.firebaseUid
+    || candidate.uid
+    || candidate.sub
+    || candidate.i
+    || candidate.id
+    || ''
+  );
+}
+
+function readParticipantNameCandidate(candidate = {}, fallback = '') {
+  if (!candidate || typeof candidate !== 'object') return String(fallback || '').trim();
+  return String(
+    candidate.displayName
+    || candidate.name
+    || candidate.alias
+    || candidate.fullName
+    || candidate.profileName
+    || candidate.n
+    || fallback
+    || ''
+  ).trim();
+}
+
 function normalizeConversationParticipantForApi(participant = {}, fallbackRole = 'participant') {
   if (!participant || typeof participant !== 'object') return null;
 
-  const email = normalizeStorageIdentity(
-    participant.email
-    || participant.userEmail
-    || participant.contactEmail
-    || participant.mail
-    || ''
-  );
-  const userId = normalizeBackendUserId(
-    participant.userId
-    || participant.internalUserId
-    || participant.uid
-    || participant.id
-    || ''
-  );
-  const displayName = String(
-    participant.displayName
-    || participant.name
-    || participant.alias
-    || email
-    || ''
-  ).trim();
+  const email = readParticipantEmailCandidate(participant);
+  const userId = readParticipantUserIdCandidate(participant);
+  const displayName = readParticipantNameCandidate(participant, email || userId || '');
   const avatarImage = readProfileAvatarCandidate(participant);
 
   if (!email && !userId && !displayName) return null;
@@ -2145,7 +2188,12 @@ let chatRealtimeReconnectAttempts = 0;
 let chatRealtimeManualDisconnect = false;
 let chatRealtimeSessionGuard = null;
 let chatRealtimeRecoveryTimer = null;
+let chatRealtimeFallbackPollTimer = null;
+let chatRealtimeFallbackPollInFlight = false;
+const chatRealtimeFallbackProcessedEventIds = new Set();
 const CHAT_REALTIME_RECOVERY_INTERVAL_MS = 12000;
+const CHAT_REALTIME_FALLBACK_POLL_INTERVAL_MS = 3000;
+const CHAT_REALTIME_EVENT_DEDUPE_LIMIT = 400;
 const CHATER_PROFILE_MESSAGE_RECEIVED_EVENT = 'chater:profile-message-received';
 const CHATER_PROFILE_MESSAGE_INDICATOR_VISIBLE_MS = 3000;
 const CHATER_PROFILE_MESSAGE_SIGNAL_STORAGE_KEY = 'chater.profileMessageReceivedSignal';
@@ -2188,6 +2236,7 @@ const remoteTypingDisplayState = new Map();
 
 const presenceSyncState = {
   status: '',
+  targetSignature: '',
   lastSyncedAt: 0,
   inFlight: false
 };
@@ -2527,6 +2576,23 @@ function notifyProfileMessageReceived(conversation = {}, message = {}, options =
   return true;
 }
 
+function getMemoriaBackendSessionTokenForRequest() {
+  return String(
+    window.memoriaBACKEND?.tk
+    || window.platformAuthGate?.getSessionToken?.()
+    || ''
+  ).trim();
+}
+
+function buildMemoriaBackendSessionHeaders() {
+  const token = getMemoriaBackendSessionTokenForRequest();
+  if (!token) return {};
+  return {
+    Authorization: `Bearer ${token}`,
+    'X-MB-Session': token
+  };
+}
+
 const apiClient = {
   async request(path, options = {}) {
     if (!CHATER_CONFIG.backendBaseUrl) {
@@ -2549,6 +2615,7 @@ const apiClient = {
       Accept: 'application/json',
       ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
       ...(siteScoped && getMemoriaSiteId() ? { 'X-MB-Site': getMemoriaSiteId() } : {}),
+      ...buildMemoriaBackendSessionHeaders(),
       ...(method !== 'GET' && method !== 'HEAD' ? { 'X-Hashinmy-Action': 'webapp' } : {}),
       ...(mutationId ? { 'X-MB-Idempotency-Key': mutationId } : {}),
       ...(optionHeaders || {})
@@ -2646,6 +2713,27 @@ const apiClient = {
     });
     return this.request(`/api/v1/chat-orquestador/reconciliar/${encodeURIComponent(conversationId)}?${params.toString()}`);
   },
+  getChatRealtimeEvents(options = {}) {
+    const params = new URLSearchParams({
+      userEmail: getSessionEmail(),
+      email: getSessionEmail(),
+      userId: getCurrentUserIdentifier(),
+      limit: String(options.limit || 80),
+      lookbackMs: String(options.lookbackMs || 45000)
+    });
+    const identityKeys = [
+      getSessionEmail(),
+      getCurrentUserIdentifier(),
+      getCurrentUserStremeInboxChannel()
+    ]
+      .map((value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9@._:-]/g, '_').replace(/_+/g, '_'))
+      .filter(Boolean)
+      .filter((value, index, source) => source.indexOf(value) === index)
+      .slice(0, 12);
+    identityKeys.forEach((identityKey) => params.append('identityKeys', identityKey));
+    if (options.reason) params.set('reason', String(options.reason).slice(0, 80));
+    return this.request(`/api/v1/chats/events?${params.toString()}`);
+  },
   getMessages(conversationId, options = {}) {
     const params = new URLSearchParams();
     const conversation = options.conversation || appState.conversations.find((item) => String(item.id || '') === String(conversationId || '')) || {};
@@ -2720,32 +2808,52 @@ const apiClient = {
       }))
     });
   },
-  markMessageDelivered(conversationId, messageId, clientMutationId = generateClientMutationId(), deliveredAt = new Date().toISOString()) {
+  markMessageDelivered(conversationId, messageId, clientMutationId = generateClientMutationId(), deliveredAt = new Date().toISOString(), options = {}) {
+    const metadata = options.metadata && typeof options.metadata === 'object' ? options.metadata : {};
     return this.request('/api/v1/interacciones-mensaje', {
       method: 'POST',
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         messageId,
         conversationId,
-        actorUserId: getCurrentUserIdentifier(),
-        actorUserEmail: getSessionEmail(),
+        actorUserId: options.actorUserId || getCurrentUserIdentifier(),
+        actorUserEmail: options.actorUserEmail || getSessionEmail(),
+        senderUserId: options.senderUserId || metadata.senderUserId || '',
+        senderUserEmail: options.senderUserEmail || metadata.senderUserEmail || '',
+        recipientUserId: options.recipientUserId || metadata.recipientUserId || getCurrentUserIdentifier(),
+        recipientUserEmail: options.recipientUserEmail || metadata.recipientUserEmail || getSessionEmail(),
         interactionType: 'delivered',
         deliveredAt,
+        metadata: {
+          source: 'chater-static-site',
+          receiptTransport: 'CHATrealtimeX',
+          ...metadata
+        },
         clientMutationId
       }))
     });
   },
-  markMessageRead(conversationId, messageId, clientMutationId = generateClientMutationId(), readAt = new Date().toISOString()) {
+  markMessageRead(conversationId, messageId, clientMutationId = generateClientMutationId(), readAt = new Date().toISOString(), options = {}) {
+    const metadata = options.metadata && typeof options.metadata === 'object' ? options.metadata : {};
     return this.request('/api/v1/interacciones-mensaje', {
       method: 'POST',
       idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         messageId,
         conversationId,
-        actorUserId: getCurrentUserIdentifier(),
-        actorUserEmail: getSessionEmail(),
+        actorUserId: options.actorUserId || getCurrentUserIdentifier(),
+        actorUserEmail: options.actorUserEmail || getSessionEmail(),
+        senderUserId: options.senderUserId || metadata.senderUserId || '',
+        senderUserEmail: options.senderUserEmail || metadata.senderUserEmail || '',
+        recipientUserId: options.recipientUserId || metadata.recipientUserId || getCurrentUserIdentifier(),
+        recipientUserEmail: options.recipientUserEmail || metadata.recipientUserEmail || getSessionEmail(),
         interactionType: 'read',
         readAt,
+        metadata: {
+          source: 'chater-static-site',
+          receiptTransport: 'CHATrealtimeX',
+          ...metadata
+        },
         clientMutationId
       }))
     });
@@ -2810,6 +2918,7 @@ const apiClient = {
     const senderUserId = getCurrentUserIdentifier();
     const senderUserEmail = getSessionEmail();
     const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
+    const realtimeAudience = buildConversationRealtimeAudience(conversation, recipients);
     const clientTime = options.clientTime || options.createdAt || new Date().toISOString();
     const expiresAt = coerceChatEphemeralExpiresAtIso(options.expiresAt || '', clientTime);
 
@@ -2828,6 +2937,13 @@ const apiClient = {
         senderUserEmail,
         recipientUserId: firstRecipient.userId || '',
         recipientUserEmail: firstRecipient.email || '',
+        recipientUserIds: realtimeAudience.recipientUserIds || [],
+        recipientUserEmails: realtimeAudience.recipientUserEmails || [],
+        participantUserIds: realtimeAudience.participantUserIds || [],
+        participantEmails: realtimeAudience.participantEmails || [],
+        identityKeys: realtimeAudience.identityKeys || [],
+        remoteInboxChannels: realtimeAudience.remoteInboxChannels || [],
+        receiptChannels: realtimeAudience.receiptChannels || [],
         text,
         status: 'sent',
         clientTime,
@@ -2839,13 +2955,22 @@ const apiClient = {
           senderUserEmail,
           recipientUserId: firstRecipient.userId || '',
           recipientUserEmail: firstRecipient.email || '',
-          recipients,
+          recipients: realtimeAudience.recipients.length ? realtimeAudience.recipients : recipients,
+          participants: realtimeAudience.participants,
+          participantUserIds: realtimeAudience.participantUserIds || [],
+          participantEmails: realtimeAudience.participantEmails || [],
+          recipientUserIds: realtimeAudience.recipientUserIds || [],
+          recipientUserEmails: realtimeAudience.recipientUserEmails || [],
+          identityKeys: realtimeAudience.identityKeys || [],
           ...lifecycle,
           expiresAt,
           ephemeralTtlSeconds: CHATER_EPHEMERAL_TTL_SECONDS,
           channel: lifecycle.redisConversationKey ? getConversationStremeChannel(lifecycle.redisConversationKey) : getConversationStremeChannel(conversationId),
-          userInboxChannel: getCurrentUserStremeInboxChannel(),
-          remoteInboxChannels: recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean)
+          conversationChannel: realtimeAudience.conversationChannel || getConversationStremeChannel(conversationId),
+          userInboxChannel: realtimeAudience.userInboxChannel || getCurrentUserStremeInboxChannel(),
+          senderInboxChannel: realtimeAudience.senderInboxChannel || getCurrentUserStremeInboxChannel(),
+          receiptChannels: realtimeAudience.receiptChannels,
+          remoteInboxChannels: realtimeAudience.remoteInboxChannels.length ? realtimeAudience.remoteInboxChannels : recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId)).filter(Boolean)
         },
         clientMutationId: clientMessageId
       }))
@@ -3065,6 +3190,18 @@ const apiClient = {
     const normalizedStatus = normalizePresenceStatus(status);
     const nowIso = new Date().toISOString();
     const clientMutationId = options.clientMutationId || generateClientMutationId();
+    const activeConversation = options.conversation || getActiveConversation() || {};
+    const conversationId = options.conversationId || activeConversation.id || activeConversationId || '';
+    const recipients = Array.isArray(options.recipients)
+      ? options.recipients
+      : (activeConversation.id ? getConversationRemoteIdentities(activeConversation) : []);
+    const realtimeAudience = buildConversationRealtimeAudience(activeConversation, recipients);
+    const remoteInboxChannels = normalizeStremeChannelList([
+      ...(Array.isArray(options.remoteInboxChannels) ? options.remoteInboxChannels : []),
+      ...realtimeAudience.remoteInboxChannels,
+      ...recipients.map((recipient) => getUserStremeInboxChannel(recipient.email, recipient.userId))
+    ]);
+    const conversationChannel = conversationId ? getConversationStremeChannel(conversationId) : '';
     return this.request('/api/v1/presencia-usuario', {
       method: 'POST',
       keepalive: options.keepalive === true,
@@ -3073,14 +3210,36 @@ const apiClient = {
         userId: options.userId || getCurrentUserIdentifier(),
         userEmail: options.userEmail || getSessionEmail(),
         status: normalizedStatus,
+        state: normalizedStatus,
         deviceId: options.deviceId || getDeviceId(),
+        conversationId,
+        recipientUserIds: realtimeAudience.recipientUserIds || [],
+        recipientUserEmails: realtimeAudience.recipientUserEmails || [],
+        participantUserIds: realtimeAudience.participantUserIds || [],
+        participantEmails: realtimeAudience.participantEmails || [],
+        identityKeys: realtimeAudience.identityKeys || [],
+        remoteInboxChannels,
+        receiptChannels: realtimeAudience.receiptChannels || [],
         heartbeatAt: options.heartbeatAt || nowIso,
         lastSeenAt: options.lastSeenAt || nowIso,
         expiresAt: options.expiresAt || (normalizedStatus === 'offline' ? nowIso : new Date(Date.now() + 45000).toISOString()),
         metadata: {
           source: 'chater-static-site',
           transport: stremeActiveTransport || resolveStremeTransport(),
-          activeConversationId: activeConversationId || '',
+          activeConversationId: conversationId,
+          conversationId,
+          channel: conversationChannel,
+          remoteInboxChannels,
+          recipients: realtimeAudience.recipients.length ? realtimeAudience.recipients : recipients,
+          participants: realtimeAudience.participants,
+          participantUserIds: realtimeAudience.participantUserIds || [],
+          participantEmails: realtimeAudience.participantEmails || [],
+          identityKeys: realtimeAudience.identityKeys || [],
+          senderInboxChannel: realtimeAudience.senderInboxChannel || getCurrentUserStremeInboxChannel(),
+          userInboxChannel: realtimeAudience.userInboxChannel || getCurrentUserStremeInboxChannel(),
+          receiptChannels: realtimeAudience.receiptChannels,
+          recipientUserIds: (realtimeAudience.recipients.length ? realtimeAudience.recipients : recipients).map((recipient) => recipient.userId).filter(Boolean),
+          recipientUserEmails: (realtimeAudience.recipients.length ? realtimeAudience.recipients : recipients).map((recipient) => recipient.email).filter(Boolean),
           visibilityState: document.visibilityState || ''
         },
         clientMutationId
@@ -5380,6 +5539,79 @@ function replaceConversationIdInPayload(payload, localConversationId, remoteConv
   return replaceInObject(payload);
 }
 
+
+function normalizeRealtimeDeliveryAlias(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9@._:-]/g, '_').replace(/_+/g, '_');
+}
+
+function collectDeliveredRealtimeAliasesFromPayload(payload = {}, depth = 0, out = new Set(), visited = new Set()) {
+  if (!payload || typeof payload !== 'object' || depth > 5 || visited.has(payload)) return out;
+  visited.add(payload);
+
+  const collectList = (value) => {
+    if (!Array.isArray(value)) return;
+    value.forEach((item) => {
+      const alias = normalizeRealtimeDeliveryAlias(item);
+      if (alias) out.add(alias);
+    });
+  };
+
+  collectList(payload.deliveredAliases);
+  collectList(payload.deliveredIdentityKeys);
+  collectList(payload.deliveredRecipients);
+
+  ['realtime', 'chatRealtime', 'transport', 'delivery', 'result', 'data', 'record', 'message', 'orchestratorResult', 'orchestratorRealtime'].forEach((key) => {
+    if (payload[key] && typeof payload[key] === 'object') collectDeliveredRealtimeAliasesFromPayload(payload[key], depth + 1, out, visited);
+  });
+
+  return out;
+}
+
+function collectRemoteRealtimeDeliveryAliases(conversation = {}, message = {}) {
+  const aliases = new Set();
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const addAlias = (value = '') => {
+    const alias = normalizeRealtimeDeliveryAlias(value);
+    if (alias) aliases.add(alias);
+  };
+  const addIdentity = (identity = {}) => {
+    if (!identity || typeof identity !== 'object') return;
+    const email = readParticipantEmailCandidate(identity);
+    const userId = readParticipantUserIdCandidate(identity);
+    if ((selfEmail && email && email === selfEmail) || (selfUserId && userId && userId === selfUserId)) return;
+    addAlias(email);
+    addAlias(userId);
+    addAlias(identity.inboxChannel || identity.channel || identity.stremeChannel || '');
+    addAlias(getUserStremeInboxChannel(email, userId));
+    if (email) addAlias(getUserStremeInboxChannel(email, ''));
+    if (userId) addAlias(getUserStremeInboxChannel('', userId));
+  };
+
+  getConversationRemoteIdentities(conversation).forEach(addIdentity);
+  addIdentity({
+    email: message.recipientUserEmail || message.recipientEmail || '',
+    userId: message.recipientUserId || message.toUserId || ''
+  });
+  const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  [message.recipients, metadata.recipients, metadata.participants, metadata.conversationParticipants].forEach((list) => {
+    if (Array.isArray(list)) list.forEach(addIdentity);
+  });
+  [metadata.remoteInboxChannels, message.remoteInboxChannels].forEach((list) => {
+    if (Array.isArray(list)) list.forEach(addAlias);
+  });
+
+  return aliases;
+}
+
+function didBackendRealtimeReachRemote(payload = {}, conversation = {}, message = {}) {
+  const deliveredAliases = collectDeliveredRealtimeAliasesFromPayload(payload);
+  if (!deliveredAliases.size) return false;
+  const remoteAliases = collectRemoteRealtimeDeliveryAliases(conversation, message);
+  if (!remoteAliases.size) return false;
+  return Array.from(remoteAliases).some((alias) => deliveredAliases.has(alias));
+}
+
 function markQueuedMessageSynced(conversationId, clientMessageId, payload = {}) {
   const remoteMessage = extractNestedObject(payload, ['message']);
   let conversation = appState.conversations.find((item) => item.id === conversationId);
@@ -5397,9 +5629,15 @@ function markQueuedMessageSynced(conversationId, clientMessageId, payload = {}) 
     if (isMessageLikePayload(remoteMessage)) {
       updateExistingMessageFromRealtime(message, normalizeMessageFromApi(remoteMessage));
     }
-    setMessageReceiptStatus(message, remoteMessage?.receiptStatus || remoteMessage?.status || 'backend_received', {
-      backendReceivedAt: remoteMessage?.createdAt || new Date().toISOString()
+    const realtimeReachedRemote = conversation ? didBackendRealtimeReachRemote(payload, conversation, remoteMessage || message) : false;
+    const realtimeDeliveredAt = realtimeReachedRemote ? new Date().toISOString() : '';
+    setMessageReceiptStatus(message, realtimeReachedRemote ? 'delivered' : (remoteMessage?.receiptStatus || remoteMessage?.status || 'backend_received'), {
+      backendReceivedAt: remoteMessage?.createdAt || realtimeDeliveredAt || new Date().toISOString(),
+      deliveredAt: realtimeDeliveredAt
     });
+    if (realtimeReachedRemote && conversation) {
+      markConversationRemotePresenceOnline(conversation, { ...(remoteMessage || {}), deliveredAt: realtimeDeliveredAt, updatedAt: realtimeDeliveredAt });
+    }
     message.clientMutationId = remoteMessage?.clientMutationId || remoteMessage?.clientMessageId || message.clientMutationId || clientMessageId;
     const remoteId = extractEntityId(payload, ['message']);
     if (remoteId) {
@@ -7672,6 +7910,7 @@ function applyDeepLinkTarget(target = {}, options = {}) {
     markConversationRead(conversation);
     renderCurrentSection();
     hydrateConversationMessages(conversation.id);
+    announceActiveConversationPresence(conversation, 'deep-link-chat-opened');
     return true;
   }
 
@@ -7880,6 +8119,69 @@ function getMessagePreviewText(message = null, emptyText = 'Sin mensajes todaví
   return mediaName || emptyText;
 }
 
+function normalizePresenceStatusText(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isPresenceStatusOnlineValue(value = '') {
+  const normalized = normalizePresenceStatusText(value);
+  if (!normalized) return false;
+  return [
+    'online',
+    'en linea',
+    'en-linea',
+    'activo',
+    'available',
+    'disponible',
+    'escribiendo',
+    'escribiendo...',
+    'typing',
+    'typing...'
+  ].includes(normalized);
+}
+
+function isConversationPresenceOnline(conversation = {}) {
+  if (!conversation || typeof conversation !== 'object') return false;
+  const metadata = conversation.metadata && typeof conversation.metadata === 'object' ? conversation.metadata : {};
+  const contact = conversation.contact && typeof conversation.contact === 'object' ? conversation.contact : {};
+  const publicData = conversation.publicData && typeof conversation.publicData === 'object' ? conversation.publicData : {};
+  const candidates = [
+    conversation.remotePresenceStatus,
+    conversation.presenceStatus,
+    conversation.status,
+    metadata.remotePresenceStatus,
+    metadata.presenceStatus,
+    metadata.presence,
+    metadata.status,
+    contact.remotePresenceStatus,
+    contact.presenceStatus,
+    contact.presence,
+    contact.status,
+    publicData.remotePresenceStatus,
+    publicData.presenceStatus,
+    publicData.presence,
+    publicData.status
+  ];
+  return candidates.some(isPresenceStatusOnlineValue);
+}
+
+function appendConversationPresenceIndicator(avatar, conversation = {}) {
+  if (!avatar) return false;
+  avatar.classList.remove('has-presence-indicator');
+  delete avatar.dataset.presenceStatus;
+  delete avatar.dataset.presenceLabel;
+  if (!isConversationPresenceOnline(conversation)) return false;
+  avatar.classList.add('has-presence-indicator');
+  avatar.dataset.presenceStatus = 'online';
+  avatar.dataset.presenceLabel = 'En línea';
+  return true;
+}
+
 function renderChatList(filter = '') {
   const normalizedFilter = normalizeUiSearchText(filter);
   const archivedListOpen = isArchivedChatListOpen();
@@ -7953,6 +8255,9 @@ function renderChatList(filter = '') {
     button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
 
     const avatar = createAvatarElement(conversation);
+    const isRemoteOnline = isConversationPresenceOnline(conversation);
+    button.dataset.presenceStatus = isRemoteOnline ? 'online' : 'offline';
+    appendConversationPresenceIndicator(avatar, conversation);
     attachConversationProfilePreview(avatar, conversation);
     const content = document.createElement('div');
     content.className = 'chat-item-content';
@@ -7999,6 +8304,7 @@ function renderChatList(filter = '') {
       renderConversation();
       sendStremeEvent({ type: 'chat.opened', chatId: conversation.id });
       hydrateConversationMessages(conversation.id);
+      announceActiveConversationPresence(conversation, 'chat-list-opened');
     });
     attachChatItemLongPress(button, conversation);
 
@@ -9451,6 +9757,7 @@ function renderConversation() {
     ? 'Contacto bloqueado · No recibirás ni enviarás mensajes aquí'
     : [conversation.status || 'Disponible', ...statusDetails].filter(Boolean).join(' · ');
   renderAvatarInPlace(activeAvatar, conversation);
+  appendConversationPresenceIndicator(activeAvatar, conversation);
   if (pinConversationButton) {
     pinConversationButton.disabled = false;
     setProfessionalIconButton(pinConversationButton, 'pin', conversation.pinned ? 'Desfijar conversación' : 'Fijar conversación');
@@ -9751,28 +10058,8 @@ function getConversationRemoteIdentities(conversation = {}) {
     }
     if (typeof candidate !== 'object' || Array.isArray(candidate)) return;
 
-    const email = normalizeStorageIdentity(
-      candidate.email
-        || candidate.userEmail
-        || candidate.contactEmail
-        || candidate.recipientUserEmail
-        || candidate.recipientEmail
-        || candidate.toEmail
-        || candidate.mail
-        || ''
-    );
-    const userId = normalizeBackendUserId(
-      candidate.userId
-        || candidate.contactUserId
-        || candidate.remoteUserId
-        || candidate.otherUserId
-        || candidate.participantUserId
-        || candidate.recipientUserId
-        || candidate.toUserId
-        || candidate.uid
-        || candidate.id
-        || ''
-    );
+    const email = readParticipantEmailCandidate(candidate);
+    const userId = readParticipantUserIdCandidate(candidate);
     if (!email && !userId) return;
     if ((selfEmail && email && email === selfEmail) || (selfUserId && userId && userId === selfUserId)) return;
     const key = `${email}|${userId}`;
@@ -9780,7 +10067,7 @@ function getConversationRemoteIdentities(conversation = {}) {
     identities.push({
       email,
       userId,
-      name: candidate.name || candidate.displayName || candidate.alias || fallbackName || email || userId
+      name: readParticipantNameCandidate(candidate, fallbackName || email || userId)
     });
   };
 
@@ -9790,16 +10077,25 @@ function getConversationRemoteIdentities(conversation = {}) {
       || conversation.userEmail
       || conversation.recipientUserEmail
       || conversation.toEmail
+      || conversation.e
+      || conversation.emailAddress
       || metadata.contactEmail
       || metadata.email
       || metadata.recipientUserEmail
+      || metadata.e
+      || metadata.emailAddress
       || data.contactEmail
       || data.email
       || data.recipientUserEmail
+      || data.e
+      || data.emailAddress
       || contact.email
       || contact.userEmail
+      || contact.e
       || remote.email
+      || remote.e
       || recipient.email
+      || recipient.e
       || '',
     userId: conversation.contactUserId
       || conversation.remoteUserId
@@ -9807,45 +10103,86 @@ function getConversationRemoteIdentities(conversation = {}) {
       || conversation.participantUserId
       || conversation.recipientUserId
       || conversation.toUserId
+      || conversation.i
       || metadata.contactUserId
       || metadata.remoteUserId
       || metadata.recipientUserId
+      || metadata.i
       || data.contactUserId
       || data.remoteUserId
       || data.recipientUserId
+      || data.i
       || contact.userId
+      || contact.i
       || contact.id
       || remote.userId
+      || remote.i
       || remote.id
       || recipient.userId
+      || recipient.i
       || recipient.id
       || '',
     name: conversation.name
       || conversation.displayName
       || conversation.alias
+      || conversation.n
       || metadata.displayName
       || metadata.name
+      || metadata.n
       || data.displayName
       || data.name
+      || data.n
       || contact.name
+      || contact.n
       || remote.name
+      || remote.n
       || recipient.name
+      || recipient.n
       || ''
   });
+
+  [
+    conversation.remoteParticipant,
+    conversation.remoteProfile,
+    conversation.contactProfile,
+    conversation.recipientProfile,
+    conversation.toUser,
+    metadata.remoteParticipant,
+    metadata.remoteProfile,
+    metadata.contactProfile,
+    metadata.recipientProfile,
+    metadata.recipient,
+    metadata.toUser,
+    data.remoteParticipant,
+    data.remoteProfile,
+    data.contactProfile,
+    data.recipientProfile,
+    data.recipient,
+    data.toUser,
+    contact.profile,
+    remote.profile,
+    recipient.profile
+  ].forEach((candidate) => pushIdentity(candidate));
 
   [
     conversation.participants,
     conversation.participantList,
     conversation.members,
     conversation.recipients,
+    conversation.remoteParticipants,
+    conversation.recipientParticipants,
     metadata.participants,
     metadata.participantList,
     metadata.members,
     metadata.recipients,
+    metadata.remoteParticipants,
+    metadata.recipientParticipants,
     data.participants,
     data.participantList,
     data.members,
-    data.recipients
+    data.recipients,
+    data.remoteParticipants,
+    data.recipientParticipants
   ].forEach((list) => collectIdentityCandidatesFromArray(list).forEach(pushIdentity));
 
   [
@@ -9937,6 +10274,109 @@ function getReceiptTargetChannels(conversation = {}, message = {}) {
   return [...new Set(channels.filter(Boolean))];
 }
 
+function buildConversationRealtimeParticipants(conversation = {}, extraIdentities = []) {
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const participants = [];
+  const seen = new Set();
+  const pushParticipant = (candidate = {}, role = 'participant') => {
+    if (!candidate || typeof candidate !== 'object') return;
+    const email = readParticipantEmailCandidate(candidate);
+    const userId = readParticipantUserIdCandidate(candidate);
+    if (!email && !userId) return;
+    const key = `${email}|${userId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    participants.push({
+      ...(email ? { email, userEmail: email } : {}),
+      ...(userId ? { userId } : {}),
+      role,
+      inboxChannel: getUserStremeInboxChannel(email, userId),
+      name: readParticipantNameCandidate(candidate)
+    });
+  };
+
+  pushParticipant({
+    email: selfEmail,
+    userId: selfUserId,
+    name: typeof getSessionDisplayName === 'function' ? getSessionDisplayName() : ''
+  }, 'self');
+  getConversationRemoteIdentities(conversation).forEach((identity) => pushParticipant(identity, 'remote'));
+  extraIdentities.forEach((identity) => pushParticipant(identity, 'remote'));
+  return participants;
+}
+
+function normalizeRealtimeIdentityList(values = []) {
+  const source = Array.isArray(values) ? values : String(values || '').split(/[\s,;|]+/);
+  const out = [];
+  source.forEach((value) => {
+    const clean = String(value || '').trim().toLowerCase().replace(/[<>]/g, '').slice(0, 240);
+    if (clean && !out.includes(clean)) out.push(clean);
+  });
+  return out;
+}
+
+function buildConversationRealtimeAudience(conversation = {}, extraIdentities = []) {
+  const participants = buildConversationRealtimeParticipants(conversation, extraIdentities);
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const remoteRecipients = participants.filter((participant = {}) => {
+    const email = normalizeStorageIdentity(participant.email || participant.userEmail || '');
+    const userId = normalizeBackendUserId(participant.userId || '');
+    return !((selfEmail && email && email === selfEmail) || (selfUserId && userId && userId === selfUserId));
+  });
+  const remoteInboxChannels = remoteRecipients.map((recipient) => recipient.inboxChannel || getUserStremeInboxChannel(recipient.email || recipient.userEmail, recipient.userId)).filter(Boolean);
+  const senderInboxChannel = getCurrentUserStremeInboxChannel();
+  const conversationChannel = conversation?.id ? getConversationStremeChannel(conversation.id) : '';
+  const participantUserIds = participants.map((participant = {}) => normalizeBackendUserId(participant.userId || participant.contactUserId || participant.uid || participant.id || '')).filter(Boolean);
+  const participantEmails = participants.map((participant = {}) => normalizeStorageIdentity(participant.email || participant.userEmail || participant.contactEmail || '')).filter(Boolean);
+  const remoteUserIds = remoteRecipients.map((recipient = {}) => normalizeBackendUserId(recipient.userId || recipient.contactUserId || recipient.uid || recipient.id || '')).filter(Boolean);
+  const remoteEmails = remoteRecipients.map((recipient = {}) => normalizeStorageIdentity(recipient.email || recipient.userEmail || recipient.contactEmail || '')).filter(Boolean);
+  const identityKeys = normalizeRealtimeIdentityList([
+    senderInboxChannel,
+    conversationChannel,
+    ...remoteInboxChannels,
+    ...participantUserIds,
+    ...participantEmails,
+    ...remoteUserIds,
+    ...remoteEmails
+  ]);
+  return {
+    participants,
+    recipients: remoteRecipients,
+    participantUserIds: [...new Set(participantUserIds)],
+    participantEmails: [...new Set(participantEmails)],
+    recipientUserIds: [...new Set(remoteUserIds)],
+    recipientUserEmails: [...new Set(remoteEmails)],
+    identityKeys,
+    remoteInboxChannels: [...new Set(remoteInboxChannels)],
+    senderInboxChannel,
+    userInboxChannel: senderInboxChannel,
+    receiptChannels: [...new Set([senderInboxChannel, conversationChannel].filter(Boolean))],
+    conversationChannel
+  };
+}
+
+function buildMessageReceiptBackendMetadata(conversation = {}, message = {}) {
+  const sender = getMessageSenderIdentity(message, conversation);
+  const actor = { email: getSessionEmail(), userId: getCurrentUserIdentifier() };
+  const audience = buildConversationRealtimeAudience(conversation, [sender]);
+  const senderInboxChannel = getUserStremeInboxChannel(sender.email, sender.userId);
+  return {
+    senderUserId: sender.userId || '',
+    senderUserEmail: sender.email || '',
+    actorUserId: actor.userId || '',
+    actorUserEmail: actor.email || '',
+    originalMessageId: message.id || message.messageId || '',
+    originalClientMessageId: message.clientMutationId || message.clientMessageId || '',
+    participants: audience.participants,
+    recipients: [sender].filter((item) => item.email || item.userId),
+    receiptChannels: [...new Set([senderInboxChannel, ...audience.receiptChannels].filter(Boolean))],
+    remoteInboxChannels: [...new Set([senderInboxChannel, ...audience.remoteInboxChannels].filter(Boolean))],
+    conversationChannel: audience.conversationChannel || getConversationStremeChannel(conversation.id)
+  };
+}
+
 function shouldSendReceiptForIncomingMessage(message = {}) {
   if (!message || message.type !== 'incoming') return false;
   return Boolean(message.id || message.clientMutationId || message.clientMessageId);
@@ -9948,6 +10388,7 @@ function publishMessageReceipt(conversation = {}, message = {}, receiptType = 'd
   const messageId = String(message.id || message.messageId || '').trim();
   const clientMutationId = String(message.clientMutationId || message.clientMessageId || '').trim();
   const receiptMutationId = generateClientMutationId();
+  const backendReceiptMetadata = buildMessageReceiptBackendMetadata(conversation, message);
   const payload = {
     type: normalizedReceiptType === 'read' ? 'message.read' : 'message.delivered',
     chatId: conversation.id,
@@ -9964,6 +10405,14 @@ function publishMessageReceipt(conversation = {}, message = {}, receiptType = 'd
     readAt: normalizedReceiptType === 'read' ? timestamp : '',
     actorUserId: getCurrentUserIdentifier(),
     actorUserEmail: getSessionEmail(),
+    senderUserId: backendReceiptMetadata.senderUserId || '',
+    senderUserEmail: backendReceiptMetadata.senderUserEmail || '',
+    recipientUserId: getCurrentUserIdentifier(),
+    recipientUserEmail: getSessionEmail(),
+    participants: backendReceiptMetadata.participants || [],
+    recipients: backendReceiptMetadata.recipients || [],
+    receiptChannels: backendReceiptMetadata.receiptChannels || [],
+    remoteInboxChannels: backendReceiptMetadata.remoteInboxChannels || [],
     deviceId: getDeviceId(),
     receiptClientMutationId: receiptMutationId
   };
@@ -9979,7 +10428,14 @@ function syncDeliveredReceiptWithBackend(conversation = {}, message = {}, delive
   const messageId = String(message.id || message.messageId || message.clientMutationId || '').trim();
   if (!messageId || message.deliveredReceiptSyncedAt) return;
   const clientMutationId = generateClientMutationId();
-  apiClient.markMessageDelivered(conversation.id, messageId, clientMutationId, deliveredAt)
+  const receiptMetadata = buildMessageReceiptBackendMetadata(conversation, message);
+  apiClient.markMessageDelivered(conversation.id, messageId, clientMutationId, deliveredAt, {
+    senderUserId: receiptMetadata.senderUserId || '',
+    senderUserEmail: receiptMetadata.senderUserEmail || '',
+    recipientUserId: getCurrentUserIdentifier(),
+    recipientUserEmail: getSessionEmail(),
+    metadata: receiptMetadata
+  })
     .then(() => {
       message.deliveredReceiptSyncedAt = deliveredAt;
       persistState();
@@ -10053,7 +10509,14 @@ function sendReadReceiptsForConversation(conversation = {}, options = {}) {
       const messageId = String(message.id || message.messageId || message.clientMutationId || '').trim();
       if (!messageId || message.readReceiptSyncedAt) return;
       const clientMutationId = generateClientMutationId();
-      apiClient.markMessageRead(conversation.id, messageId, clientMutationId, readAt)
+      const receiptMetadata = buildMessageReceiptBackendMetadata(conversation, message);
+      apiClient.markMessageRead(conversation.id, messageId, clientMutationId, readAt, {
+        senderUserId: receiptMetadata.senderUserId || '',
+        senderUserEmail: receiptMetadata.senderUserEmail || '',
+        recipientUserId: getCurrentUserIdentifier(),
+        recipientUserEmail: getSessionEmail(),
+        metadata: receiptMetadata
+      })
         .then(() => {
           message.readReceiptSyncedAt = readAt;
           persistState();
@@ -10840,6 +11303,8 @@ async function sendMessage(text) {
     receiptStatus: 'local',
     senderUserId: getCurrentUserIdentifier(),
     senderUserEmail: getSessionEmail(),
+    recipientUserId: (getConversationRemoteIdentities(conversation)[0] || {}).userId || '',
+    recipientUserEmail: (getConversationRemoteIdentities(conversation)[0] || {}).email || '',
     backendReceivedAt: '',
     deliveredAt: '',
     readAt: ''
@@ -10962,6 +11427,7 @@ function openArchivedConversation(conversation) {
   chatView.classList.add('chat-open');
   sendStremeEvent({ type: 'chat.opened', chatId: conversation.id });
   hydrateConversationMessages(conversation.id);
+  announceActiveConversationPresence(conversation, 'archived-chat-opened');
 }
 
 
@@ -12913,6 +13379,7 @@ async function openOrCreateContactConversation(contact = {}, options = {}) {
   renderCurrentSection();
   chatView.classList.add('chat-open');
   hydrateConversationMessages(conversation.id);
+  announceActiveConversationPresence(conversation, 'contact-chat-opened');
 
   if (!existingConversation && !shouldConfirmBackendProfile) {
     await syncNewContactConversation(conversation, normalizedContact, sessionGuard);
@@ -16540,6 +17007,7 @@ function replyToState(state) {
   messageInput.focus();
   sendStremeEvent({ type: 'chat.opened', chatId: relatedConversation.id });
   hydrateConversationMessages(relatedConversation.id);
+  announceActiveConversationPresence(relatedConversation, 'state-reply-chat-opened');
 }
 
 async function ensureCallPermissionForType(type) {
@@ -18821,11 +19289,8 @@ function connectStremeMultiplexEventSource(channels = []) {
       }
     };
 
-    source.addEventListener('message', handleSsePayload);
-    source.addEventListener('streme-event', handleSsePayload);
-    source.addEventListener('streme-message', handleSsePayload);
-    source.addEventListener('streme-ready', handleSseControl);
-    source.addEventListener('streme-heartbeat', handleSseControl);
+    registerEventSourcePayloadListeners(source, getRealtimePayloadEventNames(), handleSsePayload);
+    registerEventSourcePayloadListeners(source, getRealtimeControlEventNames(), handleSseControl);
     source.addEventListener('error', () => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       source.close();
@@ -18889,11 +19354,8 @@ function connectStremeEventSource(channelOverride = '') {
       }
     };
 
-    source.addEventListener('message', handleSsePayload);
-    source.addEventListener('streme-event', handleSsePayload);
-    source.addEventListener('streme-message', handleSsePayload);
-    source.addEventListener('streme-ready', handleSseControl);
-    source.addEventListener('streme-heartbeat', handleSseControl);
+    registerEventSourcePayloadListeners(source, getRealtimePayloadEventNames(), handleSsePayload);
+    registerEventSourcePayloadListeners(source, getRealtimeControlEventNames(), handleSseControl);
     source.addEventListener('error', () => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       source.close();
@@ -18962,6 +19424,9 @@ function normalizeStremeEventType(type = '') {
     'streme.typing.start': 'typing.start',
     'streme.typing.stop': 'typing.stop',
     'streme.presence.changed': 'presence.changed',
+    'streme.presence.heartbeat': 'presence.changed',
+    'streme.presence.online': 'presence.changed',
+    'streme.presence.offline': 'presence.changed',
     'streme.call.incoming': 'call.incoming',
     'streme.call.updated': 'call.updated',
     'streme.state.created': 'state.created',
@@ -18999,6 +19464,10 @@ function normalizeStremeEventType(type = '') {
   const directAliases = {
     'chat.message': 'message.created',
     'message.created': 'message.created',
+    'presence.changed': 'presence.changed',
+    'presence.heartbeat': 'presence.changed',
+    'presence.online': 'presence.changed',
+    'presence.offline': 'presence.changed',
     'chat.created': 'conversation.created',
     'chat.updated': 'conversation.updated',
     'chat.deleted': 'conversation.deleted',
@@ -19055,6 +19524,44 @@ function normalizeStremeInboundPayload(payload = {}) {
     type: normalizedType,
     data: normalizedData
   };
+}
+
+
+function registerEventSourcePayloadListeners(source, eventNames = [], handler = null) {
+  if (!source || typeof source.addEventListener !== 'function' || typeof handler !== 'function') return;
+  const uniqueEventNames = Array.from(new Set((Array.isArray(eventNames) ? eventNames : [])
+    .map((eventName) => String(eventName || '').trim())
+    .filter(Boolean)));
+  uniqueEventNames.forEach((eventName) => source.addEventListener(eventName, handler));
+}
+
+function getRealtimePayloadEventNames(extraEventNames = []) {
+  return [
+    'message',
+    'chat_event',
+    'streme-event',
+    'streme-message',
+    'chat.message',
+    'message.created',
+    'message.delivered',
+    'message.received',
+    'message.read',
+    'receipt.delivered',
+    'receipt.read',
+    'presence.changed',
+    'typing.started',
+    'typing.stopped',
+    ...(Array.isArray(extraEventNames) ? extraEventNames : [])
+  ];
+}
+
+function getRealtimeControlEventNames(extraEventNames = []) {
+  return [
+    'streme-ready',
+    'streme-heartbeat',
+    'chat_ready',
+    ...(Array.isArray(extraEventNames) ? extraEventNames : [])
+  ];
 }
 
 
@@ -19127,6 +19634,26 @@ function handleChatRealtimeEventPayload(payload = {}) {
     return;
   }
 
+  if (['message.delivered', 'message.received', 'receipt.delivered', 'delivered'].includes(type)) {
+    applyRealtimeMessageReceipt(data, 'delivered');
+    return;
+  }
+
+  if (['message.read', 'message.seen', 'message.opened', 'receipt.read', 'read'].includes(type)) {
+    applyRealtimeMessageReceipt(data, 'read');
+    return;
+  }
+
+  if (type === 'presence.changed') {
+    updatePresenceStatus({
+      ...data,
+      chatId,
+      conversationId: chatId || data.conversationId || data.chatId || '',
+      status: data.status || data.presence || (String(payload.eventType || payload.type || '').includes('offline') ? 'offline' : 'online')
+    });
+    return;
+  }
+
   if (type === 'chat.typing' || type === 'typing.started' || type === 'typing.stopped') {
     updateTypingStatus({
       ...data,
@@ -19145,8 +19672,72 @@ function isChatRealtimeRecoveryAllowed() {
   return true;
 }
 
+function getChatRealtimeFallbackEventIdentity(event = {}) {
+  if (!event || typeof event !== 'object') return '';
+  return String(
+    event.eventId
+    || event.id
+    || event.seq
+    || event.data?.eventId
+    || event.data?.id
+    || [event.type || event.eventType || '', event.conversationId || event.chatId || '', event.data?.messageId || event.data?.message?.id || '', event.createdAt || ''].join(':')
+  ).trim();
+}
+
+function rememberChatRealtimeFallbackEvent(event = {}) {
+  const identity = getChatRealtimeFallbackEventIdentity(event);
+  if (!identity) return false;
+  if (chatRealtimeFallbackProcessedEventIds.has(identity)) return false;
+  chatRealtimeFallbackProcessedEventIds.add(identity);
+  if (chatRealtimeFallbackProcessedEventIds.size > CHAT_REALTIME_EVENT_DEDUPE_LIMIT) {
+    const overflow = chatRealtimeFallbackProcessedEventIds.size - CHAT_REALTIME_EVENT_DEDUPE_LIMIT;
+    Array.from(chatRealtimeFallbackProcessedEventIds).slice(0, overflow).forEach((item) => chatRealtimeFallbackProcessedEventIds.delete(item));
+  }
+  return true;
+}
+
+function extractChatRealtimeEventsFromPayload(payload = {}) {
+  const candidates = [
+    payload?.events,
+    payload?.items,
+    payload?.records,
+    payload?.data?.events,
+    payload?.data?.items,
+    payload?.realtime?.events,
+    payload?.chatRealtime?.events
+  ];
+  const list = candidates.find((candidate) => Array.isArray(candidate));
+  return Array.isArray(list) ? list.filter((item) => item && typeof item === 'object') : [];
+}
+
+async function pullChatRealtimeEventsFromBackend(reason = 'chat-realtime-http-fallback') {
+  if (!isChatRealtimeRecoveryAllowed() || chatRealtimeFallbackPollInFlight) return 0;
+  chatRealtimeFallbackPollInFlight = true;
+  try {
+    const payload = await apiClient.getChatRealtimeEvents({ reason, limit: 80, lookbackMs: 45000 });
+    const events = extractChatRealtimeEventsFromPayload(payload);
+    let applied = 0;
+    events.forEach((event) => {
+      if (!rememberChatRealtimeFallbackEvent(event)) return;
+      handleChatRealtimeEventPayload(event);
+      applied += 1;
+    });
+    return applied;
+  } catch (error) {
+    if (!isBackendAuthError(error)) console.warn('No se pudo recuperar eventos recientes de ChatER por HTTP fallback.', error);
+    return 0;
+  } finally {
+    chatRealtimeFallbackPollInFlight = false;
+  }
+}
+
+function isChatRealtimeEventSourceOpen() {
+  return Boolean(typeof EventSource !== 'undefined' && chatRealtimeEventSource && chatRealtimeEventSource.readyState === EventSource.OPEN);
+}
+
 function runChatRealtimeRecoveryProbe(reason = 'chat-realtime-recovery') {
   if (!isChatRealtimeRecoveryAllowed()) return;
+  pullChatRealtimeEventsFromBackend(reason);
   syncRealtimeConversationInboxFromBackend({ reason });
   const conversation = getActiveConversation();
   if (conversation?.id && activeSection === 'chats') {
@@ -19154,14 +19745,32 @@ function runChatRealtimeRecoveryProbe(reason = 'chat-realtime-recovery') {
   }
 }
 
+function startChatRealtimeFallbackPollLoop() {
+  if (chatRealtimeFallbackPollTimer || typeof window === 'undefined') return;
+  chatRealtimeFallbackPollTimer = window.setInterval(() => {
+    if (!isChatRealtimeEventSourceOpen()) {
+      pullChatRealtimeEventsFromBackend('chat-realtime-http-fallback-loop');
+    }
+  }, CHAT_REALTIME_FALLBACK_POLL_INTERVAL_MS);
+}
+
+function stopChatRealtimeFallbackPollLoop() {
+  if (!chatRealtimeFallbackPollTimer || typeof window === 'undefined') return;
+  window.clearInterval(chatRealtimeFallbackPollTimer);
+  chatRealtimeFallbackPollTimer = null;
+}
+
 function startChatRealtimeRecoveryLoop() {
-  if (chatRealtimeRecoveryTimer || typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return;
+  startChatRealtimeFallbackPollLoop();
+  if (chatRealtimeRecoveryTimer) return;
   chatRealtimeRecoveryTimer = window.setInterval(() => {
     runChatRealtimeRecoveryProbe('chat-realtime-recovery-loop');
   }, CHAT_REALTIME_RECOVERY_INTERVAL_MS);
 }
 
 function stopChatRealtimeRecoveryLoop() {
+  stopChatRealtimeFallbackPollLoop();
   if (!chatRealtimeRecoveryTimer || typeof window === 'undefined') return;
   window.clearInterval(chatRealtimeRecoveryTimer);
   chatRealtimeRecoveryTimer = null;
@@ -19169,7 +19778,15 @@ function stopChatRealtimeRecoveryLoop() {
 
 function connectChatRealtimeStream() {
   if (!getEffectiveChatRealtimeUrl() || !getSessionEmail() || typeof EventSource === 'undefined') return;
-  if (chatRealtimeEventSource && chatRealtimeEventSource.readyState !== EventSource.CLOSED) return;
+  if (chatRealtimeEventSource && chatRealtimeEventSource.readyState !== EventSource.CLOSED) {
+    if (isSessionGuardCurrent(chatRealtimeSessionGuard)) return;
+    try {
+      chatRealtimeEventSource.close();
+    } catch (_) {}
+    chatRealtimeEventSource = null;
+    chatRealtimeSessionGuard = null;
+    clearTimeout(chatRealtimeReconnectTimer);
+  }
 
   chatRealtimeManualDisconnect = false;
   chatRealtimeSessionGuard = captureSessionGuard();
@@ -19180,19 +19797,23 @@ function connectChatRealtimeStream() {
     chatRealtimeEventSource.addEventListener('chat_ready', () => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       chatRealtimeReconnectAttempts = 0;
+      sendPresenceHeartbeat('online', { force: true, reason: 'chat-realtime-ready' });
+      pullChatRealtimeEventsFromBackend('chat-realtime-ready');
       syncRealtimeConversationInboxFromBackend({ reason: 'chat-realtime-ready', force: true });
     });
-    chatRealtimeEventSource.addEventListener('chat_event', (event) => {
+    const handleChatRealtimePayload = (event) => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       try {
         handleChatRealtimeEventPayload(JSON.parse(event.data || '{}'));
       } catch (error) {
         console.warn('No se pudo procesar un evento simple de chat.', error);
       }
-    });
+    };
+    registerEventSourcePayloadListeners(chatRealtimeEventSource, getRealtimePayloadEventNames(), handleChatRealtimePayload);
     chatRealtimeEventSource.addEventListener('error', () => {
       if (!isSessionGuardCurrent(connectionGuard)) return;
       if (chatRealtimeManualDisconnect) return;
+      pullChatRealtimeEventsFromBackend('chat-realtime-error');
       if (chatRealtimeEventSource?.readyState === EventSource.CLOSED) {
         chatRealtimeEventSource = null;
         scheduleChatRealtimeReconnect();
@@ -19875,6 +20496,7 @@ function receiveRealtimeMessage(data = {}) {
     notifyProfileMessageReceived(conversation, storedMessage, data);
   }
   if (storedMessage.type !== 'outgoing') {
+    markConversationRemotePresenceOnline(conversation, { ...data, ...message });
     sendDeliveredReceiptForMessage(conversation, storedMessage);
     if (conversation.id === activeConversationId && activeSection === 'chats') {
       markConversationRead(conversation, { force: true });
@@ -20320,10 +20942,26 @@ function scheduleRemoteTypingStaleClear(conversationId = '', entry = null) {
   }, REMOTE_TYPING_STALE_MS);
 }
 
+function markConversationRemotePresenceOnline(conversation = {}, data = {}) {
+  if (!conversation || typeof conversation !== 'object') return false;
+  const onlineAt = data.updatedAt || data.createdAt || data.clientTime || new Date().toISOString();
+  conversation.remotePresenceStatus = 'online';
+  conversation.presenceStatus = 'online';
+  conversation.lastPresenceAt = onlineAt;
+  if (conversation.metadata && typeof conversation.metadata === 'object' && !Array.isArray(conversation.metadata)) {
+    conversation.metadata.remotePresenceStatus = 'online';
+    conversation.metadata.presenceStatus = 'online';
+    conversation.metadata.lastPresenceAt = onlineAt;
+  }
+  return true;
+}
+
 function updateTypingStatus(data = {}, isTyping) {
   const conversationId = getTypingConversationId(data);
   const conversation = appState.conversations.find((item) => String(item.id || '') === conversationId);
   if (!conversation || isTypingSignalFromSelf(data)) return;
+
+  markConversationRemotePresenceOnline(conversation, data);
 
   if (isTyping) {
     const existingEntry = remoteTypingDisplayState.get(conversation.id);
@@ -20379,10 +21017,45 @@ function updateTypingStatus(data = {}, isTyping) {
 }
 
 function updatePresenceStatus(data = {}) {
-  const conversation = appState.conversations.find((item) => item.email === data.email || item.id === data.chatId || item.id === data.conversationId);
+  const presenceEmail = normalizeStorageIdentity(data.email || data.userEmail || data.actorUserEmail || data.senderUserEmail || '');
+  const presenceUserId = normalizeBackendUserId(data.userId || data.actorUserId || data.senderUserId || '');
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  const sameDevice = String(data.deviceId || '').trim() && String(data.deviceId || '').trim() === getDeviceId();
+  if ((selfEmail && presenceEmail && presenceEmail === selfEmail) || (selfUserId && presenceUserId && presenceUserId === selfUserId) || sameDevice) return;
+
+  const conversation = appState.conversations.find((item) => {
+    const itemEmail = normalizeStorageIdentity(item.email || item.contactEmail || item.userEmail || '');
+    const itemUserId = normalizeBackendUserId(item.contactUserId || item.remoteUserId || item.userId || '');
+    const matchesDirectIdentity = Boolean(
+      (presenceEmail && itemEmail && itemEmail === presenceEmail)
+      || (presenceUserId && itemUserId && itemUserId === presenceUserId)
+    );
+    if (matchesDirectIdentity) return true;
+
+    const matchesRemoteParticipant = getConversationRemoteIdentities(item).some((identity = {}) => {
+      const remoteEmail = normalizeStorageIdentity(identity.email || identity.userEmail || identity.contactEmail || '');
+      const remoteUserId = normalizeBackendUserId(identity.userId || identity.contactUserId || identity.remoteUserId || identity.id || '');
+      return Boolean(
+        (presenceEmail && remoteEmail && remoteEmail === presenceEmail)
+        || (presenceUserId && remoteUserId && remoteUserId === presenceUserId)
+      );
+    });
+    if (matchesRemoteParticipant) return true;
+
+    return Boolean(
+      (data.chatId && String(item.id || '') === String(data.chatId))
+      || (data.conversationId && String(item.id || '') === String(data.conversationId))
+    );
+  });
   if (!conversation) return;
-  const nextStatus = data.status === 'online' ? 'En línea' : 'No disponible';
+  const normalizedStatus = normalizePresenceStatus(data.status || data.presence || data.state || 'online');
+  const nextStatus = normalizedStatus === 'online' ? 'En línea' : 'No disponible';
   const remoteTypingEntry = remoteTypingDisplayState.get(conversation.id);
+
+  conversation.remotePresenceStatus = normalizedStatus;
+  conversation.presenceStatus = normalizedStatus;
+  conversation.lastPresenceAt = data.updatedAt || data.createdAt || new Date().toISOString();
 
   if (remoteTypingEntry) {
     remoteTypingEntry.previousStatus = nextStatus;
@@ -20404,18 +21077,43 @@ function normalizePresenceStatus(status = 'online') {
   return 'online';
 }
 
+function getPresenceSyncTargetSignature(status = 'online', options = {}) {
+  const conversation = options.conversation || getActiveConversation() || null;
+  const conversationId = String(options.conversationId || conversation?.id || activeConversationId || '').trim();
+  const recipients = Array.isArray(options.recipients) && options.recipients.length
+    ? options.recipients
+    : (conversation ? getConversationRemoteIdentities(conversation) : []);
+  const recipientKeys = recipients
+    .map((recipient = {}) => {
+      const email = normalizeStorageIdentity(recipient.email || recipient.userEmail || recipient.contactEmail || '');
+      const userId = normalizeBackendUserId(recipient.userId || recipient.contactUserId || recipient.remoteUserId || recipient.id || '');
+      return `${email}|${userId}`;
+    })
+    .filter((key) => key !== '|')
+    .sort();
+  const targetChannels = normalizeStremeChannelList([
+    ...(Array.isArray(options.remoteInboxChannels) ? options.remoteInboxChannels : []),
+    ...(conversation ? getConversationRealtimeChannels(conversation, { includeConversation: true, includeSelf: false, includeRemote: true }) : [])
+  ]).sort();
+
+  return [normalizePresenceStatus(status), conversationId, ...recipientKeys, ...targetChannels].join('::');
+}
+
 function syncPresenceStatus(status = 'online', options = {}) {
   if (!CHATER_CONFIG.backendBaseUrl || !getSessionEmail()) return;
 
   const normalizedStatus = normalizePresenceStatus(status);
   const now = Date.now();
+  const targetSignature = getPresenceSyncTargetSignature(normalizedStatus, options);
   if (!options.force
     && presenceSyncState.status === normalizedStatus
+    && presenceSyncState.targetSignature === targetSignature
     && now - Number(presenceSyncState.lastSyncedAt || 0) < PRESENCE_SYNC_MIN_INTERVAL_MS) {
     return;
   }
 
   presenceSyncState.status = normalizedStatus;
+  presenceSyncState.targetSignature = targetSignature;
   presenceSyncState.lastSyncedAt = now;
   presenceSyncState.inFlight = true;
 
@@ -20428,16 +21126,55 @@ function syncPresenceStatus(status = 'online', options = {}) {
     });
 }
 
+function announceActiveConversationPresence(conversation = getActiveConversation(), reason = 'chat-opened') {
+  if (!conversation || !conversation.id || !getSessionEmail()) return;
+
+  connectChatRealtimeStream();
+
+  if (getEffectiveRealtimeUrl() && resolveStremeTransport() === 'sse') {
+    connectStremeMultiplexEventSource(getDesiredStremeSubscriptionChannels(conversation.id));
+  }
+
+  sendPresenceHeartbeat('online', {
+    force: true,
+    conversation,
+    conversationId: conversation.id,
+    reason
+  });
+}
+
 function sendPresenceHeartbeat(status = 'online', options = {}) {
   const normalizedStatus = normalizePresenceStatus(status);
+  const conversation = options.conversation || getActiveConversation() || null;
+  const conversationId = options.conversationId || conversation?.id || activeConversationId || '';
+  const remoteRecipients = conversation ? getConversationRemoteIdentities(conversation) : [];
+  const channels = conversation
+    ? getConversationRealtimeChannels(conversation, { includeConversation: true, includeSelf: true, includeRemote: true })
+    : [getCurrentUserStremeInboxChannel()].filter(Boolean);
+  const uniqueChannels = normalizeStremeChannelList(channels, getDefaultStremeChannel());
+
   sendStremeEvent({
-    type: normalizedStatus === 'offline' ? 'presence.offline' : 'presence.heartbeat',
+    type: 'presence.changed',
     status: normalizedStatus,
+    presence: normalizedStatus,
+    chatId: conversationId,
+    conversationId,
     userId: getCurrentUserIdentifier(),
     userEmail: getSessionEmail(),
-    deviceId: getDeviceId()
+    email: getSessionEmail(),
+    deviceId: getDeviceId(),
+    channel: uniqueChannels[0] || '',
+    canal: uniqueChannels[0] || '',
+    channels: uniqueChannels,
+    canales: uniqueChannels
   });
-  syncPresenceStatus(normalizedStatus, options);
+  syncPresenceStatus(normalizedStatus, {
+    ...options,
+    conversationId,
+    conversation: conversation || undefined,
+    recipients: options.recipients || remoteRecipients,
+    remoteInboxChannels: uniqueChannels.filter((channel) => channel !== getCurrentUserStremeInboxChannel())
+  });
 }
 
 function sendTypingSignal(conversationId, isTyping) {

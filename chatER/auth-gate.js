@@ -272,7 +272,22 @@
   }
 
 
-  function preserveAuthRecord(record = readPersistentAuthRecord()) {
+  function readTabScopedAuthRecord() {
+    const sessionToken = readSessionStorageTokenOnly();
+    const persistentRecord = readPersistentAuthRecord();
+    if (sessionToken) {
+      return {
+        tk: sessionToken,
+        u: persistentRecord?.tk === sessionToken ? persistentRecord.u || null : null,
+        at: persistentRecord?.tk === sessionToken ? persistentRecord.at || Date.now() : Date.now(),
+        app: persistentRecord?.tk === sessionToken ? Boolean(persistentRecord.app) : isInstalledAppRuntime(),
+        rt: persistentRecord?.tk === sessionToken ? persistentRecord.rt || 'tab' : 'tab'
+      };
+    }
+    return persistentRecord;
+  }
+
+  function preserveAuthRecord(record = readTabScopedAuthRecord()) {
     if (!record?.tk) return null;
     const sessionTokenKey = getSessionStorageKey('tk');
     try {
@@ -281,7 +296,7 @@
     return record;
   }
 
-  function allowBackendScriptSessionRestore(record = readPersistentAuthRecord()) {
+  function allowBackendScriptSessionRestore(record = readTabScopedAuthRecord()) {
     const preservedRecord = preserveAuthRecord(record);
     STATE.sessionRestoreAllowed = !!preservedRecord;
     return preservedRecord;
@@ -345,7 +360,7 @@
   }
 
   function readStoredSessionToken() {
-    const record = readPersistentAuthRecord();
+    const record = readTabScopedAuthRecord();
     if (record?.tk) {
       const sessionTokenKey = getSessionStorageKey('tk');
       try {
@@ -353,7 +368,7 @@
       } catch (_) {}
       return record.tk;
     }
-    return readSessionStorageTokenOnly();
+    return '';
   }
 
   function getTrustedLoginFlowKey() {
@@ -626,8 +641,18 @@
 
     const persistentRecord = readPersistentAuthRecord();
     const sessionToken = readSessionStorageTokenOnly();
-    const token = persistentRecord?.tk || sessionToken || '';
-    if (persistentRecord?.tk) allowBackendScriptSessionRestore(persistentRecord);
+    const token = sessionToken || persistentRecord?.tk || '';
+    if (sessionToken) {
+      allowBackendScriptSessionRestore({
+        tk: sessionToken,
+        u: persistentRecord?.tk === sessionToken ? persistentRecord.u || null : null,
+        at: persistentRecord?.tk === sessionToken ? persistentRecord.at || Date.now() : Date.now(),
+        app: persistentRecord?.tk === sessionToken ? Boolean(persistentRecord.app) : isInstalledAppRuntime(),
+        rt: persistentRecord?.tk === sessionToken ? persistentRecord.rt || 'tab' : 'tab'
+      });
+    } else if (persistentRecord?.tk) {
+      allowBackendScriptSessionRestore(persistentRecord);
+    }
 
     if (!persistentRecord && !sessionToken && STATE.storedSessionExpired) return false;
 
@@ -839,9 +864,10 @@
   function rememberBackendLoginFromEvent(event) {
     const detail = event?.detail && typeof event.detail === 'object' ? event.detail : null;
     const eventToken = String(detail?.tk || window.memoriaBACKEND?.tk || '').trim();
-    const storedToken = eventToken ? '' : readStoredSessionToken();
+    const scopedRecord = readTabScopedAuthRecord();
+    const storedToken = eventToken ? '' : scopedRecord?.tk || '';
     const token = eventToken || storedToken;
-    const user = detail?.u || window.memoriaBACKEND?.u || readPersistentAuthRecord()?.u || null;
+    const user = detail?.u || window.memoriaBACKEND?.u || (scopedRecord?.tk === token ? scopedRecord.u || null : null);
     if (token || user) writeStoredSessionToken(token, user);
   }
 
