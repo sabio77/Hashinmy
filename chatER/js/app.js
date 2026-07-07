@@ -2237,6 +2237,16 @@ const apiClient = {
     const params = new URLSearchParams({ email: getSessionEmail(), userEmail: getSessionEmail(), userId: getCurrentUserIdentifier() });
     return this.request(`/api/v1/perfil-usuario?${params.toString()}`);
   },
+  getContactProfileQr() {
+    const profile = getCurrentProfileQrData();
+    const params = new URLSearchParams({
+      email: profile.email || getSessionEmail(),
+      userEmail: profile.email || getSessionEmail(),
+      userId: profile.userId || getCurrentUserIdentifier(),
+      displayName: profile.displayName || profile.name || ''
+    });
+    return this.request(`/api/v1/perfil-contacto/qr?${params.toString()}`);
+  },
   getUserPreferences() {
     const params = new URLSearchParams({
       userId: getCurrentUserIdentifier(),
@@ -12459,7 +12469,27 @@ function reportUnexpectedQrScannerError(error, message = 'No se pudo completar e
   console.warn(message, error);
 }
 
-function renderProfileQrForCurrentUser(container) {
+function renderRawProfileQrPayload(target, payload = '', options = {}) {
+  if (!target || !payload || !window.ChatERQRCodeLego?.generateMatrix || !window.ChatERQRCodeLego?.matrixToSvg) return null;
+  const matrix = window.ChatERQRCodeLego.generateMatrix(payload);
+  target.innerHTML = window.ChatERQRCodeLego.matrixToSvg(matrix, options || {});
+  target.dataset.qrPayload = payload;
+  return { payload, matrix };
+}
+
+function normalizeProfileQrBackendData(payload = {}) {
+  const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+  const profile = data?.profile && typeof data.profile === 'object' ? data.profile : {};
+  return {
+    profile,
+    renderableQrPayload: String(data?.renderableQrPayload || data?.legacyQrPayload || data?.qrRenderablePayload || '').trim(),
+    qrPayload: String(data?.qrPayload || data?.payload || '').trim(),
+    profileConfirmed: Boolean(data?.profileConfirmed),
+    resolvedAt: data?.resolvedAt || ''
+  };
+}
+
+async function renderProfileQrForCurrentUser(container) {
   const target = container?.querySelector?.('[data-profile-qr-code]');
   const payloadTarget = container?.querySelector?.('[data-profile-qr-payload]');
   if (!target) return;
@@ -12470,15 +12500,42 @@ function renderProfileQrForCurrentUser(container) {
     return;
   }
 
-  try {
+  const renderLocalProfileQr = (message = '') => {
     const rendered = window.ChatERQRCodeLego.renderProfileQr(target, getCurrentProfileQrData(), {
       title: 'QR de perfil ChatER'
     });
-    if (payloadTarget) payloadTarget.textContent = rendered.payload;
+    if (payloadTarget) payloadTarget.textContent = message || rendered.payload;
+    return rendered;
+  };
+
+  try {
+    if (CHATER_CONFIG.backendBaseUrl) {
+      target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
+      if (payloadTarget) payloadTarget.textContent = 'Confirmando tu perfil en memoriaBACKEND antes de mostrar el QR...';
+      const backendPayload = await apiClient.getContactProfileQr();
+      const backendQr = normalizeProfileQrBackendData(backendPayload);
+      const rendered = backendQr.renderableQrPayload
+        ? renderRawProfileQrPayload(target, backendQr.renderableQrPayload, { title: 'QR de perfil ChatER' })
+        : null;
+      if (rendered) {
+        if (payloadTarget) payloadTarget.textContent = backendQr.profileConfirmed
+          ? 'Perfil confirmado en memoriaBACKEND. Este QR permite crear el contacto.'
+          : rendered.payload;
+        return rendered;
+      }
+    }
+
+    return renderLocalProfileQr();
   } catch (error) {
-    target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
-    if (payloadTarget) payloadTarget.textContent = 'No se pudo generar el QR de perfil en este navegador.';
-    console.warn('No se pudo generar el QR del perfil.', error);
+    console.warn('No se pudo confirmar el QR del perfil con memoriaBACKEND. Se muestra QR local de respaldo.', error);
+    try {
+      return renderLocalProfileQr('QR local de respaldo: inicia sesión de nuevo si otra persona no puede agregarte.');
+    } catch (localError) {
+      target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
+      if (payloadTarget) payloadTarget.textContent = 'No se pudo generar el QR de perfil en este navegador.';
+      console.warn('No se pudo generar el QR del perfil.', localError);
+      return null;
+    }
   }
 }
 
@@ -12518,7 +12575,13 @@ async function resolveContactQrWithBackend(rawValue = '', fallbackContact = {}) 
     return normalizeContactFromQrResolverResponse(payload, normalizedFallback);
   } catch (error) {
     console.warn('memoriaBACKEND rechazó o no pudo confirmar que el contacto del QR exista.', error);
-    throw new Error('No se pudo crear el contacto: memoriaBACKEND no confirmó que el perfil del QR exista.');
+    if (isContactProfileNotFoundError(error)) {
+      throw new Error(buildContactProfileNotFoundFeedback(normalizedFallback));
+    }
+    const detail = String(error?.message || '').trim();
+    throw new Error(detail
+      ? `No se pudo crear el contacto: memoriaBACKEND no confirmó que el perfil del QR exista. Detalle: ${detail}`
+      : 'No se pudo crear el contacto: memoriaBACKEND no confirmó que el perfil del QR exista.');
   }
 }
 

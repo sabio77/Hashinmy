@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-07-chater-logout-auth-gate-151",
-  "buildTime": "2026-07-07T10:10:00-05:00",
+  "version": "2026-07-07-chater-qr-profile-confirmation-152",
+  "buildTime": "2026-07-07T11:15:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER corrige el cierre de sesión para que auth-gate envíe la cabecera obligatoria de mutación, limpie la sesión local y reinicie la puerta de autenticación.",
-  "build": "logout-auth-gate-151",
-  "updatedAt": "2026-07-07T10:10:00-05:00",
-  "notes": "El cierre de sesión usa X-Hashinmy-Action:webapp en /auth/logout, borra tokens persistentes y recarga la shell para volver al login seguro sin restaurar sesiones antiguas.",
+  "description": "ChatER confirma y materializa el perfil de memoriaBACKEND antes de mostrar el QR de perfil para que otros usuarios puedan crear el contacto sin rechazo falso.",
+  "build": "qr-profile-confirmation-152",
+  "updatedAt": "2026-07-07T11:15:00-05:00",
+  "notes": "El QR visible del perfil se solicita a memoriaBACKEND, confirma el perfil autenticado y usa un payload compatible con el lector actual; el resolver mantiene la validación estricta de perfiles reales.",
   "changes": [
-    "auth-gate.js agrega X-Hashinmy-Action:webapp a mutaciones y al cierre previo de sesiones existentes.",
-    "window.platformAuthGate.logout centraliza el cierre robusto de memoriaBACKEND, limpia tokens locales y recarga la app.",
-    "js/app.js usa primero el cierre del auth-gate antes del SDK para que el botón Cerrar sesión funcione también en sesiones restauradas.",
-    "service-worker.js actualiza la versión de caché para que Render/PWA no sigan sirviendo el auth-gate anterior."
+    "RELACIONESusuarioX confirma o crea idempotentemente el perfil autenticado antes de emitir el QR de perfil.",
+    "El endpoint /api/v1/perfil-contacto/qr devuelve un payload QR renderizable compatible con ChatER además del token firmado backend.",
+    "js/app.js solicita el QR confirmado a memoriaBACKEND antes de mostrarlo y conserva respaldo local solo si el backend no está disponible.",
+    "El mensaje de error del QR conserva la causa real cuando memoriaBACKEND rechaza el perfil del contacto."
   ]
 }
