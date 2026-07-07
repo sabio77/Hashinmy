@@ -19701,10 +19701,16 @@ function resetTypingStateForSessionEnd() {
 async function logoutCurrentSession() {
   disconnectStremeRealtime();
   try {
-    const sdk = getMemoriaBackendSdk();
-    const sdkLogout = sdk?.cerrarSesion || sdk?.logout || sdk?.signOut || sdk?.salir;
-    if (typeof sdkLogout === 'function') {
-      await sdkLogout.call(sdk);
+    const gate = getPlatformAuthGate();
+    const gateLogout = gate?.logout;
+    if (typeof gateLogout === 'function') {
+      await gateLogout.call(gate);
+    } else {
+      const sdk = getMemoriaBackendSdk();
+      const sdkLogout = sdk?.cerrarSesion || sdk?.logout || sdk?.signOut || sdk?.salir;
+      if (typeof sdkLogout === 'function') {
+        await sdkLogout.call(sdk);
+      }
     }
   } catch (error) {
     // El cierre local no debe fallar si memoriaBACKEND no está disponible.

@@ -1,17 +1,16 @@
 {
-  "version": "2026-07-06-chater-direct-open-replay-150",
-  "buildTime": "2026-07-06T20:05:00-05:00",
+  "version": "2026-07-07-chater-logout-auth-gate-151",
+  "buildTime": "2026-07-07T10:10:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER reentrega mensajes directos vigentes al abrir el stream SSE y restaura chats eliminados localmente cuando llega un mensaje realtime entrante.",
-  "build": "direct-open-replay-150",
-  "updatedAt": "2026-07-06T20:05:00-05:00",
-  "notes": "El flujo directo compatible con estadisponible conserva un solo POST a /api/v1/chats/send; CHATrealtimeX guarda eventos de mensaje en Redis durante la misma vigencia efímera de 24 horas y hace replay inmediato al abrir /stream para los alias del receptor, sin polling ni verificaciones extra.",
+  "description": "ChatER corrige el cierre de sesión para que auth-gate envíe la cabecera obligatoria de mutación, limpie la sesión local y reinicie la puerta de autenticación.",
+  "build": "logout-auth-gate-151",
+  "updatedAt": "2026-07-07T10:10:00-05:00",
+  "notes": "El cierre de sesión usa X-Hashinmy-Action:webapp en /auth/logout, borra tokens persistentes y recarga la shell para volver al login seguro sin restaurar sesiones antiguas.",
   "changes": [
-    "CHATrealtimeX reentrega desde Redis eventos de mensaje vigentes del destinatario al abrir el EventSource /api/v1/chats/stream.",
-    "chatER/js/app.js limpia flags locales de chat eliminado/oculto cuando entra un mensaje realtime nuevo.",
-    "Se agrega regresión funcional para mensaje directo guardado antes de abrir el stream del receptor y para evitar que eventos cortos reduzcan el TTL del índice realtime.",
-    "El flujo sigue usando MENSAJESx + Redis + CHATrealtimeX, sin STREMEx como transporte intermedio del mensaje directo.",
-    "service-worker.js actualiza versión para evitar caché PWA del flujo anterior."
+    "auth-gate.js agrega X-Hashinmy-Action:webapp a mutaciones y al cierre previo de sesiones existentes.",
+    "window.platformAuthGate.logout centraliza el cierre robusto de memoriaBACKEND, limpia tokens locales y recarga la app.",
+    "js/app.js usa primero el cierre del auth-gate antes del SDK para que el botón Cerrar sesión funcione también en sesiones restauradas.",
+    "service-worker.js actualiza la versión de caché para que Render/PWA no sigan sirviendo el auth-gate anterior."
   ]
 }

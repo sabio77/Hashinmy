@@ -518,10 +518,11 @@
     }
   }
 
-  function buildSessionHeaders(token = '', includeJson = false) {
+  function buildSessionHeaders(token = '', includeJson = false, includeMutationAction = false) {
     const siteId = getSiteId();
     const headers = { 'X-MB-Site': siteId };
     if (includeJson) headers['Content-Type'] = 'application/json';
+    if (includeMutationAction) headers['X-Hashinmy-Action'] = 'webapp';
     if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
   }
@@ -547,11 +548,12 @@
       const method = String(options.method || 'GET').toUpperCase();
       const hasBody = method !== 'GET' && options.body && typeof options.body === 'object';
       const url = buildUrl(path, method === 'GET' ? options.query : null);
+      const isMutation = method !== 'GET' && method !== 'HEAD';
       const response = await fetch(url, {
         method,
         credentials: 'include',
         cache: 'no-store',
-        headers: buildSessionHeaders(token, hasBody),
+        headers: buildSessionHeaders(token, hasBody, isMutation),
         body: hasBody ? JSON.stringify(options.body) : undefined
       });
       const data = await response.clone().json().catch(() => null);
@@ -591,12 +593,8 @@
       vista(k = 'v') {
         return requestJson('/api/v1/view', { method: 'POST', body: { s: siteId, k: String(k || 'v') } });
       },
-      async cerrarSesion() {
-        try {
-          return await requestJson('/auth/logout', { method: 'POST', body: { s: siteId } });
-        } finally {
-          clearKnownStoredAuth();
-        }
+      cerrarSesion() {
+        return logoutAndResetBackendSession();
       }
     };
   }
@@ -686,7 +684,11 @@
 
     if (!backendBaseUrl || !siteId || !window.fetch) return;
 
-    const headers = { 'Content-Type': 'application/json', 'X-MB-Site': siteId };
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-MB-Site': siteId,
+      'X-Hashinmy-Action': 'webapp'
+    };
     if (storedToken) headers.Authorization = `Bearer ${storedToken}`;
 
     let timeout = 0;
@@ -706,6 +708,53 @@
     } finally {
       if (timeout) window.clearTimeout(timeout);
     }
+  }
+
+
+  async function requestBackendLogout(token = '') {
+    const backendBaseUrl = getBackendBaseUrl();
+    const siteId = getSiteId();
+    if (!backendBaseUrl || !siteId || !window.fetch) return { ok: 1, skipped: true };
+
+    const headers = buildSessionHeaders(token, true, true);
+    let timeout = 0;
+    try {
+      const controller = window.AbortController ? new AbortController() : null;
+      timeout = controller ? window.setTimeout(() => controller.abort(), Math.max(1500, Number(CONFIG.sessionCheckTimeoutMs) || 4500)) : 0;
+      const response = await fetch(`${backendBaseUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers,
+        body: JSON.stringify({ s: siteId }),
+        signal: controller?.signal
+      });
+      const data = await response.clone().json().catch(() => null);
+      return response.ok && data ? data : { ok: response.ok ? 1 : 0, status: response.status, data };
+    } finally {
+      if (timeout) window.clearTimeout(timeout);
+    }
+  }
+
+  async function logoutAndResetBackendSession() {
+    const token = String(window.memoriaBACKEND?.tk || readSessionStorageTokenOnly() || readStoredSessionToken() || '').trim();
+    let result = { ok: 1, localOnly: true };
+    try {
+      result = await requestBackendLogout(token);
+    } catch (_) {
+      // El cierre local debe continuar aunque la red, CORS o el backend fallen.
+    } finally {
+      clearKnownStoredAuth();
+      clearTrustedLoginFlow();
+      STATE.sessionRestoreAllowed = false;
+      STATE.sessionRestoredFromStorage = false;
+      STATE.storedSessionExpired = false;
+      clearInjectedBackendApi();
+      try {
+        window.location.reload();
+      } catch (_) {}
+    }
+    return result;
   }
 
   function isBackendAuthCheckUrl(value) {
@@ -1232,7 +1281,8 @@
     showWaiting,
     showError,
     markBackendScriptLoaded,
-    getSessionToken: readStoredSessionToken
+    getSessionToken: readStoredSessionToken,
+    logout: logoutAndResetBackendSession
   });
 
   installStyle();
