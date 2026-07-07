@@ -3820,3 +3820,26 @@ Validación ejecutable:
 
 Estado:
 - Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
+
+## Iteración ChatER - replay vigente 24h e índice Redis no encogible
+
+Punto débil identificado: `CHATrealtimeX` ya reentregaba eventos al abrir `/api/v1/chats/stream`, pero la ventana de replay de eventos de mensaje era corta y el índice Redis del stream podía recibir un `EXPIRE` menor cuando entraban eventos transitorios como `typing`. En ese escenario el mensaje seguía guardado en Redis por `MENSAJESx`, pero el receptor podía perder el evento que lo hacía reaparecer sin borrar y recrear el contacto por QR.
+
+Cambios aplicados:
+
+- `CHATrealtimeX/BLOQUE/chatRealtimeStore.js` alinea `EVENT_TTL_SECONDS` con la vigencia efímera de ChatER: 24 horas.
+- `publishEvent()` y `persistEvent()` ahora usan `clampEventTtlSeconds()` para que los eventos de mensaje puedan reentregarse durante toda la vida útil del mensaje, no solo durante una ventana corta.
+- `expireEventIndex()` evita encoger el TTL del índice `chater:rt:index:<siteId>` cuando se publican eventos cortos como `chat.typing`; solo extiende o conserva la vigencia existente.
+- `MENSAJESx/BLOQUE/mENSAJESxStore.js` publica `chat.message` con `ttlSeconds: CHATER_MESSAGE_TTL_SECONDS`, manteniendo equivalencia entre mensaje persistido y replay realtime.
+- `PRUEBASmemoriaBACKEND/BLOQUE/chaterFunctionalRegressionChecks.js` valida que el índice realtime conserve 24 horas y que un evento `typing` de 45 segundos no reduzca esa ventana.
+- `app-version.json` y `service-worker.js` suben a `2026-07-06-chater-direct-open-replay-150` para evitar caché PWA del flujo anterior.
+
+Validación ejecutada:
+
+- `node --check memoriaBACKEND/CHATrealtimeX/BLOQUE/chatRealtimeStore.js`
+- `node --check memoriaBACKEND/MENSAJESx/BLOQUE/mENSAJESxStore.js`
+- `node --check memoriaBACKEND/PRUEBASmemoriaBACKEND/BLOQUE/chaterFunctionalRegressionChecks.js`
+- `npm run check` dentro de `memoriaBACKEND`
+
+Estado:
+- Avance parcial robusto. Se entrega ZIP con módulos afectados para que Nova aplique esta mejora y vuelva a validar antes de emitir la frase final.
