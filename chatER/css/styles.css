@@ -1156,6 +1156,67 @@ button {
   z-index: 20;
 }
 
+.message-event-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 1300;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.message-event-overlay[hidden] {
+  display: none;
+}
+
+.message-event-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.message-event-circle {
+  width: clamp(144px, 24vmin, 224px);
+  height: clamp(144px, 24vmin, 224px);
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow:
+    0 0 0 18px rgba(34, 197, 94, 0.16),
+    0 24px 80px rgba(21, 128, 61, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: chater-message-event-pulse 3000ms ease-out both;
+}
+
+@keyframes chater-message-event-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+
+  12% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  72% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-event-circle {
+    animation: none;
+  }
+}
+
 .bottom-navigation {
   display: none;
 }

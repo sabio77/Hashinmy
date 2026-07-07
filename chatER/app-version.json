@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-07-chater-qr-display-alias-153",
-  "buildTime": "2026-07-07T11:45:00-05:00",
+  "version": "2026-07-07-message-event-indicator-155",
+  "buildTime": "2026-07-07T12:50:48-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER permite personalizar el nombre público del QR y conserva nombres visibles por usuario al abrir chats existentes.",
-  "build": "qr-display-alias-153",
-  "updatedAt": "2026-07-07T11:45:00-05:00",
-  "notes": "El nombre definido sobre el QR viaja como nombre inicial del contacto; cada usuario conserva su alias local o backend-scoped sin imponerlo al otro participante.",
+  "description": "ChatER muestra un indicador visual global cuando el perfil activo recibe un mensaje nuevo en tiempo real, sin filtrar por remitente.",
+  "build": "message-event-indicator-155",
+  "updatedAt": "2026-07-07T12:50:48-05:00",
+  "notes": "Los eventos nuevos de mensajes disparan una línea visual aislada que muestra un círculo verde centrado durante 3 segundos, independiente del remitente, la sección o la ventana abierta de ChatER.",
   "changes": [
-    "El perfil muestra un campo editable arriba del QR para definir el nombre que recibirán quienes escaneen el código.",
-    "js/app.js persiste el nombre del QR por cuenta y lo envía a memoriaBACKEND como qrDisplayName/displayName.",
-    "RELACIONESusuarioX prioriza el nombre incluido en el QR al resolver contactos, sin reemplazarlo por el nombre global del perfil.",
-    "CONVERSACIONESx guarda nombres visibles por participante y responde cada conversación con el nombre correspondiente al usuario que consulta."
+    "Se agregó una línea de eventos aislada para señales de mensaje recibido del perfil activo.",
+    "El indicador visual muestra un círculo verde grande en el centro de la app durante 3 segundos y luego se oculta automáticamente.",
+    "La señal se deduplica por mensaje y se replica entre ventanas abiertas mediante BroadcastChannel con respaldo por storage.",
+    "La integración se realiza sobre mensajes nuevos de tiempo real sin filtrar por remitente y sin alterar envío, recibos, lectura ni sincronización existente."
   ]
 }

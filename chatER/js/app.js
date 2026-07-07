@@ -2146,6 +2146,11 @@ let chatRealtimeManualDisconnect = false;
 let chatRealtimeSessionGuard = null;
 let chatRealtimeRecoveryTimer = null;
 const CHAT_REALTIME_RECOVERY_INTERVAL_MS = 12000;
+const CHATER_PROFILE_MESSAGE_RECEIVED_EVENT = 'chater:profile-message-received';
+const CHATER_PROFILE_MESSAGE_INDICATOR_VISIBLE_MS = 3000;
+const CHATER_PROFILE_MESSAGE_SIGNAL_STORAGE_KEY = 'chater.profileMessageReceivedSignal';
+const CHATER_PROFILE_MESSAGE_BROADCAST_CHANNEL = 'chater-profile-message-events';
+const CHATER_PROFILE_MESSAGE_DEDUPE_TTL_MS = 45000;
 let pushConfigCache = null;
 let pushConfigInFlight = null;
 let toastTimer = null;
@@ -2273,6 +2278,7 @@ const modalBody = document.getElementById('modalBody');
 const modalCloseButton = document.getElementById('modalCloseButton');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const toast = document.getElementById('toast');
+const messageEventOverlay = document.getElementById('messageEventOverlay');
 const sectionTabs = Array.from(document.querySelectorAll('.mode-tab'));
 const bottomNavButtons = Array.from(document.querySelectorAll('.bottom-nav-item'));
 const floatingActionButton = document.getElementById('floatingActionButton');
@@ -2294,6 +2300,232 @@ const chatFloatingMenuState = {
 const CHAT_LONG_PRESS_DELAY_MS = 540;
 const CHAT_LONG_PRESS_MOVE_TOLERANCE_PX = 10;
 const DEFAULT_CHAT_LIST_NAME = 'Prioridad';
+
+
+const chaterProfileMessageEventLine = typeof EventTarget !== 'undefined' ? new EventTarget() : null;
+const chaterProfileMessageSignalDedupe = new Map();
+let chaterProfileMessageIndicatorTimer = null;
+let chaterProfileMessageBroadcast = null;
+
+function getProfileMessageSignalIdentity(detail = {}) {
+  const message = detail.message && typeof detail.message === 'object' ? detail.message : {};
+  const conversation = detail.conversation && typeof detail.conversation === 'object' ? detail.conversation : {};
+  const explicitId = detail.signalId
+    || detail.messageId
+    || message.id
+    || message.messageId
+    || message.clientMutationId
+    || message.clientMessageId
+    || '';
+  const conversationId = detail.conversationId || conversation.id || message.conversationId || message.chatId || '';
+  const createdAt = message.createdAt || message.clientTime || message.backendReceivedAt || detail.createdAt || '';
+  const sender = message.senderUserEmail || message.senderEmail || message.senderUserId || message.fromUserId || detail.senderUserEmail || detail.senderUserId || '';
+  return [conversationId, explicitId || createdAt || Date.now(), sender].map((value) => String(value || '').trim()).join('|');
+}
+
+function pruneProfileMessageSignalDedupe(now = Date.now()) {
+  chaterProfileMessageSignalDedupe.forEach((timestamp, signalId) => {
+    if (now - Number(timestamp || 0) > CHATER_PROFILE_MESSAGE_DEDUPE_TTL_MS) {
+      chaterProfileMessageSignalDedupe.delete(signalId);
+    }
+  });
+}
+
+function hasSeenProfileMessageSignal(signalId = '') {
+  const normalizedSignalId = String(signalId || '').trim();
+  if (!normalizedSignalId) return false;
+  const now = Date.now();
+  pruneProfileMessageSignalDedupe(now);
+  if (chaterProfileMessageSignalDedupe.has(normalizedSignalId)) return true;
+  chaterProfileMessageSignalDedupe.set(normalizedSignalId, now);
+  return false;
+}
+
+function showProfileMessageReceivedIndicator() {
+  if (!messageEventOverlay) return;
+  clearTimeout(chaterProfileMessageIndicatorTimer);
+  messageEventOverlay.hidden = false;
+  window.requestAnimationFrame(() => {
+    messageEventOverlay.classList.add('is-visible');
+  });
+  chaterProfileMessageIndicatorTimer = window.setTimeout(() => {
+    messageEventOverlay.classList.remove('is-visible');
+    chaterProfileMessageIndicatorTimer = window.setTimeout(() => {
+      messageEventOverlay.hidden = true;
+    }, 220);
+  }, CHATER_PROFILE_MESSAGE_INDICATOR_VISIBLE_MS);
+}
+
+function handleProfileMessageReceivedSignal(detail = {}, options = {}) {
+  const signalId = getProfileMessageSignalIdentity(detail);
+  if (hasSeenProfileMessageSignal(signalId)) return false;
+  showProfileMessageReceivedIndicator();
+  if (!options.skipBroadcast) broadcastProfileMessageReceivedSignal({ ...detail, signalId });
+  return true;
+}
+
+function emitProfileMessageReceivedSignal(detail = {}) {
+  const eventDetail = {
+    ...detail,
+    receivedAt: detail.receivedAt || new Date().toISOString(),
+    signalId: getProfileMessageSignalIdentity(detail)
+  };
+
+  if (chaterProfileMessageEventLine && typeof CustomEvent !== 'undefined') {
+    chaterProfileMessageEventLine.dispatchEvent(new CustomEvent(CHATER_PROFILE_MESSAGE_RECEIVED_EVENT, { detail: eventDetail }));
+    return;
+  }
+
+  handleProfileMessageReceivedSignal(eventDetail);
+}
+
+function broadcastProfileMessageReceivedSignal(detail = {}) {
+  const payload = {
+    type: CHATER_PROFILE_MESSAGE_RECEIVED_EVENT,
+    sourceDeviceId: getDeviceId(),
+    sessionEmail: getSessionEmail(),
+    detail
+  };
+
+  try {
+    chaterProfileMessageBroadcast?.postMessage?.(payload);
+  } catch (error) {
+    // El canal visual es auxiliar: no debe romper la recepción del mensaje.
+  }
+
+  try {
+    writeStorageItem(CHATER_PROFILE_MESSAGE_SIGNAL_STORAGE_KEY, JSON.stringify({ ...payload, emittedAt: Date.now() }));
+  } catch (error) {
+    // Sin localStorage, la ventana actual ya mostró el indicador mediante EventTarget.
+  }
+}
+
+function isProfileMessageReceivedSignalForCurrentSession(payload = {}) {
+  if (!payload || payload.type !== CHATER_PROFILE_MESSAGE_RECEIVED_EVENT) return false;
+  const payloadEmail = normalizeStorageIdentity(payload.sessionEmail || payload.detail?.sessionEmail || '');
+  const currentEmail = normalizeStorageIdentity(getSessionEmail());
+  return Boolean(!payloadEmail || !currentEmail || payloadEmail === currentEmail);
+}
+
+function handleExternalProfileMessageReceivedSignal(payload = {}) {
+  if (!isProfileMessageReceivedSignalForCurrentSession(payload)) return;
+  handleProfileMessageReceivedSignal(payload.detail || {}, { skipBroadcast: true });
+}
+
+function setupProfileMessageReceivedEventLine() {
+  if (chaterProfileMessageEventLine) {
+    chaterProfileMessageEventLine.addEventListener(CHATER_PROFILE_MESSAGE_RECEIVED_EVENT, (event) => {
+      handleProfileMessageReceivedSignal(event.detail || {});
+    });
+  }
+
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      chaterProfileMessageBroadcast = new BroadcastChannel(CHATER_PROFILE_MESSAGE_BROADCAST_CHANNEL);
+      chaterProfileMessageBroadcast.addEventListener('message', (event) => {
+        handleExternalProfileMessageReceivedSignal(event.data || {});
+      });
+    }
+  } catch (error) {
+    chaterProfileMessageBroadcast = null;
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== CHATER_PROFILE_MESSAGE_SIGNAL_STORAGE_KEY || !event.newValue) return;
+    try {
+      handleExternalProfileMessageReceivedSignal(JSON.parse(event.newValue));
+    } catch (error) {
+      // Ignora señales visuales corruptas sin afectar el chat.
+    }
+  });
+}
+
+function readProfileMessageIdentityCandidates(source = {}, aliases = []) {
+  if (!source || typeof source !== 'object') return { emails: [], userIds: [] };
+  const metadata = source.metadata && typeof source.metadata === 'object' ? source.metadata : {};
+  const nestedSender = source.sender && typeof source.sender === 'object' ? source.sender : {};
+  const nestedRecipient = source.recipient && typeof source.recipient === 'object' ? source.recipient : {};
+  const values = aliases.flatMap((alias) => ([
+    source[alias],
+    metadata[alias],
+    nestedSender[alias],
+    nestedRecipient[alias]
+  ]));
+
+  return values.reduce((acc, value) => {
+    const text = String(value || '').trim();
+    if (!text) return acc;
+    const email = normalizeStorageIdentity(text);
+    const userId = normalizeBackendUserId(text);
+    if (email && text.includes('@')) acc.emails.push(email);
+    if (userId) acc.userIds.push(userId);
+    return acc;
+  }, { emails: [], userIds: [] });
+}
+
+function shouldShowProfileMessageReceivedIndicator(message = {}, options = {}, conversation = {}) {
+  if (!message || typeof message !== 'object') return false;
+  if (message.previewOnly || message.lastMessagePreviewOnly || message.metadata?.previewOnly || message.metadata?.lastMessagePreviewOnly) return false;
+  if (message.type === 'system') return false;
+
+  const selfEmail = normalizeStorageIdentity(getSessionEmail());
+  const selfUserId = normalizeBackendUserId(getSessionUserId()) || normalizeBackendUserId(getCurrentUserIdentifier());
+  if (!selfEmail && !selfUserId) return true;
+
+  const recipientCandidates = readProfileMessageIdentityCandidates({ ...options, ...message }, [
+    'recipientUserEmail', 'recipientEmail', 'toEmail', 'targetUserEmail', 'profileEmail', 'userEmail',
+    'recipientUserId', 'toUserId', 'targetUserId', 'profileUserId', 'userId'
+  ]);
+  const senderCandidates = readProfileMessageIdentityCandidates({ ...options, ...message }, [
+    'senderUserEmail', 'senderEmail', 'fromEmail', 'authorEmail',
+    'senderUserId', 'fromUserId', 'authorUserId'
+  ]);
+  const participants = normalizeConversationParticipantsForApi(
+    conversation.participants
+      || conversation.metadata?.participants
+      || options.participants
+      || options.participantList
+      || []
+  );
+  const participantKeys = participants.map(normalizeParticipantIdentityKey).filter(Boolean);
+  const selfParticipantKeys = [
+    selfEmail ? `email:${selfEmail}` : '',
+    selfUserId ? `user:${selfUserId}` : ''
+  ].filter(Boolean);
+
+  const recipientMatchesSelf = Boolean(
+    (selfEmail && recipientCandidates.emails.includes(selfEmail))
+      || (selfUserId && recipientCandidates.userIds.includes(selfUserId))
+  );
+  const senderMatchesSelf = Boolean(
+    (selfEmail && senderCandidates.emails.includes(selfEmail))
+      || (selfUserId && senderCandidates.userIds.includes(selfUserId))
+  );
+  const conversationIncludesSelf = selfParticipantKeys.some((key) => participantKeys.includes(key));
+  const hasExplicitAudience = Boolean(recipientCandidates.emails.length || recipientCandidates.userIds.length || participantKeys.length);
+
+  if (recipientMatchesSelf || conversationIncludesSelf || senderMatchesSelf) return true;
+
+  // La línea visual está conectada a eventos de tiempo real ya filtrados por la sesión del perfil.
+  // Si el backend no envía destinatario/participantes, no se bloquea por remitente: cualquier mensaje nuevo recibido por este perfil debe indicarse.
+  return !hasExplicitAudience;
+}
+
+function notifyProfileMessageReceived(conversation = {}, message = {}, options = {}) {
+  if (!shouldShowProfileMessageReceivedIndicator(message, options, conversation)) return false;
+  emitProfileMessageReceivedSignal({
+    conversationId: conversation.id || message.conversationId || message.chatId || options.conversationId || '',
+    messageId: message.id || message.messageId || options.messageId || '',
+    senderUserEmail: message.senderUserEmail || options.senderUserEmail || '',
+    senderUserId: message.senderUserId || options.senderUserId || '',
+    recipientUserEmail: message.recipientUserEmail || options.recipientUserEmail || '',
+    recipientUserId: message.recipientUserId || options.recipientUserId || '',
+    message,
+    conversation,
+    sessionEmail: getSessionEmail()
+  });
+  return true;
+}
 
 const apiClient = {
   async request(path, options = {}) {
@@ -19639,6 +19871,9 @@ function receiveRealtimeMessage(data = {}) {
 
   const storedMessage = existingMessage || normalizedMessage;
   restoreConversationVisibilityForIncomingRealtimeMessage(conversation, storedMessage);
+  if (!existingMessage) {
+    notifyProfileMessageReceived(conversation, storedMessage, data);
+  }
   if (storedMessage.type !== 'outgoing') {
     sendDeliveredReceiptForMessage(conversation, storedMessage);
     if (conversation.id === activeConversationId && activeSection === 'chats') {
@@ -20422,6 +20657,7 @@ setInterval(() => {
   }
 }, STATE_EXPIRY_SWEEP_INTERVAL_MS);
 scheduleNextEphemeralLocalPurge('bootstrap');
+setupProfileMessageReceivedEventLine();
 renderEmojiPanel();
 updateComposerActionState();
 startMemoriaBackendKeepalive();

@@ -17,7 +17,7 @@
   <script src="js/theme-bootstrap.js"></script>
   <script src="js/memoria-backend-config.js?v=20260706-auth-reference-5"></script>
   <script src="auth-gate.js?v=20260706-auth-reference-3"></script>
-  <link rel="stylesheet" href="css/styles.css?v=20260707-qr-display-alias-153" />
+  <link rel="stylesheet" href="css/styles.css?v=20260707-message-event-indicator-155" />
 </head>
 <body>
   <main class="app-shell" aria-label="ChatER">
@@ -137,13 +137,18 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+  <div id="messageEventOverlay" class="message-event-overlay" role="status" aria-live="polite" aria-label="Mensaje recibido" hidden>
+    <span class="message-event-circle" aria-hidden="true"></span>
+    <span class="visually-hidden">Mensaje recibido</span>
+  </div>
+
   <script src="IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js?v=20260706-auth-reference-3" defer></script>
   <script src="IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js?v=20260706-auth-reference-3" defer></script>
   <script src="QRcodigosX/BLOQUE/qr-core.js?v=20260706-auth-reference-3" defer></script>
   <script src="QRcodigosX/conexion/qr-codigosx.js?v=20260706-auth-reference-3" defer></script>
   <script src="PERMISOSx/BLOQUE/permisos-core.js?v=20260706-auth-reference-3" defer></script>
   <script src="PERMISOSx/conexion/permisosx.js?v=20260706-auth-reference-3" defer></script>
-  <script src="js/app.js?v=20260707-qr-display-alias-153" defer></script>
+  <script src="js/app.js?v=20260707-message-event-indicator-155" defer></script>
   <script src="js/pwa.js?v=20260706-auth-reference-6" defer></script>
 </body>
 </html>
