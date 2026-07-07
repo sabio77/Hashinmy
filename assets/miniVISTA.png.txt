@@ -30,9 +30,9 @@
     ]
   },
   "fallback": {
-    "si_no_existe_miniVISTA_png": "usar el logo de Hashinmy como imagen alternativa en los metadatos sociales",
-    "logo_referencia": "assets/hashinmy-logo-emblem.png",
-    "si_no_existe_logo": "la interfaz debe conservar fallback geométrico ya existente de la marca"
+    "si_no_existe_miniVISTA_png": "no declarar ninguna otra imagen alternativa en metadatos sociales; conservar siempre la ruta assets/miniVISTA.png para que WhatsApp y otros previsualizadores no elijan otro recurso",
+    "fallback_visual_sin_png": "si el PNG real aún no existe en assets, el proyecto debe seguir operativo mostrando una figura geométrica de reserva solo dentro de la interfaz visible, sin cambiar og:image, twitter:image, image_src, thumbnail ni itemprop:image",
+    "restriccion_social": "miniVISTA.png es la única imagen autorizada para previews de enlaces; no usar logo, escenas, avatares, clientes ni fotografías como fallback social"
   },
   "restricciones": [
     "no usar fotografías genéricas de oficina",

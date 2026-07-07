@@ -4677,6 +4677,13 @@
       node.setAttribute('content', t(node.dataset.i18nContent));
     });
 
+    const socialPreviewAlt = [t('meta.ogTitle', ''), t('meta.ogDescription', '')].filter(Boolean).join('. ');
+    if (socialPreviewAlt) {
+      document.querySelectorAll('[data-hashinmy-social-preview-alt]').forEach((node) => {
+        node.setAttribute('content', socialPreviewAlt);
+      });
+    }
+
     syncProofLogoLocalizedText();
   }
 

@@ -1578,35 +1578,6 @@ function normalizeStremeChannelList(channels = [], fallback = '') {
   return normalized.slice(0, 8);
 }
 
-
-function normalizeClientIdempotencyKey(value = '', fallbackPrefix = 'op') {
-  const raw = String(value || '').trim();
-  const base = raw || `${fallbackPrefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-  const hashSuffix = hashIdentityForStreme(base);
-  const clean = raw
-    .replace(/[^A-Za-z0-9_.:-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  if (clean.length >= 8 && clean.length <= 120) return clean;
-  if (clean.length > 120) return `${clean.slice(0, 103)}:${hashSuffix}`.slice(0, 160);
-  return `${fallbackPrefix}:${hashSuffix}:${Date.now().toString(36)}`
-    .replace(/[^A-Za-z0-9_.:-]/g, '_')
-    .slice(0, 160);
-}
-
-function resolveStremePublishIdempotencyKey(payload = {}, options = {}) {
-  return normalizeClientIdempotencyKey(
-    options.idempotencyKey
-      || payload.stremeIdempotencyKey
-      || payload.dedupeKey
-      || payload.clientMutationId
-      || payload.clientMessageId
-      || payload.mutationId
-      || '',
-    'streme'
-  );
-}
-
 function getConversationSubscriptionChannels(conversationId = '') {
   const conversation = appState?.conversations?.find((item) => String(item.id || '') === String(conversationId || '')) || {};
   const lifecycle = buildConversationSharedLifecycleMetadata(conversation);
@@ -2888,18 +2859,14 @@ const apiClient = {
       }))
     });
   },
-  publishStremeEvent(payload, options = {}) {
+  publishStremeEvent(payload) {
     const clientMutationId = payload.clientMutationId || generateClientMutationId();
     const requestedChannels = normalizeStremeChannelList(payload.channels || payload.canales || [], '');
     const channel = payload.channel || payload.canal || requestedChannels[0] || (payload.chatId ? `chater-conversacion-${payload.chatId}` : getDefaultStremeChannel());
     const channels = normalizeStremeChannelList(requestedChannels.length ? requestedChannels : [channel], channel);
-    const stremeIdempotencyKey = resolveStremePublishIdempotencyKey(
-      { ...payload, clientMutationId, channels, canales: channels },
-      options
-    );
     return this.request('/api/v1/streme/eventos', {
       method: 'POST',
-      idempotencyKey: stremeIdempotencyKey,
+      idempotencyKey: clientMutationId,
       body: JSON.stringify(withMemoriaSitePayload({
         canal: channel,
         channel,
@@ -3626,148 +3593,6 @@ function cleanupExpiredQueuedEphemeralOperation(operation = {}, options = {}) {
   return true;
 }
 
-
-
-function isQueuedStremeOperationExpired(operation = {}) {
-  if (operation?.type !== 'publishStremeEvent') return false;
-  const eventPayload = getQueuedStremeEventPayload(operation);
-  const nestedPayload = eventPayload.payload && typeof eventPayload.payload === 'object' ? eventPayload.payload : {};
-  const datosPayload = eventPayload.datos && typeof eventPayload.datos === 'object' ? eventPayload.datos : {};
-  const createdAt = eventPayload.createdAt
-    || eventPayload.clientTime
-    || eventPayload.timestamp
-    || nestedPayload.createdAt
-    || nestedPayload.clientTime
-    || nestedPayload.timestamp
-    || datosPayload.createdAt
-    || datosPayload.clientTime
-    || datosPayload.timestamp
-    || operation.createdAt
-    || operation.enqueuedAt
-    || operation.queuedAt
-    || '';
-  const explicitExpiresAt = eventPayload.expiresAt
-    || eventPayload.expiryAt
-    || eventPayload.expireAt
-    || nestedPayload.expiresAt
-    || nestedPayload.expiryAt
-    || nestedPayload.expireAt
-    || datosPayload.expiresAt
-    || datosPayload.expiryAt
-    || datosPayload.expireAt
-    || '';
-  if (!explicitExpiresAt && !createdAt) return false;
-  const expiresAt = explicitExpiresAt || coerceChatEphemeralExpiresAtIso('', createdAt);
-  return isChatMessageExpired({ expiresAt });
-}
-
-function cleanupExpiredQueuedStremeOperation(operation = {}) {
-  return isQueuedStremeOperationExpired(operation);
-}
-
-function getQueuedStremeEventPayload(operation = {}) {
-  if (operation?.type !== 'publishStremeEvent') return {};
-  const payload = operation.payload || {};
-  return payload.event && typeof payload.event === 'object' ? payload.event : payload;
-}
-
-function getQueuedStremeEventType(operation = {}) {
-  const eventPayload = getQueuedStremeEventPayload(operation);
-  const nestedPayload = eventPayload.payload && typeof eventPayload.payload === 'object' ? eventPayload.payload : {};
-  const datosPayload = eventPayload.datos && typeof eventPayload.datos === 'object' ? eventPayload.datos : {};
-  return normalizeStremeEventType(
-    eventPayload.type
-      || eventPayload.tipo
-      || nestedPayload.type
-      || nestedPayload.tipo
-      || datosPayload.type
-      || datosPayload.tipo
-      || ''
-  );
-}
-
-function isObsoleteQueuedStremeEventOperation(operation = {}) {
-  if (operation?.type !== 'publishStremeEvent') return false;
-  const eventType = getQueuedStremeEventType(operation);
-  const obsoletePendingType = ['message', 'outgoing', 'pending'].join('.');
-  return eventType === 'message.created' || eventType === obsoletePendingType;
-}
-
-function collectQueuedStremeConflictText(source = {}, depth = 0) {
-  if (!source || depth > 3) return '';
-  if (typeof source === 'string') return source;
-  if (typeof source !== 'object') return String(source || '');
-
-  const pieces = [
-    source.lastError,
-    source.lastErrorCode,
-    source.lastStatusCode,
-    source.error,
-    source.err,
-    source.code,
-    source.statusCode,
-    source.status,
-    source.responseStatus,
-    source.message,
-    source.conflictCode,
-    source.idempotencyStatus,
-    source.skipped
-  ];
-
-  ['payload', 'event', 'response', 'metadata', 'data', 'details'].forEach((key) => {
-    const nested = source[key];
-    if (nested && typeof nested === 'object') {
-      pieces.push(collectQueuedStremeConflictText(nested, depth + 1));
-    } else if (typeof nested === 'string') {
-      pieces.push(nested);
-    }
-  });
-
-  return pieces.filter(Boolean).join(' ');
-}
-
-function isStremeConflictNoopText(value = '') {
-  const text = String(value || '').toLowerCase();
-  if (!text) return false;
-  return text.includes('streme_idempotency_conflict_noop')
-    || text.includes('idempotency')
-    || text.includes('idempotencia')
-    || text.includes('idempotent')
-    || text.includes('idempotente')
-    || text.includes('conflict')
-    || text.includes('conflicto')
-    || text.includes('processing')
-    || text.includes('proceso')
-    || text.includes('scope_mismatch')
-    || text.includes('duplicad');
-}
-
-function isQueuedStremeConflictNoopOperation(operation = {}) {
-  if (operation?.type !== 'publishStremeEvent') return false;
-  const attempts = Number(operation.attempts || 0);
-  if (attempts <= 0) return false;
-
-  const status = Number(operation.lastStatusCode || operation.statusCode || operation.status || 0);
-  const conflictText = collectQueuedStremeConflictText(operation);
-  return status === 409 || isStremeConflictNoopText(conflictText);
-}
-
-function isStremeQueuedReplayNoopError(error = {}) {
-  if (isStremePublishIdempotencyConflict(error)) return true;
-
-  const status = Number(
-    error.status
-      || error.responseStatus
-      || error.statusCode
-      || error.payload?.statusCode
-      || error.payload?.metadata?.statusCode
-      || 0
-  );
-  if (status === 409) return true;
-
-  return isStremeConflictNoopText(collectQueuedStremeConflictText(error));
-}
-
 function compactBackendOutboxQueue(queue = []) {
   let expiredLocalStateChanged = false;
   const items = Array.isArray(queue)
@@ -3780,9 +3605,6 @@ function compactBackendOutboxQueue(queue = []) {
         })) {
           return false;
         }
-        if (cleanupExpiredQueuedStremeOperation(operation)) return false;
-        if (isObsoleteQueuedStremeEventOperation(operation)) return false;
-        if (isQueuedStremeConflictNoopOperation(operation)) return false;
         return true;
       })
     : [];
@@ -4144,10 +3966,6 @@ async function flushBackendOutbox() {
   try {
     while (isSessionGuardCurrent(sessionGuard) && readBackendOutbox(sessionGuard.email).length) {
       const operation = readBackendOutbox(sessionGuard.email)[0];
-      if (isQueuedStremeConflictNoopOperation(operation)) {
-        persistBackendOutbox(readBackendOutbox(sessionGuard.email).filter((item) => item.id !== operation.id), sessionGuard.email);
-        continue;
-      }
       try {
         await replayBackendOperation(operation, sessionGuard);
         if (!isSessionGuardCurrent(sessionGuard)) break;
@@ -4155,17 +3973,11 @@ async function flushBackendOutbox() {
       } catch (error) {
         if (!isSessionGuardCurrent(sessionGuard)) break;
         const currentQueue = readBackendOutbox(sessionGuard.email);
-        if (operation.type === 'publishStremeEvent' && isStremeQueuedReplayNoopError(error)) {
-          persistBackendOutbox(currentQueue.filter((item) => item.id !== operation.id), sessionGuard.email);
-          continue;
-        }
         const updatedOperation = {
           ...operation,
           attempts: Number(operation.attempts || 0) + 1,
           lastAttemptAt: new Date().toISOString(),
-          lastError: error?.message || 'No se pudo sincronizar la operación pendiente.',
-          lastErrorCode: getBackendErrorCode(error),
-          lastStatusCode: Number(error?.status || error?.responseStatus || error?.statusCode || error?.payload?.statusCode || error?.payload?.metadata?.statusCode || 0) || ''
+          lastError: error?.message || 'No se pudo sincronizar la operación pendiente.'
         };
 
         if (error?.message === 'conversation_sync_pending' && currentQueue.length > 1) {
@@ -4319,17 +4131,8 @@ async function replayBackendOperation(operation, sessionGuard = captureSessionGu
   }
 
   if (operation.type === 'publishStremeEvent') {
-    if (cleanupExpiredQueuedStremeOperation(operation)) return;
     const eventPayload = operation.payload.event || operation.payload;
-    const stremeIdempotencyKey = resolveStremePublishIdempotencyKey(eventPayload, {
-      idempotencyKey: operation.payload.stremeIdempotencyKey || operation.stremeIdempotencyKey || operation.dedupeKey || ''
-    });
-    try {
-      await apiClient.publishStremeEvent(eventPayload, { idempotencyKey: stremeIdempotencyKey });
-    } catch (error) {
-      if (isStremePublishIdempotencyConflict(error) || isStremeQueuedReplayNoopError(error)) return;
-      throw error;
-    }
+    await apiClient.publishStremeEvent(eventPayload);
     return;
   }
 
@@ -6041,26 +5844,6 @@ function getBackendErrorCode(error = {}) {
     || error.message
     || ''
   ).trim().toLowerCase();
-}
-
-
-function isStremePublishIdempotencyConflict(error = {}) {
-  const status = Number(
-    error.status
-      || error.responseStatus
-      || error.statusCode
-      || error.payload?.statusCode
-      || error.payload?.metadata?.statusCode
-      || 0
-  );
-  if (status !== 409) return false;
-  const conflictText = [
-    getBackendErrorCode(error),
-    collectQueuedStremeConflictText(error),
-    error.payload?.message,
-    error.payload?.error?.message
-  ].filter(Boolean).join(' ');
-  return !conflictText || isStremeConflictNoopText(conflictText);
 }
 
 function isBackendAuthError(error = {}) {
@@ -18058,17 +17841,13 @@ function publishDurableStremeEvent(payload, options = {}) {
   const clientEvent = createStremeClientEvent(payload);
   const eventType = String(clientEvent.type || clientEvent.tipo || 'event').trim() || 'event';
   const dedupeKey = options.dedupeKey || `streme-event:${eventType}:${clientEvent.clientMutationId}`;
-  const stremeIdempotencyKey = resolveStremePublishIdempotencyKey(clientEvent, {
-    idempotencyKey: options.idempotencyKey || dedupeKey
-  });
 
-  return apiClient.publishStremeEvent(clientEvent, { idempotencyKey: stremeIdempotencyKey }).catch((error) => {
-    if (isStremePublishIdempotencyConflict(error)) return null;
+  return apiClient.publishStremeEvent(clientEvent).catch((error) => {
     console.warn(options.onErrorMessage || 'No se pudo publicar un evento durable en STREMEx. Se deja en cola de sincronización.', error);
     enqueueBackendOperation({
       type: 'publishStremeEvent',
       dedupeKey,
-      payload: { event: clientEvent, stremeIdempotencyKey }
+      payload: { event: clientEvent }
     });
     return null;
   });

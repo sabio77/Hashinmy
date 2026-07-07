@@ -15,7 +15,10 @@ const REQUIRED_SOCIAL_PREVIEW_TITLE = 'Financiacion 100% - Software a la medida'
 const REQUIRED_SOCIAL_PREVIEW_DESCRIPTION = 'Desarrollamos software personalizado para automatizar tu empresa';
 const REQUIRED_SOCIAL_PREVIEW_TEXT = `${REQUIRED_SOCIAL_PREVIEW_TITLE}. ${REQUIRED_SOCIAL_PREVIEW_DESCRIPTION}`;
 const REQUIRED_SOCIAL_PREVIEW_IMAGE = `${PUBLIC_SITE_URL}assets/miniVISTA.png`;
-const REQUIRED_SOCIAL_PREVIEW_FALLBACK_IMAGE = `${PUBLIC_SITE_URL}assets/hashinmy-logo-emblem.png`;
+const REQUIRED_CHATER_SOCIAL_PREVIEW_TITLE = 'ChatER | Chat web conectado a memoriaBACKEND';
+const REQUIRED_CHATER_SOCIAL_PREVIEW_DESCRIPTION = 'Chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND.';
+const REQUIRED_CHATER_SOCIAL_PREVIEW_TEXT = `${REQUIRED_CHATER_SOCIAL_PREVIEW_TITLE}. ${REQUIRED_CHATER_SOCIAL_PREVIEW_DESCRIPTION}`;
+const REQUIRED_CHATER_PUBLIC_URL = `${PUBLIC_SITE_URL}chatER/`;
 const REQUIRED_UI_KEYS = ['skip', 'stageLabel', 'brandSmall', 'languageLabel', 'languageAria', 'primaryFinance', 'primaryQuote', 'back', 'restart', 'contactLabel', 'contactPlaceholder', 'commentLabel', 'commentPlaceholder', 'submitRoute', 'copySummaryAction', 'formNote', 'contactRequired', 'summaryTitle', 'waitSummary', 'preparingOptions', 'topActionsLabel', 'proofEntryAria', 'proofOpenButton', 'proofTitle', 'proofLead', 'proofCloseAria', 'proofContentAria', 'proofSummaryAria', 'proofSummaryTitle', 'proofTrustLabel', 'proofTrustText', 'proofMethodLabel', 'proofMethodText', 'proofUseCasesLabel', 'proofUseCasesText', 'proofBrandsTitle', 'proofBrandsAria', 'proofLogoPlaceholder', 'proofLogoAltTemplate', 'proofFaqAria', 'proofFaqWhyQuestion', 'proofFaqWhyAnswer', 'proofFaqWhoQuestion', 'proofFaqWhoAnswer', 'proofFaqStartQuestion', 'proofFaqStartAnswer', 'proofBrandsStructuredDescription'];
 const REQUIRED_SEO_UI_LABEL_KEYS = ['productsLabel', 'allLabel', 'closeLabel', 'backToProductsLabel', 'viewSolutionLabel', 'classicViewLabel', 'classicViewAriaLabel', 'modernViewLabel', 'modernViewAriaLabel', 'categoryNavLabel', 'simpleLabel', 'whoLabel', 'technicalLabel', 'includesLabel', 'glossaryLabel', 'guideLabel', 'faqLabel', 'detailTitle', 'detailLead', 'scopeCatalogLabel', 'glossarySetLabel'];
 const PRIORITY_LANGUAGE_CODES = ['zh', 'hi', 'ar', 'fr', 'bn', 'pt', 'ru', 'id', 'ur', 'de', 'ja', 'sw', 'mr', 'te', 'tr', 'ta', 'vi', 'ko', 'it'];
@@ -289,6 +292,29 @@ function assertNoRawSpanishCommercialCopy(code, bundle, sourceLabel = `textX/${c
   );
 }
 
+
+function assertSocialPreviewCopySync(code, bundle, sourceLabel = `textX/${code}.json`) {
+  const title = String(bundle?.meta?.ogTitle || '').trim();
+  const description = String(bundle?.meta?.ogDescription || '').trim();
+  const stalePreviewPattern = /(?:choose route|software project summary|route selection|digital engineering firm|turns business processes|ruta selecciona|resumen de proyecto|cotizaci[oó]n directa|solicitud interactiva)/iu;
+
+  assert(title.length > 0 && description.length > 0, `${sourceLabel} debe declarar meta.ogTitle y meta.ogDescription para la miniatura social.`);
+  assert(title.includes('100'), `${sourceLabel} debe mantener financiación 100% en meta.ogTitle para sincronizar la miniatura social.`);
+  assert(!/^Hashinmy(?:\s*\|)?/iu.test(title), `${sourceLabel} conserva un título OG genérico de marca; debe usar el copy social sincronizado por idioma.`);
+  const minimumDescriptionLength = ['zh', 'ja', 'ko', 'th', 'my'].includes(code) ? 12 : 24;
+  assert(description.length >= minimumDescriptionLength, `${sourceLabel} debe tener una descripción OG comercial suficiente para WhatsApp y otros generadores de miniatura.`);
+  assert(!stalePreviewPattern.test(description), `${sourceLabel} conserva una descripción OG antigua o genérica; debe usar el copy social sincronizado por idioma.`);
+
+  if (code === 'es') {
+    assert(title === REQUIRED_SOCIAL_PREVIEW_TITLE && description === REQUIRED_SOCIAL_PREVIEW_DESCRIPTION, 'textX/es.json debe mantener el copy OG exacto solicitado para hashinmy.com.');
+  }
+
+  if (code === 'en') {
+    assert(title === '100% Financing - Custom software' && description === 'We develop custom software to automate your company', 'textX/en.json debe mantener la versión inglesa sincronizada del copy OG solicitado.');
+  }
+}
+
+
 async function exists(filePath) {
   try {
     await access(filePath);
@@ -304,6 +330,38 @@ async function readRelative(relativePath) {
 
 function unique(values) {
   return Array.from(new Set(values));
+}
+
+
+function collectHtmlAttributeValues(html, tagRegex, attributeName) {
+  const values = [];
+  const attributeRegex = new RegExp(`${attributeName}=["']([^\"']+)["']`, 'iu');
+  for (const match of String(html || '').matchAll(tagRegex)) {
+    const tag = match[0] || '';
+    const value = tag.match(attributeRegex)?.[1];
+    if (value) values.push(value);
+  }
+  return values;
+}
+
+function assertOnlyMiniVistaSocialPreviewImages(html, sourceLabel) {
+  const rules = [
+    ['og:image', /<meta\b(?=[^>]*\bproperty=["']og:image["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['og:image:secure_url', /<meta\b(?=[^>]*\bproperty=["']og:image:secure_url["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['twitter:image', /<meta\b(?=[^>]*\bname=["']twitter:image["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['twitter:image:src', /<meta\b(?=[^>]*\bname=["']twitter:image:src["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['thumbnail', /<meta\b(?=[^>]*\bname=["']thumbnail["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['itemprop:image', /<meta\b(?=[^>]*\bitemprop=["']image["'])(?=[^>]*\bcontent=)[^>]*>/giu, 'content'],
+    ['image_src', /<link\b(?=[^>]*\brel=["']image_src["'])(?=[^>]*\bhref=)[^>]*>/giu, 'href']
+  ];
+
+  for (const [label, tagRegex, attributeName] of rules) {
+    const values = collectHtmlAttributeValues(html, tagRegex, attributeName);
+    assert(values.length > 0, `${sourceLabel} debe declarar ${label} para que los previsualizadores sociales usen miniVISTA.png.`);
+    for (const value of values) {
+      assert(value === REQUIRED_SOCIAL_PREVIEW_IMAGE, `${sourceLabel} debe usar solamente ${REQUIRED_SOCIAL_PREVIEW_IMAGE} en ${label}; valor encontrado: ${value}`);
+    }
+  }
 }
 
 function assert(condition, message) {
@@ -1372,6 +1430,7 @@ function assertBundleCatalogMetadata(code, bundle, languages, sourceLabel = `tex
 }
 
 const indexHtml = await readRelative('index.html');
+const chaterIndexHtml = await readRelative('chatER/index.html');
 const cssText = await readRelative('css/hashinmy-immersive.css');
 const classicCssText = await readRelative('css/hashinmy-classic.css');
 const jsText = await readRelative('js/hashinmy-immersive.js');
@@ -1434,11 +1493,38 @@ if (!assetsOnly) {
       && indexHtml.includes('property="og:image:width" content="1200"')
       && indexHtml.includes('property="og:image:height" content="630"')
       && indexHtml.includes(`property="og:image:alt" content="${REQUIRED_SOCIAL_PREVIEW_TEXT}"`)
-      && indexHtml.includes(`property="og:image" content="${REQUIRED_SOCIAL_PREVIEW_FALLBACK_IMAGE}" data-hashinmy-preview-fallback="logo"`)
+      && indexHtml.includes(`rel="image_src" href="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes(`name="thumbnail" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes(`itemprop="name" content="${REQUIRED_SOCIAL_PREVIEW_TITLE}" data-i18n-content="meta.ogTitle"`)
+      && indexHtml.includes(`itemprop="description" content="${REQUIRED_SOCIAL_PREVIEW_DESCRIPTION}" data-i18n-content="meta.ogDescription"`)
+      && indexHtml.includes(`itemprop="image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
       && indexHtml.includes(`name="twitter:image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && indexHtml.includes(`name="twitter:image:src" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
       && indexHtml.includes(`name="twitter:image:alt" content="${REQUIRED_SOCIAL_PREVIEW_TEXT}"`),
-    'index.html debe publicar miniVISTA.png como imagen social principal y el logo de Hashinmy como fallback declarado.'
+    'index.html debe publicar miniVISTA.png como única imagen social, incluyendo og:image, image_src, thumbnail, itemprop y twitter:image sin fallback a otros assets.'
   );
+  assert(!indexHtml.includes('data-hashinmy-preview-fallback'), 'index.html no debe declarar imagen social fallback: miniVISTA.png debe ser la única miniatura para WhatsApp y otros previsualizadores.');
+  assertOnlyMiniVistaSocialPreviewImages(indexHtml, 'index.html');
+  assert(
+    chaterIndexHtml.includes(`property="og:title" content="${REQUIRED_CHATER_SOCIAL_PREVIEW_TITLE}"`)
+      && chaterIndexHtml.includes(`property="og:description" content="${REQUIRED_CHATER_SOCIAL_PREVIEW_DESCRIPTION}"`)
+      && chaterIndexHtml.includes(`property="og:url" content="${REQUIRED_CHATER_PUBLIC_URL}"`)
+      && chaterIndexHtml.includes(`property="og:image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`property="og:image:secure_url" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes('property="og:image:type" content="image/png"')
+      && chaterIndexHtml.includes('property="og:image:width" content="1200"')
+      && chaterIndexHtml.includes('property="og:image:height" content="630"')
+      && chaterIndexHtml.includes(`property="og:image:alt" content="${REQUIRED_CHATER_SOCIAL_PREVIEW_TEXT}"`)
+      && chaterIndexHtml.includes(`rel="image_src" href="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`name="thumbnail" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`itemprop="image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`name="twitter:image" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`name="twitter:image:src" content="${REQUIRED_SOCIAL_PREVIEW_IMAGE}"`)
+      && chaterIndexHtml.includes(`name="twitter:image:alt" content="${REQUIRED_CHATER_SOCIAL_PREVIEW_TEXT}"`)
+      && chaterIndexHtml.includes(`rel="canonical" href="${REQUIRED_CHATER_PUBLIC_URL}"`),
+    'chatER/index.html debe publicar miniVISTA.png como única miniatura para WhatsApp y otros previsualizadores; los iconos PWA no deben ser la imagen social.'
+  );
+  assertOnlyMiniVistaSocialPreviewImages(chaterIndexHtml, 'chatER/index.html');
   {
     const socialPreviewBundlePosition = indexHtml.indexOf('id="hmInitialTextBundle"');
     const criticalPreviewPositions = [
@@ -1655,10 +1741,7 @@ if (!assetsOnly) {
   const textFiles = (await readdir(path.join(root, 'textX'))).filter((file) => file.endsWith('.json') && file !== 'languages.json');
   assert(codes.every((code) => textFiles.includes(`${code}.json`)), 'Cada idioma detectado debe existir como textX/{isocode}.json.');
   const spanishBundle = await readJson('textX/es.json');
-  assert(
-    spanishBundle.meta.ogTitle === REQUIRED_SOCIAL_PREVIEW_TITLE && spanishBundle.meta.ogDescription === REQUIRED_SOCIAL_PREVIEW_DESCRIPTION,
-    'textX/es.json debe mantener sincronizado el copy OG solicitado para la raíz hashinmy.com.'
-  );
+  assertSocialPreviewCopySync('es', spanishBundle, 'textX/es.json');
   const englishBundle = await readJson('textX/en.json');
   assert(spanishBundle.ui?.primaryFinance === 'Solicitar diagnóstico' && spanishBundle.ui?.primaryQuote === 'Cotizar mi sistema' && spanishBundle.ui?.submitRoute === 'Enviar a Hashinmy', 'textX/es.json debe usar CTAs directos y cierre explícito: Solicitar diagnóstico, Cotizar mi sistema y Enviar a Hashinmy.');
   assert(englishBundle.ui?.primaryFinance === 'Request diagnosis' && englishBundle.ui?.primaryQuote === 'Quote my system' && englishBundle.ui?.submitRoute === 'Send to Hashinmy', 'textX/en.json debe mantener CTAs internacionales equivalentes y cierre explícito para conversión.');
@@ -1667,6 +1750,7 @@ if (!assetsOnly) {
     if (await exists(path.join(root, 'textX', `${code}.json`))) {
       const bundle = await readJson(`textX/${code}.json`);
       assertBundleSchema(code, bundle);
+      assertSocialPreviewCopySync(code, bundle);
       assertNoRawSpanishSeoTermLeakage(code, await readJson(`textX/seo/${code}.json`));
       assertBundleCatalogMetadata(code, bundle, manifest.languages);
       assertBundleParity(code, bundle, spanishBundle);

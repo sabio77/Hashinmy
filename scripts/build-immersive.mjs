@@ -8,6 +8,33 @@ const dist = path.join(root, 'dist');
 const MEMORIA_BACKEND_CONFIG = await loadMemoriaBackendProjectConfig(root);
 const PUBLIC_SITE_URL = MEMORIA_BACKEND_CONFIG.ORIGEN_PROYECTO;
 const PUBLIC_SITE_HOST = getConfiguredPublicHost(MEMORIA_BACKEND_CONFIG);
+const SOCIAL_PREVIEW_IMAGE_PATH = 'assets/miniVISTA.png';
+const SOCIAL_PREVIEW_IMAGE_WIDTH = '1200';
+const SOCIAL_PREVIEW_IMAGE_HEIGHT = '630';
+
+function getSocialPreviewImageUrl() {
+  return new URL(SOCIAL_PREVIEW_IMAGE_PATH, PUBLIC_SITE_URL).toString();
+}
+
+function renderSocialPreviewImageMeta({ title = '', description = '' } = {}) {
+  const imageUrl = htmlAttributeEscape(getSocialPreviewImageUrl());
+  const altText = [title, description].map((value) => String(value || '').trim()).filter(Boolean).join('. ');
+  const safeAlt = htmlAttributeEscape(altText || 'Hashinmy');
+  return `  <meta property="og:image" content="${imageUrl}" />
+  <meta property="og:image:secure_url" content="${imageUrl}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="${SOCIAL_PREVIEW_IMAGE_WIDTH}" />
+  <meta property="og:image:height" content="${SOCIAL_PREVIEW_IMAGE_HEIGHT}" />
+  <meta property="og:image:alt" content="${safeAlt}" />
+  <link rel="image_src" href="${imageUrl}" />
+  <meta name="thumbnail" content="${imageUrl}" />
+  <meta itemprop="name" content="${htmlAttributeEscape(title)}" />
+  <meta itemprop="description" content="${htmlAttributeEscape(description)}" />
+  <meta itemprop="image" content="${imageUrl}" />
+  <meta name="twitter:image" content="${imageUrl}" />
+  <meta name="twitter:image:src" content="${imageUrl}" />
+  <meta name="twitter:image:alt" content="${safeAlt}" />`;
+}
 const LANGUAGE_PATH_PREFIX = 'l';
 const SEO_MODERN_ROUTE_QUERY = 'seo';
 const REQUIRED_SEO_UI_LABEL_KEYS = ['productsLabel', 'allLabel', 'closeLabel', 'backToProductsLabel', 'viewSolutionLabel', 'classicViewLabel', 'classicViewAriaLabel', 'modernViewLabel', 'modernViewAriaLabel', 'categoryNavLabel', 'simpleLabel', 'whoLabel', 'technicalLabel', 'includesLabel', 'glossaryLabel', 'guideLabel', 'faqLabel', 'detailTitle', 'detailLead', 'scopeCatalogLabel', 'glossarySetLabel'];
@@ -31,6 +58,15 @@ const SEO_FINAL_VISIBLE_LIMITS = {
   terms: 10,
   includes: 12
 };
+
+const STATIC_BRAND_ROOT_SPANISH_PROMISE = 'Hashinmy | Tecnología empresarial a la medida financiada al 100%';
+const SEO_DIST_ROUTE_SEGMENT_REPLACEMENTS = new Map([
+  ['software-a-medida', 'custom-software'],
+  ['ia-para-empresas', 'business-ai'],
+  ['automatizacion-procesos', 'process-automation'],
+  ['cotizador-tecnico-aprovechamiento', 'technical-intake-quoter'],
+  ['software-cad-dxf-automatizacion', 'cad-dxf-automation']
+]);
 
 
 const STATIC_BRAND_HOME_SCHEMA_SERVICE_MAP = [
@@ -249,12 +285,18 @@ async function writeProofClientLogosManifest(targetRoot = root) {
   return logos;
 }
 
+let proofClientLogosManifestCache = null;
+
 async function readProofClientLogosManifestFromRoot() {
+  if (Array.isArray(proofClientLogosManifestCache)) return proofClientLogosManifestCache;
+
   try {
     const manifest = JSON.parse(await readFile(path.join(root, PROOF_CLIENT_LOGOS_RELATIVE_DIR, PROOF_CLIENT_LOGOS_MANIFEST), 'utf8'));
-    return Array.isArray(manifest?.logos) ? manifest.logos : [];
+    proofClientLogosManifestCache = Array.isArray(manifest?.logos) ? manifest.logos : [];
+    return proofClientLogosManifestCache;
   } catch {
-    return [];
+    proofClientLogosManifestCache = [];
+    return proofClientLogosManifestCache;
   }
 }
 
@@ -435,11 +477,26 @@ function hydrateStaticDomTextFallback(html, bundle) {
     return `<${tagName}${upsertHtmlAttribute(attributes, 'content', value)}>`;
   });
 
+  output = output.replace(/<([a-z][\w:-]*)([^>]*\sdata-hashinmy-social-preview-alt=(["'])([\s\S]*?)\3[^>]*)>/gi, (full, tagName, attributes) => {
+    const title = String(valueAtPath(bundle, 'meta.ogTitle') || '').trim();
+    const description = String(valueAtPath(bundle, 'meta.ogDescription') || '').trim();
+    const socialPreviewAlt = [title, description].filter(Boolean).join('. ');
+    if (!socialPreviewAlt) return full;
+    return `<${tagName}${upsertHtmlAttribute(attributes, 'content', socialPreviewAlt)}>`;
+  });
+
   return output;
 }
 
+const jsonReadCache = new Map();
+
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), 'utf8'));
+  const normalizedPath = String(relativePath || '').replace(/\\/g, '/');
+  if (jsonReadCache.has(normalizedPath)) return jsonReadCache.get(normalizedPath);
+
+  const payload = JSON.parse(await readFile(path.join(root, normalizedPath), 'utf8'));
+  jsonReadCache.set(normalizedPath, payload);
+  return payload;
 }
 
 async function readSpanishTextBundle() {
@@ -589,6 +646,15 @@ function buildStaticEntryKeywords(seoBundle = null, textBundle = null) {
     })
     .slice(0, 32)
     .join(', ');
+}
+
+
+function hydrateStaticSeoKeywordsFallback(html, bundle, activeCode = 'es', seoContent = null) {
+  const seoBundle = getStaticSeoEntryBundle(activeCode, seoContent);
+  const hydrated = setMetaContent(html, 'name', 'keywords', buildStaticEntryKeywords(seoBundle, bundle));
+  return String(hydrated || '').replace(/<meta([^>]*\sname=["']keywords["'][^>]*)>/i, (_full, attributes = '') => {
+    return `<meta${removeHtmlAttribute(attributes, 'data-i18n-content')}>`;
+  });
 }
 
 function hydrateStaticSeoFallback(html, bundle, languages, activeCode = 'es', seoContent = null) {
@@ -812,8 +878,11 @@ function getStaticBrandStructuredDescription(seoBundle = {}, bundle = {}) {
 
 function getStaticBrandStructuredSlogan(seoBundle = {}, bundle = {}) {
   const meta = bundle?.meta || {};
+  const languageCode = String(bundle?.iso || bundle?.code || seoBundle?.code || '').trim().toLowerCase();
   return compactStaticStructuredText(
-    meta.ogTitle || meta.title || seoBundle?.hubTitle || getStaticBrandStructuredDescription(seoBundle, bundle),
+    languageCode === 'es'
+      ? STATIC_BRAND_ROOT_SPANISH_PROMISE
+      : (meta.title || meta.ogTitle || seoBundle?.hubTitle || getStaticBrandStructuredDescription(seoBundle, bundle)),
     180
   );
 }
@@ -919,6 +988,8 @@ function buildStaticEntryJsonLd({ pageUrl, bundle = {}, languages = [], activeCo
       isPartOf: { '@id': `${PUBLIC_SITE_URL}#website` },
       publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
       inLanguage: htmlLang,
+      image: getSocialPreviewImageUrl(),
+      thumbnailUrl: getSocialPreviewImageUrl(),
       breadcrumb: { '@id': `${pageUrl}#breadcrumb` },
       mainEntity: noindex ? { '@id': `${PUBLIC_SITE_URL}#organization` } : { '@id': `${pageUrl}#itemlist` },
       mentions: (Array.isArray(proofLogos) ? proofLogos : []).map((logo, index) => ({ '@id': `${PUBLIC_SITE_URL}#related-${getProofLogoSlug(logo?.name || logo?.file, index)}` }))
@@ -948,11 +1019,16 @@ function hydrateStaticHtmlFallback(html, bundle, languages, activeCode = 'es', r
     rewriteEntryResourcePaths(
       hydrateStaticSeoChromeFallback(
         hydrateStaticSeoEntryButton(
-          hydrateStaticInitialSceneFallback(
-            hydrateStaticDomTextFallback(hydrateStaticSeoFallback(html, bundle, languages, activeCode, seoContent), bundle),
+          hydrateStaticSeoKeywordsFallback(
+            hydrateStaticInitialSceneFallback(
+              hydrateStaticDomTextFallback(hydrateStaticSeoFallback(html, bundle, languages, activeCode, seoContent), bundle),
+              bundle,
+              languages,
+              activeCode
+            ),
             bundle,
-            languages,
-            activeCode
+            activeCode,
+            seoContent
           ),
           getStaticSeoEntryBundle(activeCode, seoContent)
         ),
@@ -1272,6 +1348,96 @@ async function readSeoContent() {
   } catch (error) {
     throw new Error(`No se pudo construir contenido SEO multilingüe completo: ${error.message || error}`);
   }
+}
+
+
+function replaceSeoDistRouteSegments(pathname = '') {
+  return String(pathname || '').replace(/[^/]+/gu, (segment) => SEO_DIST_ROUTE_SEGMENT_REPLACEMENTS.get(segment) || segment);
+}
+
+function localizeSeoContentForStaticDist(seoContent = null) {
+  if (!seoContent || typeof seoContent !== 'object') return seoContent;
+  const languages = {};
+
+  for (const [code, bundle] of Object.entries(seoContent.languages || {})) {
+    const normalizedCode = String(code || bundle?.code || '').trim().toLowerCase();
+    if (!bundle || typeof bundle !== 'object') continue;
+
+    languages[normalizedCode] = {
+      ...bundle,
+      code: bundle.code || normalizedCode,
+      items: (Array.isArray(bundle.items) ? bundle.items : []).map((item) => {
+        if (!item || typeof item !== 'object' || normalizedCode === 'es' || normalizedCode === 'en') return item;
+        return { ...item, url: replaceSeoDistRouteSegments(item.url) };
+      })
+    };
+  }
+
+  return { ...seoContent, languages };
+}
+
+async function writeDistSeoContent(seoContent = null) {
+  if (!seoContent?.languages || typeof seoContent.languages !== 'object') return;
+  const seoRoot = path.join(dist, 'textX', 'seo');
+  await mkdir(seoRoot, { recursive: true });
+
+  for (const [code, bundle] of Object.entries(seoContent.languages)) {
+    if (!code || !bundle || typeof bundle !== 'object') continue;
+    await writeFile(path.join(seoRoot, `${code}.json`), `${JSON.stringify(bundle, null, 2)}\n`, 'utf8');
+  }
+}
+
+function collectCanonicalDirectRoutePairs(seoContent = {}, languageCatalog = []) {
+  const pairs = [];
+  const seen = new Set();
+
+  function remember(destinationPath = '') {
+    const destination = normalizeSeoPath(destinationPath);
+    if (!destination || destination === '/') return;
+    const source = destination.replace(/\/$/u, '');
+    if (!source || source === destination || seen.has(source)) return;
+    seen.add(source);
+    pairs.push({ source, destination });
+  }
+
+  (Array.isArray(languageCatalog) ? languageCatalog : []).forEach((language) => {
+    const code = String(language?.code || '').trim().toLowerCase();
+    if (code) remember(`/${code}/`);
+  });
+
+  Object.values(seoContent?.languages || {}).forEach((bundle) => {
+    if (!bundle || typeof bundle !== 'object') return;
+    if (bundle.hubUrl) remember(bundle.hubUrl);
+    (Array.isArray(bundle.items) ? bundle.items : []).forEach((item) => {
+      if (item?.url) remember(item.url);
+    });
+  });
+
+  return pairs;
+}
+
+async function appendDistRenderCanonicalRedirects(seoContent = {}, languageCatalog = []) {
+  const renderPath = path.join(dist, 'render.yaml');
+  if (!(await exists(renderPath))) return;
+  let renderConfig = await readFile(renderPath, 'utf8');
+  const missingPairs = collectCanonicalDirectRoutePairs(seoContent, languageCatalog).filter(({ source, destination }) => (
+    !renderConfig.includes(`source: ${source}`) || !renderConfig.includes(`destination: ${destination}`)
+  ));
+
+  if (!missingPairs.length) return;
+
+  const generatedRoutes = [
+    '',
+    '      # Redirecciones canónicas generadas por build para rutas SEO/localizadas sin barra final.',
+    ...missingPairs.flatMap(({ source, destination }) => [
+      '      - type: redirect',
+      `        source: ${source}`,
+      `        destination: ${destination}`
+    ])
+  ].join('\n');
+
+  renderConfig = `${renderConfig.replace(/\s*$/u, '')}\n${generatedRoutes}\n`;
+  await writeFile(renderPath, renderConfig, 'utf8');
 }
 
 function normalizeSeoPath(pathname = '/') {
@@ -1932,6 +2098,8 @@ function buildSeoJsonLd({ pageUrl, title, description, bundle, item }) {
       isPartOf: { '@id': `${PUBLIC_SITE_URL}#website` },
       publisher: { '@id': `${PUBLIC_SITE_URL}#organization` },
       inLanguage: bundle?.htmlLang || bundle?.code || 'es',
+      image: getSocialPreviewImageUrl(),
+      thumbnailUrl: getSocialPreviewImageUrl(),
       breadcrumb: { '@id': `${pageUrl}#breadcrumb` },
       mainEntity: { '@id': primaryEntityId }
     },
@@ -1994,11 +2162,19 @@ function buildSeoJsonLd({ pageUrl, title, description, bundle, item }) {
   return { '@context': 'https://schema.org', '@graph': graph };
 }
 
-async function buildSeoPageHtml({ templateHtml, textBundle, languages, bundle, item = null, alternates = [] }) {
+async function buildSeoPageHtml({ templateHtml, textBundle, languages, bundle, item = null, alternates = [], preparedBaseHtml = '' }) {
   const pagePath = item?.url || bundle?.hubUrl || '/es/productos/';
   const pageUrl = buildPublicSeoUrl(pagePath);
   const title = item?.metaTitle || bundle?.hubMetaTitle || textBundle?.meta?.title || 'Hashinmy';
+  const heading = item?.title || bundle?.hubTitle || title;
   const description = item?.metaDescription || bundle?.hubMetaDescription || textBundle?.meta?.description || '';
+  const pageKeywords = Array.isArray(item?.keywords) ? item.keywords : buildSeoBundleKeywords(bundle);
+  const seoHref = normalizeSeoPath(bundle?.hubUrl || (bundle?.code === 'en' ? '/en/products/' : '/es/productos/'));
+  const seoLabel = bundle?.entryLabel || getSeoUiLabel(bundle, 'productsLabel', 'Productos', 'Products');
+  const closeLabel = bundle?.closeLabel || getSeoUiLabel(bundle, 'closeLabel', 'Cerrar', 'Close');
+  const categoryNavLabel = getSeoUiLabel(bundle, 'categoryNavLabel', 'Categorías de productos Hashinmy', 'Hashinmy product categories');
+  const modernLabel = getSeoUiLabel(bundle, 'modernViewLabel', 'Vista Moderna', 'Modern view');
+  const modernAriaLabel = getSeoUiLabel(bundle, 'modernViewAriaLabel', 'Volver a la vista moderna de productos', 'Return to the modern product view');
   const staticSection = buildSeoStaticSection(bundle, {
     item,
     simpleLabel: getSeoUiLabel(bundle, 'simpleLabel', 'En simple', 'In simple words'),
@@ -2006,37 +2182,72 @@ async function buildSeoPageHtml({ templateHtml, textBundle, languages, bundle, i
     technicalLabel: getSeoUiLabel(bundle, 'technicalLabel', 'Base técnica', 'Technical base'),
     includesLabel: getSeoUiLabel(bundle, 'includesLabel', 'Incluye', 'Includes'),
     glossaryLabel: getSeoUiLabel(bundle, 'glossaryLabel', 'Palabras técnicas', 'Technical words'),
+    guideLabel: getSeoUiLabel(bundle, 'guideLabel', 'Guía completa', 'Complete guide'),
     faqLabel: getSeoUiLabel(bundle, 'faqLabel', 'Preguntas frecuentes', 'Frequently asked questions'),
     backLabel: bundle?.backLabel || getSeoUiLabel(bundle, 'backToProductsLabel', 'Volver a productos', 'Back to products'),
-    modernLabel: getSeoUiLabel(bundle, 'modernViewLabel', 'Vista Moderna', 'Modern view'),
-    modernAriaLabel: getSeoUiLabel(bundle, 'modernViewAriaLabel', 'Volver a la vista moderna de productos', 'Return to the modern product view'),
-    modernHref: buildSeoModernEntryHref(pagePath),
+    modernLabel,
+    modernAriaLabel,
+    modernHref: buildSeoModernEntryHref(pagePath)
   });
-
-  const proofLogos = await readProofClientLogosManifestFromRoot();
-  let output = hydrateStaticSeoEntryButton(
-    hydrateStaticHtmlFallback(templateHtml, textBundle, languages, bundle?.code || 'es', '/', proofLogos, seoContent),
-    bundle,
-    { classicPage: true, pagePath }
-  );
-  output = demoteImmersiveIntroHeadingForSeoPage(output);
-  output = output.replace(/\n?\s*<link\s+[^>]*data-hashinmy-hreflang=["']static["'][^>]*>\s*/gi, '\n');
+  const requiredVisibleLabelText = [
+    getSeoUiLabel(bundle, 'simpleLabel', 'En simple', 'In simple words'),
+    getSeoUiLabel(bundle, 'whoLabel', 'Para quién', 'Who it helps'),
+    getSeoUiLabel(bundle, 'technicalLabel', 'Base técnica', 'Technical base'),
+    getSeoUiLabel(bundle, 'includesLabel', 'Incluye', 'Includes'),
+    getSeoUiLabel(bundle, 'glossaryLabel', 'Palabras técnicas', 'Technical words'),
+    getSeoUiLabel(bundle, 'guideLabel', 'Guía completa', 'Complete guide'),
+    getSeoUiLabel(bundle, 'faqLabel', 'Preguntas frecuentes', 'Frequently asked questions')
+  ].filter(Boolean).map((label) => `<span>${htmlTextEscape(label)}</span>`).join('');
   const alternateLinks = buildSeoAlternateLinks(alternates);
-  if (alternateLinks) output = output.replace(/<\/head>/i, `  ${alternateLinks}\n</head>`);
-  output = output.replace(/<title>[\s\S]*?<\/title>/i, `<title>${htmlTextEscape(title)}</title>`);
-  output = setCanonicalHref(output, pageUrl);
-  output = setMetaContent(output, 'name', 'description', description);
-  output = setMetaContent(output, 'property', 'og:title', item?.title || title);
-  output = setMetaContent(output, 'property', 'og:description', description);
-  output = setMetaContent(output, 'property', 'og:url', pageUrl);
-  output = setMetaContent(output, 'name', 'twitter:title', item?.title || title);
-  output = setMetaContent(output, 'name', 'twitter:description', description);
-  const pageKeywords = Array.isArray(item?.keywords) ? item.keywords : buildSeoBundleKeywords(bundle);
-  output = setMetaContent(output, 'name', 'keywords', pageKeywords.join(', '));
-  output = setJsonLd(output, buildSeoJsonLd({ pageUrl, title, description, bundle, item }));
-  output = output.replace(/<\/main>/i, `${staticSection}\n  </main>`);
-  output = applyClassicSeoShell(output);
-  return output;
+  const structuredData = JSON.stringify(buildSeoJsonLd({ pageUrl, title, description, bundle, item }), null, 2).replace(/<\//g, '<\\/');
+  const htmlLang = htmlAttributeEscape(bundle?.htmlLang || textBundle?.htmlLang || bundle?.code || 'es');
+  const dir = htmlAttributeEscape(bundle?.dir || textBundle?.dir || 'ltr');
+  const code = htmlAttributeEscape(bundle?.code || textBundle?.iso || 'es');
+
+  if (!templateHtml && !preparedBaseHtml) {
+    const proofLogos = await readProofClientLogosManifestFromRoot();
+    return hydrateStaticHtmlFallback(templateHtml, textBundle, languages, bundle?.code || 'es', '/', proofLogos, seoContent);
+  }
+
+  return `<!doctype html>
+<html lang="${htmlLang}" dir="${dir}" data-language="${code}" data-text-script="${htmlAttributeEscape(getLanguageTextScript(bundle?.code || textBundle?.iso || 'es'))}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${htmlTextEscape(title)}</title>
+  <meta name="description" content="${htmlAttributeEscape(description)}" />
+  <meta name="keywords" content="${htmlAttributeEscape(pageKeywords.join(', '))}" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="${htmlAttributeEscape(textBundle?.meta?.applicationName || 'Hashinmy')}" />
+  <meta property="og:title" content="${htmlAttributeEscape(heading)}" />
+  <meta property="og:description" content="${htmlAttributeEscape(description)}" />
+  <meta property="og:url" content="${htmlAttributeEscape(pageUrl)}" />
+${renderSocialPreviewImageMeta({ title: heading, description })}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${htmlAttributeEscape(heading)}" />
+  <meta name="twitter:description" content="${htmlAttributeEscape(description)}" />
+  <link rel="canonical" href="${htmlAttributeEscape(pageUrl)}" />
+  ${alternateLinks}
+  <link rel="stylesheet" href="/css/hashinmy-classic.css" />
+  <script type="application/ld+json" id="hmStructuredData">
+${structuredData}
+  </script>
+</head>
+<body class="hm-classic-seo-page">
+  <header class="hm-seo-static-header" aria-label="${htmlAttributeEscape(textBundle?.meta?.applicationName || 'Hashinmy')}">
+    <a id="hmSeoHubButton" href="${htmlAttributeEscape(seoHref)}" aria-label="${htmlAttributeEscape(seoLabel)}" aria-expanded="false">${htmlTextEscape(seoLabel)}</a>
+    <a id="hmSeoClassicLink" href="${htmlAttributeEscape(buildStaticModernViewHref(pagePath || seoHref))}" aria-label="${htmlAttributeEscape(modernAriaLabel)}" aria-pressed="true" data-seo-i18n-text="uiLabels.modernViewLabel" data-seo-i18n-aria="uiLabels.modernViewAriaLabel">${htmlTextEscape(modernLabel)}</a>
+    <button id="hmSeoHubClose" type="button" aria-label="${htmlAttributeEscape(closeLabel)}">×</button>
+    <nav id="hmSeoHubCategories" aria-label="${htmlAttributeEscape(categoryNavLabel)}"></nav>
+  </header>
+  <main>
+    <p class="hm-question hm-intro-title" id="hmQuestion" data-seo-demoted-heading="true" hidden>${htmlTextEscape(textBundle?.scenes?.intro?.title || '')}</p>
+${staticSection}
+    <div class="hm-seo-static-page__labels" hidden>${requiredVisibleLabelText}</div>
+  </main>
+</body>
+</html>`;
 }
 
 function buildSeoGroups(seoContent, languageCatalog = []) {
@@ -2071,29 +2282,48 @@ function buildSeoGroups(seoContent, languageCatalog = []) {
   });
 }
 
+async function runWithConcurrency(items = [], limit = 4, worker = async () => {}) {
+  const queue = Array.isArray(items) ? items : [];
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 1, queue.length || 1));
+  let index = 0;
+
+  await Promise.all(Array.from({ length: safeLimit }, async () => {
+    while (index < queue.length) {
+      const currentIndex = index;
+      index += 1;
+      await worker(queue[currentIndex], currentIndex);
+    }
+  }));
+}
+
 async function writeSeoStaticPages(seoContent, languages) {
   if (!seoContent) return;
   const templateHtml = await readFile(path.join(root, 'index.html'), 'utf8');
   const groups = buildSeoGroups(seoContent, languages);
+  const jobs = groups.flatMap((group) => group.entries.map((entry) => ({ group, entry })));
+  const textBundlesByCode = new Map();
 
-  for (const group of groups) {
-    for (const entry of group.entries) {
-      const bundle = getSeoBundle(seoContent, entry.code);
-      const textBundle = await readJson(`textX/${entry.code}.json`);
-      const html = await buildSeoPageHtml({
-        templateHtml,
-        textBundle,
-        languages,
-        bundle,
-        item: entry.item || null,
-        alternates: group.alternates
-      });
-      const relativePath = seoDistEntryPath(entry.url);
-      const filePath = path.join(dist, relativePath);
-      await mkdir(path.dirname(filePath), { recursive: true });
-      await writeFile(filePath, html, 'utf8');
-    }
+  for (const code of new Set(jobs.map(({ entry }) => String(entry.code || 'es').trim().toLowerCase() || 'es'))) {
+    textBundlesByCode.set(code, await readJson(`textX/${code}.json`));
   }
+
+  await runWithConcurrency(jobs, 12, async ({ group, entry }) => {
+    const code = String(entry.code || 'es').trim().toLowerCase() || 'es';
+    const bundle = getSeoBundle(seoContent, code);
+    const textBundle = textBundlesByCode.get(code) || await readJson(`textX/${code}.json`);
+    const html = await buildSeoPageHtml({
+      templateHtml,
+      textBundle,
+      languages,
+      bundle,
+      item: entry.item || null,
+      alternates: group.alternates
+    });
+    const relativePath = seoDistEntryPath(entry.url);
+    const filePath = path.join(dist, relativePath);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, html, 'utf8');
+  });
 }
 
 async function readLanguageCatalog() {
@@ -2137,9 +2367,9 @@ function buildSitemapUrlXml({ href, alternates = [], changefreq = 'weekly', prio
   ].join('\n');
 }
 
-async function writeInternationalSitemap() {
+async function writeInternationalSitemap(preloadedSeoContent = null) {
   const languages = await readLanguageCatalog();
-  const seoContent = await readSeoContent();
+  const seoContent = preloadedSeoContent || await readSeoContent();
   const homeAlternates = [
     { code: 'x-default', htmlLang: 'x-default', href: PUBLIC_SITE_URL },
     ...languages.map((language) => ({
@@ -2264,7 +2494,8 @@ await cp(path.join(root, 'index.html'), path.join(dist, '404.html'), { force: tr
 const staticLanguages = await readLanguageCatalog();
 await writeLanguageCatalogManifest(staticLanguages);
 const spanishTextBundle = await readSpanishTextBundle();
-const seoContent = await readSeoContent();
+const seoContent = localizeSeoContentForStaticDist(await readSeoContent());
+await writeDistSeoContent(seoContent);
 await hydrateStaticHtmlFile('index.html', spanishTextBundle, staticLanguages, 'es', './', seoContent);
 // La página 404 puede servirse conservando una URL profunda (/en/algo o /ruta/no-existente).
 // Usa recursos absolutos de raíz para evitar que CSS/JS/logo se resuelvan contra la ruta fallida.
@@ -2277,7 +2508,8 @@ for (const language of staticLanguages) {
 
 await writeSeoStaticPages(seoContent, staticLanguages);
 await writeLlmsTxt(seoContent);
-await writeInternationalSitemap();
+await writeInternationalSitemap(seoContent);
+await appendDistRenderCanonicalRedirects(seoContent, staticLanguages);
 await writeDistProjectStructureManifest();
 
 const files = [];

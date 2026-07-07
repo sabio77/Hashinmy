@@ -1,17 +1,16 @@
 {
-  "version": "2026-07-06-chater-streme-outbox-idempotency-148",
-  "buildTime": "2026-07-06T16:20:00-05:00",
+  "version": "2026-07-06-chater-streme-single-message-post-147",
+  "buildTime": "2026-07-06T14:55:00-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER mantiene /api/v1/mensajes como envío canónico y sanea la outbox STREMEx para evitar reintentos legacy con conflictos 409.",
-  "build": "streme-outbox-idempotency-148",
-  "updatedAt": "2026-07-06T16:20:00-05:00",
-  "notes": "El envío eficiente conserva un solo POST a /api/v1/mensajes; MENSAJESx publica el message.created canónico y la outbox STREMEx descarta eventos legacy de mensajes, usando idempotencia estable por evento/canales sin polling.",
+  "description": "ChatER elimina la publicación STREMEx previa al envío y deja que MENSAJESx publique el message.created canónico inmediatamente al persistir el mensaje.",
+  "build": "streme-single-message-post-147",
+  "updatedAt": "2026-07-06T14:55:00-05:00",
+  "notes": "El envío eficiente usa un solo POST a /api/v1/mensajes; memoriaBACKEND entrega por STREMEx en el mismo flujo backend, preservando orden y checks sin polling ni evento pending duplicado.",
   "changes": [
-    "js/app.js descarta de la outbox local eventos STREMEx legacy de mensajes ya delegados a MENSAJESx.",
-    "Las publicaciones STREMEx durables usan una clave idempotente estable por dedupe/canales para no chocar por clientMutationId reutilizado.",
-    "La replay de outbox trata conflictos idempotentes STREMEx como no-op seguro y evita reintentos infinitos visibles en consola.",
-    "STREMEx responde no-op 200 ante conflictos idempotentes de /api/v1/streme/eventos para no repetir efectos realtime ni generar 409 en Chrome.",
-    "service-worker.js actualiza versión para evitar caché PWA del flujo anterior."
+    "js/app.js deja de publicar message.outgoing.pending antes de persistir mensajes de texto.",
+    "El indicador local sigue siendo optimista, pero el destinatario solo recibe message.created desde MENSAJESx como fuente canónica.",
+    "La prueba chaterStaticContractChecks bloquea regresiones que reintroduzcan un POST STREMEx previo por cada mensaje.",
+    "service-worker.js actualiza versión para evitar que la PWA sirva el flujo anterior desde caché."
   ]
 }
