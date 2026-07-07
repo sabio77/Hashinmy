@@ -9522,6 +9522,31 @@ function restoreConversationVisibilityForIncomingRealtimeMessage(conversation = 
       changed = true;
     }
   };
+  const writeIfChanged = (target, field, value) => {
+    const before = JSON.stringify(target[field] ?? null);
+    const after = JSON.stringify(value ?? null);
+    if (before !== after) {
+      target[field] = value;
+      changed = true;
+    }
+  };
+  const stripDeletionField = (target, field, fallbackValue) => {
+    if (!target || typeof target !== 'object' || !Object.prototype.hasOwnProperty.call(target, field)) return;
+    writeIfChanged(target, field, stripCurrentParticipantFromDeletionSource(target[field] ?? fallbackValue));
+  };
+  const restoreParticipantDeletionState = (target) => {
+    if (!target || typeof target !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(target, 'localDeletionRegistry')) {
+      writeIfChanged(target, 'localDeletionRegistry', null);
+    }
+    stripDeletionField(target, 'deletionRegistry', null);
+    stripDeletionField(target, 'participantDeletionRegistry', null);
+    stripDeletionField(target, 'deletedParticipants', []);
+    stripDeletionField(target, 'deletedParticipantIdentityKeys', []);
+    stripDeletionField(target, 'deletedByParticipantIdentityKeys', []);
+    stripDeletionField(target, 'hiddenForParticipants', []);
+    stripDeletionField(target, 'hiddenForUserEmails', []);
+  };
 
   [
     'deleted',
@@ -9529,6 +9554,17 @@ function restoreConversationVisibilityForIncomingRealtimeMessage(conversation = 
     'isDeletedForCurrentUser',
     'hiddenForCurrentUser'
   ].forEach(clearFlag);
+
+  restoreParticipantDeletionState(conversation);
+  if (conversation.metadata && typeof conversation.metadata === 'object') {
+    restoreParticipantDeletionState(conversation.metadata);
+    ['deleted', 'deletedForCurrentUser', 'isDeletedForCurrentUser', 'hiddenForCurrentUser'].forEach((field) => {
+      if (conversation.metadata[field]) {
+        conversation.metadata[field] = false;
+        changed = true;
+      }
+    });
+  }
 
   if (conversation.deletedAt) {
     conversation.deletedAt = '';
@@ -9558,10 +9594,34 @@ function restoreConversationVisibilityForIncomingRealtimeMessage(conversation = 
   return changed;
 }
 
-function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
-  const rawConversation = getRealtimeRecord(data, ['conversation', 'chat']);
-  const rawMetadata = rawConversation.metadata && typeof rawConversation.metadata === 'object' ? rawConversation.metadata : {};
+function getRealtimeConversationSnapshotForMessage(data = {}, message = {}) {
+  const dataMetadata = data.metadata && typeof data.metadata === 'object' ? data.metadata : {};
   const messageMetadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  const candidates = [
+    data.conversation,
+    data.chat,
+    data.conversationSnapshot,
+    data.chatSnapshot,
+    dataMetadata.conversationSnapshot,
+    dataMetadata.conversation,
+    dataMetadata.chat,
+    message.conversation,
+    message.chat,
+    message.conversationSnapshot,
+    message.chatSnapshot,
+    messageMetadata.conversationSnapshot,
+    messageMetadata.conversation,
+    messageMetadata.chat
+  ];
+  return candidates.find((candidate) => candidate && typeof candidate === 'object' && !Array.isArray(candidate) && Object.keys(candidate).length) || null;
+}
+
+function findOrCreateConversationForRealtimeMessage(data = {}, message = {}) {
+  const messageMetadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  const realtimeConversationSnapshot = getRealtimeConversationSnapshotForMessage(data, message);
+  const fallbackRealtimeConversation = getRealtimeRecord(data, ['conversation', 'chat']);
+  const rawConversation = realtimeConversationSnapshot || fallbackRealtimeConversation;
+  const rawMetadata = rawConversation.metadata && typeof rawConversation.metadata === 'object' ? rawConversation.metadata : {};
   const conversationId = String(
     data.chatId
       || data.conversationId
