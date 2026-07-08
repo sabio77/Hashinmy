@@ -58,6 +58,8 @@ const state = {
   },
   activeChatId: '',
   eventSource: null,
+  realtimeOpeningPromise: null,
+  realtimeOpenSeq: 0,
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
   realtimeManualClose: false,
@@ -1133,7 +1135,7 @@ function renderQueuedMessage(queued = {}) {
   const replyPreview = queued.replyTo?.text
     ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>↩ ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
     : '';
-  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
+  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-client-message-id="${escapeHtml(queued.clientMessageId)}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
     <div class="ce-outbox-actions">
       <button type="button" data-outbox-retry="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Enviar ahora</button>
       <button type="button" data-outbox-discard="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Descartar</button>
@@ -1159,11 +1161,9 @@ async function sendQueuedOutboxMessage(queued = {}) {
       silent: Boolean(normalized.silent),
       ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds)
     });
-    removeQueuedMessage(normalized.clientMessageId, { render: false });
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    if (state.archivedView && data.chat?.isArchived === false) await loadChats({ includeArchived: false });
-    else renderAll();
+    if (!shouldWaitForStreamConfirmation(data)) {
+      await applySentMessageHttpFallback(data, normalized.clientMessageId);
+    }
     return true;
   } catch (error) {
     const recoverable = isRecoverableSendError(error);
@@ -3153,36 +3153,63 @@ async function bootstrapExistingSession() {
 
 function closeRealtime() {
   state.realtimeManualClose = true;
+  state.realtimeOpenSeq += 1;
   if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
   state.realtimeReconnectTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
 }
 
+function isRealtimeStreamUsable() {
+  return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
+}
+
 async function openRealtime() {
-  if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
-  state.realtimeReconnectTimer = 0;
-  state.realtimeManualClose = false;
-  if (state.eventSource) state.eventSource.close();
-  state.eventSource = null;
-  const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
-  const token = encodeURIComponent(tokenData.realtimeToken || '');
-  if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
-  state.eventSource = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
-  state.eventSource.addEventListener('chater_ready', () => {
-    state.realtimeRetryCount = 0;
-  });
-  state.eventSource.addEventListener('chater_event', (event) => {
-    const payload = JSON.parse(event.data || '{}');
-    handleRealtimeEvent(payload);
-  });
-  state.eventSource.onerror = () => {
-    if (state.realtimeManualClose || !getSessionToken()) {
-      closeRealtime();
-      return;
+  if (state.realtimeOpeningPromise) return state.realtimeOpeningPromise;
+  if (isRealtimeStreamUsable()) return state.eventSource;
+  const openSeq = state.realtimeOpenSeq + 1;
+  state.realtimeOpenSeq = openSeq;
+  const opening = (async () => {
+    if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+    state.realtimeReconnectTimer = 0;
+    state.realtimeManualClose = false;
+    if (state.eventSource) state.eventSource.close();
+    state.eventSource = null;
+    const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) return null;
+    const token = encodeURIComponent(tokenData.realtimeToken || '');
+    if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
+    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
+    source.addEventListener('chater_ready', () => {
+      if (state.eventSource !== source) return;
+      state.realtimeRetryCount = 0;
+    });
+    source.addEventListener('chater_event', (event) => {
+      if (state.eventSource !== source) return;
+      const payload = JSON.parse(event.data || '{}');
+      handleRealtimeEvent(payload);
+    });
+    source.onerror = () => {
+      if (state.eventSource !== source) return;
+      if (state.realtimeManualClose || !getSessionToken()) {
+        closeRealtime();
+        return;
+      }
+      scheduleRealtimeReconnect();
+    };
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) {
+      source.close();
+      return null;
     }
-    scheduleRealtimeReconnect();
-  };
+    state.eventSource = source;
+    return source;
+  })();
+  state.realtimeOpeningPromise = opening;
+  try {
+    return await opening;
+  } finally {
+    if (state.realtimeOpeningPromise === opening) state.realtimeOpeningPromise = null;
+  }
 }
 
 function scheduleRealtimeReconnect() {
@@ -3810,6 +3837,7 @@ function handleRealtimeEvent(payload = {}) {
 function stableRenderNodeKey(node = null) {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return '';
   const element = node;
+  if (element.dataset?.clientMessageId) return `client-message:${element.dataset.clientMessageId}`;
   if (element.dataset?.messageId) return `message:${element.dataset.messageId}`;
   if (element.dataset?.outboxId) return `outbox:${element.dataset.outboxId}`;
   if (element.dataset?.chatId) return `chat:${element.dataset.chatId}`;
@@ -4261,7 +4289,8 @@ function renderActiveChat() {
     const highlighted = msg.messageId === state.highlightedMessageId ? ' is-highlighted' : '';
     const pinned = msg.isPinned && !isDeletedMessage(msg) ? ' is-pinned-message' : '';
     const unreadSeparator = unreadMarker?.messageId && msg.messageId === unreadMarker.messageId ? renderUnreadSeparator(unreadMarker) : '';
-    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}">${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
+    const clientMessageAttr = msg.clientMessageId ? ` data-client-message-id="${escapeHtml(msg.clientMessageId)}"` : '';
+    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}"${clientMessageAttr}>${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
   }).join('');
   const queuedMessageHtml = queuedMessages.map(renderQueuedMessage).join('');
   const emptyText = isChatInteractionBlocked(chat) ? 'La conversación se mantiene disponible para consulta.' : 'Envía el primer mensaje.';
@@ -4376,6 +4405,23 @@ async function openSelfNotesChat() {
   showTemporaryDraftStatus('Notas para mí abierto. Todo lo que guardes aquí queda en tu cuenta.');
 }
 
+async function applySentMessageHttpFallback(data = {}, clientMessageId = '') {
+  if (!data?.message?.messageId) return false;
+  removeQueuedMessage(clientMessageId || data.message.clientMessageId || '', { render: false });
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  if (state.archivedView && data.chat?.isArchived === false) {
+    await loadChats({ includeArchived: false });
+    return true;
+  }
+  renderAll();
+  return true;
+}
+
+function shouldWaitForStreamConfirmation(data = {}) {
+  return Boolean(!data?.deduplicated && data?.realtimeDelivery?.ok === true && isRealtimeStreamUsable());
+}
+
 async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
@@ -4386,17 +4432,28 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
+  const queued = upsertQueuedMessage({
+    chatId,
+    text,
+    clientMessageId,
+    localId: clientMessageId,
+    replyToMessageId,
+    replyTo,
+    silent: Boolean(silent),
+    ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: 'sending',
+    attempts: 1,
+    lastError: ''
+  }, { render: true });
   try {
     const data = await post('/api/chats/send', { chatId, text, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds) });
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    if (state.archivedView && data.chat?.isArchived === false) {
-      await loadChats({ includeArchived: false });
-      return;
+    if (!shouldWaitForStreamConfirmation(data)) {
+      await applySentMessageHttpFallback(data, clientMessageId);
     }
-    renderAll();
     if (silent || normalizeEphemeralSeconds(ephemeralSeconds)) {
       const parts = [];
       if (silent) parts.push('sin notificación push');
@@ -4404,10 +4461,20 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
       showTemporaryDraftStatus(`Mensaje enviado ${parts.join(' y ')}.`);
     }
   } catch (error) {
-    if (!isRecoverableSendError(error)) throw error;
+    if (!isRecoverableSendError(error)) {
+      removeQueuedMessage(clientMessageId, { render: true });
+      throw error;
+    }
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    enqueueOutboxMessage({ chatId, text, clientMessageId, replyToMessageId, replyTo, silent, ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), error });
+    upsertQueuedMessage({
+      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo }),
+      status: 'failed',
+      attempts: Math.max(1, Number(queued?.attempts || 1)),
+      updatedAt: new Date().toISOString(),
+      lastError: error?.message || 'Sin conexión o servidor no disponible'
+    }, { render: true });
+    showTemporaryDraftStatus('Mensaje guardado en pendientes. Se enviará automáticamente cuando vuelva la conexión.', 4600);
     sendTyping(false).catch(() => null);
   }
 }
