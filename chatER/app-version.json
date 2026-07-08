@@ -1,16 +1,16 @@
 {
-  "version": "2026-07-07-message-event-indicator-155",
-  "buildTime": "2026-07-07T12:50:48-05:00",
+  "version": "2026-07-07-profile-qr-manual-code-156",
+  "buildTime": "2026-07-07T19:03:54-05:00",
   "channel": "render-static-site",
   "app": "ChatER",
-  "description": "ChatER muestra un indicador visual global cuando el perfil activo recibe un mensaje nuevo en tiempo real, sin filtrar por remitente.",
-  "build": "message-event-indicator-155",
-  "updatedAt": "2026-07-07T12:50:48-05:00",
-  "notes": "Los eventos nuevos de mensajes disparan una línea visual aislada que muestra un círculo verde centrado durante 3 segundos, independiente del remitente, la sección o la ventana abierta de ChatER.",
+  "description": "ChatER muestra debajo del QR de perfil el contenido textual exacto del QR para agregar contactos manualmente cuando sea necesario.",
+  "build": "profile-qr-manual-code-156",
+  "updatedAt": "2026-07-07T19:03:54-05:00",
+  "notes": "El estado del QR y el código manual quedan separados para que los mensajes de confirmación no oculten el payload que debe copiarse en el campo manual de Crear contacto.",
   "changes": [
-    "Se agregó una línea de eventos aislada para señales de mensaje recibido del perfil activo.",
-    "El indicador visual muestra un círculo verde grande en el centro de la app durante 3 segundos y luego se oculta automáticamente.",
-    "La señal se deduplica por mensaje y se replica entre ventanas abiertas mediante BroadcastChannel con respaldo por storage.",
-    "La integración se realiza sobre mensajes nuevos de tiempo real sin filtrar por remitente y sin alterar envío, recibos, lectura ni sincronización existente."
+    "Se agregó un bloque visible debajo del QR con el código QR en texto.",
+    "Los mensajes de estado del QR se muestran en una línea separada para no reemplazar el código manual.",
+    "El QR confirmado por memoriaBACKEND y el QR local de respaldo exponen el mismo payload usado para renderizar la imagen.",
+    "Se actualizó la versión estática y la caché PWA para publicar el cambio sin afectar otros flujos."
   ]
 }

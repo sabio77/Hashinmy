@@ -2730,11 +2730,44 @@ button {
 }
 
 .profile-qr-card small,
-.profile-qr-payload {
+.profile-qr-payload,
+.profile-qr-status {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
 
+.profile-qr-manual-code {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.profile-qr-manual-code span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-qr-manual-code code {
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--app-bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.profile-qr-status {
+  min-height: 16px;
+}
 
 .profile-qr-name-form {
   display: grid;

@@ -13455,11 +13455,24 @@ function normalizeProfileQrBackendData(payload = {}) {
 async function renderProfileQrForCurrentUser(container) {
   const target = container?.querySelector?.('[data-profile-qr-code]');
   const payloadTarget = container?.querySelector?.('[data-profile-qr-payload]');
+  const statusTarget = container?.querySelector?.('[data-profile-qr-status]');
   if (!target) return;
+
+  const setManualQrPayload = (payload = '') => {
+    if (!payloadTarget) return;
+    const normalizedPayload = String(payload || '').trim();
+    payloadTarget.textContent = normalizedPayload || 'Código QR no disponible todavía.';
+  };
+
+  const setProfileQrStatus = (message = '') => {
+    if (!statusTarget) return;
+    statusTarget.textContent = String(message || '').trim();
+  };
 
   if (!window.ChatERQRCodeLego?.renderProfileQr) {
     target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
-    if (payloadTarget) payloadTarget.textContent = 'El bloque QR se cargará automáticamente al iniciar la app.';
+    setManualQrPayload('');
+    setProfileQrStatus('El bloque QR se cargará automáticamente al iniciar la app.');
     return;
   }
 
@@ -13467,35 +13480,39 @@ async function renderProfileQrForCurrentUser(container) {
     const rendered = window.ChatERQRCodeLego.renderProfileQr(target, getCurrentProfileQrData(), {
       title: 'QR de perfil ChatER'
     });
-    if (payloadTarget) payloadTarget.textContent = message || rendered.payload;
+    setManualQrPayload(rendered.payload);
+    setProfileQrStatus(message);
     return rendered;
   };
 
   try {
     if (CHATER_CONFIG.backendBaseUrl) {
       target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
-      if (payloadTarget) payloadTarget.textContent = 'Confirmando tu perfil en memoriaBACKEND antes de mostrar el QR...';
+      setManualQrPayload('');
+      setProfileQrStatus('Confirmando tu perfil en memoriaBACKEND antes de mostrar el QR...');
       const backendPayload = await apiClient.getContactProfileQr();
       const backendQr = normalizeProfileQrBackendData(backendPayload);
       const rendered = backendQr.renderableQrPayload
         ? renderRawProfileQrPayload(target, backendQr.renderableQrPayload, { title: 'QR de perfil ChatER' })
         : null;
       if (rendered) {
-        if (payloadTarget) payloadTarget.textContent = backendQr.profileConfirmed
+        setManualQrPayload(rendered.payload);
+        setProfileQrStatus(backendQr.profileConfirmed
           ? 'Perfil confirmado en memoriaBACKEND. Este QR permite crear el contacto.'
-          : rendered.payload;
+          : 'QR generado. Copia este código si otra persona necesita agregarte manualmente.');
         return rendered;
       }
     }
 
-    return renderLocalProfileQr();
+    return renderLocalProfileQr('QR generado. Copia este código si otra persona necesita agregarte manualmente.');
   } catch (error) {
     console.warn('No se pudo confirmar el QR del perfil con memoriaBACKEND. Se muestra QR local de respaldo.', error);
     try {
       return renderLocalProfileQr('QR local de respaldo: inicia sesión de nuevo si otra persona no puede agregarte.');
     } catch (localError) {
       target.innerHTML = '<div class="qr-fallback-shape" aria-hidden="true">QR</div>';
-      if (payloadTarget) payloadTarget.textContent = 'No se pudo generar el QR de perfil en este navegador.';
+      setManualQrPayload('');
+      setProfileQrStatus('No se pudo generar el QR de perfil en este navegador.');
       console.warn('No se pudo generar el QR del perfil.', localError);
       return null;
     }
@@ -14771,7 +14788,11 @@ function openProfileModal() {
         <p class="profile-qr-name-feedback" data-profile-qr-name-feedback role="status" aria-live="polite"></p>
       </form>
       <div class="profile-qr-code" data-profile-qr-code></div>
-      <small class="profile-qr-payload" data-profile-qr-payload></small>
+      <div class="profile-qr-manual-code" aria-live="polite">
+        <span>Código QR en texto para agregar manualmente</span>
+        <code data-profile-qr-payload>Código QR no disponible todavía.</code>
+      </div>
+      <small class="profile-qr-status" data-profile-qr-status></small>
     </section>
     <div class="quick-action-grid">
       <button class="primary-button" type="button" data-profile-action="privacy">Configurar privacidad</button>
