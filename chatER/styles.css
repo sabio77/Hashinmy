@@ -1121,8 +1121,8 @@ svg {
   padding: 9px 11px 6px;
   border-radius: 17px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
-  animation: ce-message-in 0.18s ease both;
 }
+
 
 .ce-msg.is-pinned-message {
   outline: 2px solid rgba(10, 168, 132, 0.2);
@@ -6590,5 +6590,482 @@ body.ce-compact-mode .ce-shell {
     min-height: 36px;
     padding-inline: 4px;
     font-size: 0.68rem;
+  }
+}
+
+/* Iteración 12 · Responsive y compacto PC/tablet/móvil
+   Punto débil identificado: la última capa ya respondía al ancho real del panel de chat para cabecera y composer,
+   pero la búsqueda interna del chat seguía dependiendo principalmente del viewport. En PC con ventana partida,
+   tablet en panel estrecho o móvil con zoom, el panel podía quedar angosto aunque el viewport no activara el media query.
+   Se agrega respuesta por container query sin tocar JS ni eliminar acciones. */
+@container ce-chat-pane (max-width: 680px) {
+  .ce-chat-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(82px, auto) minmax(74px, auto);
+    grid-template-areas:
+      "chatSearchInput chatSearchAction chatSearchClear"
+      "chatSearchStarred chatSearchStarred chatSearchStarred";
+    align-items: center;
+    gap: 7px;
+    overflow-x: visible;
+    padding: 8px max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
+  }
+
+  .ce-chat-search > input {
+    grid-area: chatSearchInput;
+    min-width: 0;
+  }
+
+  .ce-chat-search > .ce-btn {
+    grid-area: chatSearchAction;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-width: 0;
+    min-height: 34px;
+    border-radius: 999px;
+    padding: 8px 10px;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(15, 118, 110, 0.07);
+  }
+
+  .ce-chat-search #btnClearSearch {
+    grid-area: chatSearchClear;
+    justify-self: stretch;
+  }
+
+  .ce-chat-search .ce-link--starred {
+    grid-area: chatSearchStarred;
+    justify-self: stretch;
+  }
+}
+
+@container ce-chat-pane (max-width: 520px) {
+  .ce-chat-search {
+    grid-template-columns: minmax(0, 1fr) minmax(76px, auto);
+    grid-template-areas:
+      "chatSearchInput chatSearchAction"
+      "chatSearchClear chatSearchStarred";
+    gap: 6px;
+    padding-block: 7px;
+  }
+
+  .ce-chat-search > input {
+    padding-block: 9px;
+  }
+
+  .ce-chat-search > .ce-btn,
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-height: 32px;
+    padding-inline: 8px;
+    font-size: 0.8rem;
+  }
+}
+
+@container ce-chat-pane (max-width: 340px) {
+  .ce-chat-search {
+    grid-template-columns: minmax(0, 1fr) minmax(62px, auto);
+    gap: 5px;
+    padding: 6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left));
+  }
+
+  .ce-chat-search > input {
+    padding-inline: 9px;
+    font-size: 0.86rem;
+  }
+
+  .ce-chat-search > .ce-btn,
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-height: 30px;
+    padding-inline: 6px;
+    font-size: 0.72rem;
+  }
+}
+
+body.ce-compact-mode .ce-chat-search {
+  gap: 6px;
+  padding-block: 7px;
+}
+
+body.ce-compact-mode .ce-chat-search input {
+  padding-block: 8px;
+}
+
+/* Iteración 13 · Responsive y compacto PC/tablet/móvil
+   Punto débil identificado: la capa anterior resolvía el ancho real del panel, pero en tablet o móvil horizontal
+   con poca altura útil, cabecera + búsqueda + composer podían consumir casi todo el alto y dejar el historial sin
+   área usable. Esta corrección compacta únicamente el modo de baja altura, mantiene todos los controles visibles,
+   evita overflow lateral y no toca la lógica JS existente. */
+@media (max-width: 900px) and (max-height: 560px) {
+  body {
+    --ce-header: 54px;
+    --ce-compose: 58px;
+  }
+
+  body.ce-compact-mode {
+    --ce-header: 50px;
+    --ce-compose: 54px;
+  }
+
+  .ce-chat {
+    grid-template-rows: minmax(var(--ce-header), auto) auto minmax(72px, 1fr) auto auto auto;
+  }
+
+  .ce-sidebar__header,
+  .ce-chat__header {
+    min-height: var(--ce-header);
+    padding-block: 6px;
+  }
+
+  .ce-chat__header {
+    gap: 8px;
+  }
+
+  .ce-chat-tools {
+    max-width: min(42vw, 172px);
+  }
+
+  .ce-chat-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(58px, auto) minmax(54px, auto) minmax(64px, auto);
+    grid-template-areas: "chatSearchInput chatSearchAction chatSearchClear chatSearchStarred";
+    align-items: center;
+    gap: 5px;
+    overflow-x: visible;
+    padding: 5px max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+  }
+
+  .ce-chat-search > input {
+    grid-area: chatSearchInput;
+    min-width: 0;
+    min-height: 30px;
+    padding: 7px 9px;
+    font-size: 0.84rem;
+  }
+
+  .ce-chat-search > .ce-btn {
+    grid-area: chatSearchAction;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ce-chat-search #btnClearSearch {
+    grid-area: chatSearchClear;
+  }
+
+  .ce-chat-search .ce-link--starred {
+    grid-area: chatSearchStarred;
+  }
+
+  .ce-chat-search > .ce-btn,
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-height: 30px;
+    padding: 6px 7px;
+    overflow: hidden;
+    justify-content: center;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+  }
+
+  .ce-messages {
+    gap: 5px;
+    padding: 7px max(8px, env(safe-area-inset-right)) 7px max(8px, env(safe-area-inset-left));
+  }
+
+  .ce-msg {
+    padding: 7px 9px 5px;
+  }
+
+  .ce-msg p,
+  .ce-msg__text {
+    line-height: 1.32;
+  }
+
+  .ce-reply-draft,
+  .ce-typing {
+    padding-block: 5px;
+  }
+
+  .ce-compose {
+    grid-template-columns: repeat(7, minmax(28px, 1fr)) minmax(52px, 1.35fr);
+    grid-template-areas:
+      "quick smart emoji schedule poll voice silent ttl"
+      "input input input input input input send send";
+    align-items: center;
+    gap: 4px;
+    padding: 6px max(7px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(7px, env(safe-area-inset-left));
+  }
+
+  .ce-compose .ce-draft-status,
+  .ce-compose .ce-quick-replies,
+  .ce-compose .ce-slash-panel,
+  .ce-compose .ce-emoji-panel {
+    grid-column: 1 / -1;
+  }
+
+  .ce-compose > .ce-icon-btn {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 10px;
+    font-size: 0.76rem;
+  }
+
+  .ce-compose > .ce-icon-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .ce-compose > .ce-ttl-control {
+    grid-area: ttl;
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding-inline: 3px;
+    justify-content: center;
+    font-size: 0.56rem;
+  }
+
+  .ce-compose > .ce-ttl-control span {
+    display: none;
+  }
+
+  .ce-ttl-control select {
+    max-width: 48px;
+    font-size: 0.66rem;
+  }
+
+  .ce-compose > #messageInput {
+    grid-area: input;
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 0.88rem;
+  }
+
+  .ce-compose > #btnSend {
+    grid-area: send;
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    padding-inline: 4px;
+    justify-content: center;
+    font-size: 0.68rem;
+  }
+
+  .ce-scroll-bottom {
+    bottom: clamp(74px, 21vh, 108px);
+    right: max(10px, env(safe-area-inset-right));
+    padding: 6px 10px;
+    font-size: 0.76rem;
+  }
+}
+
+@media (max-width: 380px) and (max-height: 560px) {
+  .ce-chat-tools {
+    max-width: min(36vw, 128px);
+  }
+
+  .ce-chat-search {
+    grid-template-columns: minmax(0, 1fr) minmax(48px, auto) minmax(46px, auto) minmax(54px, auto);
+    gap: 4px;
+    padding-inline: max(6px, env(safe-area-inset-left));
+  }
+
+  .ce-chat-search > .ce-btn,
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-height: 28px;
+    padding-inline: 5px;
+    font-size: 0.66rem;
+  }
+
+  .ce-compose {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(48px, 1.45fr);
+    gap: 3px;
+    padding-inline: max(6px, env(safe-area-inset-left));
+  }
+}
+
+/* Iteración 14 · Responsive y compacto PC/tablet/móvil
+   Punto débil identificado: la optimización de baja altura solo se activaba hasta 900px de viewport.
+   En PC estrecho o tablet horizontal con ancho mayor a 900px, el panel real del chat podía quedar angosto por la
+   barra lateral y mantener composer de 3 filas + búsqueda alta, dejando el historial con poca área usable.
+   Esta capa compacta únicamente ventanas de baja altura en escritorio/tablet horizontal, sin tocar JS ni flujos. */
+@media (min-width: 901px) and (max-height: 560px) {
+  body {
+    --ce-header: 54px;
+    --ce-compose: 54px;
+  }
+
+  body.ce-compact-mode {
+    --ce-header: 50px;
+    --ce-compose: 50px;
+  }
+
+  .ce-chat {
+    grid-template-rows: minmax(var(--ce-header), auto) auto minmax(96px, 1fr) auto auto minmax(var(--ce-compose), auto);
+  }
+
+  .ce-sidebar__header,
+  .ce-chat__header {
+    min-height: var(--ce-header);
+    padding-block: 6px;
+  }
+
+  .ce-chat__header {
+    gap: 8px;
+  }
+
+  .ce-chat-tools {
+    max-width: min(30vw, 240px);
+  }
+
+  .ce-chat-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(58px, auto) minmax(54px, auto) minmax(64px, auto);
+    grid-template-areas: "chatSearchInput chatSearchAction chatSearchClear chatSearchStarred";
+    align-items: center;
+    gap: 5px;
+    overflow-x: visible;
+    padding: 5px max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+  }
+
+  .ce-chat-search > input {
+    grid-area: chatSearchInput;
+    min-width: 0;
+    min-height: 30px;
+    padding: 7px 9px;
+    font-size: 0.84rem;
+  }
+
+  .ce-chat-search > .ce-btn {
+    grid-area: chatSearchAction;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ce-chat-search #btnClearSearch {
+    grid-area: chatSearchClear;
+  }
+
+  .ce-chat-search .ce-link--starred {
+    grid-area: chatSearchStarred;
+  }
+
+  .ce-chat-search > .ce-btn,
+  .ce-chat-search #btnClearSearch,
+  .ce-chat-search .ce-link--starred {
+    min-height: 30px;
+    padding: 6px 7px;
+    overflow: hidden;
+    justify-content: center;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+  }
+
+  .ce-messages {
+    gap: 5px;
+    padding: 7px max(8px, env(safe-area-inset-right)) 7px max(8px, env(safe-area-inset-left));
+  }
+
+  .ce-reply-draft,
+  .ce-typing {
+    padding-block: 5px;
+  }
+
+  .ce-compose {
+    grid-template-columns: repeat(7, minmax(30px, 34px)) minmax(52px, 64px) minmax(0, 1fr) minmax(58px, 72px);
+    grid-template-areas: "quick smart emoji schedule poll voice silent ttl input send";
+    align-items: center;
+    gap: 4px;
+    min-height: var(--ce-compose);
+    padding: 6px max(7px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(7px, env(safe-area-inset-left));
+  }
+
+  .ce-compose .ce-draft-status,
+  .ce-compose .ce-quick-replies,
+  .ce-compose .ce-slash-panel,
+  .ce-compose .ce-emoji-panel {
+    grid-column: 1 / -1;
+  }
+
+  .ce-compose > .ce-icon-btn {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 10px;
+    font-size: 0.76rem;
+  }
+
+  .ce-compose > .ce-icon-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
+  .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
+  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
+  .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
+  .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
+  .ce-compose > .ce-icon-btn--silent { grid-area: silent; }
+
+  .ce-compose > .ce-ttl-control {
+    grid-area: ttl;
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding-inline: 3px;
+    justify-content: center;
+    font-size: 0.56rem;
+  }
+
+  .ce-compose > .ce-ttl-control span {
+    display: none;
+  }
+
+  .ce-ttl-control select {
+    max-width: 48px;
+    font-size: 0.66rem;
+  }
+
+  .ce-compose > #messageInput {
+    grid-area: input;
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 0.88rem;
+  }
+
+  .ce-compose > #btnSend {
+    grid-area: send;
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    padding-inline: 4px;
+    justify-content: center;
+    font-size: 0.68rem;
+  }
+
+  .ce-scroll-bottom {
+    bottom: clamp(74px, 21vh, 108px);
+    right: max(10px, env(safe-area-inset-right));
+    padding: 6px 10px;
+    font-size: 0.76rem;
   }
 }

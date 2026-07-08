@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v69';
+const CACHE_NAME = 'chater-static-v74';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',

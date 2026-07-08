@@ -50,8 +50,17 @@ const state = {
   deliveryAckRetryTimer: 0,
   renderedMessageCountByChat: new Map(),
   renderedActiveChatId: '',
+  renderCache: {
+    chatListHtml: '',
+    contactListHtml: '',
+    userSummaryHtml: '',
+    activeChatHeaderHtml: '',
+    messagesHtml: ''
+  },
   activeChatId: '',
   eventSource: null,
+  realtimeOpeningPromise: null,
+  realtimeOpenSeq: 0,
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
   realtimeManualClose: false,
@@ -68,8 +77,6 @@ const state = {
   outboxRetryTimer: 0,
   scanStream: null,
   scanTimer: 0,
-  syncInFlight: null,
-  lastSyncAt: 0,
   clientId: '',
   chatSearchQuery: '',
   chatSearchResults: [],
@@ -152,7 +159,6 @@ const state = {
   commandPaletteActiveIndex: 0,
   scrollBottomVisible: false,
   scrollNewMessages: 0,
-  presenceRefreshTimer: 0,
   notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' }
 };
 
@@ -207,9 +213,14 @@ function initials(profile = {}) {
   return source.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'CE';
 }
 
+function avatarStableKey(profile = {}) {
+  return safeStorageKeyPart(profile.userId || profile.email || profile.profileCode || initials(profile) || 'avatar');
+}
+
 function avatar(profile = {}, size = 'normal') {
-  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer">`;
-  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true">${escapeHtml(initials(profile))}</span>`;
+  const stableKey = avatarStableKey(profile);
+  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false" data-avatar-key="${escapeHtml(stableKey)}">`;
+  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true" data-avatar-key="${escapeHtml(stableKey)}">${escapeHtml(initials(profile))}</span>`;
 }
 
 function isSelfChat(chat = {}) {
@@ -272,7 +283,8 @@ function renderPresenceDot(chat = {}) {
 
 function renderChatAvatarWithPresence(chat = {}, size = 'normal') {
   const small = size === 'small' ? ' ce-avatar-wrap--small' : '';
-  return `<span class="ce-avatar-wrap${small}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
+  const stableKey = isSelfChat(chat) ? 'self-notes' : avatarStableKey(chat.other || {});
+  return `<span class="ce-avatar-wrap${small}" data-avatar-wrap-key="${escapeHtml(stableKey)}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
 }
 
 function formatMessageTime(value = '') {
@@ -283,6 +295,40 @@ function formatScheduleDateTime(value = '') {
   const date = new Date(value || Date.now());
   if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
   return date.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function stableDataSignature(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (seen.has(value)) return '"[Circular]"';
+  seen.add(value);
+  let signature = '';
+  if (Array.isArray(value)) {
+    signature = `[${value.map((item) => stableDataSignature(item, seen)).join(',')}]`;
+  } else {
+    const keys = Object.keys(value).sort();
+    signature = `{${keys.map((key) => `${JSON.stringify(key)}:${stableDataSignature(value[key], seen)}`).join(',')}}`;
+  }
+  seen.delete(value);
+  return signature;
+}
+
+function hasStableDataChanged(current = null, next = null) {
+  return stableDataSignature(current) !== stableDataSignature(next);
+}
+
+function withoutVolatilePresenceTimestamps(value = null) {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(withoutVolatilePresenceTimestamps);
+  const clone = { ...value };
+  if (clone.presence && typeof clone.presence === 'object') {
+    const { checkedAt, ...stablePresence } = clone.presence;
+    clone.presence = stablePresence;
+  }
+  return clone;
+}
+
+function hasStableChatListChanged(current = [], next = []) {
+  return hasStableDataChanged(withoutVolatilePresenceTimestamps(current), withoutVolatilePresenceTimestamps(next));
 }
 
 
@@ -1130,7 +1176,7 @@ function renderQueuedMessage(queued = {}) {
   const replyPreview = queued.replyTo?.text
     ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>↩ ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
     : '';
-  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
+  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-client-message-id="${escapeHtml(queued.clientMessageId)}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
     <div class="ce-outbox-actions">
       <button type="button" data-outbox-retry="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Enviar ahora</button>
       <button type="button" data-outbox-discard="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Descartar</button>
@@ -1156,11 +1202,9 @@ async function sendQueuedOutboxMessage(queued = {}) {
       silent: Boolean(normalized.silent),
       ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds)
     });
-    removeQueuedMessage(normalized.clientMessageId, { render: false });
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    if (state.archivedView && data.chat?.isArchived === false) await loadChats({ includeArchived: false });
-    else renderAll();
+    if (!shouldWaitForStreamConfirmation(data)) {
+      await applySentMessageHttpFallback(data, normalized.clientMessageId);
+    }
     return true;
   } catch (error) {
     const recoverable = isRecoverableSendError(error);
@@ -1867,9 +1911,11 @@ async function createPollFromSlashArgs(args = '') {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId });
     clearDraftForChat(chatId);
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    renderAll();
+    if (!shouldWaitForStreamConfirmation(data)) {
+      upsertChat(data.chat);
+      upsertMessage(data.message);
+      renderAll();
+    }
     showTemporaryDraftStatus('Encuesta publicada desde comando rápido.');
     return { clearComposer: true };
   } finally {
@@ -2992,10 +3038,20 @@ async function unregisterCurrentPushSubscription() {
   }
 }
 
+function renderUserSummary() {
+  if (!els.userSummary) return;
+  if (!state.user) {
+    setCachedHtml('userSummaryHtml', els.userSummary, '');
+    return;
+  }
+  const userSummaryHtml = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
+  setCachedHtml('userSummaryHtml', els.userSummary, userSummaryHtml);
+}
+
 function showAuthenticated() {
   els.authScreen.classList.add('hidden');
   els.chatScreen.classList.remove('hidden');
-  els.userSummary.innerHTML = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
+  renderUserSummary();
   renderAll();
   updateAfterLoginBanners();
 }
@@ -3150,38 +3206,64 @@ async function bootstrapExistingSession() {
 
 function closeRealtime() {
   state.realtimeManualClose = true;
+  state.realtimeOpenSeq += 1;
   if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
   state.realtimeReconnectTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
 }
 
+function isRealtimeStreamUsable() {
+  return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
+}
+
 async function openRealtime() {
-  if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
-  state.realtimeReconnectTimer = 0;
-  state.realtimeManualClose = false;
-  if (state.eventSource) state.eventSource.close();
-  state.eventSource = null;
-  const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
-  const token = encodeURIComponent(tokenData.realtimeToken || '');
-  if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
-  state.eventSource = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
-  state.eventSource.addEventListener('chater_ready', () => {
-    const shouldRecover = state.realtimeRetryCount > 0;
-    state.realtimeRetryCount = 0;
-    if (shouldRecover) resyncStateFromBackend({ reloadActive: true, force: true }).catch(() => null);
-  });
-  state.eventSource.addEventListener('chater_event', (event) => {
-    const payload = JSON.parse(event.data || '{}');
-    handleRealtimeEvent(payload);
-  });
-  state.eventSource.onerror = () => {
-    if (state.realtimeManualClose || !getSessionToken()) {
-      closeRealtime();
-      return;
+  if (state.realtimeOpeningPromise) return state.realtimeOpeningPromise;
+  if (isRealtimeStreamUsable()) return state.eventSource;
+  const openSeq = state.realtimeOpenSeq + 1;
+  state.realtimeOpenSeq = openSeq;
+  const opening = (async () => {
+    if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+    state.realtimeReconnectTimer = 0;
+    state.realtimeManualClose = false;
+    if (state.eventSource) state.eventSource.close();
+    state.eventSource = null;
+    const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) return null;
+    const token = encodeURIComponent(tokenData.realtimeToken || '');
+    if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
+    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
+    state.eventSource = source;
+    source.addEventListener('chater_ready', () => {
+      if (state.eventSource !== source) return;
+      state.realtimeRetryCount = 0;
+    });
+    source.addEventListener('chater_event', (event) => {
+      if (state.eventSource !== source) return;
+      const payload = JSON.parse(event.data || '{}');
+      handleRealtimeEvent(payload);
+    });
+    source.onerror = () => {
+      if (state.eventSource !== source) return;
+      if (state.realtimeManualClose || !getSessionToken()) {
+        closeRealtime();
+        return;
+      }
+      scheduleRealtimeReconnect();
+    };
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) {
+      source.close();
+      if (state.eventSource === source) state.eventSource = null;
+      return null;
     }
-    scheduleRealtimeReconnect();
-  };
+    return source;
+  })();
+  state.realtimeOpeningPromise = opening;
+  try {
+    return await opening;
+  } finally {
+    if (state.realtimeOpeningPromise === opening) state.realtimeOpeningPromise = null;
+  }
 }
 
 function scheduleRealtimeReconnect() {
@@ -3229,34 +3311,44 @@ function clearActiveChatState() {
   closeContactNicknameModal();
   closeCommandPalette();
   if (els.chatSearchInput) els.chatSearchInput.value = '';
-  if (els.messages) els.messages.innerHTML = '';
+  setCachedHtml('messagesHtml', els.messages, '');
 }
+
 
 function removeChat(chatId = '') {
   const cleanChatId = String(chatId || '').trim();
-  if (!cleanChatId) return;
+  if (!cleanChatId) return false;
+  const before = state.chats.length;
   state.chats = state.chats.filter((item) => item.chatId !== cleanChatId);
-  if (state.activeChatId === cleanChatId) clearActiveChatState();
+  const removed = before !== state.chats.length;
+  if (state.activeChatId === cleanChatId) {
+    clearActiveChatState();
+    return true;
+  }
+  return removed;
 }
 
 function upsertChat(chat = {}) {
-  if (!chat.chatId) return;
+  if (!chat.chatId) return false;
   const belongsInCurrentView = state.chatListMode === 'unread'
     ? true
     : Boolean(chat.isArchived) === Boolean(state.archivedView);
-  if (!belongsInCurrentView) {
-    removeChat(chat.chatId);
-    return;
-  }
+  if (!belongsInCurrentView) return removeChat(chat.chatId);
   const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
-  if (index >= 0) state.chats[index] = { ...state.chats[index], ...chat };
-  else state.chats.unshift(chat);
+  if (index >= 0) {
+    const nextChat = { ...state.chats[index], ...chat };
+    if (!hasStableDataChanged(state.chats[index], nextChat)) return false;
+    state.chats[index] = nextChat;
+    sortChats();
+    return true;
+  }
+  state.chats.unshift(chat);
   sortChats();
+  return true;
 }
 
 function stopPresenceRefresh() {
-  if (state.presenceRefreshTimer) window.clearTimeout(state.presenceRefreshTimer);
-  state.presenceRefreshTimer = 0;
+  // La presencia de chatER se actualiza exclusivamente por el stream SSE.
 }
 
 function applyChatPresence(chatId = '', presence = {}) {
@@ -3265,59 +3357,44 @@ function applyChatPresence(chatId = '', presence = {}) {
   const index = state.chats.findIndex((item) => item.chatId === cleanChatId);
   if (index < 0) return false;
   const current = state.chats[index];
-  const nextPresence = { ...(current.presence || {}), ...presence };
+  const currentPresence = current.presence && typeof current.presence === 'object' ? current.presence : {};
+  const nextPresence = { ...currentPresence, ...presence };
+  const currentOnline = Boolean(current.otherOnline || currentPresence.otherOnline || currentPresence.status === 'online');
+  const nextOnline = Boolean(nextPresence.otherOnline || nextPresence.status === 'online');
+  const visualChanged = currentOnline !== nextOnline || String(currentPresence.status || '') !== String(nextPresence.status || '');
   state.chats[index] = {
     ...current,
     presence: nextPresence,
-    otherOnline: Boolean(nextPresence.otherOnline || nextPresence.status === 'online')
+    otherOnline: nextOnline
   };
-  return true;
-}
-
-function schedulePresenceRefresh(delay = 45000) {
-  stopPresenceRefresh();
-  const chat = activeChat();
-  if (!state.user || !chat?.chatId || !canShowChatPresence(chat)) return;
-  state.presenceRefreshTimer = window.setTimeout(() => {
-    refreshActiveChatPresence().catch(() => schedulePresenceRefresh(60000));
-  }, Math.max(10000, Number(delay || 45000)));
-}
-
-async function refreshActiveChatPresence({ render = true } = {}) {
-  const chat = activeChat();
-  if (!state.user || !chat?.chatId || !canShowChatPresence(chat)) {
-    stopPresenceRefresh();
-    return false;
-  }
-  const chatId = chat.chatId;
-  const data = await post('/api/chats/presence', { chatId });
-  if (state.activeChatId !== chatId) return false;
-  const changed = applyChatPresence(chatId, data.presence || {});
-  if (render && changed) renderAll();
-  schedulePresenceRefresh();
-  return changed;
+  return visualChanged;
 }
 
 function upsertContact(contact = {}) {
-  if (!contact.userId) return;
+  if (!contact.userId) return false;
   const normalized = {
     ...contact,
     contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
   };
   const index = state.contacts.findIndex((item) => item.userId === normalized.userId);
-  if (index >= 0) state.contacts[index] = { ...state.contacts[index], ...normalized };
-  else state.contacts.push(normalized);
+  if (index >= 0) {
+    const nextContact = { ...state.contacts[index], ...normalized };
+    if (!hasStableDataChanged(state.contacts[index], nextContact)) return false;
+    state.contacts[index] = nextContact;
+  } else {
+    state.contacts.push(normalized);
+  }
   state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+  return true;
 }
 
 function applyContactToChats(contact = {}) {
-  if (!contact?.userId) return;
+  if (!contact?.userId) return false;
   let changed = false;
   state.chats = state.chats.map((chat) => {
     const other = chat.other || {};
     if (other.userId !== contact.userId) return chat;
-    changed = true;
-    return {
+    const nextChat = {
       ...chat,
       other: {
         ...other,
@@ -3325,14 +3402,19 @@ function applyContactToChats(contact = {}) {
         contactName: contact.contactName || contact.nickname || other.displayName || other.email || 'Contacto'
       }
     };
+    if (!hasStableDataChanged(chat, nextChat)) return chat;
+    changed = true;
+    return nextChat;
   });
   if (changed) sortChats();
+  return changed;
 }
 
 function applyUpdatedContact(contact = {}) {
-  if (!contact?.userId) return;
-  upsertContact(contact);
-  applyContactToChats(contact);
+  if (!contact?.userId) return false;
+  const contactChanged = upsertContact(contact);
+  const chatChanged = applyContactToChats(contact);
+  return contactChanged || chatChanged;
 }
 
 function getContactByUserId(userId = '') {
@@ -3342,12 +3424,18 @@ function getContactByUserId(userId = '') {
 }
 
 function upsertMessage(message = {}) {
-  if (!message.messageId || !message.chatId) return;
+  if (!message.messageId || !message.chatId) return false;
   const list = state.messagesByChat.get(message.chatId) || [];
   const index = list.findIndex((msg) => msg.messageId === message.messageId);
-  if (index >= 0) list[index] = { ...list[index], ...message };
-  else list.push(message);
+  if (index >= 0) {
+    const nextMessage = { ...list[index], ...message };
+    if (!hasStableDataChanged(list[index], nextMessage)) return false;
+    list[index] = nextMessage;
+  } else {
+    list.push(message);
+  }
   state.messagesByChat.set(message.chatId, list);
+  return true;
 }
 
 function shouldAcknowledgeDelivery(message = {}) {
@@ -3651,51 +3739,15 @@ async function openSearchResult(messageId = '') {
   window.setTimeout(focusHighlightedMessage, 30);
 }
 
-async function resyncStateFromBackend({ reloadActive = false, force = false } = {}) {
-  if (!getSessionToken() || !state.user) return false;
-  if (state.syncInFlight) return state.syncInFlight;
-  const elapsed = Date.now() - Number(state.lastSyncAt || 0);
-  if (!force && elapsed > 0 && elapsed < 5000) return false;
-  state.syncInFlight = (async () => {
-    const previousActiveChatId = state.activeChatId;
-    const data = await post('/api/bootstrap', {});
-    const previousLabelFilter = state.activeLabelFilter;
-    applyBootstrap(data);
-    await loadChatLabels({ force: true }).catch(() => null);
-    if (previousLabelFilter && state.labels.some((item) => item.label.toLowerCase() === previousLabelFilter.toLowerCase())) state.activeLabelFilter = previousLabelFilter;
-    state.lastSyncAt = Date.now();
-    if (previousActiveChatId && state.chats.some((chat) => chat.chatId === previousActiveChatId)) {
-      state.activeChatId = previousActiveChatId;
-      if (reloadActive) {
-        const messages = await post('/api/chats/messages', { chatId: previousActiveChatId });
-        state.messagesByChat.set(previousActiveChatId, messages.messages || []);
-        acknowledgeMessagesDelivered(messages.messages || []);
-      }
-    } else if (previousActiveChatId) {
-      state.activeChatId = '';
-    }
-    renderAll();
-    if (reloadActive && canConfirmReadInActiveChat() && isMessagesNearBottom()) {
-      await markActiveRead();
-    }
-    return true;
-  })();
-  try {
-    return await state.syncInFlight;
-  } finally {
-    state.syncInFlight = null;
-  }
-}
-
 function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
   const chatId = String(payload.chatId || data.chat?.chatId || '').trim();
   const readerUserId = String(data.readerUserId || payload.actorUserId || '').trim();
   const readAt = String(data.readAt || '').trim();
-  if (!chatId || !readerUserId || readerUserId === state.user?.userId || !readAt) return;
+  if (!chatId || !readerUserId || readerUserId === state.user?.userId || !readAt) return false;
   const readMs = Date.parse(readAt) || 0;
-  if (!readMs) return;
+  if (!readMs) return false;
   const list = state.messagesByChat.get(chatId) || [];
-  if (!list.length) return;
+  if (!list.length) return false;
   let changed = false;
   const updated = list.map((message) => {
     if (message.senderUserId !== state.user?.userId || isDeletedMessage(message)) return message;
@@ -3721,31 +3773,91 @@ function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
     return next;
   });
   if (changed) state.messagesByChat.set(chatId, updated);
+  return changed;
+}
+
+function applyRealtimeSnapshot(data = {}) {
+  const previousActiveChatId = state.activeChatId;
+  let shouldRender = false;
+  if (data.user && hasStableDataChanged(state.user, data.user)) {
+    state.user = data.user;
+    shouldRender = true;
+  }
+  if (Array.isArray(data.contacts)) {
+    const nextContacts = data.contacts.map((contact) => ({
+      ...contact,
+      contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
+    }));
+    nextContacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+    if (hasStableDataChanged(state.contacts, nextContacts)) {
+      state.contacts = nextContacts;
+      shouldRender = true;
+    }
+  }
+  if (Array.isArray(data.chats)) {
+    const nextChats = [...data.chats];
+    nextChats.sort((a, b) => {
+      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
+      return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+    });
+    if (hasStableChatListChanged(state.chats, nextChats)) {
+      state.chats = nextChats;
+      shouldRender = true;
+    }
+    if (previousActiveChatId && !state.chats.some((chat) => chat.chatId === previousActiveChatId)) {
+      clearActiveChatState();
+      shouldRender = true;
+    } else if (state.activeChatId !== previousActiveChatId) {
+      state.activeChatId = previousActiveChatId;
+      shouldRender = true;
+    }
+  }
+  if (data.notificationPreferences) {
+    const nextPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
+    if (hasStableDataChanged(state.notificationPreferences, nextPreferences)) {
+      state.notificationPreferences = nextPreferences;
+      shouldRender = true;
+    }
+  }
+  if (shouldRender) renderAll();
 }
 
 function handleRealtimeEvent(payload = {}) {
   const data = payload.data || {};
+  if (payload.eventType === 'stream.snapshot') {
+    applyRealtimeSnapshot(data);
+    return;
+  }
   const currentUserId = state.user?.userId || '';
   const chatForThisUser = data.chatByUserId?.[currentUserId] || data.chat;
   const messageForThisUser = data.messageByUserId?.[currentUserId] || data.message;
+  let shouldRender = false;
   if (chatForThisUser) {
-    upsertChat(chatForThisUser);
-    if (Array.isArray(chatForThisUser.pinnedMessageIds)) syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds);
+    shouldRender = upsertChat(chatForThisUser) || shouldRender;
+    if (Array.isArray(chatForThisUser.pinnedMessageIds)) {
+      shouldRender = syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds) || shouldRender;
+    }
   }
-  if (data.contact && payload.recipientUserIds?.includes?.(state.user?.userId)) applyUpdatedContact(data.contact);
+  if (data.contact && payload.recipientUserIds?.includes?.(state.user?.userId)) {
+    shouldRender = applyUpdatedContact(data.contact) || shouldRender;
+  }
   if (messageForThisUser) {
-    if (messageForThisUser.clientMessageId) removeQueuedMessage(messageForThisUser.clientMessageId, { render: false });
-    upsertMessage(messageForThisUser);
+    shouldRender = removeQueuedMessage(messageForThisUser.clientMessageId || '', { render: false }) || shouldRender;
+    shouldRender = upsertMessage(messageForThisUser) || shouldRender;
     acknowledgeMessageDelivered(messageForThisUser).catch(() => null);
     if (state.replyToMessage?.messageId === messageForThisUser.messageId) {
-      state.replyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
+      const nextReplyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
+      if (hasStableDataChanged(state.replyToMessage, nextReplyToMessage)) {
+        state.replyToMessage = nextReplyToMessage;
+        shouldRender = true;
+      }
     }
     if (state.editingMessage?.messageId === messageForThisUser.messageId) {
-      if (isDeletedMessage(messageForThisUser)) {
-        state.editingMessage = null;
-        loadDraftForChat(state.activeChatId);
-      } else {
-        state.editingMessage = { ...state.editingMessage, ...messageForThisUser };
+      const nextEditingMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.editingMessage, ...messageForThisUser };
+      if (hasStableDataChanged(state.editingMessage, nextEditingMessage)) {
+        state.editingMessage = nextEditingMessage;
+        if (!nextEditingMessage) loadDraftForChat(state.activeChatId);
+        shouldRender = true;
       }
     }
   }
@@ -3757,6 +3869,7 @@ function handleRealtimeEvent(payload = {}) {
       if (index >= 0) state.scheduledMessages[index] = { ...state.scheduledMessages[index], ...data.scheduledMessage };
       else state.scheduledMessages.unshift(data.scheduledMessage);
     }
+    shouldRender = true;
   }
   if (payload.eventType === 'chat.draft.updated' && state.draftsOpen) loadDrafts({ silent: true }).catch(() => null);
   if (payload.eventType === 'chat.draft.updated' && data.draft?.chatId === state.activeChatId && !state.editingMessage?.messageId) {
@@ -3787,6 +3900,7 @@ function handleRealtimeEvent(payload = {}) {
   if (payload.eventType === 'contact.block.updated' && data.targetUserId) {
     applyBlockStatusForTargetUser(data.targetUserId, data.blockStatus || {});
     if (state.voiceDictating && isChatInteractionBlocked()) stopVoiceDictation({ announce: false });
+    shouldRender = true;
   }
   if (data.reminder?.reminderId) {
     if (['chat.reminder.completed'].includes(payload.eventType)) {
@@ -3806,25 +3920,151 @@ function handleRealtimeEvent(payload = {}) {
       state.labelsDraft = normalizeChatLabelList(data.labels || []).join(', ');
       renderLabelsModal();
     }
+    shouldRender = true;
   }
   if ((['message.star.updated', 'message.deleted', 'message.expired'].includes(payload.eventType)) && messageForThisUser) {
     syncStarredPanelMessage(messageForThisUser);
     syncGlobalStarredMessage(messageForThisUser);
   }
-  if (payload.eventType === 'presence.updated' && data.chatId && data.presence) applyChatPresence(data.chatId, data.presence);
-  if (payload.eventType === 'chat.read') syncReadReceiptsFromReadEvent(payload, data);
+  if (payload.eventType === 'presence.updated' && data.chatId && data.presence) {
+    shouldRender = applyChatPresence(data.chatId, data.presence) || shouldRender;
+  }
+  if (payload.eventType === 'chat.read') {
+    shouldRender = syncReadReceiptsFromReadEvent(payload, data) || shouldRender;
+  }
   if (payload.eventType === 'chat.typing' && data.userId !== state.user?.userId && payload.chatId === state.activeChatId) {
     els.typingStatus.textContent = data.isTyping ? 'Escribiendo...' : '';
     if (data.isTyping) window.setTimeout(() => { els.typingStatus.textContent = ''; }, 5200);
   }
-  renderAll();
+  if (shouldRender) renderAll();
   if (canConfirmReadInActiveChat() && messageForThisUser?.chatId === state.activeChatId) {
     const mine = messageForThisUser.senderUserId === state.user?.userId;
     if (mine || isMessagesNearBottom()) markActiveRead();
   }
 }
 
+function stableRenderNodeKeys(node = null) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
+  const element = node;
+  const keys = [];
+  if (element.dataset?.messageId) keys.push(`message:${element.dataset.messageId}`);
+  if (element.dataset?.clientMessageId) keys.push(`client-message:${element.dataset.clientMessageId}`);
+  if (element.dataset?.outboxId) keys.push(`outbox:${element.dataset.outboxId}`);
+  if (element.dataset?.chatId) keys.push(`chat:${element.dataset.chatId}`);
+  if (element.dataset?.contactId) keys.push(`contact:${element.dataset.contactId}`);
+  if (element.dataset?.unreadMarkerFor) keys.push(`unread:${element.dataset.unreadMarkerFor}`);
+  if (element.dataset?.stableRenderKey) keys.push(`stable:${element.dataset.stableRenderKey}`);
+  if (element.dataset?.avatarKey) keys.push(`avatar:${element.dataset.avatarKey}`);
+  if (element.dataset?.avatarWrapKey) keys.push(`avatar-wrap:${element.dataset.avatarWrapKey}`);
+  if (element.classList?.contains('ce-chat__identity')) keys.push('active-chat-identity');
+  if (element.classList?.contains('ce-chat-tools')) keys.push('active-chat-tools');
+  if (element.classList?.contains('ce-pinned-strip')) keys.push('active-pinned-strip');
+  if (element.classList?.contains('ce-block-notice')) keys.push('active-block-notice');
+  if (element.classList?.contains('ce-chat-empty')) keys.push('active-chat-empty');
+  if (element.classList?.contains('ce-empty-title')) keys.push('active-empty-title');
+  return keys.filter(Boolean);
+}
+
+function stableRenderNodeKey(node = null) {
+  return stableRenderNodeKeys(node)[0] || '';
+}
+
+function shareStableRenderKey(current = null, next = null) {
+  const currentKeys = stableRenderNodeKeys(current);
+  const nextKeys = stableRenderNodeKeys(next);
+  if (!currentKeys.length || !nextKeys.length) return true;
+  const currentSet = new Set(currentKeys);
+  return nextKeys.some((key) => currentSet.has(key));
+}
+
+function canPatchRenderNode(current = null, next = null) {
+  if (!current || !next || current.nodeType !== next.nodeType) return false;
+  if (current.nodeType !== Node.ELEMENT_NODE) return true;
+  if (current.tagName !== next.tagName) return false;
+  return shareStableRenderKey(current, next);
+}
+
+function normalizeRenderUrl(value = '') {
+  try {
+    return new URL(String(value || ''), document.baseURI).href;
+  } catch {
+    return String(value || '');
+  }
+}
+
+function syncRenderAttributes(current = null, next = null) {
+  if (!current || !next || current.nodeType !== Node.ELEMENT_NODE || next.nodeType !== Node.ELEMENT_NODE) return;
+  for (const attr of Array.from(current.attributes)) {
+    if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
+  }
+  for (const attr of Array.from(next.attributes)) {
+    if (current.tagName === 'IMG' && ['src', 'srcset'].includes(attr.name) && normalizeRenderUrl(current.getAttribute(attr.name)) === normalizeRenderUrl(attr.value)) continue;
+    if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
+  }
+}
+
+function patchRenderNode(current = null, next = null) {
+  if (!canPatchRenderNode(current, next)) {
+    const replacement = next.cloneNode(true);
+    current?.replaceWith(replacement);
+    return replacement;
+  }
+  if (current.nodeType === Node.TEXT_NODE || current.nodeType === Node.COMMENT_NODE) {
+    if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+    return current;
+  }
+  syncRenderAttributes(current, next);
+  patchRenderChildren(current, Array.from(next.childNodes));
+  return current;
+}
+
+function findReusableRenderChild(nextChild = null, keyedCurrent = new Map(), cursor = null, used = new Set()) {
+  for (const key of stableRenderNodeKeys(nextChild)) {
+    const candidate = keyedCurrent.get(key);
+    if (candidate && !used.has(candidate) && canPatchRenderNode(candidate, nextChild)) return candidate;
+  }
+  if (cursor && !used.has(cursor) && canPatchRenderNode(cursor, nextChild)) return cursor;
+  return null;
+}
+
+function patchRenderChildren(parent = null, nextChildren = []) {
+  if (!parent) return;
+  const keyedCurrent = new Map();
+  for (const child of Array.from(parent.childNodes)) {
+    for (const key of stableRenderNodeKeys(child)) {
+      if (key && !keyedCurrent.has(key)) keyedCurrent.set(key, child);
+    }
+  }
+  const used = new Set();
+  let cursor = parent.firstChild;
+  for (const nextChild of nextChildren) {
+    while (cursor && used.has(cursor)) cursor = cursor.nextSibling;
+    const currentChild = findReusableRenderChild(nextChild, keyedCurrent, cursor, used);
+    const referenceNode = cursor && !used.has(cursor) ? cursor : null;
+    const patched = currentChild ? patchRenderNode(currentChild, nextChild) : nextChild.cloneNode(true);
+    if (!currentChild) parent.insertBefore(patched, referenceNode);
+    else if (patched !== referenceNode) parent.insertBefore(patched, referenceNode);
+    used.add(patched);
+    if (patched === cursor) cursor = cursor.nextSibling;
+  }
+  for (const child of Array.from(parent.childNodes)) {
+    if (!used.has(child)) child.remove();
+  }
+}
+
+function setCachedHtml(cacheKey = '', element = null, html = '') {
+  if (!element) return false;
+  const value = String(html || '');
+  if (state.renderCache?.[cacheKey] === value) return false;
+  const template = document.createElement('template');
+  template.innerHTML = value;
+  patchRenderChildren(element, Array.from(template.content.childNodes));
+  if (state.renderCache) state.renderCache[cacheKey] = value;
+  return true;
+}
+
 function renderAll() {
+  renderUserSummary();
   renderChats();
   renderContacts();
   renderLabelFilters();
@@ -3884,7 +4124,7 @@ function renderChats() {
         : (state.archivedView
           ? 'No tienes chats archivados.'
           : 'Agrega un contacto por correo o QR para iniciar tu primer chat.'));
-    els.chatList.innerHTML = `<div class="ce-empty">${escapeHtml(emptyText)}</div>`;
+    setCachedHtml('chatListHtml', els.chatList, `<div class="ce-empty">${escapeHtml(emptyText)}</div>`);
     return;
   }
   sortChats();
@@ -3895,7 +4135,7 @@ function renderChats() {
   const labelToolbar = activeFilter
     ? `<div class="ce-list-toolbar ce-list-toolbar--label" role="status"><span>Filtro activo: #${escapeHtml(activeFilter)}</span><button class="ce-link" type="button" data-clear-label-filter="1">Quitar filtro</button></div>`
     : '';
-  els.chatList.innerHTML = `${labelToolbar}${unreadToolbar}${getVisibleChats().map((chat) => {
+  const chatListHtml = `${labelToolbar}${unreadToolbar}${getVisibleChats().map((chat) => {
     const title = chatDisplayName(chat);
     const subtitle = chatDisplaySubtitle(chat);
     const queuedCount = getQueuedMessagesForChat(chat.chatId).length;
@@ -3918,20 +4158,22 @@ function renderChats() {
     const archiveButton = `<button class="ce-chat-archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-chat-id="${escapeHtml(chat.chatId)}" data-archived="${chat.isArchived ? '1' : '0'}" title="${escapeHtml(archiveLabel)}" aria-label="${escapeHtml(archiveLabel)}">${archiveIcon}</button>`;
     return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
   }).join('')}`;
+  setCachedHtml('chatListHtml', els.chatList, chatListHtml);
 }
 
 function renderContacts() {
   if (!state.contacts.length) {
-    els.contactList.innerHTML = '<div class="ce-empty">Todavía no tienes contactos guardados.</div>';
+    setCachedHtml('contactListHtml', els.contactList, '<div class="ce-empty">Todavía no tienes contactos guardados.</div>');
     return;
   }
-  els.contactList.innerHTML = state.contacts.map((contact) => {
+  const contactListHtml = state.contacts.map((contact) => {
     const title = contactDisplayName(contact);
     const subtitle = contactDisplaySubtitle(contact);
     const hasNickname = Boolean(String(contact.nickname || '').trim());
     const nicknameLabel = hasNickname ? 'Editar apodo privado' : 'Agregar apodo privado';
     return `<div class="ce-row ce-row--contact${hasNickname ? ' has-nickname' : ''}" data-contact-id="${escapeHtml(contact.userId)}" role="button" tabindex="0" aria-label="Abrir chat con ${escapeHtml(title)}">${avatar(contact, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span><span class="ce-row__meta"><button class="ce-contact-alias-btn" type="button" data-edit-contact-nickname="${escapeHtml(contact.userId)}" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button></span></div>`;
   }).join('');
+  setCachedHtml('contactListHtml', els.contactList, contactListHtml);
 }
 
 function activeChat() {
@@ -3947,10 +4189,10 @@ function findActiveMessage(messageId = '') {
 
 function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
   const cleanChatId = String(chatId || '').trim();
-  if (!cleanChatId) return;
+  if (!cleanChatId) return false;
   const pinned = new Set((Array.isArray(pinnedMessageIds) ? pinnedMessageIds : []).filter(Boolean));
   const list = state.messagesByChat.get(cleanChatId) || [];
-  if (!list.length) return;
+  if (!list.length) return false;
   let changed = false;
   const updated = list.map((message) => {
     const isPinned = pinned.has(message.messageId) && !isDeletedMessage(message);
@@ -3959,6 +4201,7 @@ function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
     return { ...message, isPinned };
   });
   if (changed) state.messagesByChat.set(cleanChatId, updated);
+  return changed;
 }
 
 function getPinnedMessagesForChat(chat = {}, messages = []) {
@@ -4079,11 +4322,11 @@ async function exportActiveChat() {
 function renderActiveChat() {
   const chat = activeChat();
   if (!chat) {
-    els.activeChatHeader.innerHTML = '<div class="ce-empty-title">Selecciona un chat</div>';
+    setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, '<div class="ce-empty-title">Selecciona un chat</div>');
     els.chatSearchArea?.classList.add('hidden');
     if (els.chatSearchInput) els.chatSearchInput.disabled = true;
     if (els.btnShowStarred) els.btnShowStarred.disabled = true;
-    els.messages.innerHTML = '<div class="ce-chat-empty">Tus conversaciones aparecerán aquí.</div>';
+    setCachedHtml('messagesHtml', els.messages, '<div class="ce-chat-empty">Tus conversaciones aparecerán aquí.</div>');
     els.messageInput.disabled = true;
     els.btnSend.disabled = true;
     state.replyToMessage = null;
@@ -4133,7 +4376,7 @@ function renderActiveChat() {
   const nicknameLabel = chat.other?.nickname ? 'Editar apodo privado del contacto' : 'Agregar apodo privado al contacto';
   const nicknameButtonHtml = isSelfChat(chat) ? '' : `
       <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button>`;
-  els.activeChatHeader.innerHTML = `
+  const activeChatHeaderHtml = `
     <button class="ce-icon-btn ce-mobile-back" type="button" data-close-mobile-chat="1" title="Volver a conversaciones" aria-label="Volver a conversaciones">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/></svg>
     </button>
@@ -4170,6 +4413,7 @@ function renderActiveChat() {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2ZM13 4h-2v8.17L7.41 8.59 6 10l6 6 6-6-1.41-1.41L13 12.17V4Z"/></svg>
       </button>
     </div>`;
+  setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, activeChatHeaderHtml);
   els.chatSearchArea?.classList.remove('hidden');
   if (els.chatSearchInput) els.chatSearchInput.disabled = false;
   if (els.btnShowStarred) els.btnShowStarred.disabled = false;
@@ -4188,15 +4432,19 @@ function renderActiveChat() {
     const highlighted = msg.messageId === state.highlightedMessageId ? ' is-highlighted' : '';
     const pinned = msg.isPinned && !isDeletedMessage(msg) ? ' is-pinned-message' : '';
     const unreadSeparator = unreadMarker?.messageId && msg.messageId === unreadMarker.messageId ? renderUnreadSeparator(unreadMarker) : '';
-    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}">${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
+    const clientMessageAttr = msg.clientMessageId ? ` data-client-message-id="${escapeHtml(msg.clientMessageId)}"` : '';
+    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}"${clientMessageAttr}>${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
   }).join('');
   const queuedMessageHtml = queuedMessages.map(renderQueuedMessage).join('');
   const emptyText = isChatInteractionBlocked(chat) ? 'La conversación se mantiene disponible para consulta.' : 'Envía el primer mensaje.';
   const messageHtml = `${storedMessageHtml}${queuedMessageHtml}` || `<div class="ce-chat-empty">${escapeHtml(emptyText)}</div>`;
-  els.messages.innerHTML = `${renderChatBlockNotice(chat)}${renderPinnedMessagesStrip(chat, messages)}${messageHtml}`;
+  const activeMessagesHtml = `${renderChatBlockNotice(chat)}${renderPinnedMessagesStrip(chat, messages)}${messageHtml}`;
+  const messagesChanged = setCachedHtml('messagesHtml', els.messages, activeMessagesHtml);
   state.renderedActiveChatId = chat.chatId;
   state.renderedMessageCountByChat.set(chat.chatId, nextRenderedCount);
-  if (state.highlightedMessageId) {
+  if (!messagesChanged && sameRenderedChat && !state.highlightedMessageId && !unreadMarker?.messageId) {
+    updateScrollBottomButton();
+  } else if (state.highlightedMessageId) {
     window.setTimeout(() => {
       focusHighlightedMessage();
       updateScrollBottomButton();
@@ -4259,7 +4507,6 @@ async function selectChat(chatId) {
   loadDraftForChat(chatId);
   updateComposerControls();
   await markActiveRead();
-  refreshActiveChatPresence({ render: false }).catch(() => schedulePresenceRefresh(60000));
 }
 
 async function markActiveRead() {
@@ -4301,6 +4548,27 @@ async function openSelfNotesChat() {
   showTemporaryDraftStatus('Notas para mí abierto. Todo lo que guardes aquí queda en tu cuenta.');
 }
 
+async function applySentMessageHttpFallback(data = {}, clientMessageId = '') {
+  if (!data?.message?.messageId) return false;
+  removeQueuedMessage(clientMessageId || data.message.clientMessageId || '', { render: false });
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  if (state.archivedView && data.chat?.isArchived === false) {
+    await loadChats({ includeArchived: false });
+    return true;
+  }
+  renderAll();
+  return true;
+}
+
+function shouldWaitForStreamConfirmation(data = {}) {
+  return Boolean(!data?.deduplicated && data?.realtimeDelivery?.ok === true && isRealtimeStreamUsable());
+}
+
+function shouldSendMessageStreamOnly() {
+  return Boolean(isRealtimeStreamUsable() && navigator.onLine !== false);
+}
+
 async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
@@ -4311,17 +4579,29 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
+  const streamOnly = shouldSendMessageStreamOnly();
+  const queued = streamOnly ? null : upsertQueuedMessage({
+    chatId,
+    text,
+    clientMessageId,
+    localId: clientMessageId,
+    replyToMessageId,
+    replyTo,
+    silent: Boolean(silent),
+    ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: 'sending',
+    attempts: 1,
+    lastError: ''
+  }, { render: true });
   try {
     const data = await post('/api/chats/send', { chatId, text, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds) });
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    if (state.archivedView && data.chat?.isArchived === false) {
-      await loadChats({ includeArchived: false });
-      return;
+    if (!shouldWaitForStreamConfirmation(data)) {
+      await applySentMessageHttpFallback(data, clientMessageId);
     }
-    renderAll();
     if (silent || normalizeEphemeralSeconds(ephemeralSeconds)) {
       const parts = [];
       if (silent) parts.push('sin notificación push');
@@ -4329,10 +4609,20 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
       showTemporaryDraftStatus(`Mensaje enviado ${parts.join(' y ')}.`);
     }
   } catch (error) {
-    if (!isRecoverableSendError(error)) throw error;
+    if (!isRecoverableSendError(error)) {
+      removeQueuedMessage(clientMessageId, { render: true });
+      throw error;
+    }
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    enqueueOutboxMessage({ chatId, text, clientMessageId, replyToMessageId, replyTo, silent, ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), error });
+    upsertQueuedMessage({
+      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
+      status: 'failed',
+      attempts: Math.max(1, Number(queued?.attempts || 1)),
+      updatedAt: new Date().toISOString(),
+      lastError: error?.message || 'Sin conexión o servidor no disponible'
+    }, { render: true });
+    showTemporaryDraftStatus('Mensaje guardado en pendientes. Se enviará automáticamente cuando vuelva la conexión.', 4600);
     sendTyping(false).catch(() => null);
   }
 }
@@ -4507,11 +4797,13 @@ async function createPollFromModal() {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId });
     clearDraftForChat(chatId);
-    upsertChat(data.chat);
-    upsertMessage(data.message);
+    if (!shouldWaitForStreamConfirmation(data)) {
+      upsertChat(data.chat);
+      upsertMessage(data.message);
+      renderAll();
+    }
     closePollModal();
     if (els.pollForm) els.pollForm.reset();
-    renderAll();
     showTemporaryDraftStatus('Encuesta publicada en el chat.');
   } finally {
     state.pollCreating = false;
@@ -6389,7 +6681,7 @@ function bindEvents() {
   });
   window.addEventListener('online', () => {
     if (state.user) {
-      resyncStateFromBackend({ reloadActive: true, force: true }).catch(() => null);
+      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
     }
@@ -6397,8 +6689,7 @@ function bindEvents() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') saveActiveDraft({ announce: false });
     if (document.visibilityState === 'visible' && state.user) {
-      resyncStateFromBackend({ reloadActive: Boolean(state.activeChatId) }).catch(() => null);
-      refreshActiveChatPresence({ render: true }).catch(() => null);
+      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
       scheduleOutboxRetry(1400);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
       requestServiceWorkerDeliveryAckFlush();
