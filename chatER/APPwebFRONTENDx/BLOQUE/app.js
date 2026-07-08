@@ -53,14 +53,11 @@ const state = {
   renderCache: {
     chatListHtml: '',
     contactListHtml: '',
-    userSummaryHtml: '',
     activeChatHeaderHtml: '',
     messagesHtml: ''
   },
   activeChatId: '',
   eventSource: null,
-  realtimeOpeningPromise: null,
-  realtimeOpenSeq: 0,
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
   realtimeManualClose: false,
@@ -213,14 +210,9 @@ function initials(profile = {}) {
   return source.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'CE';
 }
 
-function avatarStableKey(profile = {}) {
-  return safeStorageKeyPart(profile.userId || profile.email || profile.profileCode || initials(profile) || 'avatar');
-}
-
 function avatar(profile = {}, size = 'normal') {
-  const stableKey = avatarStableKey(profile);
-  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false" data-avatar-key="${escapeHtml(stableKey)}">`;
-  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true" data-avatar-key="${escapeHtml(stableKey)}">${escapeHtml(initials(profile))}</span>`;
+  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer">`;
+  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true">${escapeHtml(initials(profile))}</span>`;
 }
 
 function isSelfChat(chat = {}) {
@@ -283,8 +275,7 @@ function renderPresenceDot(chat = {}) {
 
 function renderChatAvatarWithPresence(chat = {}, size = 'normal') {
   const small = size === 'small' ? ' ce-avatar-wrap--small' : '';
-  const stableKey = isSelfChat(chat) ? 'self-notes' : avatarStableKey(chat.other || {});
-  return `<span class="ce-avatar-wrap${small}" data-avatar-wrap-key="${escapeHtml(stableKey)}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
+  return `<span class="ce-avatar-wrap${small}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
 }
 
 function formatMessageTime(value = '') {
@@ -295,40 +286,6 @@ function formatScheduleDateTime(value = '') {
   const date = new Date(value || Date.now());
   if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
   return date.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function stableDataSignature(value, seen = new WeakSet()) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (seen.has(value)) return '"[Circular]"';
-  seen.add(value);
-  let signature = '';
-  if (Array.isArray(value)) {
-    signature = `[${value.map((item) => stableDataSignature(item, seen)).join(',')}]`;
-  } else {
-    const keys = Object.keys(value).sort();
-    signature = `{${keys.map((key) => `${JSON.stringify(key)}:${stableDataSignature(value[key], seen)}`).join(',')}}`;
-  }
-  seen.delete(value);
-  return signature;
-}
-
-function hasStableDataChanged(current = null, next = null) {
-  return stableDataSignature(current) !== stableDataSignature(next);
-}
-
-function withoutVolatilePresenceTimestamps(value = null) {
-  if (!value || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map(withoutVolatilePresenceTimestamps);
-  const clone = { ...value };
-  if (clone.presence && typeof clone.presence === 'object') {
-    const { checkedAt, ...stablePresence } = clone.presence;
-    clone.presence = stablePresence;
-  }
-  return clone;
-}
-
-function hasStableChatListChanged(current = [], next = []) {
-  return hasStableDataChanged(withoutVolatilePresenceTimestamps(current), withoutVolatilePresenceTimestamps(next));
 }
 
 
@@ -1176,7 +1133,7 @@ function renderQueuedMessage(queued = {}) {
   const replyPreview = queued.replyTo?.text
     ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>↩ ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
     : '';
-  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-client-message-id="${escapeHtml(queued.clientMessageId)}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
+  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
     <div class="ce-outbox-actions">
       <button type="button" data-outbox-retry="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Enviar ahora</button>
       <button type="button" data-outbox-discard="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Descartar</button>
@@ -1202,9 +1159,11 @@ async function sendQueuedOutboxMessage(queued = {}) {
       silent: Boolean(normalized.silent),
       ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds)
     });
-    if (!shouldWaitForStreamConfirmation(data)) {
-      await applySentMessageHttpFallback(data, normalized.clientMessageId);
-    }
+    removeQueuedMessage(normalized.clientMessageId, { render: false });
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    if (state.archivedView && data.chat?.isArchived === false) await loadChats({ includeArchived: false });
+    else renderAll();
     return true;
   } catch (error) {
     const recoverable = isRecoverableSendError(error);
@@ -1911,11 +1870,9 @@ async function createPollFromSlashArgs(args = '') {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId });
     clearDraftForChat(chatId);
-    if (!shouldWaitForStreamConfirmation(data)) {
-      upsertChat(data.chat);
-      upsertMessage(data.message);
-      renderAll();
-    }
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    renderAll();
     showTemporaryDraftStatus('Encuesta publicada desde comando rápido.');
     return { clearComposer: true };
   } finally {
@@ -3038,20 +2995,10 @@ async function unregisterCurrentPushSubscription() {
   }
 }
 
-function renderUserSummary() {
-  if (!els.userSummary) return;
-  if (!state.user) {
-    setCachedHtml('userSummaryHtml', els.userSummary, '');
-    return;
-  }
-  const userSummaryHtml = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
-  setCachedHtml('userSummaryHtml', els.userSummary, userSummaryHtml);
-}
-
 function showAuthenticated() {
   els.authScreen.classList.add('hidden');
   els.chatScreen.classList.remove('hidden');
-  renderUserSummary();
+  els.userSummary.innerHTML = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
   renderAll();
   updateAfterLoginBanners();
 }
@@ -3206,64 +3153,36 @@ async function bootstrapExistingSession() {
 
 function closeRealtime() {
   state.realtimeManualClose = true;
-  state.realtimeOpenSeq += 1;
   if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
   state.realtimeReconnectTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
 }
 
-function isRealtimeStreamUsable() {
-  return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
-}
-
 async function openRealtime() {
-  if (state.realtimeOpeningPromise) return state.realtimeOpeningPromise;
-  if (isRealtimeStreamUsable()) return state.eventSource;
-  const openSeq = state.realtimeOpenSeq + 1;
-  state.realtimeOpenSeq = openSeq;
-  const opening = (async () => {
-    if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
-    state.realtimeReconnectTimer = 0;
-    state.realtimeManualClose = false;
-    if (state.eventSource) state.eventSource.close();
-    state.eventSource = null;
-    const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
-    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) return null;
-    const token = encodeURIComponent(tokenData.realtimeToken || '');
-    if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
-    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
-    state.eventSource = source;
-    source.addEventListener('chater_ready', () => {
-      if (state.eventSource !== source) return;
-      state.realtimeRetryCount = 0;
-    });
-    source.addEventListener('chater_event', (event) => {
-      if (state.eventSource !== source) return;
-      const payload = JSON.parse(event.data || '{}');
-      handleRealtimeEvent(payload);
-    });
-    source.onerror = () => {
-      if (state.eventSource !== source) return;
-      if (state.realtimeManualClose || !getSessionToken()) {
-        closeRealtime();
-        return;
-      }
-      scheduleRealtimeReconnect();
-    };
-    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) {
-      source.close();
-      if (state.eventSource === source) state.eventSource = null;
-      return null;
+  if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+  state.realtimeReconnectTimer = 0;
+  state.realtimeManualClose = false;
+  if (state.eventSource) state.eventSource.close();
+  state.eventSource = null;
+  const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+  const token = encodeURIComponent(tokenData.realtimeToken || '');
+  if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
+  state.eventSource = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
+  state.eventSource.addEventListener('chater_ready', () => {
+    state.realtimeRetryCount = 0;
+  });
+  state.eventSource.addEventListener('chater_event', (event) => {
+    const payload = JSON.parse(event.data || '{}');
+    handleRealtimeEvent(payload);
+  });
+  state.eventSource.onerror = () => {
+    if (state.realtimeManualClose || !getSessionToken()) {
+      closeRealtime();
+      return;
     }
-    return source;
-  })();
-  state.realtimeOpeningPromise = opening;
-  try {
-    return await opening;
-  } finally {
-    if (state.realtimeOpeningPromise === opening) state.realtimeOpeningPromise = null;
-  }
+    scheduleRealtimeReconnect();
+  };
 }
 
 function scheduleRealtimeReconnect() {
@@ -3317,34 +3236,24 @@ function clearActiveChatState() {
 
 function removeChat(chatId = '') {
   const cleanChatId = String(chatId || '').trim();
-  if (!cleanChatId) return false;
-  const before = state.chats.length;
+  if (!cleanChatId) return;
   state.chats = state.chats.filter((item) => item.chatId !== cleanChatId);
-  const removed = before !== state.chats.length;
-  if (state.activeChatId === cleanChatId) {
-    clearActiveChatState();
-    return true;
-  }
-  return removed;
+  if (state.activeChatId === cleanChatId) clearActiveChatState();
 }
 
 function upsertChat(chat = {}) {
-  if (!chat.chatId) return false;
+  if (!chat.chatId) return;
   const belongsInCurrentView = state.chatListMode === 'unread'
     ? true
     : Boolean(chat.isArchived) === Boolean(state.archivedView);
-  if (!belongsInCurrentView) return removeChat(chat.chatId);
-  const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
-  if (index >= 0) {
-    const nextChat = { ...state.chats[index], ...chat };
-    if (!hasStableDataChanged(state.chats[index], nextChat)) return false;
-    state.chats[index] = nextChat;
-    sortChats();
-    return true;
+  if (!belongsInCurrentView) {
+    removeChat(chat.chatId);
+    return;
   }
-  state.chats.unshift(chat);
+  const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
+  if (index >= 0) state.chats[index] = { ...state.chats[index], ...chat };
+  else state.chats.unshift(chat);
   sortChats();
-  return true;
 }
 
 function stopPresenceRefresh() {
@@ -3371,30 +3280,25 @@ function applyChatPresence(chatId = '', presence = {}) {
 }
 
 function upsertContact(contact = {}) {
-  if (!contact.userId) return false;
+  if (!contact.userId) return;
   const normalized = {
     ...contact,
     contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
   };
   const index = state.contacts.findIndex((item) => item.userId === normalized.userId);
-  if (index >= 0) {
-    const nextContact = { ...state.contacts[index], ...normalized };
-    if (!hasStableDataChanged(state.contacts[index], nextContact)) return false;
-    state.contacts[index] = nextContact;
-  } else {
-    state.contacts.push(normalized);
-  }
+  if (index >= 0) state.contacts[index] = { ...state.contacts[index], ...normalized };
+  else state.contacts.push(normalized);
   state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
-  return true;
 }
 
 function applyContactToChats(contact = {}) {
-  if (!contact?.userId) return false;
+  if (!contact?.userId) return;
   let changed = false;
   state.chats = state.chats.map((chat) => {
     const other = chat.other || {};
     if (other.userId !== contact.userId) return chat;
-    const nextChat = {
+    changed = true;
+    return {
       ...chat,
       other: {
         ...other,
@@ -3402,19 +3306,14 @@ function applyContactToChats(contact = {}) {
         contactName: contact.contactName || contact.nickname || other.displayName || other.email || 'Contacto'
       }
     };
-    if (!hasStableDataChanged(chat, nextChat)) return chat;
-    changed = true;
-    return nextChat;
   });
   if (changed) sortChats();
-  return changed;
 }
 
 function applyUpdatedContact(contact = {}) {
-  if (!contact?.userId) return false;
-  const contactChanged = upsertContact(contact);
-  const chatChanged = applyContactToChats(contact);
-  return contactChanged || chatChanged;
+  if (!contact?.userId) return;
+  upsertContact(contact);
+  applyContactToChats(contact);
 }
 
 function getContactByUserId(userId = '') {
@@ -3424,18 +3323,12 @@ function getContactByUserId(userId = '') {
 }
 
 function upsertMessage(message = {}) {
-  if (!message.messageId || !message.chatId) return false;
+  if (!message.messageId || !message.chatId) return;
   const list = state.messagesByChat.get(message.chatId) || [];
   const index = list.findIndex((msg) => msg.messageId === message.messageId);
-  if (index >= 0) {
-    const nextMessage = { ...list[index], ...message };
-    if (!hasStableDataChanged(list[index], nextMessage)) return false;
-    list[index] = nextMessage;
-  } else {
-    list.push(message);
-  }
+  if (index >= 0) list[index] = { ...list[index], ...message };
+  else list.push(message);
   state.messagesByChat.set(message.chatId, list);
-  return true;
 }
 
 function shouldAcknowledgeDelivery(message = {}) {
@@ -3778,48 +3671,22 @@ function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
 
 function applyRealtimeSnapshot(data = {}) {
   const previousActiveChatId = state.activeChatId;
-  let shouldRender = false;
-  if (data.user && hasStableDataChanged(state.user, data.user)) {
-    state.user = data.user;
-    shouldRender = true;
-  }
+  if (data.user) state.user = data.user;
   if (Array.isArray(data.contacts)) {
-    const nextContacts = data.contacts.map((contact) => ({
+    state.contacts = data.contacts.map((contact) => ({
       ...contact,
       contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
     }));
-    nextContacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
-    if (hasStableDataChanged(state.contacts, nextContacts)) {
-      state.contacts = nextContacts;
-      shouldRender = true;
-    }
+    state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
   }
   if (Array.isArray(data.chats)) {
-    const nextChats = [...data.chats];
-    nextChats.sort((a, b) => {
-      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
-      return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
-    });
-    if (hasStableChatListChanged(state.chats, nextChats)) {
-      state.chats = nextChats;
-      shouldRender = true;
-    }
-    if (previousActiveChatId && !state.chats.some((chat) => chat.chatId === previousActiveChatId)) {
-      clearActiveChatState();
-      shouldRender = true;
-    } else if (state.activeChatId !== previousActiveChatId) {
-      state.activeChatId = previousActiveChatId;
-      shouldRender = true;
-    }
+    state.chats = data.chats;
+    sortChats();
+    if (previousActiveChatId && !state.chats.some((chat) => chat.chatId === previousActiveChatId)) clearActiveChatState();
+    else state.activeChatId = previousActiveChatId;
   }
-  if (data.notificationPreferences) {
-    const nextPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
-    if (hasStableDataChanged(state.notificationPreferences, nextPreferences)) {
-      state.notificationPreferences = nextPreferences;
-      shouldRender = true;
-    }
-  }
-  if (shouldRender) renderAll();
+  if (data.notificationPreferences) state.notificationPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
+  renderAll();
 }
 
 function handleRealtimeEvent(payload = {}) {
@@ -3833,33 +3700,30 @@ function handleRealtimeEvent(payload = {}) {
   const messageForThisUser = data.messageByUserId?.[currentUserId] || data.message;
   let shouldRender = false;
   if (chatForThisUser) {
-    shouldRender = upsertChat(chatForThisUser) || shouldRender;
-    if (Array.isArray(chatForThisUser.pinnedMessageIds)) {
-      shouldRender = syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds) || shouldRender;
-    }
+    upsertChat(chatForThisUser);
+    if (Array.isArray(chatForThisUser.pinnedMessageIds)) syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds);
+    shouldRender = true;
   }
   if (data.contact && payload.recipientUserIds?.includes?.(state.user?.userId)) {
-    shouldRender = applyUpdatedContact(data.contact) || shouldRender;
+    applyUpdatedContact(data.contact);
+    shouldRender = true;
   }
   if (messageForThisUser) {
-    shouldRender = removeQueuedMessage(messageForThisUser.clientMessageId || '', { render: false }) || shouldRender;
-    shouldRender = upsertMessage(messageForThisUser) || shouldRender;
+    if (messageForThisUser.clientMessageId) removeQueuedMessage(messageForThisUser.clientMessageId, { render: false });
+    upsertMessage(messageForThisUser);
     acknowledgeMessageDelivered(messageForThisUser).catch(() => null);
     if (state.replyToMessage?.messageId === messageForThisUser.messageId) {
-      const nextReplyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
-      if (hasStableDataChanged(state.replyToMessage, nextReplyToMessage)) {
-        state.replyToMessage = nextReplyToMessage;
-        shouldRender = true;
-      }
+      state.replyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
     }
     if (state.editingMessage?.messageId === messageForThisUser.messageId) {
-      const nextEditingMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.editingMessage, ...messageForThisUser };
-      if (hasStableDataChanged(state.editingMessage, nextEditingMessage)) {
-        state.editingMessage = nextEditingMessage;
-        if (!nextEditingMessage) loadDraftForChat(state.activeChatId);
-        shouldRender = true;
+      if (isDeletedMessage(messageForThisUser)) {
+        state.editingMessage = null;
+        loadDraftForChat(state.activeChatId);
+      } else {
+        state.editingMessage = { ...state.editingMessage, ...messageForThisUser };
       }
     }
+    shouldRender = true;
   }
   if (data.scheduledMessage?.scheduledId) {
     if (['message.scheduled.cancelled', 'message.scheduled.sent'].includes(payload.eventType)) {
@@ -3943,53 +3807,30 @@ function handleRealtimeEvent(payload = {}) {
   }
 }
 
-function stableRenderNodeKeys(node = null) {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
-  const element = node;
-  const keys = [];
-  if (element.dataset?.messageId) keys.push(`message:${element.dataset.messageId}`);
-  if (element.dataset?.clientMessageId) keys.push(`client-message:${element.dataset.clientMessageId}`);
-  if (element.dataset?.outboxId) keys.push(`outbox:${element.dataset.outboxId}`);
-  if (element.dataset?.chatId) keys.push(`chat:${element.dataset.chatId}`);
-  if (element.dataset?.contactId) keys.push(`contact:${element.dataset.contactId}`);
-  if (element.dataset?.unreadMarkerFor) keys.push(`unread:${element.dataset.unreadMarkerFor}`);
-  if (element.dataset?.stableRenderKey) keys.push(`stable:${element.dataset.stableRenderKey}`);
-  if (element.dataset?.avatarKey) keys.push(`avatar:${element.dataset.avatarKey}`);
-  if (element.dataset?.avatarWrapKey) keys.push(`avatar-wrap:${element.dataset.avatarWrapKey}`);
-  if (element.classList?.contains('ce-chat__identity')) keys.push('active-chat-identity');
-  if (element.classList?.contains('ce-chat-tools')) keys.push('active-chat-tools');
-  if (element.classList?.contains('ce-pinned-strip')) keys.push('active-pinned-strip');
-  if (element.classList?.contains('ce-block-notice')) keys.push('active-block-notice');
-  if (element.classList?.contains('ce-chat-empty')) keys.push('active-chat-empty');
-  if (element.classList?.contains('ce-empty-title')) keys.push('active-empty-title');
-  return keys.filter(Boolean);
-}
-
 function stableRenderNodeKey(node = null) {
-  return stableRenderNodeKeys(node)[0] || '';
-}
-
-function shareStableRenderKey(current = null, next = null) {
-  const currentKeys = stableRenderNodeKeys(current);
-  const nextKeys = stableRenderNodeKeys(next);
-  if (!currentKeys.length || !nextKeys.length) return true;
-  const currentSet = new Set(currentKeys);
-  return nextKeys.some((key) => currentSet.has(key));
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return '';
+  const element = node;
+  if (element.dataset?.messageId) return `message:${element.dataset.messageId}`;
+  if (element.dataset?.outboxId) return `outbox:${element.dataset.outboxId}`;
+  if (element.dataset?.chatId) return `chat:${element.dataset.chatId}`;
+  if (element.dataset?.contactId) return `contact:${element.dataset.contactId}`;
+  if (element.dataset?.unreadMarkerFor) return `unread:${element.dataset.unreadMarkerFor}`;
+  if (element.classList?.contains('ce-chat__identity')) return 'active-chat-identity';
+  if (element.classList?.contains('ce-chat__tools')) return 'active-chat-tools';
+  if (element.classList?.contains('ce-pinned-strip')) return 'active-pinned-strip';
+  if (element.classList?.contains('ce-block-notice')) return 'active-block-notice';
+  if (element.classList?.contains('ce-chat-empty')) return 'active-chat-empty';
+  if (element.classList?.contains('ce-empty-title')) return 'active-empty-title';
+  return '';
 }
 
 function canPatchRenderNode(current = null, next = null) {
   if (!current || !next || current.nodeType !== next.nodeType) return false;
   if (current.nodeType !== Node.ELEMENT_NODE) return true;
   if (current.tagName !== next.tagName) return false;
-  return shareStableRenderKey(current, next);
-}
-
-function normalizeRenderUrl(value = '') {
-  try {
-    return new URL(String(value || ''), document.baseURI).href;
-  } catch {
-    return String(value || '');
-  }
+  const currentKey = stableRenderNodeKey(current);
+  const nextKey = stableRenderNodeKey(next);
+  return !currentKey || !nextKey || currentKey === nextKey;
 }
 
 function syncRenderAttributes(current = null, next = null) {
@@ -3998,7 +3839,6 @@ function syncRenderAttributes(current = null, next = null) {
     if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
   }
   for (const attr of Array.from(next.attributes)) {
-    if (current.tagName === 'IMG' && ['src', 'srcset'].includes(attr.name) && normalizeRenderUrl(current.getAttribute(attr.name)) === normalizeRenderUrl(attr.value)) continue;
     if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
   }
 }
@@ -4018,34 +3858,25 @@ function patchRenderNode(current = null, next = null) {
   return current;
 }
 
-function findReusableRenderChild(nextChild = null, keyedCurrent = new Map(), cursor = null, used = new Set()) {
-  for (const key of stableRenderNodeKeys(nextChild)) {
-    const candidate = keyedCurrent.get(key);
-    if (candidate && !used.has(candidate) && canPatchRenderNode(candidate, nextChild)) return candidate;
-  }
-  if (cursor && !used.has(cursor) && canPatchRenderNode(cursor, nextChild)) return cursor;
-  return null;
-}
-
 function patchRenderChildren(parent = null, nextChildren = []) {
   if (!parent) return;
   const keyedCurrent = new Map();
   for (const child of Array.from(parent.childNodes)) {
-    for (const key of stableRenderNodeKeys(child)) {
-      if (key && !keyedCurrent.has(key)) keyedCurrent.set(key, child);
-    }
+    const key = stableRenderNodeKey(child);
+    if (key && !keyedCurrent.has(key)) keyedCurrent.set(key, child);
   }
   const used = new Set();
   let cursor = parent.firstChild;
   for (const nextChild of nextChildren) {
-    while (cursor && used.has(cursor)) cursor = cursor.nextSibling;
-    const currentChild = findReusableRenderChild(nextChild, keyedCurrent, cursor, used);
-    const referenceNode = cursor && !used.has(cursor) ? cursor : null;
+    const key = stableRenderNodeKey(nextChild);
+    let currentChild = key ? keyedCurrent.get(key) : cursor;
+    if (currentChild && used.has(currentChild)) currentChild = null;
+    if (currentChild && !canPatchRenderNode(currentChild, nextChild)) currentChild = null;
     const patched = currentChild ? patchRenderNode(currentChild, nextChild) : nextChild.cloneNode(true);
-    if (!currentChild) parent.insertBefore(patched, referenceNode);
-    else if (patched !== referenceNode) parent.insertBefore(patched, referenceNode);
+    if (!currentChild) parent.insertBefore(patched, cursor);
+    else if (patched !== cursor) parent.insertBefore(patched, cursor);
+    else cursor = cursor.nextSibling;
     used.add(patched);
-    if (patched === cursor) cursor = cursor.nextSibling;
   }
   for (const child of Array.from(parent.childNodes)) {
     if (!used.has(child)) child.remove();
@@ -4064,7 +3895,6 @@ function setCachedHtml(cacheKey = '', element = null, html = '') {
 }
 
 function renderAll() {
-  renderUserSummary();
   renderChats();
   renderContacts();
   renderLabelFilters();
@@ -4189,10 +4019,10 @@ function findActiveMessage(messageId = '') {
 
 function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
   const cleanChatId = String(chatId || '').trim();
-  if (!cleanChatId) return false;
+  if (!cleanChatId) return;
   const pinned = new Set((Array.isArray(pinnedMessageIds) ? pinnedMessageIds : []).filter(Boolean));
   const list = state.messagesByChat.get(cleanChatId) || [];
-  if (!list.length) return false;
+  if (!list.length) return;
   let changed = false;
   const updated = list.map((message) => {
     const isPinned = pinned.has(message.messageId) && !isDeletedMessage(message);
@@ -4201,7 +4031,6 @@ function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
     return { ...message, isPinned };
   });
   if (changed) state.messagesByChat.set(cleanChatId, updated);
-  return changed;
 }
 
 function getPinnedMessagesForChat(chat = {}, messages = []) {
@@ -4432,8 +4261,7 @@ function renderActiveChat() {
     const highlighted = msg.messageId === state.highlightedMessageId ? ' is-highlighted' : '';
     const pinned = msg.isPinned && !isDeletedMessage(msg) ? ' is-pinned-message' : '';
     const unreadSeparator = unreadMarker?.messageId && msg.messageId === unreadMarker.messageId ? renderUnreadSeparator(unreadMarker) : '';
-    const clientMessageAttr = msg.clientMessageId ? ` data-client-message-id="${escapeHtml(msg.clientMessageId)}"` : '';
-    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}"${clientMessageAttr}>${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
+    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}">${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
   }).join('');
   const queuedMessageHtml = queuedMessages.map(renderQueuedMessage).join('');
   const emptyText = isChatInteractionBlocked(chat) ? 'La conversación se mantiene disponible para consulta.' : 'Envía el primer mensaje.';
@@ -4548,27 +4376,6 @@ async function openSelfNotesChat() {
   showTemporaryDraftStatus('Notas para mí abierto. Todo lo que guardes aquí queda en tu cuenta.');
 }
 
-async function applySentMessageHttpFallback(data = {}, clientMessageId = '') {
-  if (!data?.message?.messageId) return false;
-  removeQueuedMessage(clientMessageId || data.message.clientMessageId || '', { render: false });
-  upsertChat(data.chat);
-  upsertMessage(data.message);
-  if (state.archivedView && data.chat?.isArchived === false) {
-    await loadChats({ includeArchived: false });
-    return true;
-  }
-  renderAll();
-  return true;
-}
-
-function shouldWaitForStreamConfirmation(data = {}) {
-  return Boolean(!data?.deduplicated && data?.realtimeDelivery?.ok === true && isRealtimeStreamUsable());
-}
-
-function shouldSendMessageStreamOnly() {
-  return Boolean(isRealtimeStreamUsable() && navigator.onLine !== false);
-}
-
 async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
@@ -4579,29 +4386,17 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
-  const streamOnly = shouldSendMessageStreamOnly();
-  const queued = streamOnly ? null : upsertQueuedMessage({
-    chatId,
-    text,
-    clientMessageId,
-    localId: clientMessageId,
-    replyToMessageId,
-    replyTo,
-    silent: Boolean(silent),
-    ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    status: 'sending',
-    attempts: 1,
-    lastError: ''
-  }, { render: true });
   try {
     const data = await post('/api/chats/send', { chatId, text, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds) });
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    if (!shouldWaitForStreamConfirmation(data)) {
-      await applySentMessageHttpFallback(data, clientMessageId);
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    if (state.archivedView && data.chat?.isArchived === false) {
+      await loadChats({ includeArchived: false });
+      return;
     }
+    renderAll();
     if (silent || normalizeEphemeralSeconds(ephemeralSeconds)) {
       const parts = [];
       if (silent) parts.push('sin notificación push');
@@ -4609,20 +4404,10 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
       showTemporaryDraftStatus(`Mensaje enviado ${parts.join(' y ')}.`);
     }
   } catch (error) {
-    if (!isRecoverableSendError(error)) {
-      removeQueuedMessage(clientMessageId, { render: true });
-      throw error;
-    }
+    if (!isRecoverableSendError(error)) throw error;
     clearDraftForChat(chatId);
     state.replyToMessage = null;
-    upsertQueuedMessage({
-      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
-      status: 'failed',
-      attempts: Math.max(1, Number(queued?.attempts || 1)),
-      updatedAt: new Date().toISOString(),
-      lastError: error?.message || 'Sin conexión o servidor no disponible'
-    }, { render: true });
-    showTemporaryDraftStatus('Mensaje guardado en pendientes. Se enviará automáticamente cuando vuelva la conexión.', 4600);
+    enqueueOutboxMessage({ chatId, text, clientMessageId, replyToMessageId, replyTo, silent, ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), error });
     sendTyping(false).catch(() => null);
   }
 }
@@ -4797,13 +4582,11 @@ async function createPollFromModal() {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId });
     clearDraftForChat(chatId);
-    if (!shouldWaitForStreamConfirmation(data)) {
-      upsertChat(data.chat);
-      upsertMessage(data.message);
-      renderAll();
-    }
+    upsertChat(data.chat);
+    upsertMessage(data.message);
     closePollModal();
     if (els.pollForm) els.pollForm.reset();
+    renderAll();
     showTemporaryDraftStatus('Encuesta publicada en el chat.');
   } finally {
     state.pollCreating = false;
