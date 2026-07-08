@@ -212,9 +212,14 @@ function initials(profile = {}) {
   return source.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'CE';
 }
 
+function avatarStableKey(profile = {}) {
+  return safeStorageKeyPart(profile.userId || profile.email || profile.profileCode || initials(profile) || 'avatar');
+}
+
 function avatar(profile = {}, size = 'normal') {
-  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer">`;
-  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true">${escapeHtml(initials(profile))}</span>`;
+  const stableKey = avatarStableKey(profile);
+  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false" data-avatar-key="${escapeHtml(stableKey)}">`;
+  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true" data-avatar-key="${escapeHtml(stableKey)}">${escapeHtml(initials(profile))}</span>`;
 }
 
 function isSelfChat(chat = {}) {
@@ -1870,9 +1875,11 @@ async function createPollFromSlashArgs(args = '') {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId });
     clearDraftForChat(chatId);
-    upsertChat(data.chat);
-    upsertMessage(data.message);
-    renderAll();
+    if (!shouldWaitForStreamConfirmation(data)) {
+      upsertChat(data.chat);
+      upsertMessage(data.message);
+      renderAll();
+    }
     showTemporaryDraftStatus('Encuesta publicada desde comando rápido.');
     return { clearComposer: true };
   } finally {
@@ -3834,31 +3841,51 @@ function handleRealtimeEvent(payload = {}) {
   }
 }
 
-function stableRenderNodeKey(node = null) {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return '';
+function stableRenderNodeKeys(node = null) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
   const element = node;
-  if (element.dataset?.clientMessageId) return `client-message:${element.dataset.clientMessageId}`;
-  if (element.dataset?.messageId) return `message:${element.dataset.messageId}`;
-  if (element.dataset?.outboxId) return `outbox:${element.dataset.outboxId}`;
-  if (element.dataset?.chatId) return `chat:${element.dataset.chatId}`;
-  if (element.dataset?.contactId) return `contact:${element.dataset.contactId}`;
-  if (element.dataset?.unreadMarkerFor) return `unread:${element.dataset.unreadMarkerFor}`;
-  if (element.classList?.contains('ce-chat__identity')) return 'active-chat-identity';
-  if (element.classList?.contains('ce-chat__tools')) return 'active-chat-tools';
-  if (element.classList?.contains('ce-pinned-strip')) return 'active-pinned-strip';
-  if (element.classList?.contains('ce-block-notice')) return 'active-block-notice';
-  if (element.classList?.contains('ce-chat-empty')) return 'active-chat-empty';
-  if (element.classList?.contains('ce-empty-title')) return 'active-empty-title';
-  return '';
+  const keys = [];
+  if (element.dataset?.messageId) keys.push(`message:${element.dataset.messageId}`);
+  if (element.dataset?.clientMessageId) keys.push(`client-message:${element.dataset.clientMessageId}`);
+  if (element.dataset?.outboxId) keys.push(`outbox:${element.dataset.outboxId}`);
+  if (element.dataset?.chatId) keys.push(`chat:${element.dataset.chatId}`);
+  if (element.dataset?.contactId) keys.push(`contact:${element.dataset.contactId}`);
+  if (element.dataset?.unreadMarkerFor) keys.push(`unread:${element.dataset.unreadMarkerFor}`);
+  if (element.dataset?.avatarKey) keys.push(`avatar:${element.dataset.avatarKey}`);
+  if (element.classList?.contains('ce-chat__identity')) keys.push('active-chat-identity');
+  if (element.classList?.contains('ce-chat__tools')) keys.push('active-chat-tools');
+  if (element.classList?.contains('ce-pinned-strip')) keys.push('active-pinned-strip');
+  if (element.classList?.contains('ce-block-notice')) keys.push('active-block-notice');
+  if (element.classList?.contains('ce-chat-empty')) keys.push('active-chat-empty');
+  if (element.classList?.contains('ce-empty-title')) keys.push('active-empty-title');
+  return keys.filter(Boolean);
+}
+
+function stableRenderNodeKey(node = null) {
+  return stableRenderNodeKeys(node)[0] || '';
+}
+
+function shareStableRenderKey(current = null, next = null) {
+  const currentKeys = stableRenderNodeKeys(current);
+  const nextKeys = stableRenderNodeKeys(next);
+  if (!currentKeys.length || !nextKeys.length) return true;
+  const currentSet = new Set(currentKeys);
+  return nextKeys.some((key) => currentSet.has(key));
 }
 
 function canPatchRenderNode(current = null, next = null) {
   if (!current || !next || current.nodeType !== next.nodeType) return false;
   if (current.nodeType !== Node.ELEMENT_NODE) return true;
   if (current.tagName !== next.tagName) return false;
-  const currentKey = stableRenderNodeKey(current);
-  const nextKey = stableRenderNodeKey(next);
-  return !currentKey || !nextKey || currentKey === nextKey;
+  return shareStableRenderKey(current, next);
+}
+
+function normalizeRenderUrl(value = '') {
+  try {
+    return new URL(String(value || ''), document.baseURI).href;
+  } catch {
+    return String(value || '');
+  }
 }
 
 function syncRenderAttributes(current = null, next = null) {
@@ -3867,6 +3894,7 @@ function syncRenderAttributes(current = null, next = null) {
     if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
   }
   for (const attr of Array.from(next.attributes)) {
+    if (current.tagName === 'IMG' && attr.name === 'src' && normalizeRenderUrl(current.getAttribute('src')) === normalizeRenderUrl(attr.value)) continue;
     if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
   }
 }
@@ -3886,25 +3914,34 @@ function patchRenderNode(current = null, next = null) {
   return current;
 }
 
+function findReusableRenderChild(nextChild = null, keyedCurrent = new Map(), cursor = null, used = new Set()) {
+  for (const key of stableRenderNodeKeys(nextChild)) {
+    const candidate = keyedCurrent.get(key);
+    if (candidate && !used.has(candidate) && canPatchRenderNode(candidate, nextChild)) return candidate;
+  }
+  if (cursor && !used.has(cursor) && canPatchRenderNode(cursor, nextChild)) return cursor;
+  return null;
+}
+
 function patchRenderChildren(parent = null, nextChildren = []) {
   if (!parent) return;
   const keyedCurrent = new Map();
   for (const child of Array.from(parent.childNodes)) {
-    const key = stableRenderNodeKey(child);
-    if (key && !keyedCurrent.has(key)) keyedCurrent.set(key, child);
+    for (const key of stableRenderNodeKeys(child)) {
+      if (key && !keyedCurrent.has(key)) keyedCurrent.set(key, child);
+    }
   }
   const used = new Set();
   let cursor = parent.firstChild;
   for (const nextChild of nextChildren) {
-    const key = stableRenderNodeKey(nextChild);
-    let currentChild = key ? keyedCurrent.get(key) : cursor;
-    if (currentChild && used.has(currentChild)) currentChild = null;
-    if (currentChild && !canPatchRenderNode(currentChild, nextChild)) currentChild = null;
+    while (cursor && used.has(cursor)) cursor = cursor.nextSibling;
+    const currentChild = findReusableRenderChild(nextChild, keyedCurrent, cursor, used);
+    const referenceNode = cursor && !used.has(cursor) ? cursor : null;
     const patched = currentChild ? patchRenderNode(currentChild, nextChild) : nextChild.cloneNode(true);
-    if (!currentChild) parent.insertBefore(patched, cursor);
-    else if (patched !== cursor) parent.insertBefore(patched, cursor);
-    else cursor = cursor.nextSibling;
+    if (!currentChild) parent.insertBefore(patched, referenceNode);
+    else if (patched !== referenceNode) parent.insertBefore(patched, referenceNode);
     used.add(patched);
+    if (patched === cursor) cursor = cursor.nextSibling;
   }
   for (const child of Array.from(parent.childNodes)) {
     if (!used.has(child)) child.remove();
@@ -4422,6 +4459,10 @@ function shouldWaitForStreamConfirmation(data = {}) {
   return Boolean(!data?.deduplicated && data?.realtimeDelivery?.ok === true && isRealtimeStreamUsable());
 }
 
+function shouldSendMessageStreamOnly() {
+  return Boolean(isRealtimeStreamUsable() && navigator.onLine !== false);
+}
+
 async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
@@ -4432,7 +4473,8 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
-  const queued = upsertQueuedMessage({
+  const streamOnly = shouldSendMessageStreamOnly();
+  const queued = streamOnly ? null : upsertQueuedMessage({
     chatId,
     text,
     clientMessageId,
@@ -4468,7 +4510,7 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
     clearDraftForChat(chatId);
     state.replyToMessage = null;
     upsertQueuedMessage({
-      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo }),
+      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
       status: 'failed',
       attempts: Math.max(1, Number(queued?.attempts || 1)),
       updatedAt: new Date().toISOString(),
@@ -4649,11 +4691,13 @@ async function createPollFromModal() {
   try {
     const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId });
     clearDraftForChat(chatId);
-    upsertChat(data.chat);
-    upsertMessage(data.message);
+    if (!shouldWaitForStreamConfirmation(data)) {
+      upsertChat(data.chat);
+      upsertMessage(data.message);
+      renderAll();
+    }
     closePollModal();
     if (els.pollForm) els.pollForm.reset();
-    renderAll();
     showTemporaryDraftStatus('Encuesta publicada en el chat.');
   } finally {
     state.pollCreating = false;
