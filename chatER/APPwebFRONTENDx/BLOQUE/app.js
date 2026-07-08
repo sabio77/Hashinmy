@@ -1,0 +1,7162 @@
+import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken } from './api.js';
+import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigError } from './firebase.auth.js';
+
+const clientIdKey = 'chater_client_id';
+const draftStoragePrefix = 'chater_draft_v1';
+const outboxStoragePrefix = 'chater_outbox_v1';
+const privacyModeKey = 'chater_privacy_mode_v1';
+const privacyLockStorageKey = 'chater_privacy_lock_v1';
+const privacyLockAutoMs = 5 * 60 * 1000;
+const privacyLockHiddenGraceMs = 30 * 1000;
+const compactModeKey = 'chater_compact_mode_v1';
+const scrollBottomThresholdPx = 160;
+const quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
+const emojiPickerStorageKey = 'chater_recent_emojis_v1';
+const emojiPickerMaxRecent = 24;
+const emojiPickerCategories = [
+  { id: 'recientes', title: 'Recientes', icon: '🕘', emojis: [] },
+  { id: 'caras', title: 'Caras', icon: '😊', emojis: ['😀','😃','😄','😁','😆','😅','😂','🤣','🙂','🙃','😉','😊','😇','😍','😘','😜','🤗','🤔','😎','🥳','😬','😢','😭','😡'] },
+  { id: 'gestos', title: 'Gestos', icon: '👍', emojis: ['👍','👎','👏','🙌','🙏','🤝','💪','👌','✌️','🤞','👋','🤟','☝️','👇','👉','👈','🫶','🤲'] },
+  { id: 'trabajo', title: 'Trabajo', icon: '💼', emojis: ['💼','📌','📎','📝','📅','⏰','✅','☑️','❌','⚠️','🚨','📣','💡','🔎','🔒','🔗','📊','📈','📦','🚀'] },
+  { id: 'objetos', title: 'Objetos', icon: '⭐', emojis: ['⭐','🔥','❤️','💚','💙','💜','✨','🎉','🏆','🎯','🎁','📍','📞','📧','💬','🔔','🔕','🌟'] }
+];
+const ephemeralOptions = [0, 3600, 24 * 3600, 7 * 24 * 3600];
+const smartReplySuggestionLimit = 4;
+
+const state = {
+  config: null,
+  user: null,
+  contacts: [],
+  chats: [],
+  labels: [],
+  chatLabelsByChatId: new Map(),
+  labelsLoading: false,
+  labelsModalOpen: false,
+  labelsSaving: false,
+  blockedContactsOpen: false,
+  blockedContacts: [],
+  blockedContactsLoading: false,
+  contactNicknameModalOpen: false,
+  contactNicknameTarget: null,
+  contactNicknameDraft: '',
+  contactNicknameSaving: false,
+  labelsDraft: '',
+  activeLabelFilter: '',
+  archivedView: false,
+  chatListMode: 'active',
+  messagesByChat: new Map(),
+  renderedMessageCountByChat: new Map(),
+  renderedActiveChatId: '',
+  activeChatId: '',
+  eventSource: null,
+  realtimeReconnectTimer: 0,
+  realtimeRetryCount: 0,
+  realtimeManualClose: false,
+  installPrompt: null,
+  installDismissed: false,
+  pushDismissed: false,
+  pushState: 'idle',
+  serviceWorkerRegistration: null,
+  typingTimer: 0,
+  draftSaveTimer: 0,
+  draftSyncTimers: new Map(),
+  outboxMessages: [],
+  outboxSyncing: false,
+  outboxRetryTimer: 0,
+  scanStream: null,
+  scanTimer: 0,
+  syncInFlight: null,
+  lastSyncAt: 0,
+  clientId: '',
+  chatSearchQuery: '',
+  chatSearchResults: [],
+  chatSearchLoading: false,
+  starredPanelOpen: false,
+  starredMessages: [],
+  starredLoading: false,
+  quickRepliesOpen: false,
+  slashCommandsOpen: false,
+  emojiPickerOpen: false,
+  emojiPickerCategory: 'recientes',
+  quickRepliesLoaded: false,
+  quickRepliesLoading: false,
+  quickReplies: [],
+  highlightedMessageId: '',
+  unreadMarkerByChatId: new Map(),
+  replyToMessage: null,
+  editingMessage: null,
+  forwardingMessage: null,
+  privacyMode: false,
+  privacyLock: {
+    enabled: false,
+    locked: false,
+    mode: 'closed',
+    salt: '',
+    pinHash: '',
+    error: '',
+    status: '',
+    autoLockTimer: 0,
+    hiddenLockTimer: 0,
+    lastActivityAt: 0,
+    saving: false
+  },
+  compactMode: false,
+  scheduleModalOpen: false,
+  scheduledMessages: [],
+  scheduledLoading: false,
+  schedulingMessage: false,
+  pollModalOpen: false,
+  pollCreating: false,
+  globalSearchOpen: false,
+  globalSearchQuery: '',
+  globalSearchResults: [],
+  globalSearchLoading: false,
+  globalSearchSearchedChats: 0,
+  globalStarredOpen: false,
+  globalStarredMessages: [],
+  globalStarredLoading: false,
+  globalStarredScannedChats: 0,
+  draftsOpen: false,
+  drafts: [],
+  draftsLoading: false,
+  linkLibraryOpen: false,
+  linkLibraryQuery: '',
+  chatBriefOpen: false,
+  chatBriefLoading: false,
+  chatBriefError: '',
+  dateJumpOpen: false,
+  dateJumpLoading: false,
+  dateJumpSelected: '',
+  dateJumpDays: [],
+  dateJumpError: '',
+  dateJumpChatId: '',
+  privateNotesOpen: false,
+  privateNotes: [],
+  privateNotesLoading: false,
+  privateNoteSaving: false,
+  privateNoteEditingId: '',
+  remindersOpen: false,
+  reminderMessage: null,
+  reminderDraftText: '',
+  reminders: [],
+  remindersLoading: false,
+  reminderSaving: false,
+  voiceRecognition: null,
+  voiceDictating: false,
+  voiceStopRequested: false,
+  commandPaletteOpen: false,
+  commandPaletteQuery: '',
+  commandPaletteActiveIndex: 0,
+  scrollBottomVisible: false,
+  scrollNewMessages: 0,
+  presenceRefreshTimer: 0,
+  notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' }
+};
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  appRoot: $('appRoot'), authScreen: $('authScreen'), chatScreen: $('chatScreen'), btnGoogleLogin: $('btnGoogleLogin'), authStatus: $('authStatus'),
+  userSummary: $('userSummary'), btnOpenSelfNotes: $('btnOpenSelfNotes'), btnOpenGlobalSearch: $('btnOpenGlobalSearch'), btnOpenGlobalStarred: $('btnOpenGlobalStarred'), btnOpenDrafts: $('btnOpenDrafts'), btnNotificationPause: $('btnNotificationPause'), btnOpenBlockedContacts: $('btnOpenBlockedContacts'), btnPrivacyMode: $('btnPrivacyMode'), btnPrivacyLock: $('btnPrivacyLock'), btnCompactMode: $('btnCompactMode'), btnCommandPalette: $('btnCommandPalette'), btnLogout: $('btnLogout'), installBanner: $('installBanner'), btnInstall: $('btnInstall'), btnInstallLater: $('btnInstallLater'),
+  pushBanner: $('pushBanner'), btnEnablePush: $('btnEnablePush'), btnPushLater: $('btnPushLater'),
+  addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
+  chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
+  activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
+  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'),
+  qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
+  forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
+  scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnCloseSchedule: $('btnCloseSchedule'), btnConfirmSchedule: $('btnConfirmSchedule'),
+  pollModal: $('pollModal'), pollForm: $('pollForm'), pollQuestionInput: $('pollQuestionInput'), pollOptions: $('pollOptions'), pollPreview: $('pollPreview'), btnClosePoll: $('btnClosePoll'), btnConfirmPoll: $('btnConfirmPoll'),
+  globalSearchModal: $('globalSearchModal'), globalSearchForm: $('globalSearchForm'), globalSearchInput: $('globalSearchInput'), globalSearchList: $('globalSearchList'), btnCloseGlobalSearch: $('btnCloseGlobalSearch'),
+  globalStarredModal: $('globalStarredModal'), globalStarredList: $('globalStarredList'), btnCloseGlobalStarred: $('btnCloseGlobalStarred'), btnRefreshGlobalStarred: $('btnRefreshGlobalStarred'),
+  draftsModal: $('draftsModal'), draftsList: $('draftsList'), btnCloseDrafts: $('btnCloseDrafts'),
+  linkLibraryModal: $('linkLibraryModal'), linkLibraryInput: $('linkLibraryInput'), linkLibraryList: $('linkLibraryList'), btnCloseLinkLibrary: $('btnCloseLinkLibrary'),
+  chatBriefModal: $('chatBriefModal'), chatBriefList: $('chatBriefList'), btnCloseChatBrief: $('btnCloseChatBrief'),
+  dateJumpModal: $('dateJumpModal'), dateJumpInput: $('dateJumpInput'), dateJumpList: $('dateJumpList'), btnCloseDateJump: $('btnCloseDateJump'),
+  privateNotesModal: $('privateNotesModal'), privateNotesTitle: $('privateNotesTitle'), privateNotesChatName: $('privateNotesChatName'), privateNotesTextarea: $('privateNotesTextarea'), privateNotesList: $('privateNotesList'), btnClosePrivateNotes: $('btnClosePrivateNotes'), btnSavePrivateNote: $('btnSavePrivateNote'), btnCancelPrivateNoteEdit: $('btnCancelPrivateNoteEdit'),
+  reminderModal: $('reminderModal'), reminderTitle: $('reminderTitle'), reminderChatName: $('reminderChatName'), reminderPreview: $('reminderPreview'), reminderText: $('reminderText'), reminderDateTime: $('reminderDateTime'), reminderList: $('reminderList'), btnCloseReminders: $('btnCloseReminders'), btnSaveReminder: $('btnSaveReminder'),
+  labelsModal: $('labelsModal'), labelsChatName: $('labelsChatName'), chatLabelsInput: $('chatLabelsInput'), labelsPresetList: $('labelsPresetList'), labelsCurrentList: $('labelsCurrentList'), btnCloseLabels: $('btnCloseLabels'), btnSaveLabels: $('btnSaveLabels'),
+  blockedContactsModal: $('blockedContactsModal'), blockedContactsList: $('blockedContactsList'), btnCloseBlockedContacts: $('btnCloseBlockedContacts'), btnRefreshBlockedContacts: $('btnRefreshBlockedContacts'),
+  privacyLockOverlay: $('privacyLockOverlay'), privacyLockTitle: $('privacyLockTitle'), privacyLockDescription: $('privacyLockDescription'), privacyLockPinInput: $('privacyLockPinInput'), privacyLockConfirmInput: $('privacyLockConfirmInput'), privacyLockConfirmField: $('privacyLockConfirmField'), privacyLockError: $('privacyLockError'), privacyLockStatus: $('privacyLockStatus'), btnClosePrivacyLock: $('btnClosePrivacyLock'), btnPrivacyLockPrimary: $('btnPrivacyLockPrimary'), btnPrivacyLockSecondary: $('btnPrivacyLockSecondary'), btnPrivacyLockDisable: $('btnPrivacyLockDisable'),
+  contactNicknameModal: $('contactNicknameModal'), contactNicknameTitle: $('contactNicknameTitle'), contactNicknameSubtitle: $('contactNicknameSubtitle'), contactNicknameInput: $('contactNicknameInput'), btnCloseContactNickname: $('btnCloseContactNickname'), btnSaveContactNickname: $('btnSaveContactNickname'), btnClearContactNickname: $('btnClearContactNickname'),
+  commandPalette: $('commandPalette'), commandPaletteInput: $('commandPaletteInput'), commandPaletteList: $('commandPaletteList'), btnCloseCommandPalette: $('btnCloseCommandPalette')
+};
+
+
+function getClientId() {
+  if (state.clientId) return state.clientId;
+  const existing = localStorage.getItem(clientIdKey) || '';
+  if (existing) {
+    state.clientId = existing;
+    return existing;
+  }
+  const randomPart = window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `client_${Date.now()}`;
+  localStorage.setItem(clientIdKey, state.clientId);
+  return state.clientId;
+}
+
+function escapeHtml(value = '') {
+  return String(value || '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+function initials(profile = {}) {
+  const source = String(profile.contactName || profile.nickname || profile.displayName || profile.email || 'CE').trim();
+  return source.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'CE';
+}
+
+function avatar(profile = {}, size = 'normal') {
+  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer">`;
+  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true">${escapeHtml(initials(profile))}</span>`;
+}
+
+function isSelfChat(chat = {}) {
+  const participants = Array.isArray(chat.participants) ? chat.participants : [];
+  return chat?.type === 'self' || (participants.length === 1 && participants[0] === state.user?.userId);
+}
+
+function notesAvatar(size = 'normal') {
+  return `<span class="ce-avatar ce-avatar--${size} ce-avatar--notes" aria-hidden="true">📝</span>`;
+}
+
+function contactDisplayName(contact = {}) {
+  return contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto';
+}
+
+function contactDisplaySubtitle(contact = {}) {
+  const nickname = String(contact.nickname || '').trim();
+  const realName = String(contact.displayName || '').trim();
+  const email = String(contact.email || '').trim();
+  if (nickname && realName && email) return `${realName} · ${email}`;
+  if (nickname && realName) return realName;
+  return email || realName || 'Contacto chatER';
+}
+
+function chatDisplayName(chat = {}) {
+  if (isSelfChat(chat)) return 'Notas para mí';
+  return contactDisplayName(chat.other || {});
+}
+
+function hasChatPresenceBlocked(chat = {}) {
+  const status = chat.blockStatus || {};
+  return Boolean(chat.isBlocked || chat.isBlockedByMe || chat.hasBlockedMe || status.blocked || status.blockedByMe || status.blockedMe);
+}
+
+function canShowChatPresence(chat = {}) {
+  if (isSelfChat(chat) || hasChatPresenceBlocked(chat)) return false;
+  return Boolean(chat.other?.userId || chat.presence?.otherUserId);
+}
+
+function isChatOnline(chat = {}) {
+  if (!canShowChatPresence(chat)) return false;
+  const presence = chat.presence && typeof chat.presence === 'object' ? chat.presence : {};
+  return Boolean(chat.otherOnline || presence.otherOnline || presence.status === 'online');
+}
+
+function chatDisplaySubtitle(chat = {}) {
+  if (isSelfChat(chat)) return 'Espacio privado para guardar ideas, enlaces y recordatorios.';
+  const base = contactDisplaySubtitle(chat.other || {});
+  return isChatOnline(chat) ? `${base} · En línea ahora` : base;
+}
+
+function chatAvatar(chat = {}, size = 'normal') {
+  return isSelfChat(chat) ? notesAvatar(size) : avatar(chat.other || {}, size);
+}
+
+function renderPresenceDot(chat = {}) {
+  if (!isChatOnline(chat)) return '';
+  return '<span class="ce-presence-dot" title="En línea ahora" aria-label="En línea ahora"></span>';
+}
+
+function renderChatAvatarWithPresence(chat = {}, size = 'normal') {
+  const small = size === 'small' ? ' ce-avatar-wrap--small' : '';
+  return `<span class="ce-avatar-wrap${small}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
+}
+
+function formatMessageTime(value = '') {
+  return new Date(value || Date.now()).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatScheduleDateTime(value = '') {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
+  return date.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+
+function normalizeEphemeralSeconds(value = 0) {
+  const seconds = Math.max(0, Number(value || 0));
+  return ephemeralOptions.includes(seconds) ? seconds : 0;
+}
+
+function selectedEphemeralSeconds() {
+  return normalizeEphemeralSeconds(els.messageTtlSelect?.value || 0);
+}
+
+function formatEphemeralOption(seconds = 0) {
+  const value = normalizeEphemeralSeconds(seconds);
+  if (value === 3600) return '1 hora';
+  if (value === 24 * 3600) return '24 horas';
+  if (value === 7 * 24 * 3600) return '7 días';
+  return 'No expira';
+}
+
+function formatEphemeralMessageLabel(message = {}) {
+  const seconds = normalizeEphemeralSeconds(message.ephemeralSeconds);
+  const expireAt = message.expireAt || message.expiresAt || '';
+  if (!seconds && !expireAt) return '';
+  const when = expireAt ? formatScheduleDateTime(expireAt) : formatEphemeralOption(seconds);
+  return `⏳ Temporal · expira ${when}`;
+}
+
+function formatPrivateNoteDateTime(value = '') {
+  return formatScheduleDateTime(value || Date.now());
+}
+
+function formatReminderDateTime(value = '') {
+  return formatScheduleDateTime(value || Date.now());
+}
+
+function toDateTimeLocalValue(date = new Date()) {
+  const target = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return target.toISOString().slice(0, 16);
+}
+
+function isMessagesNearBottom(threshold = scrollBottomThresholdPx) {
+  if (!els.messages) return true;
+  const distance = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight;
+  return distance <= threshold;
+}
+
+function updateScrollBottomButton() {
+  if (!els.btnScrollBottom) return;
+  const hasActiveChat = Boolean(state.activeChatId && activeChat());
+  const shouldShow = hasActiveChat && !isMessagesNearBottom();
+  const hadPendingNewMessages = Number(state.scrollNewMessages || 0) > 0;
+  state.scrollBottomVisible = shouldShow;
+  els.btnScrollBottom.classList.toggle('hidden', !shouldShow);
+  if (!shouldShow) state.scrollNewMessages = 0;
+  if (!shouldShow && hadPendingNewMessages && state.activeChatId && state.user) {
+    window.setTimeout(() => markActiveRead().catch(() => null), 0);
+  }
+  const label = state.scrollNewMessages > 0
+    ? `${state.scrollNewMessages} ${state.scrollNewMessages === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}`
+    : 'Ir al final';
+  els.btnScrollBottom.innerHTML = `<span>${escapeHtml(label)}</span>`;
+  els.btnScrollBottom.setAttribute('aria-label', label === 'Ir al final' ? 'Ir al final de la conversación' : `${label}. Ir al final de la conversación`);
+}
+
+function scrollMessagesToBottom({ smooth = true, resetNew = true } = {}) {
+  if (!els.messages) return;
+  els.messages.scrollTo({ top: els.messages.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  if (resetNew) state.scrollNewMessages = 0;
+  updateScrollBottomButton();
+  if (resetNew && state.activeChatId && state.user) {
+    window.setTimeout(() => markActiveRead().catch(() => null), smooth ? 320 : 0);
+  }
+}
+
+function compactText(value = '', max = 220) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  const safeMax = Math.min(320, Math.max(60, Number(max || 220)));
+  return clean.length > safeMax ? `${clean.slice(0, safeMax - 1)}…` : clean;
+}
+
+function normalizeClientSearchText(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function readPrivacyModePreference() {
+  try {
+    return localStorage.getItem(privacyModeKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function applyPrivacyModeClass() {
+  document.body.classList.toggle('ce-privacy-mode', Boolean(state.privacyMode));
+  els.appRoot?.classList.toggle('ce-app--privacy', Boolean(state.privacyMode));
+  if (els.btnPrivacyMode) {
+    const label = state.privacyMode ? 'Desactivar modo privacidad' : 'Activar modo privacidad';
+    els.btnPrivacyMode.classList.toggle('active', Boolean(state.privacyMode));
+    els.btnPrivacyMode.setAttribute('aria-pressed', state.privacyMode ? 'true' : 'false');
+    els.btnPrivacyMode.setAttribute('title', label);
+    els.btnPrivacyMode.setAttribute('aria-label', label);
+  }
+}
+
+function setPrivacyMode(enabled = false, { announce = false } = {}) {
+  state.privacyMode = Boolean(enabled);
+  try {
+    localStorage.setItem(privacyModeKey, state.privacyMode ? '1' : '0');
+  } catch {}
+  applyPrivacyModeClass();
+  if (announce) {
+    showTemporaryDraftStatus(state.privacyMode
+      ? 'Modo privacidad activado: nombres, vistas previas y mensajes se ocultan hasta pasar el cursor o tocar.'
+      : 'Modo privacidad desactivado.');
+  }
+}
+
+function togglePrivacyMode({ announce = true } = {}) {
+  setPrivacyMode(!state.privacyMode, { announce });
+}
+
+function privacyLockPreferenceKey(userId = state.user?.userId || '') {
+  const safeUser = String(userId || 'local')
+    .replace(/[^a-z0-9_-]/gi, '')
+    .slice(0, 160) || 'local';
+  return `${privacyLockStorageKey}:${safeUser}`;
+}
+
+function normalizePrivacyPin(value = '') {
+  return String(value || '').replace(/\D+/g, '').slice(0, 12);
+}
+
+function randomHex(bytes = 16) {
+  const array = new Uint8Array(Math.max(8, Math.min(64, Number(bytes || 16))));
+  window.crypto?.getRandomValues?.(array);
+  return Array.from(array).map((item) => item.toString(16).padStart(2, '0')).join('');
+}
+
+function bytesToHex(buffer) {
+  return Array.from(new Uint8Array(buffer)).map((item) => item.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPrivacyPin(pin = '', salt = '') {
+  const normalizedPin = normalizePrivacyPin(pin);
+  if (!normalizedPin || normalizedPin.length < 4) throw new Error('El PIN debe tener mínimo 4 números.');
+  if (!window.crypto?.subtle || !window.TextEncoder) throw new Error('Este navegador no permite proteger el PIN localmente.');
+  const payload = `${salt}:${state.user?.userId || ''}:${normalizedPin}`;
+  const encoded = new TextEncoder().encode(payload);
+  return bytesToHex(await window.crypto.subtle.digest('SHA-256', encoded));
+}
+
+function readPrivacyLockPreference() {
+  if (!state.user?.userId) return { enabled: false, salt: '', pinHash: '' };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(privacyLockPreferenceKey()) || '{}');
+    return {
+      enabled: Boolean(parsed.enabled && parsed.salt && parsed.pinHash),
+      salt: String(parsed.salt || ''),
+      pinHash: String(parsed.pinHash || ''),
+      updatedAt: String(parsed.updatedAt || '')
+    };
+  } catch {
+    return { enabled: false, salt: '', pinHash: '' };
+  }
+}
+
+function persistPrivacyLockPreference(config = {}) {
+  if (!state.user?.userId) return;
+  if (!config.enabled) {
+    try { localStorage.removeItem(privacyLockPreferenceKey()); } catch {}
+    return;
+  }
+  const payload = {
+    enabled: true,
+    salt: String(config.salt || ''),
+    pinHash: String(config.pinHash || ''),
+    updatedAt: new Date().toISOString(),
+    autoLockMs: privacyLockAutoMs
+  };
+  localStorage.setItem(privacyLockPreferenceKey(), JSON.stringify(payload));
+}
+
+function loadPrivacyLockForCurrentUser({ lockOnRestore = false } = {}) {
+  const saved = readPrivacyLockPreference();
+  state.privacyLock.enabled = Boolean(saved.enabled);
+  state.privacyLock.salt = saved.salt || '';
+  state.privacyLock.pinHash = saved.pinHash || '';
+  state.privacyLock.error = '';
+  state.privacyLock.status = '';
+  state.privacyLock.locked = Boolean(lockOnRestore && saved.enabled);
+  state.privacyLock.mode = state.privacyLock.locked ? 'unlock' : 'closed';
+  resetPrivacyLockActivity();
+  renderPrivacyLockOverlay();
+}
+
+function updatePrivacyLockButton() {
+  if (!els.btnPrivacyLock) return;
+  const enabled = Boolean(state.privacyLock.enabled);
+  const locked = Boolean(state.privacyLock.locked);
+  const label = !enabled
+    ? 'Configurar bloqueo por PIN'
+    : (locked ? 'Pantalla protegida por PIN' : 'Bloquear pantalla ahora');
+  els.btnPrivacyLock.classList.toggle('active', enabled);
+  els.btnPrivacyLock.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  els.btnPrivacyLock.setAttribute('title', label);
+  els.btnPrivacyLock.setAttribute('aria-label', label);
+}
+
+function focusPrivacyLockInput() {
+  window.setTimeout(() => {
+    els.privacyLockPinInput?.focus();
+    els.privacyLockPinInput?.select?.();
+  }, 30);
+}
+
+function clearPrivacyLockInputs() {
+  if (els.privacyLockPinInput) els.privacyLockPinInput.value = '';
+  if (els.privacyLockConfirmInput) els.privacyLockConfirmInput.value = '';
+}
+
+function renderPrivacyLockOverlay() {
+  const mode = state.privacyLock.mode || 'closed';
+  const isOpen = mode !== 'closed';
+  const isLocked = Boolean(state.privacyLock.locked);
+  const isSetup = mode === 'setup';
+  const isSettings = mode === 'settings';
+  els.privacyLockOverlay?.classList.toggle('hidden', !isOpen);
+  document.body.classList.toggle('ce-privacy-locked', Boolean(isLocked));
+  updatePrivacyLockButton();
+  if (!isOpen) return;
+
+  const title = isLocked ? 'Pantalla protegida' : (isSetup ? 'Crear PIN privado' : 'Bloqueo privado');
+  const description = isLocked
+    ? 'Ingresa tu PIN local para volver a ver tus conversaciones en este dispositivo.'
+    : (isSetup
+      ? 'Activa un bloqueo local para ocultar chatER después de inactividad o cuando bloquees la pantalla manualmente.'
+      : 'Cambia tu PIN local, bloquea la pantalla ahora o desactiva esta protección en este dispositivo.');
+  if (els.privacyLockTitle) els.privacyLockTitle.textContent = title;
+  if (els.privacyLockDescription) els.privacyLockDescription.textContent = description;
+  if (els.privacyLockConfirmField) els.privacyLockConfirmField.classList.toggle('hidden', isLocked);
+  if (els.btnClosePrivacyLock) els.btnClosePrivacyLock.classList.toggle('hidden', isLocked);
+  if (els.btnPrivacyLockPrimary) els.btnPrivacyLockPrimary.textContent = isLocked ? 'Desbloquear' : (isSetup ? 'Activar bloqueo' : 'Cambiar PIN');
+  if (els.btnPrivacyLockSecondary) {
+    els.btnPrivacyLockSecondary.textContent = isLocked ? 'Usar modo privacidad' : (state.privacyLock.enabled ? 'Bloquear ahora' : 'Cancelar');
+    els.btnPrivacyLockSecondary.classList.toggle('hidden', false);
+  }
+  if (els.btnPrivacyLockDisable) els.btnPrivacyLockDisable.classList.toggle('hidden', !isSettings || !state.privacyLock.enabled);
+  if (els.privacyLockError) {
+    els.privacyLockError.textContent = state.privacyLock.error || '';
+    els.privacyLockError.classList.toggle('hidden', !state.privacyLock.error);
+  }
+  if (els.privacyLockStatus) {
+    const status = state.privacyLock.status || (isSettings ? 'El PIN nunca se envía al servidor y solo protege este dispositivo.' : 'Se bloqueará automáticamente tras 5 minutos de inactividad.');
+    els.privacyLockStatus.textContent = status;
+  }
+  if (document.activeElement !== els.privacyLockPinInput && document.activeElement !== els.privacyLockConfirmInput) {
+    focusPrivacyLockInput();
+  }
+}
+
+function openPrivacyLockSettings() {
+  if (!state.user) return;
+  state.privacyLock.locked = false;
+  state.privacyLock.mode = state.privacyLock.enabled ? 'settings' : 'setup';
+  state.privacyLock.error = '';
+  state.privacyLock.status = '';
+  clearPrivacyLockInputs();
+  renderPrivacyLockOverlay();
+}
+
+function closePrivacyLockSettings() {
+  if (state.privacyLock.locked) return;
+  state.privacyLock.mode = 'closed';
+  state.privacyLock.error = '';
+  clearPrivacyLockInputs();
+  renderPrivacyLockOverlay();
+}
+
+function lockPrivacyScreen({ announce = false } = {}) {
+  if (!state.user || !state.privacyLock.enabled || state.privacyLock.locked) return;
+  if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  sendTyping(false).catch(() => null);
+  closeCommandPalette();
+  state.privacyLock.locked = true;
+  state.privacyLock.mode = 'unlock';
+  state.privacyLock.error = '';
+  state.privacyLock.status = announce ? 'Tus chats quedaron ocultos en este dispositivo.' : '';
+  clearPrivacyLockInputs();
+  renderPrivacyLockOverlay();
+}
+
+async function unlockPrivacyScreen() {
+  const pin = normalizePrivacyPin(els.privacyLockPinInput?.value || '');
+  try {
+    const hash = await hashPrivacyPin(pin, state.privacyLock.salt || '');
+    if (hash !== state.privacyLock.pinHash) throw new Error('PIN incorrecto. Inténtalo nuevamente.');
+    state.privacyLock.locked = false;
+    state.privacyLock.mode = 'closed';
+    state.privacyLock.error = '';
+    state.privacyLock.status = '';
+    clearPrivacyLockInputs();
+    resetPrivacyLockActivity();
+    renderPrivacyLockOverlay();
+  } catch (error) {
+    state.privacyLock.error = error.message || 'No se pudo desbloquear la pantalla.';
+    renderPrivacyLockOverlay();
+  }
+}
+
+async function savePrivacyLockFromOverlay() {
+  if (!state.user || state.privacyLock.saving) return;
+  const pin = normalizePrivacyPin(els.privacyLockPinInput?.value || '');
+  const confirmPin = normalizePrivacyPin(els.privacyLockConfirmInput?.value || '');
+  if (pin.length < 4) {
+    state.privacyLock.error = 'El PIN debe tener mínimo 4 números.';
+    renderPrivacyLockOverlay();
+    return;
+  }
+  if (pin !== confirmPin) {
+    state.privacyLock.error = 'Los PIN no coinciden.';
+    renderPrivacyLockOverlay();
+    return;
+  }
+  try {
+    state.privacyLock.saving = true;
+    const salt = randomHex(16);
+    const pinHash = await hashPrivacyPin(pin, salt);
+    persistPrivacyLockPreference({ enabled: true, salt, pinHash });
+    state.privacyLock.enabled = true;
+    state.privacyLock.locked = false;
+    state.privacyLock.salt = salt;
+    state.privacyLock.pinHash = pinHash;
+    state.privacyLock.mode = 'closed';
+    state.privacyLock.error = '';
+    state.privacyLock.status = '';
+    clearPrivacyLockInputs();
+    resetPrivacyLockActivity();
+    renderPrivacyLockOverlay();
+    showTemporaryDraftStatus('Bloqueo privado activado en este dispositivo.');
+  } catch (error) {
+    state.privacyLock.error = error.message || 'No se pudo guardar el PIN.';
+    renderPrivacyLockOverlay();
+  } finally {
+    state.privacyLock.saving = false;
+  }
+}
+
+function disablePrivacyLock() {
+  if (!state.user || !state.privacyLock.enabled) return;
+  const ok = window.confirm('¿Desactivar el bloqueo privado en este dispositivo?');
+  if (!ok) return;
+  persistPrivacyLockPreference({ enabled: false });
+  state.privacyLock.enabled = false;
+  state.privacyLock.locked = false;
+  state.privacyLock.mode = 'closed';
+  state.privacyLock.salt = '';
+  state.privacyLock.pinHash = '';
+  state.privacyLock.error = '';
+  clearPrivacyLockInputs();
+  if (state.privacyLock.autoLockTimer) window.clearTimeout(state.privacyLock.autoLockTimer);
+  state.privacyLock.autoLockTimer = 0;
+  renderPrivacyLockOverlay();
+  showTemporaryDraftStatus('Bloqueo privado desactivado en este dispositivo.');
+}
+
+function resetPrivacyLockActivity() {
+  state.privacyLock.lastActivityAt = Date.now();
+  if (state.privacyLock.autoLockTimer) window.clearTimeout(state.privacyLock.autoLockTimer);
+  state.privacyLock.autoLockTimer = 0;
+  if (!state.user || !state.privacyLock.enabled || state.privacyLock.locked) return;
+  state.privacyLock.autoLockTimer = window.setTimeout(() => lockPrivacyScreen(), privacyLockAutoMs);
+}
+
+function handlePrivacyLockVisibilityChange() {
+  if (!state.user || !state.privacyLock.enabled || state.privacyLock.locked) return;
+  if (state.privacyLock.hiddenLockTimer) window.clearTimeout(state.privacyLock.hiddenLockTimer);
+  state.privacyLock.hiddenLockTimer = 0;
+  if (document.hidden) {
+    state.privacyLock.hiddenLockTimer = window.setTimeout(() => lockPrivacyScreen(), privacyLockHiddenGraceMs);
+    return;
+  }
+  if (Date.now() - Number(state.privacyLock.lastActivityAt || 0) >= privacyLockHiddenGraceMs) {
+    lockPrivacyScreen();
+  } else {
+    resetPrivacyLockActivity();
+  }
+}
+
+function runPrivacyLockShortcut() {
+  if (!state.user) return;
+  if (state.privacyLock.enabled) lockPrivacyScreen({ announce: true });
+  else openPrivacyLockSettings();
+}
+
+function readCompactModePreference() {
+  try {
+    return localStorage.getItem(compactModeKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function applyCompactModeClass() {
+  document.body.classList.toggle('ce-compact-mode', Boolean(state.compactMode));
+  els.appRoot?.classList.toggle('ce-app--compact', Boolean(state.compactMode));
+  if (els.btnCompactMode) {
+    const label = state.compactMode ? 'Desactivar modo compacto' : 'Activar modo compacto';
+    els.btnCompactMode.classList.toggle('active', Boolean(state.compactMode));
+    els.btnCompactMode.setAttribute('aria-pressed', state.compactMode ? 'true' : 'false');
+    els.btnCompactMode.setAttribute('title', label);
+    els.btnCompactMode.setAttribute('aria-label', label);
+  }
+}
+
+function setCompactMode(enabled = false, { announce = false } = {}) {
+  state.compactMode = Boolean(enabled);
+  try {
+    localStorage.setItem(compactModeKey, state.compactMode ? '1' : '0');
+  } catch {}
+  applyCompactModeClass();
+  if (announce) {
+    showTemporaryDraftStatus(state.compactMode
+      ? 'Modo compacto activado: verás más chats y mensajes en la misma pantalla.'
+      : 'Modo compacto desactivado.');
+  }
+}
+
+function toggleCompactMode({ announce = true } = {}) {
+  setCompactMode(!state.compactMode, { announce });
+}
+
+function normalizeNotificationPreferences(input = {}) {
+  const pausedUntilRaw = String(input.notificationsPausedUntil || input.pausedUntil || '').trim();
+  const pausedUntilMs = Date.parse(pausedUntilRaw);
+  const notificationsPausedUntil = Number.isFinite(pausedUntilMs) && pausedUntilMs > Date.now() ? new Date(pausedUntilMs).toISOString() : '';
+  return {
+    notificationsPausedUntil,
+    notificationsPaused: Boolean(notificationsPausedUntil),
+    updatedAt: String(input.updatedAt || '').trim()
+  };
+}
+
+function isNotificationPauseActive() {
+  return Boolean(Date.parse(state.notificationPreferences?.notificationsPausedUntil || '') > Date.now());
+}
+
+function notificationPauseUntilLabel() {
+  if (!isNotificationPauseActive()) return '';
+  return formatScheduleDateTime(state.notificationPreferences.notificationsPausedUntil);
+}
+
+function updateNotificationPauseButton() {
+  if (!els.btnNotificationPause) return;
+  state.notificationPreferences = normalizeNotificationPreferences(state.notificationPreferences || {});
+  const paused = isNotificationPauseActive();
+  const untilLabel = notificationPauseUntilLabel();
+  const label = paused ? `Desactivar No molestar · pausado hasta ${untilLabel}` : 'Activar No molestar por 8 horas';
+  els.btnNotificationPause.classList.toggle('active', paused);
+  els.btnNotificationPause.setAttribute('aria-pressed', paused ? 'true' : 'false');
+  els.btnNotificationPause.setAttribute('title', label);
+  els.btnNotificationPause.setAttribute('aria-label', label);
+}
+
+async function saveNotificationPause(input = {}) {
+  if (!state.user) return null;
+  const data = await post('/api/preferences/notifications/save', input);
+  state.notificationPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
+  updateNotificationPauseButton();
+  if (state.commandPaletteOpen) renderCommandPalette();
+  return state.notificationPreferences;
+}
+
+async function toggleNotificationPause() {
+  if (!state.user) return;
+  const paused = isNotificationPauseActive();
+  const preferences = await saveNotificationPause(paused ? { notificationsPaused: false } : { pauseHours: 8 });
+  if (preferences?.notificationsPaused) {
+    showTemporaryDraftStatus(`No molestar activado hasta ${notificationPauseUntilLabel()}. No recibirás notificaciones push durante ese tiempo.`, 5200);
+  } else {
+    showTemporaryDraftStatus('No molestar desactivado. Volverás a recibir notificaciones push.');
+  }
+  renderAll();
+}
+function normalizeChatLabelName(value = '') {
+  return String(value || '')
+    .replace(/^#+/, '')
+    .replace(/[|{}[\]<>`]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 32);
+}
+
+function normalizeChatLabelList(input = []) {
+  const source = Array.isArray(input) ? input : String(input || '').split(/[;,\n]/g);
+  const labels = [];
+  const seen = new Set();
+  for (const item of source) {
+    const label = normalizeChatLabelName(item);
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+    if (labels.length >= 8) break;
+  }
+  return labels;
+}
+
+function normalizeLabelCatalog(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const label = normalizeChatLabelName(item?.label || item?.name || '');
+      if (!label) return null;
+      const chatIds = Array.from(new Set((Array.isArray(item.chatIds) ? item.chatIds : [])
+        .map((chatId) => String(chatId || '').trim())
+        .filter(Boolean)));
+      return {
+        label,
+        count: Math.max(Number(item.count || 0), chatIds.length),
+        chatIds,
+        createdAt: String(item.createdAt || '').trim(),
+        updatedAt: String(item.updatedAt || '').trim()
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+}
+
+function applyLabelCatalog(items = []) {
+  const labels = normalizeLabelCatalog(items);
+  const byChat = new Map();
+  for (const item of labels) {
+    for (const chatId of item.chatIds || []) {
+      const current = byChat.get(chatId) || [];
+      if (!current.some((label) => label.toLowerCase() === item.label.toLowerCase())) current.push(item.label);
+      byChat.set(chatId, current);
+    }
+  }
+  for (const [chatId, list] of byChat.entries()) {
+    byChat.set(chatId, normalizeChatLabelList(list).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })));
+  }
+  state.labels = labels;
+  state.chatLabelsByChatId = byChat;
+  if (state.activeLabelFilter && !labels.some((item) => item.label.toLowerCase() === state.activeLabelFilter.toLowerCase())) {
+    state.activeLabelFilter = '';
+  }
+}
+
+function getLabelsForChat(chatId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return [];
+  return state.chatLabelsByChatId.get(cleanChatId) || [];
+}
+
+function chatHasActiveLabel(chat = {}) {
+  const filter = normalizeChatLabelName(state.activeLabelFilter || '');
+  if (!filter) return true;
+  const label = state.labels.find((item) => item.label.toLowerCase() === filter.toLowerCase());
+  if (!label) return true;
+  return (label.chatIds || []).includes(chat.chatId);
+}
+
+async function loadChatLabels({ force = false } = {}) {
+  if (!state.user || state.labelsLoading) return state.labels;
+  if (!force && state.labels.length) return state.labels;
+  state.labelsLoading = true;
+  renderLabelFilters();
+  try {
+    const data = await post('/api/chats/labels/list', {});
+    applyLabelCatalog(data.labels || []);
+    renderChats();
+    renderActiveChat();
+    return state.labels;
+  } finally {
+    state.labelsLoading = false;
+    renderLabelFilters();
+  }
+}
+
+function closeLabelsModal() {
+  state.labelsModalOpen = false;
+  state.labelsDraft = '';
+  renderLabelsModal();
+}
+
+async function openLabelsModal() {
+  const chat = activeChat();
+  if (!chat?.chatId) return;
+  state.labelsModalOpen = true;
+  state.labelsDraft = getLabelsForChat(chat.chatId).join(', ');
+  renderLabelsModal();
+  await loadChatLabels({ force: !state.labels.length }).catch(() => null);
+  if (!state.labelsDraft) state.labelsDraft = getLabelsForChat(chat.chatId).join(', ');
+  renderLabelsModal();
+  window.setTimeout(() => els.chatLabelsInput?.focus(), 0);
+}
+
+function addLabelToDraft(label = '') {
+  const next = normalizeChatLabelList([...(normalizeChatLabelList(state.labelsDraft)), label]);
+  state.labelsDraft = next.join(', ');
+  if (els.chatLabelsInput) els.chatLabelsInput.value = state.labelsDraft;
+  renderLabelsModal();
+}
+
+function removeLabelFromDraft(label = '') {
+  const target = normalizeChatLabelName(label).toLowerCase();
+  state.labelsDraft = normalizeChatLabelList(state.labelsDraft)
+    .filter((item) => item.toLowerCase() !== target)
+    .join(', ');
+  if (els.chatLabelsInput) els.chatLabelsInput.value = state.labelsDraft;
+  renderLabelsModal();
+}
+
+function renderLabelFilters() {
+  if (!els.chatLabelFilters) return;
+  const contactsVisible = els.contactList && !els.contactList.classList.contains('hidden');
+  if (!state.user || contactsVisible) {
+    els.chatLabelFilters.classList.add('hidden');
+    els.chatLabelFilters.innerHTML = '';
+    return;
+  }
+  const labels = normalizeLabelCatalog(state.labels || []);
+  if (!labels.length && !state.labelsLoading) {
+    els.chatLabelFilters.classList.add('hidden');
+    els.chatLabelFilters.innerHTML = '';
+    return;
+  }
+  els.chatLabelFilters.classList.remove('hidden');
+  const active = normalizeChatLabelName(state.activeLabelFilter || '');
+  const chips = labels.map((item) => {
+    const selected = item.label.toLowerCase() === active.toLowerCase();
+    return `<button class="ce-label-chip${selected ? ' active' : ''}" type="button" data-label-filter="${escapeHtml(item.label)}" aria-pressed="${selected ? 'true' : 'false'}">#${escapeHtml(item.label)} <span>${Number(item.count || 0)}</span></button>`;
+  }).join('');
+  const loading = state.labelsLoading ? '<span class="ce-label-filter__loading">Actualizando...</span>' : '';
+  els.chatLabelFilters.innerHTML = `<button class="ce-label-chip${active ? '' : ' active'}" type="button" data-label-filter="" aria-pressed="${active ? 'false' : 'true'}">Todos</button>${chips}${loading}`;
+}
+
+function renderChatLabelBadges(chat = {}) {
+  const labels = getLabelsForChat(chat.chatId).slice(0, 3);
+  if (!labels.length) return '';
+  return `<div class="ce-row-labels" aria-label="Etiquetas del chat">${labels.map((label) => `<span>#${escapeHtml(label)}</span>`).join('')}</div>`;
+}
+
+function renderActiveChatLabelBadges(chat = {}) {
+  const labels = getLabelsForChat(chat.chatId);
+  if (!labels.length) return '<span>Sin etiquetas</span>';
+  return `<div class="ce-chat-labels">${labels.map((label) => `<span>#${escapeHtml(label)}</span>`).join('')}</div>`;
+}
+
+function renderLabelsModal() {
+  if (!els.labelsModal || !els.labelsPresetList || !els.labelsCurrentList) return;
+  els.labelsModal.classList.toggle('hidden', !state.labelsModalOpen);
+  if (!state.labelsModalOpen) return;
+  const chat = activeChat();
+  const current = normalizeChatLabelList(state.labelsDraft);
+  const title = chat ? chatDisplayName(chat) : 'chat seleccionado';
+  if (els.labelsChatName) els.labelsChatName.textContent = `Organiza “${title}” con hasta 8 etiquetas personales.`;
+  if (els.chatLabelsInput && document.activeElement !== els.chatLabelsInput) els.chatLabelsInput.value = state.labelsDraft;
+  if (els.btnSaveLabels) els.btnSaveLabels.disabled = state.labelsSaving || !chat?.chatId;
+  els.labelsCurrentList.innerHTML = current.length
+    ? current.map((label) => `<span class="ce-label-token">#${escapeHtml(label)} <button type="button" data-remove-draft-label="${escapeHtml(label)}" aria-label="Quitar etiqueta ${escapeHtml(label)}">×</button></span>`).join('')
+    : '<div class="ce-label-empty">Este chat todavía no tiene etiquetas.</div>';
+  const currentLower = new Set(current.map((label) => label.toLowerCase()));
+  const presets = (state.labels || []).filter((item) => !currentLower.has(item.label.toLowerCase())).slice(0, 20);
+  els.labelsPresetList.innerHTML = state.labelsLoading
+    ? '<div class="ce-label-empty">Cargando etiquetas...</div>'
+    : (presets.length
+      ? presets.map((item) => `<button type="button" class="ce-label-preset" data-add-draft-label="${escapeHtml(item.label)}">#${escapeHtml(item.label)} <span>${Number(item.count || 0)}</span></button>`).join('')
+      : '<div class="ce-label-empty">Escribe una nueva etiqueta o guarda la combinación actual.</div>');
+}
+
+async function saveLabelsFromModal() {
+  const chat = activeChat();
+  if (!chat?.chatId || state.labelsSaving) return;
+  const labels = normalizeChatLabelList(state.labelsDraft || els.chatLabelsInput?.value || '');
+  state.labelsSaving = true;
+  renderLabelsModal();
+  try {
+    const data = await post('/api/chats/labels/save', { chatId: chat.chatId, labels });
+    applyLabelCatalog(data.allLabels || []);
+    state.labelsDraft = normalizeChatLabelList(data.labels || labels).join(', ');
+    closeLabelsModal();
+    showTemporaryDraftStatus(labels.length ? 'Etiquetas guardadas para este chat.' : 'Etiquetas quitadas de este chat.');
+    renderAll();
+  } finally {
+    state.labelsSaving = false;
+    renderLabelsModal();
+  }
+}
+
+async function deleteChatLabel(label = '') {
+  const cleanLabel = normalizeChatLabelName(label);
+  if (!cleanLabel) return;
+  const ok = window.confirm(`¿Eliminar la etiqueta “${cleanLabel}” de todos tus chats?`);
+  if (!ok) return;
+  const data = await post('/api/chats/labels/delete', { label: cleanLabel });
+  applyLabelCatalog(data.allLabels || []);
+  showTemporaryDraftStatus(`Etiqueta “${cleanLabel}” eliminada.`);
+  renderAll();
+}
+
+function safeStorageKeyPart(value = '') {
+  return String(value || '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 140);
+}
+
+function outboxStorageKey() {
+  const userId = safeStorageKeyPart(state.user?.userId || '');
+  return userId ? `${outboxStoragePrefix}:${userId}` : '';
+}
+
+function normalizeQueuedMessage(item = {}) {
+  const chatId = String(item.chatId || '').trim().slice(0, 140);
+  const text = String(item.text || '').trim();
+  const clientMessageId = String(item.clientMessageId || item.localId || '').trim().slice(0, 160);
+  if (!chatId || !text || !clientMessageId) return null;
+  const status = ['queued', 'sending', 'failed'].includes(item.status) ? item.status : 'queued';
+  const createdAt = item.createdAt && !Number.isNaN(Date.parse(item.createdAt)) ? item.createdAt : new Date().toISOString();
+  return {
+    localId: clientMessageId,
+    clientMessageId,
+    chatId,
+    text: text.slice(0, 12000),
+    replyToMessageId: String(item.replyToMessageId || '').trim().slice(0, 160),
+    replyTo: item.replyTo && typeof item.replyTo === 'object' ? item.replyTo : null,
+    silent: Boolean(item.silent),
+    ephemeralSeconds: normalizeEphemeralSeconds(item.ephemeralSeconds),
+    createdAt,
+    updatedAt: item.updatedAt && !Number.isNaN(Date.parse(item.updatedAt)) ? item.updatedAt : createdAt,
+    status,
+    attempts: Math.max(0, Number(item.attempts || 0)),
+    lastError: String(item.lastError || '').trim().slice(0, 240)
+  };
+}
+
+function readOutboxMessages() {
+  const key = outboxStorageKey();
+  if (!key) return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    return (Array.isArray(parsed) ? parsed : [])
+      .map(normalizeQueuedMessage)
+      .filter(Boolean)
+      .sort((a, b) => (Date.parse(a.createdAt) || 0) - (Date.parse(b.createdAt) || 0))
+      .slice(-100);
+  } catch {
+    return [];
+  }
+}
+
+function persistOutboxMessages(list = state.outboxMessages) {
+  const key = outboxStorageKey();
+  if (!key) return;
+  const normalized = (Array.isArray(list) ? list : [])
+    .map(normalizeQueuedMessage)
+    .filter(Boolean)
+    .slice(-100);
+  state.outboxMessages = normalized;
+  try {
+    if (normalized.length) localStorage.setItem(key, JSON.stringify(normalized));
+    else localStorage.removeItem(key);
+  } catch {}
+}
+
+function loadOutboxState() {
+  state.outboxMessages = readOutboxMessages();
+}
+
+function getQueuedMessagesForChat(chatId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return [];
+  return state.outboxMessages.filter((item) => item.chatId === cleanChatId);
+}
+
+function upsertQueuedMessage(item = {}, { render = true } = {}) {
+  const normalized = normalizeQueuedMessage(item);
+  if (!normalized) return null;
+  const list = state.outboxMessages.filter((queued) => queued.clientMessageId !== normalized.clientMessageId);
+  list.push(normalized);
+  list.sort((a, b) => (Date.parse(a.createdAt) || 0) - (Date.parse(b.createdAt) || 0));
+  persistOutboxMessages(list);
+  if (render) renderAll();
+  return normalized;
+}
+
+function removeQueuedMessage(clientMessageId = '', { render = true } = {}) {
+  const cleanId = String(clientMessageId || '').trim();
+  if (!cleanId) return false;
+  const before = state.outboxMessages.length;
+  persistOutboxMessages(state.outboxMessages.filter((item) => item.clientMessageId !== cleanId));
+  if (render && before !== state.outboxMessages.length) renderAll();
+  return before !== state.outboxMessages.length;
+}
+
+function isRecoverableSendError(error = {}) {
+  if (navigator.onLine === false) return true;
+  const status = Number(error?.status || 0);
+  if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true;
+  if (status >= 400 && status < 500) return false;
+  const message = String(error?.message || '').toLowerCase();
+  return !status || /fetch|network|conexi[oó]n|internet|offline|load failed|networkerror/.test(message);
+}
+
+function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', replyToMessageId = '', replyTo = null, silent = false, ephemeralSeconds = 0, error = null } = {}) {
+  const now = new Date().toISOString();
+  const queued = upsertQueuedMessage({
+    chatId,
+    text,
+    clientMessageId,
+    localId: clientMessageId,
+    replyToMessageId,
+    replyTo,
+    silent: Boolean(silent),
+    ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
+    createdAt: now,
+    updatedAt: now,
+    status: 'queued',
+    attempts: 0,
+    lastError: error?.message || ''
+  }, { render: false });
+  if (!queued) return null;
+  showTemporaryDraftStatus('Mensaje guardado en pendientes. Se enviará automáticamente cuando vuelva la conexión.', 4600);
+  renderAll();
+  return queued;
+}
+
+function renderQueuedMessage(queued = {}) {
+  const failed = queued.status === 'failed';
+  const sending = queued.status === 'sending';
+  const statusText = sending
+    ? 'Enviando pendiente...'
+    : (failed ? `Pendiente sin enviar${queued.lastError ? ` · ${queued.lastError}` : ''}` : 'Pendiente · se enviará al recuperar conexión');
+  const replyPreview = queued.replyTo?.text
+    ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>↩ ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
+    : '';
+  return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
+    <div class="ce-outbox-actions">
+      <button type="button" data-outbox-retry="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Enviar ahora</button>
+      <button type="button" data-outbox-discard="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Descartar</button>
+    </div>
+    ${replyPreview}
+    ${queued.silent ? '<div class="ce-silent-label" aria-label="Mensaje pendiente silencioso">🔕 Sin notificación</div>' : ''}
+    ${queued.ephemeralSeconds ? `<div class="ce-ephemeral-label" aria-label="Mensaje pendiente temporal">${escapeHtml(formatEphemeralOption(queued.ephemeralSeconds))} · temporal</div>` : ''}
+    <p class="ce-msg__text">${escapeHtml(queued.text)}</p>
+    <span class="ce-msg__meta ce-msg__meta--outbox"><time>${formatMessageTime(queued.createdAt)}</time><span class="ce-msg__receipt" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${sending ? '…' : '⏳'}</span></span>
+  </article>`;
+}
+
+async function sendQueuedOutboxMessage(queued = {}) {
+  const normalized = normalizeQueuedMessage(queued);
+  if (!normalized || !state.user) return false;
+  upsertQueuedMessage({ ...normalized, status: 'sending', attempts: normalized.attempts + 1, updatedAt: new Date().toISOString(), lastError: '' }, { render: true });
+  try {
+    const data = await post('/api/chats/send', {
+      chatId: normalized.chatId,
+      text: normalized.text,
+      clientMessageId: normalized.clientMessageId,
+      replyToMessageId: normalized.replyToMessageId || '',
+      silent: Boolean(normalized.silent),
+      ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds)
+    });
+    removeQueuedMessage(normalized.clientMessageId, { render: false });
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    if (state.archivedView && data.chat?.isArchived === false) await loadChats({ includeArchived: false });
+    else renderAll();
+    return true;
+  } catch (error) {
+    const recoverable = isRecoverableSendError(error);
+    upsertQueuedMessage({
+      ...normalized,
+      status: 'failed',
+      attempts: normalized.attempts + 1,
+      updatedAt: new Date().toISOString(),
+      lastError: recoverable ? 'Sin conexión o servidor no disponible' : (error?.message || 'No se pudo enviar')
+    }, { render: true });
+    return false;
+  }
+}
+
+async function retryQueuedOutboxMessages({ chatId = '', silent = false, force = false } = {}) {
+  if (!state.user || state.outboxSyncing) return { sent: 0, failed: 0 };
+  if (!force && navigator.onLine === false) return { sent: 0, failed: state.outboxMessages.length };
+  const targets = state.outboxMessages
+    .filter((item) => !chatId || item.chatId === chatId)
+    .filter((item) => force || item.attempts < 6);
+  if (!targets.length) return { sent: 0, failed: 0 };
+  state.outboxSyncing = true;
+  let sent = 0;
+  let failed = 0;
+  try {
+    renderAll();
+    for (const item of targets) {
+      const ok = await sendQueuedOutboxMessage(item);
+      if (ok) sent += 1;
+      else failed += 1;
+      if (!ok && navigator.onLine === false) break;
+    }
+  } finally {
+    state.outboxSyncing = false;
+    renderAll();
+  }
+  if (!silent) {
+    if (sent && !failed) showTemporaryDraftStatus(`${sent} mensaje${sent === 1 ? '' : 's'} pendiente${sent === 1 ? '' : 's'} enviado${sent === 1 ? '' : 's'}.`);
+    else if (sent && failed) showTemporaryDraftStatus(`${sent} enviado${sent === 1 ? '' : 's'} y ${failed} pendiente${failed === 1 ? '' : 's'} todavía sin conexión.`);
+    else if (failed) showTemporaryDraftStatus('Los mensajes pendientes siguen sin poder enviarse.', 4200);
+  }
+  return { sent, failed };
+}
+
+function scheduleOutboxRetry(delayMs = 900) {
+  if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
+  state.outboxRetryTimer = window.setTimeout(() => {
+    state.outboxRetryTimer = 0;
+    retryQueuedOutboxMessages({ silent: true }).catch(() => null);
+  }, Math.max(0, Number(delayMs || 0)));
+}
+
+function chatDraftStorageKey(chatId = state.activeChatId) {
+  const userId = safeStorageKeyPart(state.user?.userId || '');
+  const safeChatId = safeStorageKeyPart(chatId || '');
+  return userId && safeChatId ? `${draftStoragePrefix}:${userId}:${safeChatId}` : '';
+}
+
+function readDraftPayload(chatId = state.activeChatId) {
+  const key = chatDraftStorageKey(chatId);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.text === 'string' ? parsed : { text: String(raw || ''), savedAt: 0 };
+  } catch {
+    return null;
+  }
+}
+
+function writeDraftPayload(chatId = state.activeChatId, text = '', savedAt = Date.now()) {
+  const key = chatDraftStorageKey(chatId);
+  if (!key) return false;
+  try {
+    localStorage.setItem(key, JSON.stringify({ text: String(text || ''), savedAt: Number(savedAt || Date.now()) }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeLocalDraftPayload(chatId = state.activeChatId) {
+  const key = chatDraftStorageKey(chatId);
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch {}
+}
+
+function remoteDraftSavedMs(draft = {}) {
+  return Date.parse(draft?.savedAt || '') || 0;
+}
+
+function setDraftStatus(message = '') {
+  if (!els.draftStatus) return;
+  const clean = String(message || '').trim();
+  els.draftStatus.textContent = clean;
+  els.draftStatus.classList.toggle('hidden', !clean);
+}
+
+function showTemporaryDraftStatus(message = '', ttl = 2200) {
+  const clean = String(message || '').trim();
+  if (!clean) return;
+  setDraftStatus(clean);
+  window.setTimeout(() => {
+    if (els.draftStatus?.textContent === clean) setDraftStatus('');
+  }, Math.max(800, Number(ttl || 2200)));
+}
+
+async function syncDraftToServer(chatId = state.activeChatId, text = '', { announce = false } = {}) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!state.user || !cleanChatId) return;
+  try {
+    const data = await post('/api/chats/draft/save', { chatId: cleanChatId, text: String(text || '') });
+    if (data.draft?.text) writeDraftPayload(cleanChatId, data.draft.text, remoteDraftSavedMs(data.draft) || Date.now());
+    else removeLocalDraftPayload(cleanChatId);
+    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador sincronizado en tu cuenta.');
+  } catch {
+    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador guardado en este dispositivo. Se sincronizará cuando haya conexión.');
+  }
+}
+
+function scheduleRemoteDraftSync(chatId = state.activeChatId, text = '', { delay = 900, announce = false } = {}) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!state.user || !cleanChatId) return;
+  const current = state.draftSyncTimers.get(cleanChatId);
+  if (current) window.clearTimeout(current);
+  const timer = window.setTimeout(() => {
+    state.draftSyncTimers.delete(cleanChatId);
+    syncDraftToServer(cleanChatId, text, { announce }).catch(() => null);
+  }, Math.max(0, Number(delay || 0)));
+  state.draftSyncTimers.set(cleanChatId, timer);
+}
+
+function saveActiveDraft({ announce = false } = {}) {
+  if (!els.messageInput || !state.user || !state.activeChatId || state.editingMessage?.messageId) return;
+  const chatId = state.activeChatId;
+  const text = els.messageInput.value || '';
+  if (text.trim()) {
+    const saved = writeDraftPayload(chatId, text, Date.now());
+    scheduleRemoteDraftSync(chatId, text, { announce });
+    if (announce) setDraftStatus(saved ? 'Borrador guardado en este chat.' : 'No se pudo guardar el borrador en este dispositivo.');
+  } else {
+    removeLocalDraftPayload(chatId);
+    scheduleRemoteDraftSync(chatId, '', { delay: 0 });
+    setDraftStatus('');
+  }
+}
+
+function scheduleActiveDraftSave() {
+  if (state.draftSaveTimer) window.clearTimeout(state.draftSaveTimer);
+  state.draftSaveTimer = window.setTimeout(() => {
+    state.draftSaveTimer = 0;
+    saveActiveDraft({ announce: true });
+  }, 350);
+}
+
+async function loadDraftForChat(chatId = state.activeChatId) {
+  if (!els.messageInput || state.editingMessage?.messageId) return;
+  const localDraft = readDraftPayload(chatId);
+  const localText = typeof localDraft?.text === 'string' ? localDraft.text : '';
+  els.messageInput.value = localText;
+  setDraftStatus(localText.trim() ? 'Borrador recuperado en este chat.' : '');
+  if (!state.user || !chatId) return;
+  try {
+    const data = await post('/api/chats/draft/get', { chatId });
+    const remoteDraft = data.draft || null;
+    if (state.activeChatId !== chatId || state.editingMessage?.messageId) return;
+    const remoteText = typeof remoteDraft?.text === 'string' ? remoteDraft.text : '';
+    const remoteMs = remoteDraftSavedMs(remoteDraft);
+    const localMs = Number(localDraft?.savedAt || 0);
+    if (remoteText.trim() && remoteMs >= localMs && remoteText !== els.messageInput.value) {
+      writeDraftPayload(chatId, remoteText, remoteMs || Date.now());
+      els.messageInput.value = remoteText;
+      setDraftStatus('Borrador sincronizado desde tu cuenta.');
+      updateComposerControls();
+    }
+  } catch {
+    // El borrador local sigue disponible aunque la sincronización remota no responda.
+  }
+}
+
+function clearDraftForChat(chatId = state.activeChatId) {
+  removeLocalDraftPayload(chatId);
+  scheduleRemoteDraftSync(chatId, '', { delay: 0 });
+  setDraftStatus('');
+}
+
+function closeDraftsModal() {
+  state.draftsOpen = false;
+  state.draftsLoading = false;
+  renderDraftsModal();
+}
+
+function renderDraftsModal() {
+  if (!els.draftsModal || !els.draftsList) return;
+  els.draftsModal.classList.toggle('hidden', !state.draftsOpen);
+  if (!state.draftsOpen) return;
+  if (state.draftsLoading) {
+    els.draftsList.innerHTML = '<div class="ce-drafts-empty">Cargando borradores pendientes...</div>';
+    return;
+  }
+  const drafts = Array.isArray(state.drafts) ? state.drafts : [];
+  if (!drafts.length) {
+    els.draftsList.innerHTML = '<div class="ce-drafts-empty">No tienes borradores pendientes en este momento.</div>';
+    return;
+  }
+  els.draftsList.innerHTML = drafts.map((draft) => {
+    const chat = draft.chat || state.chats.find((item) => item.chatId === draft.chatId) || { chatId: draft.chatId };
+    const title = chatDisplayName(chat);
+    const subtitle = chatDisplaySubtitle(chat);
+    const excerpt = compactText(draft.excerpt || draft.text || '', 220);
+    const saved = draft.savedAt ? formatScheduleDateTime(draft.savedAt) : 'Guardado recientemente';
+    return `<article class="ce-draft-item" data-draft-item-chat-id="${escapeHtml(draft.chatId)}">
+      ${renderChatAvatarWithPresence(chat, 'small')}
+      <div class="ce-draft-item__body">
+        <strong>${escapeHtml(title)}</strong>
+        <em>${escapeHtml(subtitle)}</em>
+        <p>${escapeHtml(excerpt || 'Borrador sin vista previa')}</p>
+        <span>${escapeHtml(saved)}</span>
+      </div>
+      <div class="ce-draft-item__actions">
+        <button class="ce-btn ce-btn--small" type="button" data-open-draft-chat-id="${escapeHtml(draft.chatId)}">Continuar</button>
+        <button class="ce-link" type="button" data-delete-draft-chat-id="${escapeHtml(draft.chatId)}">Descartar</button>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+async function loadDrafts({ silent = false } = {}) {
+  if (!state.user) return [];
+  state.draftsLoading = !silent;
+  renderDraftsModal();
+  try {
+    const data = await post('/api/chats/drafts/list', { limit: 80 });
+    state.drafts = Array.isArray(data.drafts) ? data.drafts : [];
+    return state.drafts;
+  } finally {
+    state.draftsLoading = false;
+    renderDraftsModal();
+  }
+}
+
+async function openDraftsModal() {
+  if (!state.user) return;
+  saveActiveDraft({ announce: false });
+  const activeText = String(els.messageInput?.value || '').trim();
+  if (state.activeChatId && activeText && !state.editingMessage?.messageId) {
+    await syncDraftToServer(state.activeChatId, activeText, { announce: false }).catch(() => null);
+  }
+  state.draftsOpen = true;
+  renderDraftsModal();
+  await loadDrafts();
+}
+
+function mergeDraftChatIntoState(chat = {}) {
+  if (!chat?.chatId) return;
+  state.activeLabelFilter = '';
+  state.archivedView = Boolean(chat.isArchived);
+  state.chatListMode = chat.isArchived ? 'archived' : 'active';
+  const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
+  if (index >= 0) state.chats[index] = { ...state.chats[index], ...chat };
+  else state.chats.unshift(chat);
+  sortChats();
+  showChatListMode(state.chatListMode);
+}
+
+async function openDraftFromList(chatId = '') {
+  const draft = state.drafts.find((item) => item.chatId === chatId) || null;
+  if (draft?.chat) mergeDraftChatIntoState(draft.chat);
+  closeDraftsModal();
+  await selectChat(chatId);
+  const draftText = String(draft?.text || '').trim();
+  if (draftText && els.messageInput && !els.messageInput.value.trim()) {
+    els.messageInput.value = draftText;
+    writeDraftPayload(chatId, draftText, remoteDraftSavedMs(draft) || Date.now());
+  }
+  updateComposerControls();
+  els.messageInput?.focus();
+}
+
+async function deleteDraftFromList(chatId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  await post('/api/chats/draft/delete', { chatId: cleanChatId });
+  removeLocalDraftPayload(cleanChatId);
+  state.drafts = state.drafts.filter((draft) => draft.chatId !== cleanChatId);
+  if (state.activeChatId === cleanChatId && !state.editingMessage?.messageId) {
+    if (els.messageInput) els.messageInput.value = '';
+    setDraftStatus('');
+    updateComposerControls();
+  }
+  renderDraftsModal();
+}
+
+function isDeletedMessage(message = {}) {
+  return Boolean(message?.deletedAt || message?.type === 'deleted');
+}
+
+function normalizeChatBlockStatus(chat = {}) {
+  const source = chat?.blockStatus && typeof chat.blockStatus === 'object' ? chat.blockStatus : {};
+  const targetUserId = String(source.targetUserId || chat?.other?.userId || '').trim();
+  const blockedByMe = Boolean(chat?.isBlockedByMe || source.blockedByMe);
+  const blockedMe = Boolean(chat?.hasBlockedMe || source.blockedMe);
+  return {
+    targetUserId,
+    blockedByMe,
+    blockedMe,
+    blocked: Boolean(chat?.isBlocked || source.blocked || blockedByMe || blockedMe),
+    blockedAt: String(source.blockedAt || '').trim(),
+    blockedMeAt: String(source.blockedMeAt || '').trim()
+  };
+}
+
+function isChatInteractionBlocked(chat = activeChat()) {
+  return Boolean(chat?.chatId && !isSelfChat(chat) && normalizeChatBlockStatus(chat).blocked);
+}
+
+function chatBlockNoticeText(chat = activeChat()) {
+  const status = normalizeChatBlockStatus(chat || {});
+  if (status.blockedByMe && status.blockedMe) return 'Este contacto está bloqueado y tampoco recibe mensajes tuyos por ahora.';
+  if (status.blockedByMe) return 'Contacto bloqueado. La conversación se conserva, pero no puedes enviar mensajes hasta desbloquearlo.';
+  if (status.blockedMe) return 'Este contacto no recibe tus mensajes en este momento.';
+  return '';
+}
+
+function ensureChatInteractionAllowed(chat = activeChat()) {
+  if (!isChatInteractionBlocked(chat)) return true;
+  const message = chatBlockNoticeText(chat) || 'La comunicación con este contacto está pausada.';
+  showTemporaryDraftStatus(message, 4200);
+  throw new Error(message);
+}
+
+function renderChatBlockNotice(chat = activeChat()) {
+  const text = chatBlockNoticeText(chat);
+  if (!text) return '';
+  const canUnblock = normalizeChatBlockStatus(chat).blockedByMe;
+  const action = canUnblock ? '<button class="ce-link" type="button" data-block-active-contact="0">Desbloquear contacto</button>' : '';
+  return `<div class="ce-block-notice" role="status"><strong>Comunicación pausada</strong><span>${escapeHtml(text)}</span>${action}</div>`;
+}
+
+function blockIconSvg(blocked = false) {
+  return blocked
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 0 1 5.3 13.98L6.02 6.7A7.97 7.97 0 0 1 12 4ZM4 12c0-1.46.39-2.82 1.08-4l10.92 10.92A8 8 0 0 1 4 12Z"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.85 0 3.55.63 4.9 1.69L5.69 16.9A7.96 7.96 0 0 1 12 4Zm0 16a7.96 7.96 0 0 1-4.9-1.69L18.31 7.1A8 8 0 0 1 12 20Z"/></svg>';
+}
+
+function getMessageReactions(message = {}) {
+  const source = message.reactions && typeof message.reactions === 'object' ? message.reactions : {};
+  return Object.fromEntries(Object.entries(source).filter(([, users]) => Array.isArray(users) && users.length));
+}
+
+function userReactionForMessage(message = {}) {
+  const reactions = getMessageReactions(message);
+  return Object.entries(reactions).find(([, users]) => users.includes(state.user?.userId))?.[0] || '';
+}
+
+function renderReactionSummary(message = {}) {
+  const reactions = getMessageReactions(message);
+  const entries = Object.entries(reactions);
+  if (!entries.length) return '';
+  const activeReaction = userReactionForMessage(message);
+  return `<div class="ce-reaction-summary" aria-label="Reacciones del mensaje">${entries.map(([emoji, users]) => {
+    const count = Array.from(new Set(users)).length;
+    const active = emoji === activeReaction ? ' active' : '';
+    const label = emoji === activeReaction ? `Quitar reacción ${emoji}` : `Reaccionar con ${emoji}`;
+    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(emoji)}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(emoji)}</span><strong>${count}</strong></button>`;
+  }).join('')}</div>`;
+}
+
+function renderReactionPicker(message = {}) {
+  const activeReaction = userReactionForMessage(message);
+  return `<div class="ce-reaction-picker" aria-label="Reaccionar al mensaje">${quickReactions.map((emoji) => {
+    const active = emoji === activeReaction ? ' active' : '';
+    const label = emoji === activeReaction ? `Quitar reacción ${emoji}` : `Reaccionar con ${emoji}`;
+    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(emoji)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(emoji)}</button>`;
+  }).join('')}</div>`;
+}
+
+
+function normalizePollClient(message = {}) {
+  const poll = message.poll && typeof message.poll === 'object' ? message.poll : null;
+  if (!poll) return null;
+  const question = String(poll.question || message.text || '').replace(/^Encuesta:\s*/i, '').trim();
+  const options = Array.isArray(poll.options) ? poll.options.map((option) => ({
+    optionId: String(option.optionId || option.id || '').trim(),
+    text: String(option.text || '').trim()
+  })).filter((option) => option.optionId && option.text).slice(0, 6) : [];
+  if (!question || options.length < 2) return null;
+  const votes = poll.votes && typeof poll.votes === 'object' ? poll.votes : {};
+  return { question, options, votes };
+}
+
+function pollSelectedOptionId(poll = {}) {
+  const userId = state.user?.userId || '';
+  if (!userId) return '';
+  for (const option of poll.options || []) {
+    const voters = Array.isArray(poll.votes?.[option.optionId]) ? poll.votes[option.optionId] : [];
+    if (voters.includes(userId)) return option.optionId;
+  }
+  return '';
+}
+
+function renderPollMessage(message = {}) {
+  const poll = normalizePollClient(message);
+  if (!poll) return `<p class="ce-msg__text">${escapeHtml(message.text || 'Encuesta no disponible')}</p>`;
+  const selectedOptionId = pollSelectedOptionId(poll);
+  const totalVotes = poll.options.reduce((total, option) => total + new Set(Array.isArray(poll.votes?.[option.optionId]) ? poll.votes[option.optionId] : []).size, 0);
+  const optionsHtml = poll.options.map((option) => {
+    const count = new Set(Array.isArray(poll.votes?.[option.optionId]) ? poll.votes[option.optionId] : []).size;
+    const percent = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
+    const selected = option.optionId === selectedOptionId;
+    const label = selected ? `Quitar voto de ${option.text}` : `Votar ${option.text}`;
+    return `<button class="ce-poll-option${selected ? ' active' : ''}" type="button" data-poll-vote-message-id="${escapeHtml(message.messageId || '')}" data-poll-option-id="${escapeHtml(option.optionId)}" aria-label="${escapeHtml(label)}">
+      <span class="ce-poll-option__bar" style="width:${Math.max(0, Math.min(100, percent))}%"></span>
+      <span class="ce-poll-option__text">${escapeHtml(option.text)}</span>
+      <strong>${count ? `${count} · ${percent}%` : '0'}</strong>
+    </button>`;
+  }).join('');
+  const help = selectedOptionId ? 'Toca tu opción otra vez para quitar el voto.' : 'Elige una opción para votar.';
+  return `<section class="ce-poll" aria-label="Encuesta">
+    <div class="ce-poll__label">📊 Encuesta</div>
+    <h3>${escapeHtml(poll.question)}</h3>
+    <div class="ce-poll__options">${optionsHtml}</div>
+    <small>${totalVotes} ${totalVotes === 1 ? 'voto' : 'votos'} · ${help}</small>
+  </section>`;
+}
+
+function renderStarButton(message = {}) {
+  const active = message.isStarred ? ' active' : '';
+  const symbol = message.isStarred ? '★' : '☆';
+  const label = message.isStarred ? 'Quitar de mensajes destacados' : 'Destacar mensaje';
+  return `<button class="ce-star-btn${active}" type="button" data-star-message-id="${escapeHtml(message.messageId || '')}" data-starred="${message.isStarred ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${symbol}</button>`;
+}
+
+function renderPinMessageButton(message = {}) {
+  const active = message.isPinned ? ' active' : '';
+  const symbol = message.isPinned ? '📌' : '📍';
+  const label = message.isPinned ? 'Desfijar mensaje de este chat' : 'Fijar mensaje en este chat';
+  return `<button class="ce-pin-msg-btn${active}" type="button" data-pin-message-id="${escapeHtml(message.messageId || '')}" data-pinned="${message.isPinned ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${symbol}</button>`;
+}
+
+function renderReplyButton(message = {}) {
+  const label = 'Responder este mensaje';
+  return `<button class="ce-reply-btn" type="button" data-reply-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">↩</button>`;
+}
+
+function renderForwardButton(message = {}) {
+  const label = 'Reenviar mensaje';
+  return `<button class="ce-forward-btn" type="button" data-forward-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">↪</button>`;
+}
+
+function renderMessageLinkButton(message = {}) {
+  const label = 'Copiar enlace interno del mensaje';
+  return `<button class="ce-link-msg-btn" type="button" data-copy-message-link-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">🔗</button>`;
+}
+
+function renderCopyButton(message = {}) {
+  const label = 'Copiar texto del mensaje';
+  return `<button class="ce-copy-btn" type="button" data-copy-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">⧉</button>`;
+}
+
+function renderReminderButton(message = {}) {
+  const label = 'Crear recordatorio privado de este mensaje';
+  return `<button class="ce-reminder-btn" type="button" data-remind-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">⏰</button>`;
+}
+
+function renderEditButton(message = {}) {
+  const label = 'Editar mensaje';
+  return `<button class="ce-edit-btn" type="button" data-edit-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">✎</button>`;
+}
+
+function renderDeleteButton(message = {}) {
+  const label = 'Eliminar mensaje para todos';
+  return `<button class="ce-delete-btn" type="button" data-delete-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">×</button>`;
+}
+
+
+
+function bellIconSvg(muted = false) {
+  if (muted) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.27 3 3 4.27l3.02 3.02A7.86 7.86 0 0 0 5 11v4l-2 2v1h15.73L20.73 20 22 18.73 4.27 3ZM12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-7v-4a7 7 0 0 0-9.9-6.37l9.7 9.7.2.2V15Z"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6v-5a7 7 0 0 0-5-6.71V3a2 2 0 0 0-4 0v1.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"/></svg>';
+}
+
+function renderMessageActions(message = {}, mine = false) {
+  if (isDeletedMessage(message)) return '';
+  const isPoll = message.type === 'poll' || Boolean(message.poll);
+  const ownerActions = mine ? `${isPoll ? '' : renderEditButton(message)}${renderDeleteButton(message)}` : '';
+  return `${renderStarButton(message)}${renderPinMessageButton(message)}${renderReplyButton(message)}${renderForwardButton(message)}${renderReminderButton(message)}${renderMessageLinkButton(message)}${renderCopyButton(message)}${ownerActions}`;
+}
+
+function renderMessageBody(message = {}, mine = false) {
+  if (isDeletedMessage(message)) {
+    const text = message.expirationReason === 'ephemeral_expired' || message.expiredAt ? 'Mensaje temporal expirado' : 'Mensaje eliminado';
+    return `<p class="ce-msg__deleted">${escapeHtml(text)}</p>`;
+  }
+  const forwarded = message.type === 'forwarded' || message.forwardedFrom?.messageId
+    ? '<div class="ce-forwarded-label" aria-label="Mensaje reenviado">↪ Reenviado</div>'
+    : '';
+  const silent = mine && message.silent
+    ? '<div class="ce-silent-label" aria-label="Mensaje enviado sin notificación">🔕 Sin notificación</div>'
+    : '';
+  const ephemeral = message.ephemeralSeconds || message.expireAt
+    ? `<div class="ce-ephemeral-label" aria-label="Mensaje temporal">${escapeHtml(formatEphemeralMessageLabel(message))}</div>`
+    : '';
+  const body = message.type === 'poll' || message.poll
+    ? renderPollMessage(message)
+    : `<p class="ce-msg__text">${escapeHtml(message.text)}</p>`;
+  return `${forwarded}${silent}${ephemeral}${body}`;
+}
+
+function renderUnreadSeparator(marker = {}) {
+  const count = Math.max(1, Number(marker.count || 1));
+  const label = count === 1 ? '1 mensaje nuevo' : `${count} mensajes nuevos`;
+  return `<div class="ce-unread-separator" data-unread-marker-for="${escapeHtml(marker.messageId || '')}" role="separator" aria-label="${escapeHtml(label)}">
+    <span></span>
+    <button type="button" data-jump-unread-marker="${escapeHtml(marker.messageId || '')}">${escapeHtml(label)}</button>
+    <span></span>
+  </div>`;
+}
+
+function selectUnreadMarkerMessage(messages = [], unreadCount = 0) {
+  const safeUnread = Math.min(messages.length, Math.max(0, Number(unreadCount || 0)));
+  if (!safeUnread || !messages.length) return null;
+  const incoming = messages
+    .filter((message) => message?.messageId && message.senderUserId !== state.user?.userId && !isDeletedMessage(message))
+    .slice(-safeUnread);
+  if (incoming.length) return incoming[0];
+  return messages[Math.max(0, messages.length - safeUnread)] || null;
+}
+
+function rememberUnreadMarkerForChat(chat = {}, messages = []) {
+  const chatId = chat?.chatId || '';
+  const unreadCount = Math.max(0, Number(chat?.unread || 0));
+  if (!chatId || unreadCount <= 0) {
+    if (chatId) state.unreadMarkerByChatId.delete(chatId);
+    return null;
+  }
+  const markerMessage = selectUnreadMarkerMessage(messages, unreadCount);
+  if (!markerMessage?.messageId) {
+    state.unreadMarkerByChatId.delete(chatId);
+    return null;
+  }
+  const marker = { messageId: markerMessage.messageId, count: unreadCount, createdAt: markerMessage.createdAt || '' };
+  state.unreadMarkerByChatId.set(chatId, marker);
+  return marker;
+}
+
+function jumpToUnreadMarker(messageId = '') {
+  const cleanMessageId = String(messageId || state.unreadMarkerByChatId.get(state.activeChatId)?.messageId || '').trim();
+  if (!cleanMessageId || !els.messages) return false;
+  const markerNode = [...els.messages.querySelectorAll('[data-unread-marker-for]')]
+    .find((node) => node.dataset.unreadMarkerFor === cleanMessageId);
+  const messageNode = [...els.messages.querySelectorAll('[data-message-id]')]
+    .find((node) => node.dataset.messageId === cleanMessageId);
+  const target = markerNode || messageNode;
+  if (!target) return false;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (messageNode) messageNode.classList.add('is-highlighted');
+  state.highlightedMessageId = cleanMessageId;
+  window.setTimeout(() => {
+    if (messageNode?.isConnected) messageNode.classList.remove('is-highlighted');
+    if (state.highlightedMessageId === cleanMessageId) state.highlightedMessageId = '';
+  }, 1800);
+  return true;
+}
+
+function renderMessageReceipt(message = {}, mine = false) {
+  if (!mine || isDeletedMessage(message)) return '';
+  const recipientCount = Math.max(0, Number(message.recipientCount || 0));
+  if (!recipientCount) return '';
+  const readByCount = Math.max(0, Number(message.readByCount || 0));
+  const read = message.receiptStatus === 'read' || (recipientCount > 0 && readByCount >= recipientCount);
+  const label = read
+    ? `Leído${message.readAt ? ` · ${formatExportDateTime(message.readAt)}` : ''}`
+    : 'Enviado';
+  return `<span class="ce-msg__receipt${read ? ' is-read' : ''}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${read ? '✓✓' : '✓'}</span>`;
+}
+
+function renderMessageTime(message = {}, mine = false) {
+  const edited = message.editedAt && !isDeletedMessage(message) ? ' · editado' : '';
+  return `<span class="ce-msg__meta"><time>${formatMessageTime(message.createdAt)}${edited}</time>${renderMessageReceipt(message, mine)}</span>`;
+}
+
+function messageSenderLabel(senderUserId = '') {
+  if (senderUserId && senderUserId === state.user?.userId) return 'Tú';
+  const other = activeChat()?.other || {};
+  if (senderUserId && other.userId === senderUserId) return other.displayName || other.email || 'Contacto';
+  return 'Contacto';
+}
+
+function renderReplyPreview(message = {}) {
+  const reply = message.replyTo;
+  if (!reply?.messageId || !reply.text) return '';
+  return `<button class="ce-reply-preview" type="button" data-jump-message-id="${escapeHtml(reply.messageId)}" aria-label="Ver mensaje respondido"><strong>↩ ${escapeHtml(messageSenderLabel(reply.senderUserId))}</strong><span>${escapeHtml(compactText(reply.text))}</span></button>`;
+}
+
+function renderReplyDraft() {
+  if (!els.replyDraft) return;
+  const editing = state.editingMessage;
+  if (state.activeChatId && editing?.messageId) {
+    els.replyDraft.classList.remove('hidden');
+    els.replyDraft.innerHTML = `
+      <button class="ce-reply-draft__content ce-reply-draft__content--edit" type="button" data-edit-focus="1" aria-label="Editar mensaje seleccionado">
+        <strong>Editando mensaje</strong>
+        <span>${escapeHtml(compactText(editing.text || ''))}</span>
+      </button>
+      <button class="ce-reply-draft__close" type="button" data-cancel-edit="1" aria-label="Cancelar edición">×</button>`;
+    updateComposerControls();
+    return;
+  }
+  const reply = state.replyToMessage;
+  if (!state.activeChatId || !reply?.messageId) {
+    els.replyDraft.classList.add('hidden');
+    els.replyDraft.innerHTML = '';
+    updateComposerControls();
+    return;
+  }
+  els.replyDraft.classList.remove('hidden');
+  els.replyDraft.innerHTML = `
+    <button class="ce-reply-draft__content" type="button" data-jump-message-id="${escapeHtml(reply.messageId)}" aria-label="Ver mensaje que estás respondiendo">
+      <strong>Respondiendo a ${escapeHtml(messageSenderLabel(reply.senderUserId))}</strong>
+      <span>${escapeHtml(compactText(reply.text || ''))}</span>
+    </button>
+    <button class="ce-reply-draft__close" type="button" data-cancel-reply="1" aria-label="Cancelar respuesta">×</button>`;
+  updateComposerControls();
+}
+
+
+function normalizeSlashCommandName(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/^\/+/, '');
+}
+
+function parseSlashCommandText(text = '') {
+  const raw = String(text || '').trim();
+  if (!raw.startsWith('/')) return null;
+  const firstSpace = raw.search(/\s/);
+  const commandToken = firstSpace === -1 ? raw : raw.slice(0, firstSpace);
+  return {
+    raw,
+    token: commandToken,
+    name: normalizeSlashCommandName(commandToken),
+    args: firstSpace === -1 ? '' : raw.slice(firstSpace + 1).trim()
+  };
+}
+
+function parsePollSlashArgs(args = '') {
+  const parts = String(args || '').split('|').map((part) => part.trim()).filter(Boolean);
+  return { question: parts[0] || '', options: parts.slice(1, 7) };
+}
+
+function prefillPollModalFromSlash(args = '') {
+  const parsed = parsePollSlashArgs(args);
+  openPollModal();
+  if (els.pollQuestionInput && parsed.question) els.pollQuestionInput.value = parsed.question;
+  const inputs = Array.from(els.pollOptions?.querySelectorAll('input[data-poll-option-input]') || []);
+  inputs.forEach((input, index) => {
+    input.value = parsed.options[index] || '';
+  });
+  renderPollModal();
+}
+
+async function createPollFromSlashArgs(args = '') {
+  const parsed = parsePollSlashArgs(args);
+  if (!parsed.question || parsed.options.length < 2) {
+    prefillPollModalFromSlash(args);
+    showTemporaryDraftStatus('Comando de encuesta abierto. Completa pregunta y mínimo 2 opciones para publicar.', 5200);
+    return { clearComposer: false };
+  }
+  ensureChatInteractionAllowed();
+  const chatId = state.activeChatId;
+  const clientMessageId = `poll_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  state.pollCreating = true;
+  renderPollModal();
+  updateComposerControls();
+  try {
+    const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId });
+    clearDraftForChat(chatId);
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    renderAll();
+    showTemporaryDraftStatus('Encuesta publicada desde comando rápido.');
+    return { clearComposer: true };
+  } finally {
+    state.pollCreating = false;
+    renderPollModal();
+    updateComposerControls();
+  }
+}
+
+async function savePrivateNoteFromSlash(args = '') {
+  const text = String(args || '').trim();
+  if (!text) {
+    await openPrivateNotesModal();
+    showTemporaryDraftStatus('Escribe la nota después de /nota o guárdala desde el panel.', 4200);
+    return { clearComposer: false };
+  }
+  const data = await post('/api/chats/private-notes/save', { chatId: state.activeChatId, text });
+  state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes;
+  showTemporaryDraftStatus('Nota privada guardada desde comando rápido.');
+  return { clearComposer: true };
+}
+
+function getSlashCommandDefinitions() {
+  return [
+    {
+      id: 'help',
+      names: ['ayuda', 'help', 'comandos'],
+      title: '/ayuda',
+      description: 'Muestra comandos rápidos disponibles sin enviar un mensaje.',
+      template: '/ayuda',
+      enabled: Boolean(state.user),
+      run: async () => {
+        state.slashCommandsOpen = true;
+        renderSlashCommandsPanel({ force: true });
+        showTemporaryDraftStatus('Comandos rápidos abiertos. Elige uno o escribe /emoji, /encuesta, /silencio, /nota, /resumen, /fecha o /exportar.', 5600);
+        return { clearComposer: false, keepPanelOpen: true };
+      }
+    },
+    {
+      id: 'emoji',
+      names: ['emoji', 'emojis'],
+      title: '/emoji',
+      description: 'Abre el selector local de emojis para insertarlos en el compositor.',
+      template: '/emoji',
+      enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId && !isChatInteractionBlocked()),
+      run: async () => {
+        state.emojiPickerOpen = true;
+        renderEmojiPickerPanel();
+        showTemporaryDraftStatus('Selector de emojis abierto. Elige uno para insertarlo en tu mensaje.');
+        return { clearComposer: true, keepPanelOpen: false };
+      }
+    },
+    {
+      id: 'poll',
+      names: ['encuesta', 'poll'],
+      title: '/encuesta',
+      description: 'Publica una encuesta usando: /encuesta Pregunta | Opción 1 | Opción 2.',
+      template: '/encuesta ¿Qué opción prefieren? | Opción 1 | Opción 2',
+      enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId && !isChatInteractionBlocked()),
+      run: (args) => createPollFromSlashArgs(args)
+    },
+    {
+      id: 'silent',
+      names: ['silencio', 'silent'],
+      title: '/silencio',
+      description: 'Envía el texto sin notificación push al destinatario.',
+      template: '/silencio Te dejo esta actualización sin interrumpirte.',
+      enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId && !isChatInteractionBlocked()),
+      run: async (args) => {
+        const text = String(args || '').trim();
+        if (!text) throw new Error('Escribe el mensaje después de /silencio.');
+        await sendMessage(text, { silent: true, ephemeralSeconds: selectedEphemeralSeconds() });
+        await sendTyping(false);
+        return { clearComposer: true };
+      }
+    },
+    {
+      id: 'note',
+      names: ['nota', 'note'],
+      title: '/nota',
+      description: 'Guarda una nota privada del chat visible solo para tu cuenta.',
+      template: '/nota Pendiente importante de esta conversación.',
+      enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId),
+      run: (args) => savePrivateNoteFromSlash(args)
+    },
+    {
+      id: 'brief',
+      names: ['resumen', 'brief'],
+      title: '/resumen',
+      description: 'Abre el resumen local con pendientes, acuerdos y preguntas del chat.',
+      template: '/resumen',
+      enabled: Boolean(state.activeChatId),
+      run: async () => {
+        await openChatBrief();
+        return { clearComposer: true };
+      }
+    },
+    {
+      id: 'fecha',
+      names: ['fecha', 'calendario', 'timeline'],
+      title: '/fecha',
+      description: 'Abre el calendario local del chat para saltar a un día con mensajes.',
+      template: '/fecha',
+      enabled: Boolean(state.activeChatId),
+      run: async () => {
+        await openDateJump();
+        return { clearComposer: true };
+      }
+    },
+    {
+      id: 'export',
+      names: ['exportar', 'export'],
+      title: '/exportar',
+      description: 'Descarga la conversación actual en archivo de texto.',
+      template: '/exportar',
+      enabled: Boolean(state.activeChatId),
+      run: async () => {
+        await exportActiveChat();
+        return { clearComposer: true };
+      }
+    }
+  ];
+}
+
+function findSlashCommand(name = '') {
+  const cleanName = normalizeSlashCommandName(name);
+  return getSlashCommandDefinitions().find((command) => command.names.includes(cleanName));
+}
+
+function getVisibleSlashCommands({ force = false } = {}) {
+  const parsed = parseSlashCommandText(els.messageInput?.value || '');
+  if (!force && !parsed) return [];
+  const query = parsed ? normalizeSlashCommandName(parsed.name) : '';
+  const commands = getSlashCommandDefinitions();
+  if (!query || (force && ['ayuda', 'help', 'comandos'].includes(query))) return commands;
+  return commands.filter((command) => command.names.some((name) => name.includes(query)) || normalizeClientSearchText(`${command.title} ${command.description}`).includes(query));
+}
+
+function renderSlashCommandsPanel({ force = false } = {}) {
+  if (!els.slashCommandsPanel) return;
+  const hasChat = Boolean(state.activeChatId);
+  const blocked = isChatInteractionBlocked();
+  const shouldOpen = Boolean(force || state.slashCommandsOpen || String(els.messageInput?.value || '').trim().startsWith('/')) && !state.editingMessage?.messageId;
+  const commands = shouldOpen ? getVisibleSlashCommands({ force }) : [];
+  if (!shouldOpen || !commands.length || !hasChat) {
+    els.slashCommandsPanel.classList.add('hidden');
+    els.slashCommandsPanel.innerHTML = '';
+    return;
+  }
+  els.slashCommandsPanel.classList.remove('hidden');
+  const help = blocked
+    ? 'Este chat está bloqueado. Los comandos de escritura permanecen desactivados.'
+    : 'Pulsa un comando para insertarlo o escríbelo completo y presiona Enviar.';
+  els.slashCommandsPanel.innerHTML = `
+    <div class="ce-slash-panel__head"><strong>Comandos rápidos</strong><span>${escapeHtml(help)}</span></div>
+    <div class="ce-slash-panel__list">
+      ${commands.map((command) => `
+        <button class="ce-slash-command" type="button" data-slash-template="${escapeHtml(command.template)}" ${command.enabled ? '' : 'disabled'}>
+          <span><strong>${escapeHtml(command.title)}</strong><em>${escapeHtml(command.description)}</em></span>
+        </button>`).join('')}
+    </div>`;
+}
+
+function insertSlashCommandTemplate(template = '') {
+  if (!els.messageInput) return;
+  if (state.emojiPickerOpen) closeEmojiPicker();
+  els.messageInput.value = template;
+  state.slashCommandsOpen = true;
+  els.messageInput.focus();
+  try { els.messageInput.setSelectionRange(els.messageInput.value.length, els.messageInput.value.length); } catch {}
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  renderSlashCommandsPanel({ force: true });
+}
+
+async function handleSlashCommandSubmit(text = '') {
+  if (state.editingMessage?.messageId) return false;
+  const parsed = parseSlashCommandText(text);
+  if (!parsed) return false;
+  if (!state.activeChatId) return true;
+  const command = findSlashCommand(parsed.name);
+  if (!command) {
+    state.slashCommandsOpen = true;
+    renderSlashCommandsPanel({ force: true });
+    showTemporaryDraftStatus('Comando no reconocido. Usa /ayuda para ver opciones disponibles.', 4200);
+    return true;
+  }
+  if (!command.enabled) {
+    showTemporaryDraftStatus(isChatInteractionBlocked() ? chatBlockNoticeText() : 'Este comando no está disponible en el estado actual del chat.', 4200);
+    return true;
+  }
+  const result = await command.run(parsed.args || '');
+  state.slashCommandsOpen = Boolean(result?.keepPanelOpen);
+  renderSlashCommandsPanel({ force: state.slashCommandsOpen });
+  return { handled: true, clearComposer: result?.clearComposer !== false };
+}
+
+function updateComposerControls() {
+  if (!els.messageInput || !els.btnSend) return;
+  const hasChat = Boolean(state.activeChatId);
+  const blocked = isChatInteractionBlocked();
+  els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje, /ayuda o 😊');
+  els.btnSend.textContent = state.editingMessage?.messageId ? 'Guardar' : 'Enviar';
+  els.btnSend.disabled = !hasChat || blocked;
+  if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked;
+  if (els.btnEmojiPicker) {
+    const emojiDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
+    els.btnEmojiPicker.disabled = emojiDisabled;
+    els.btnEmojiPicker.setAttribute('title', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
+    els.btnEmojiPicker.setAttribute('aria-label', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
+  }
+  if (els.btnSmartReplySuggestions) {
+    const smartReplyCount = buildSmartReplySuggestions().length;
+    els.btnSmartReplySuggestions.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || !smartReplyCount;
+    const label = smartReplyCount ? `Sugerir ${smartReplyCount} respuestas inteligentes locales` : 'Sugerencias inteligentes no disponibles todavía';
+    els.btnSmartReplySuggestions.setAttribute('title', label);
+    els.btnSmartReplySuggestions.setAttribute('aria-label', label);
+  }
+  const hasText = Boolean(String(els.messageInput?.value || '').trim());
+  if (els.btnScheduleMessage) {
+    els.btnScheduleMessage.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId) || state.schedulingMessage;
+  }
+  if (els.btnCreatePoll) {
+    els.btnCreatePoll.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.pollCreating;
+  }
+  renderVoiceDictationControl();
+  if (els.btnSilentSend) {
+    els.btnSilentSend.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId);
+  }
+  if (els.messageTtlSelect) {
+    els.messageTtlSelect.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
+    els.messageTtlSelect.setAttribute('aria-label', `Expiración del mensaje: ${formatEphemeralOption(selectedEphemeralSeconds())}`);
+  }
+  if (!hasChat) {
+    state.quickRepliesOpen = false;
+    state.slashCommandsOpen = false;
+    state.emojiPickerOpen = false;
+    renderQuickRepliesPanel();
+  }
+  renderEmojiPickerPanel();
+  renderSlashCommandsPanel();
+}
+
+
+function readRecentEmojis() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(emojiPickerStorageKey) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((emoji) => typeof emoji === 'string' && emoji.trim()).slice(0, emojiPickerMaxRecent) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentEmojis(emojis = []) {
+  const clean = [...new Set((Array.isArray(emojis) ? emojis : []).map((emoji) => String(emoji || '').trim()).filter(Boolean))].slice(0, emojiPickerMaxRecent);
+  try { localStorage.setItem(emojiPickerStorageKey, JSON.stringify(clean)); } catch {}
+  return clean;
+}
+
+function recordRecentEmoji(emoji = '') {
+  const clean = String(emoji || '').trim();
+  if (!clean) return [];
+  return writeRecentEmojis([clean, ...readRecentEmojis().filter((item) => item !== clean)]);
+}
+
+function getEmojiPickerCategories() {
+  const recents = readRecentEmojis();
+  return emojiPickerCategories.map((category) => category.id === 'recientes'
+    ? { ...category, emojis: recents.length ? recents : ['👍', '❤️', '😂', '🙏', '🔥', '✅'] }
+    : category);
+}
+
+function normalizeEmojiCategory(categoryId = '') {
+  const clean = String(categoryId || '').trim();
+  const categories = getEmojiPickerCategories();
+  return categories.some((category) => category.id === clean) ? clean : 'recientes';
+}
+
+function renderEmojiPickerPanel() {
+  if (!els.emojiPickerPanel) return;
+  const hasChat = Boolean(state.activeChatId);
+  const blocked = isChatInteractionBlocked();
+  const canUse = hasChat && !blocked && !state.editingMessage?.messageId;
+  els.btnEmojiPicker?.classList.toggle('active', Boolean(state.emojiPickerOpen && canUse));
+  els.btnEmojiPicker?.setAttribute('aria-expanded', state.emojiPickerOpen && canUse ? 'true' : 'false');
+  if (!state.emojiPickerOpen || !canUse) {
+    els.emojiPickerPanel.classList.add('hidden');
+    els.emojiPickerPanel.innerHTML = '';
+    return;
+  }
+  const categories = getEmojiPickerCategories();
+  const activeCategoryId = normalizeEmojiCategory(state.emojiPickerCategory);
+  state.emojiPickerCategory = activeCategoryId;
+  const activeCategory = categories.find((category) => category.id === activeCategoryId) || categories[0];
+  els.emojiPickerPanel.classList.remove('hidden');
+  els.emojiPickerPanel.innerHTML = `
+    <div class="ce-emoji-panel__head">
+      <div><strong>Emojis rápidos</strong><span>Inserta expresiones sin salir del chat.</span></div>
+      <button class="ce-link" type="button" data-close-emoji-picker="1">Cerrar</button>
+    </div>
+    <div class="ce-emoji-tabs" role="tablist" aria-label="Categorías de emojis">
+      ${categories.map((category) => `<button class="ce-emoji-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-emoji-category="${escapeHtml(category.id)}"><span>${escapeHtml(category.icon)}</span>${escapeHtml(category.title)}</button>`).join('')}
+    </div>
+    <div class="ce-emoji-grid" role="list" aria-label="${escapeHtml(activeCategory.title)}">
+      ${activeCategory.emojis.map((emoji) => `<button class="ce-emoji-item" type="button" role="listitem" data-insert-emoji="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`).join('')}
+    </div>`;
+}
+
+function closeEmojiPicker() {
+  state.emojiPickerOpen = false;
+  renderEmojiPickerPanel();
+}
+
+function toggleEmojiPicker() {
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  if (!state.activeChatId || state.editingMessage?.messageId) return;
+  state.emojiPickerOpen = !state.emojiPickerOpen;
+  if (state.emojiPickerOpen) {
+    state.quickRepliesOpen = false;
+    state.slashCommandsOpen = false;
+    renderQuickRepliesPanel();
+    renderSlashCommandsPanel();
+  }
+  renderEmojiPickerPanel();
+}
+
+function insertEmojiIntoComposer(emoji = '') {
+  const clean = String(emoji || '').trim();
+  if (!clean || !els.messageInput) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  const current = String(els.messageInput.value || '');
+  const start = Number.isFinite(els.messageInput.selectionStart) ? els.messageInput.selectionStart : current.length;
+  const end = Number.isFinite(els.messageInput.selectionEnd) ? els.messageInput.selectionEnd : start;
+  const before = current.slice(0, start);
+  const after = current.slice(end);
+  const needsSpaceBefore = before && !/\s$/.test(before);
+  const needsSpaceAfter = after && !/^\s/.test(after);
+  const insertion = `${needsSpaceBefore ? ' ' : ''}${clean}${needsSpaceAfter ? ' ' : ''}`;
+  els.messageInput.value = `${before}${insertion}${after}`.trimStart();
+  const nextCursor = Math.max(0, before.length + insertion.length);
+  els.messageInput.focus();
+  try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+  recordRecentEmoji(clean);
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  if (state.scheduleModalOpen) renderScheduleModal();
+  if (state.quickRepliesOpen) renderQuickRepliesPanel();
+  sendTyping(true);
+  renderEmojiPickerPanel();
+}
+
+function getSpeechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function isVoiceDictationSupported() {
+  return Boolean(getSpeechRecognitionConstructor());
+}
+
+function voiceDictationLabel() {
+  if (!isVoiceDictationSupported()) return 'Dictado por voz no disponible en este navegador';
+  if (state.voiceDictating) return 'Detener dictado por voz';
+  return 'Dictar mensaje por voz';
+}
+
+function renderVoiceDictationControl() {
+  if (!els.btnVoiceDictation) return;
+  const supported = isVoiceDictationSupported();
+  const blocked = isChatInteractionBlocked();
+  const disabled = !supported || !state.activeChatId || Boolean(state.editingMessage?.messageId) || blocked;
+  const label = blocked ? 'Dictado por voz no disponible con contacto bloqueado' : voiceDictationLabel();
+  els.btnVoiceDictation.disabled = disabled;
+  els.btnVoiceDictation.classList.toggle('active', Boolean(state.voiceDictating));
+  els.btnVoiceDictation.setAttribute('aria-pressed', state.voiceDictating ? 'true' : 'false');
+  els.btnVoiceDictation.setAttribute('title', label);
+  els.btnVoiceDictation.setAttribute('aria-label', label);
+}
+
+function appendVoiceDictationText(text = '') {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean || !els.messageInput) return;
+  const current = String(els.messageInput.value || '');
+  const needsSpace = current && !/\s$/.test(current);
+  els.messageInput.value = `${current}${needsSpace ? ' ' : ''}${clean}`.trimStart();
+  els.messageInput.focus();
+  try { els.messageInput.setSelectionRange(els.messageInput.value.length, els.messageInput.value.length); } catch {}
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  if (state.scheduleModalOpen) renderScheduleModal();
+  if (state.quickRepliesOpen) renderQuickRepliesPanel();
+  sendTyping(true);
+}
+
+function stopVoiceDictation({ announce = true } = {}) {
+  state.voiceStopRequested = true;
+  if (state.voiceRecognition) {
+    try { state.voiceRecognition.stop(); } catch {}
+  }
+  state.voiceRecognition = null;
+  state.voiceDictating = false;
+  renderVoiceDictationControl();
+  if (announce) showTemporaryDraftStatus('Dictado por voz detenido.');
+}
+
+function startVoiceDictation() {
+  if (!state.activeChatId) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  if (state.editingMessage?.messageId) {
+    showTemporaryDraftStatus('Termina o cancela la edición antes de dictar un mensaje.', 3600);
+    return;
+  }
+  const Recognition = getSpeechRecognitionConstructor();
+  if (!Recognition) {
+    showTemporaryDraftStatus('Este navegador no permite dictado por voz desde la web. Puedes escribir el mensaje manualmente.', 5200);
+    renderVoiceDictationControl();
+    return;
+  }
+  stopVoiceDictation({ announce: false });
+  const recognition = new Recognition();
+  state.voiceRecognition = recognition;
+  state.voiceDictating = true;
+  state.voiceStopRequested = false;
+  recognition.lang = /^es/i.test(navigator.language || '') ? navigator.language : 'es-CO';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (event) => {
+    let finalText = '';
+    let interimText = '';
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index];
+      const transcript = String(result?.[0]?.transcript || '').trim();
+      if (!transcript) continue;
+      if (result.isFinal) finalText += `${transcript} `;
+      else interimText += `${transcript} `;
+    }
+    if (finalText.trim()) appendVoiceDictationText(finalText);
+    if (interimText.trim()) showTemporaryDraftStatus(`Escuchando: ${compactText(interimText, 90)}`, 1600);
+  };
+  recognition.onerror = (event) => {
+    const code = String(event?.error || '').trim();
+    const messages = {
+      'not-allowed': 'Permiso de micrófono denegado. Actívalo en el navegador para dictar mensajes.',
+      'service-not-allowed': 'El navegador bloqueó el servicio de dictado por voz.',
+      'no-speech': 'No detecté voz. Pulsa el micrófono para intentar de nuevo.',
+      'audio-capture': 'No encontré un micrófono disponible para dictar.'
+    };
+    state.voiceStopRequested = true;
+    state.voiceDictating = false;
+    state.voiceRecognition = null;
+    renderVoiceDictationControl();
+    showTemporaryDraftStatus(messages[code] || 'No se pudo continuar el dictado por voz.', 5200);
+  };
+  recognition.onend = () => {
+    const requested = state.voiceStopRequested;
+    state.voiceRecognition = null;
+    state.voiceDictating = false;
+    state.voiceStopRequested = false;
+    renderVoiceDictationControl();
+    if (!requested) showTemporaryDraftStatus('Dictado por voz finalizado. Puedes tocar el micrófono para continuar.', 3600);
+  };
+  try {
+    recognition.start();
+    renderVoiceDictationControl();
+    showTemporaryDraftStatus('Dictado por voz activo. Habla y el texto aparecerá en el compositor.', 4200);
+  } catch {
+    state.voiceRecognition = null;
+    state.voiceDictating = false;
+    renderVoiceDictationControl();
+    showTemporaryDraftStatus('No se pudo iniciar el dictado por voz en este momento.', 4200);
+  }
+}
+
+function toggleVoiceDictation() {
+  if (state.voiceDictating) stopVoiceDictation();
+  else {
+    try { ensureChatInteractionAllowed(); } catch { return; }
+    startVoiceDictation();
+  }
+}
+
+function closeQuickRepliesPanel() {
+  state.quickRepliesOpen = false;
+  renderQuickRepliesPanel();
+}
+
+function getSmartReplySourceMessage() {
+  const list = (state.messagesByChat.get(state.activeChatId) || [])
+    .filter((message) => !isDeletedMessage(message) && String(message.text || '').trim());
+  if (!list.length) return null;
+  return [...list].reverse().find((message) => message.senderUserId !== state.user?.userId) || list[list.length - 1] || null;
+}
+
+function uniqueSmartReplies(items = []) {
+  const used = new Set();
+  const replies = [];
+  for (const item of items) {
+    const clean = compactText(String(item || '').replace(/\s+/g, ' ').trim(), 160);
+    if (!clean || clean.length < 2) continue;
+    const key = normalizeClientSearchText(clean).replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!key || used.has(key)) continue;
+    used.add(key);
+    replies.push(clean);
+    if (replies.length >= smartReplySuggestionLimit) break;
+  }
+  return replies;
+}
+
+function buildSmartReplySuggestions() {
+  if (!state.activeChatId || state.editingMessage?.messageId) return [];
+  const source = getSmartReplySourceMessage();
+  if (!source?.text) return [];
+  const normalized = normalizeClientSearchText(source.text || '').replace(/[\u0300-\u036f]/g, '');
+  const suggestions = [];
+  const add = (...items) => suggestions.push(...items);
+
+  if (/\b(gracias|agradezco|mil gracias|thanks|thank you)\b/.test(normalized)) {
+    add('Con gusto. Quedo atento.', 'Gracias a ti.', 'Perfecto, seguimos atentos.');
+  }
+  if (/\b(hora|horario|reunion|reunir|agenda|agendar|cita|mañana|manana|tarde|noche|hoy|fecha|cuando)\b/.test(normalized)) {
+    add('Sí, me funciona ese horario.', 'Déjame revisar agenda y te confirmo.', '¿Qué hora te queda mejor?');
+  }
+  if (/\b(cotizacion|cotizar|precio|costo|valor|propuesta|presupuesto|pago|factura|cliente)\b/.test(normalized)) {
+    add('Déjame validar el alcance y te confirmo.', 'Te envío la propuesta revisada.', 'Perfecto, reviso los detalles comerciales.');
+  }
+  if (/\b(urgente|prioridad|rapido|rápido|importante|hoy|ya|inmediato)\b/.test(normalized)) {
+    add('Lo reviso con prioridad.', 'Dame un momento y te respondo.', 'Entendido, lo atiendo primero.');
+  }
+  if (/\?/.test(source.text || '') || /\b(que|qué|cual|cuál|puedes|podemos|confirmas|revisas|tienes|hay|como|cómo|cuando|cuándo|donde|dónde)\b/.test(normalized)) {
+    add('Sí, claro.', 'Lo reviso y te confirmo.', '¿Me compartes un poco más de detalle?');
+  }
+  if (/\b(listo|ok|okay|vale|perfecto|confirmado|aprobado|de acuerdo)\b/.test(normalized)) {
+    add('Perfecto, avanzamos así.', 'Confirmado, muchas gracias.', 'Listo, quedo atento.');
+  }
+  if (/\b(enviar|mandar|revisar|aprobar|pendiente|tarea|seguimiento|recordar)\b/.test(normalized)) {
+    add('Lo dejo en seguimiento.', 'Lo reviso y te aviso.', 'Gracias, lo tengo presente.');
+  }
+
+  add('Gracias, lo reviso y te confirmo.', 'De acuerdo.', 'Perfecto, quedo atento.', '¿Me compartes más contexto?');
+  return uniqueSmartReplies(suggestions);
+}
+
+function insertSmartReplyText(text = '') {
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  const clean = String(text || '').trim();
+  if (!clean || !els.messageInput) return;
+  const current = els.messageInput.value.trim();
+  els.messageInput.value = current ? `${current} ${clean}` : clean;
+  els.messageInput.focus();
+  try { els.messageInput.setSelectionRange(els.messageInput.value.length, els.messageInput.value.length); } catch {}
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  if (state.scheduleModalOpen) renderScheduleModal();
+  closeQuickRepliesPanel();
+  showTemporaryDraftStatus('Sugerencia insertada. Puedes editarla antes de enviar.');
+}
+
+function insertSmartReplyByIndex(index = 0) {
+  const suggestions = buildSmartReplySuggestions();
+  const target = suggestions[Math.max(0, Number(index || 0))];
+  insertSmartReplyText(target || '');
+}
+
+function openSmartReplySuggestions() {
+  if (state.emojiPickerOpen) closeEmojiPicker();
+  if (!state.activeChatId) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  if (state.editingMessage?.messageId) {
+    showTemporaryDraftStatus('Termina o cancela la edición antes de insertar una sugerencia.', 3600);
+    return;
+  }
+  const suggestions = buildSmartReplySuggestions();
+  if (!suggestions.length) {
+    showTemporaryDraftStatus('Todavía no hay suficientes mensajes para sugerir una respuesta.', 3600);
+    return;
+  }
+  state.quickRepliesOpen = true;
+  renderQuickRepliesPanel();
+}
+
+function renderQuickRepliesPanel() {
+  if (!els.quickRepliesPanel) return;
+  els.btnQuickReplies?.classList.toggle('active', Boolean(state.quickRepliesOpen));
+  els.btnSmartReplySuggestions?.classList.toggle('active', Boolean(state.quickRepliesOpen && buildSmartReplySuggestions().length));
+  if (!state.quickRepliesOpen || !state.activeChatId) {
+    els.quickRepliesPanel.classList.add('hidden');
+    els.quickRepliesPanel.innerHTML = '';
+    return;
+  }
+  els.quickRepliesPanel.classList.remove('hidden');
+  const composerText = String(els.messageInput?.value || '').trim();
+  if (state.quickRepliesLoading) {
+    els.quickRepliesPanel.innerHTML = '<div class="ce-quick-replies__empty">Cargando respuestas rápidas...</div>';
+    return;
+  }
+  const replies = Array.isArray(state.quickReplies) ? state.quickReplies : [];
+  const smartSuggestions = buildSmartReplySuggestions();
+  const smartHtml = smartSuggestions.length ? `
+    <div class="ce-smart-replies" aria-label="Sugerencias inteligentes locales">
+      <div class="ce-smart-replies__title"><strong>✨ Sugerencias inteligentes</strong><span>Generadas en este dispositivo desde el último mensaje relevante.</span></div>
+      <div class="ce-smart-replies__list">${smartSuggestions.map((suggestion, index) => `<button class="ce-smart-reply" type="button" data-smart-reply-index="${index}">${escapeHtml(suggestion)}</button>`).join('')}</div>
+    </div>` : '';
+  const saveDisabled = composerText ? '' : ' disabled';
+  const items = replies.length ? replies.map((reply) => `
+    <div class="ce-quick-reply" data-quick-reply-row="${escapeHtml(reply.replyId || '')}">
+      <button class="ce-quick-reply__insert" type="button" data-quick-reply-insert="${escapeHtml(reply.replyId || '')}" aria-label="Insertar respuesta rápida">
+        <strong>${escapeHtml(reply.title || 'Respuesta rápida')}</strong>
+        <span>${escapeHtml(compactText(reply.text || '', 150))}</span>
+      </button>
+      <button class="ce-quick-reply__delete" type="button" data-quick-reply-delete="${escapeHtml(reply.replyId || '')}" title="Eliminar respuesta rápida" aria-label="Eliminar respuesta rápida">×</button>
+    </div>`).join('') : '<div class="ce-quick-replies__empty">Guarda frases frecuentes para responder más rápido en cualquier dispositivo.</div>';
+  els.quickRepliesPanel.innerHTML = `
+    <div class="ce-quick-replies__head">
+      <div><strong>Respuestas rápidas</strong><span>Personales y sincronizadas para tu cuenta</span></div>
+      <button class="ce-link" type="button" data-quick-replies-refresh="1">Actualizar</button>
+    </div>
+    <div class="ce-quick-replies__actions">
+      <button class="ce-btn ce-btn--small" type="button" data-quick-reply-save-current="1"${saveDisabled}>Guardar texto actual</button>
+      <span>${replies.length}/${40} guardadas</span>
+    </div>
+    ${smartHtml}
+    <div class="ce-quick-replies__list">${items}</div>`;
+}
+
+async function loadQuickReplies({ force = false } = {}) {
+  if (!state.user) return;
+  if (state.quickRepliesLoading) return;
+  if (state.quickRepliesLoaded && !force) {
+    renderQuickRepliesPanel();
+    return;
+  }
+  state.quickRepliesLoading = true;
+  renderQuickRepliesPanel();
+  try {
+    const data = await post('/api/quick-replies/list', {});
+    state.quickReplies = Array.isArray(data.quickReplies) ? data.quickReplies : [];
+    state.quickRepliesLoaded = true;
+  } finally {
+    state.quickRepliesLoading = false;
+    renderQuickRepliesPanel();
+  }
+}
+
+function insertQuickReplyText(replyId = '') {
+  const reply = state.quickReplies.find((item) => item.replyId === replyId);
+  if (!reply?.text || !els.messageInput) return;
+  const current = els.messageInput.value.trim();
+  els.messageInput.value = current ? `${current} ${reply.text}` : reply.text;
+  els.messageInput.focus();
+  try { els.messageInput.setSelectionRange(els.messageInput.value.length, els.messageInput.value.length); } catch {}
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  closeQuickRepliesPanel();
+}
+
+async function saveCurrentTextAsQuickReply() {
+  const text = String(els.messageInput?.value || '').trim();
+  if (!text) {
+    showTemporaryDraftStatus('Escribe una frase antes de guardarla como respuesta rápida.');
+    return;
+  }
+  const data = await post('/api/quick-replies/save', { text });
+  state.quickReplies = Array.isArray(data.quickReplies) ? data.quickReplies : [];
+  state.quickRepliesLoaded = true;
+  showTemporaryDraftStatus('Respuesta rápida guardada para tu cuenta.');
+  renderQuickRepliesPanel();
+}
+
+async function deleteQuickReply(replyId = '') {
+  if (!replyId) return;
+  const ok = window.confirm('¿Eliminar esta respuesta rápida?');
+  if (!ok) return;
+  const data = await post('/api/quick-replies/delete', { replyId });
+  state.quickReplies = Array.isArray(data.quickReplies) ? data.quickReplies : state.quickReplies.filter((item) => item.replyId !== replyId);
+  state.quickRepliesLoaded = true;
+  showTemporaryDraftStatus('Respuesta rápida eliminada.');
+  renderQuickRepliesPanel();
+}
+
+function privateNoteCounter() {
+  return `${Array.isArray(state.privateNotes) ? state.privateNotes.length : 0}/80 notas`;
+}
+
+function resetPrivateNoteEditor() {
+  state.privateNoteEditingId = '';
+  if (els.privateNotesTextarea) els.privateNotesTextarea.value = '';
+  if (els.btnSavePrivateNote) els.btnSavePrivateNote.textContent = 'Guardar nota';
+  els.btnCancelPrivateNoteEdit?.classList.add('hidden');
+}
+
+function closePrivateNotesModal() {
+  state.privateNotesOpen = false;
+  resetPrivateNoteEditor();
+  renderPrivateNotesModal();
+}
+
+function renderPrivateNotesModal() {
+  if (!els.privateNotesModal || !els.privateNotesList) return;
+  els.privateNotesModal.classList.toggle('hidden', !state.privateNotesOpen);
+  if (!state.privateNotesOpen) return;
+  const chat = activeChat();
+  const title = chat ? chatDisplayName(chat) : 'Chat';
+  if (els.privateNotesTitle) els.privateNotesTitle.textContent = 'Notas privadas del chat';
+  if (els.privateNotesChatName) els.privateNotesChatName.textContent = `${title} · visibles solo para ti · ${privateNoteCounter()}`;
+  if (els.btnSavePrivateNote) {
+    els.btnSavePrivateNote.disabled = Boolean(state.privateNoteSaving || state.privateNotesLoading || !state.activeChatId);
+    els.btnSavePrivateNote.textContent = state.privateNoteEditingId ? 'Actualizar nota' : 'Guardar nota';
+  }
+  if (els.btnCancelPrivateNoteEdit) els.btnCancelPrivateNoteEdit.classList.toggle('hidden', !state.privateNoteEditingId);
+  if (state.privateNotesLoading) {
+    els.privateNotesList.innerHTML = '<div class="ce-private-notes-empty">Cargando notas privadas...</div>';
+    return;
+  }
+  const notes = Array.isArray(state.privateNotes) ? state.privateNotes : [];
+  if (!notes.length) {
+    els.privateNotesList.innerHTML = '<div class="ce-private-notes-empty">Agrega recordatorios, contexto del cliente, pendientes o datos importantes de esta conversación. Nadie más los verá.</div>';
+    return;
+  }
+  els.privateNotesList.innerHTML = notes.map((note) => `
+    <article class="ce-private-note" data-private-note-id="${escapeHtml(note.noteId || '')}">
+      <div class="ce-private-note__body">${escapeHtml(note.text || '').replace(/\n/g, '<br>')}</div>
+      <div class="ce-private-note__meta">
+        <span>${escapeHtml(formatPrivateNoteDateTime(note.updatedAt || note.createdAt))}</span>
+        <div>
+          <button class="ce-link" type="button" data-edit-private-note="${escapeHtml(note.noteId || '')}">Editar</button>
+          <button class="ce-link ce-link--danger" type="button" data-delete-private-note="${escapeHtml(note.noteId || '')}">Eliminar</button>
+        </div>
+      </div>
+    </article>`).join('');
+}
+
+async function loadPrivateNotes({ force = false } = {}) {
+  if (!state.activeChatId || state.privateNotesLoading) return;
+  if (state.privateNotes.length && !force) {
+    renderPrivateNotesModal();
+    return;
+  }
+  state.privateNotesLoading = true;
+  renderPrivateNotesModal();
+  try {
+    const data = await post('/api/chats/private-notes/list', { chatId: state.activeChatId });
+    state.privateNotes = Array.isArray(data.notes) ? data.notes : [];
+  } finally {
+    state.privateNotesLoading = false;
+    renderPrivateNotesModal();
+  }
+}
+
+async function openPrivateNotesModal() {
+  if (!state.activeChatId) return;
+  state.privateNotesOpen = true;
+  state.privateNotes = [];
+  resetPrivateNoteEditor();
+  renderPrivateNotesModal();
+  await loadPrivateNotes({ force: true });
+  window.setTimeout(() => els.privateNotesTextarea?.focus(), 0);
+}
+
+function startEditPrivateNote(noteId = '') {
+  const note = state.privateNotes.find((item) => item.noteId === noteId);
+  if (!note) return;
+  state.privateNoteEditingId = note.noteId;
+  if (els.privateNotesTextarea) {
+    els.privateNotesTextarea.value = note.text || '';
+    els.privateNotesTextarea.focus();
+    try { els.privateNotesTextarea.setSelectionRange(els.privateNotesTextarea.value.length, els.privateNotesTextarea.value.length); } catch {}
+  }
+  renderPrivateNotesModal();
+}
+
+async function savePrivateNoteFromModal() {
+  const text = String(els.privateNotesTextarea?.value || '').trim();
+  if (!state.activeChatId || !text) {
+    showTemporaryDraftStatus('Escribe una nota privada antes de guardarla.');
+    return;
+  }
+  const wasEditing = Boolean(state.privateNoteEditingId);
+  state.privateNoteSaving = true;
+  renderPrivateNotesModal();
+  try {
+    const data = await post('/api/chats/private-notes/save', {
+      chatId: state.activeChatId,
+      noteId: state.privateNoteEditingId || '',
+      text
+    });
+    state.privateNotes = Array.isArray(data.notes) ? data.notes : [];
+    resetPrivateNoteEditor();
+    showTemporaryDraftStatus(wasEditing ? 'Nota privada actualizada.' : 'Nota privada guardada para este chat.');
+  } finally {
+    state.privateNoteSaving = false;
+    renderPrivateNotesModal();
+  }
+}
+
+async function deletePrivateNote(noteId = '') {
+  if (!noteId || !state.activeChatId) return;
+  const ok = window.confirm('¿Eliminar esta nota privada? Solo se elimina de tu cuenta.');
+  if (!ok) return;
+  const data = await post('/api/chats/private-notes/delete', { chatId: state.activeChatId, noteId });
+  state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes.filter((item) => item.noteId !== noteId);
+  if (state.privateNoteEditingId === noteId) resetPrivateNoteEditor();
+  showTemporaryDraftStatus('Nota privada eliminada.');
+  renderPrivateNotesModal();
+}
+
+
+function reminderCounter() {
+  const active = (Array.isArray(state.reminders) ? state.reminders : []).filter((item) => item.status === 'scheduled' || item.status === 'due');
+  return `${active.length}/120 recordatorios`;
+}
+
+function normalizeReminderInputValue() {
+  const raw = String(els.reminderDateTime?.value || '').trim();
+  if (!raw) return '';
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function defaultReminderText(message = null) {
+  if (message?.text) return compactText(message.text, 260);
+  const chat = activeChat();
+  return chat ? `Revisar chat con ${chatDisplayName(chat)}` : 'Revisar este chat';
+}
+
+function setDefaultReminderDateTime() {
+  if (!els.reminderDateTime) return;
+  const minDate = new Date(Date.now() + 60 * 1000);
+  const defaultDate = new Date(Date.now() + 60 * 60 * 1000);
+  els.reminderDateTime.min = toDateTimeLocalValue(minDate);
+  if (!els.reminderDateTime.value) els.reminderDateTime.value = toDateTimeLocalValue(defaultDate);
+}
+
+function closeReminderModal() {
+  state.remindersOpen = false;
+  state.reminderMessage = null;
+  state.reminderDraftText = '';
+  renderReminderModal();
+}
+
+function renderReminderModal() {
+  if (!els.reminderModal || !els.reminderList) return;
+  els.reminderModal.classList.toggle('hidden', !state.remindersOpen);
+  if (!state.remindersOpen) return;
+  const chat = activeChat();
+  const title = chat ? chatDisplayName(chat) : 'Chat';
+  if (els.reminderTitle) els.reminderTitle.textContent = 'Recordatorios privados';
+  if (els.reminderChatName) els.reminderChatName.textContent = `${title} · visibles solo para ti · ${reminderCounter()}`;
+  const selected = state.reminderMessage;
+  if (els.reminderPreview) {
+    els.reminderPreview.innerHTML = selected?.messageId
+      ? `<strong>Recordar mensaje</strong><span>${escapeHtml(compactText(selected.text || '', 280))}</span>`
+      : '<strong>Recordar este chat</strong><span>Crea un aviso personal para volver a esta conversación cuando lo necesites.</span>';
+  }
+  if (els.btnSaveReminder) els.btnSaveReminder.disabled = Boolean(state.reminderSaving || state.remindersLoading || !state.activeChatId || !normalizeReminderInputValue());
+  if (state.remindersLoading) {
+    els.reminderList.innerHTML = '<div class="ce-reminders-empty">Cargando recordatorios...</div>';
+    return;
+  }
+  const reminders = (Array.isArray(state.reminders) ? state.reminders : []).filter((item) => item.status === 'scheduled' || item.status === 'due');
+  if (!reminders.length) {
+    els.reminderList.innerHTML = '<div class="ce-reminders-empty">No tienes recordatorios activos en este chat.</div>';
+    return;
+  }
+  els.reminderList.innerHTML = reminders.map((item) => {
+    const due = item.status === 'due';
+    const jump = item.messageId ? `<button class="ce-link" type="button" data-jump-reminder-message-id="${escapeHtml(item.messageId || '')}">Ir al mensaje</button>` : '';
+    return `<article class="ce-reminder${due ? ' is-due' : ''}" data-reminder-id="${escapeHtml(item.reminderId || '')}">
+      <div class="ce-reminder__body"><strong>${escapeHtml(compactText(item.text || '', 180))}</strong><em>${due ? 'Pendiente ahora' : `Aviso ${escapeHtml(formatReminderDateTime(item.remindFor))}`}</em></div>
+      <div class="ce-reminder__actions">${jump}<button class="ce-link" type="button" data-complete-reminder-id="${escapeHtml(item.reminderId || '')}">${due ? 'Completar' : 'Quitar'}</button></div>
+    </article>`;
+  }).join('');
+}
+
+async function loadReminders({ force = false } = {}) {
+  if (!state.activeChatId || state.remindersLoading) return;
+  if (!force && state.reminders.some((item) => item.chatId === state.activeChatId)) {
+    renderReminderModal();
+    return;
+  }
+  state.remindersLoading = true;
+  renderReminderModal();
+  try {
+    const data = await post('/api/chats/reminders/list', { chatId: state.activeChatId, limit: 80 });
+    state.reminders = Array.isArray(data.reminders) ? data.reminders : [];
+  } finally {
+    state.remindersLoading = false;
+    renderReminderModal();
+  }
+}
+
+async function openReminderModal(messageId = '') {
+  if (!state.activeChatId) return;
+  state.remindersOpen = true;
+  state.reminderMessage = messageId ? findActiveMessage(messageId) : null;
+  state.reminderDraftText = defaultReminderText(state.reminderMessage);
+  if (els.reminderText) els.reminderText.value = state.reminderDraftText;
+  setDefaultReminderDateTime();
+  renderReminderModal();
+  await loadReminders({ force: true });
+  window.setTimeout(() => els.reminderDateTime?.focus(), 0);
+}
+
+async function openReminderFromChatBrief(messageId = '') {
+  if (!state.activeChatId) return;
+  const message = findActiveMessage(messageId);
+  if (!message?.messageId) throw new Error('No se pudo identificar el pendiente dentro del chat.');
+  closeChatBrief();
+  state.remindersOpen = true;
+  state.reminderMessage = message;
+  state.reminderDraftText = `Dar seguimiento: ${compactText(message.text || message.briefText || '', 240)}`;
+  if (els.reminderText) els.reminderText.value = state.reminderDraftText;
+  if (els.reminderDateTime) els.reminderDateTime.value = '';
+  setDefaultReminderDateTime();
+  renderReminderModal();
+  await loadReminders({ force: true });
+  showTemporaryDraftStatus('Pendiente listo para guardar como recordatorio privado.');
+  window.setTimeout(() => els.reminderDateTime?.focus(), 0);
+}
+
+async function saveReminderFromModal() {
+  if (!state.activeChatId || state.reminderSaving) return;
+  const remindAt = normalizeReminderInputValue();
+  if (!remindAt) throw new Error('Selecciona una fecha y hora válida.');
+  const text = String(els.reminderText?.value || state.reminderDraftText || '').trim() || defaultReminderText(state.reminderMessage);
+  state.reminderSaving = true;
+  renderReminderModal();
+  try {
+    const data = await post('/api/chats/reminders/create', {
+      chatId: state.activeChatId,
+      messageId: state.reminderMessage?.messageId || '',
+      text,
+      remindAt
+    });
+    state.reminders = [data.reminder, ...state.reminders.filter((item) => item.reminderId !== data.reminder?.reminderId)].filter(Boolean);
+    state.reminders.sort((a, b) => (Date.parse(a.remindFor || '') || 0) - (Date.parse(b.remindFor || '') || 0));
+    showTemporaryDraftStatus(`Recordatorio creado para ${formatReminderDateTime(data.reminder?.remindFor)}.`);
+    state.reminderMessage = null;
+    state.reminderDraftText = defaultReminderText(null);
+    if (els.reminderText) els.reminderText.value = state.reminderDraftText;
+    if (els.reminderDateTime) els.reminderDateTime.value = '';
+    setDefaultReminderDateTime();
+  } finally {
+    state.reminderSaving = false;
+    renderReminderModal();
+  }
+}
+
+async function completeReminder(reminderId = '') {
+  if (!reminderId) return;
+  const data = await post('/api/chats/reminders/done', { reminderId });
+  state.reminders = state.reminders.filter((item) => item.reminderId !== (data.reminderId || reminderId));
+  showTemporaryDraftStatus('Recordatorio completado.');
+  renderReminderModal();
+}
+
+
+function focusHighlightedMessage() {
+  if (!state.highlightedMessageId) return;
+  const target = [...els.messages.querySelectorAll('[data-message-id]')].find((node) => node.dataset.messageId === state.highlightedMessageId);
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function setStatus(message = '') {
+  els.authStatus.textContent = message;
+}
+
+function isInstalled() {
+  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+}
+
+function updateInstallBanner() {
+  if (!state.user || isInstalled() || state.installDismissed) {
+    els.installBanner.classList.add('hidden');
+    return;
+  }
+  els.installBanner.classList.remove('hidden');
+}
+
+function hasPushSupport() {
+  return Boolean('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
+}
+
+function updatePushBanner() {
+  if (!els.pushBanner) return;
+  const permission = hasPushSupport() ? Notification.permission : 'denied';
+  const shouldHide = !state.user || state.pushDismissed || !hasPushSupport() || permission === 'granted' || permission === 'denied' || state.pushState === 'saving';
+  els.pushBanner.classList.toggle('hidden', shouldHide);
+}
+
+function updateAfterLoginBanners() {
+  updateInstallBanner();
+  updatePushBanner();
+}
+
+
+function urlBase64ToUint8Array(base64String = '') {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+function getAppMode() {
+  return isInstalled() ? 'standalone' : 'browser';
+}
+
+async function getReadyServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) return null;
+  if (state.serviceWorkerRegistration) return state.serviceWorkerRegistration;
+  state.serviceWorkerRegistration = await navigator.serviceWorker.ready;
+  return state.serviceWorkerRegistration;
+}
+
+async function enableWebPushNotifications() {
+  if (!state.user) return false;
+  if (!hasPushSupport()) throw new Error('Este navegador no soporta notificaciones web push.');
+  const keyData = await apiGet('/api/push/public-key');
+  if (!keyData.enabled || !keyData.publicKey) throw new Error('El backend todavía no tiene configuradas las claves Web Push.');
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    state.pushDismissed = true;
+    updatePushBanner();
+    throw new Error('No se activaron las notificaciones porque el permiso no fue concedido.');
+  }
+  state.pushState = 'saving';
+  updatePushBanner();
+  const registration = await getReadyServiceWorkerRegistration();
+  if (!registration?.pushManager) throw new Error('No se pudo preparar PushManager.');
+  const existing = await registration.pushManager.getSubscription();
+  const subscription = existing || await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+  });
+  await post('/api/push/subscribe', {
+    subscription: subscription.toJSON(),
+    meta: {
+      clientId: getClientId(),
+      platform: navigator.platform || '',
+      appMode: getAppMode(),
+      language: navigator.language || 'es-CO'
+    }
+  });
+  state.pushState = 'enabled';
+  state.pushDismissed = true;
+  updatePushBanner();
+  return true;
+}
+
+async function ensureExistingPushSubscriptionRegistered() {
+  if (!state.user || !hasPushSupport() || Notification.permission !== 'granted') return false;
+  try {
+    const registration = await getReadyServiceWorkerRegistration();
+    let subscription = await registration?.pushManager?.getSubscription?.();
+    if (!subscription) {
+      const keyData = await apiGet('/api/push/public-key');
+      if (!keyData.enabled || !keyData.publicKey || !registration?.pushManager) return false;
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+      });
+    }
+    await post('/api/push/subscribe', {
+      subscription: subscription.toJSON(),
+      meta: { clientId: getClientId(), platform: navigator.platform || '', appMode: getAppMode(), language: navigator.language || 'es-CO' }
+    });
+    state.pushState = 'enabled';
+    updatePushBanner();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function unregisterCurrentPushSubscription() {
+  if (!hasPushSupport() || !getSessionToken()) return false;
+  try {
+    const registration = await getReadyServiceWorkerRegistration();
+    const subscription = await registration?.pushManager?.getSubscription?.();
+    if (!subscription) return false;
+    const endpoint = subscription.endpoint || '';
+    await post('/api/push/unsubscribe', { endpoint }).catch(() => null);
+    await subscription.unsubscribe().catch(() => null);
+    state.pushState = 'idle';
+    state.pushDismissed = false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function showAuthenticated() {
+  els.authScreen.classList.add('hidden');
+  els.chatScreen.classList.remove('hidden');
+  els.userSummary.innerHTML = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
+  renderAll();
+  updateAfterLoginBanners();
+}
+
+function showGuest() {
+  els.chatScreen.classList.add('hidden');
+  els.authScreen.classList.remove('hidden');
+  closeGlobalSearch();
+  resetGlobalSearchState();
+  closeGlobalStarred();
+  state.globalStarredMessages = [];
+  state.globalStarredLoading = false;
+  state.globalStarredScannedChats = 0;
+  closeCommandPalette();
+  state.privacyLock.locked = false;
+  state.privacyLock.mode = 'closed';
+  renderPrivacyLockOverlay();
+  closeRealtime();
+  stopPresenceRefresh();
+  updatePushBanner();
+}
+
+async function loadConfig() {
+  state.config = await apiGet('/api/config');
+  const error = getFirebaseWebConfigError(state.config.firebaseWebConfig || {});
+  setStatus(error || 'Listo para iniciar sesión.');
+  els.btnGoogleLogin.disabled = Boolean(error);
+}
+
+async function loginWithGoogle() {
+  try {
+    els.btnGoogleLogin.disabled = true;
+    setStatus('Abriendo Google...');
+    const google = await signInWithGooglePopup(state.config.firebaseWebConfig || {});
+    setStatus('Validando sesión...');
+    const data = await post('/api/auth/google-login', { idToken: google.idToken });
+    setSessionToken(data.sessionToken);
+    applyBootstrap(data);
+    showAuthenticated();
+    await loadChatLabels({ force: true }).catch(() => null);
+    await openRealtime();
+    await ensureExistingPushSubscriptionRegistered();
+    await consumeAddFromUrl();
+    await consumeChatFromUrl();
+    scheduleOutboxRetry(1200);
+  } catch (error) {
+    setStatus(error.message || 'No se pudo iniciar sesión.');
+  } finally {
+    els.btnGoogleLogin.disabled = false;
+  }
+}
+
+function applyBootstrap(data = {}) {
+  state.user = data.user || null;
+  state.contacts = (Array.isArray(data.contacts) ? data.contacts : []).map((contact) => ({
+    ...contact,
+    contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
+  }));
+  state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+  state.chats = Array.isArray(data.chats) ? data.chats : [];
+  state.notificationPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
+  loadPrivacyLockForCurrentUser({ lockOnRestore: false });
+  state.labels = [];
+  state.chatLabelsByChatId = new Map();
+  state.activeLabelFilter = '';
+  loadOutboxState();
+  sortChats();
+}
+
+
+function normalizeChatListMode(mode = 'active') {
+  if (mode === true || mode === 'archived') return 'archived';
+  if (mode === 'unread') return 'unread';
+  return 'active';
+}
+
+function isUnreadChat(chat = {}) {
+  return Number(chat.unread || 0) > 0;
+}
+
+function unreadChatsCount() {
+  return (Array.isArray(state.chats) ? state.chats : []).filter(isUnreadChat).length;
+}
+
+async function markAllChatsRead() {
+  if (!state.user) return;
+  const data = await post('/api/chats/read-all', { includeArchived: true, limit: 250 });
+  const updatedChats = Array.isArray(data.chats) ? data.chats : [];
+  for (const chat of updatedChats) upsertChat(chat);
+  if (state.chatListMode === 'unread') {
+    state.chats = state.chats.map((chat) => updatedChats.find((item) => item.chatId === chat.chatId) || chat);
+  }
+  const count = Number(data.updatedCount || updatedChats.length || 0);
+  showTemporaryDraftStatus(count
+    ? `${count} ${count === 1 ? 'chat marcado' : 'chats marcados'} como leído${count === 1 ? '' : 's'}.`
+    : 'No había chats sin leer.');
+  if (state.chatListMode === 'unread' && count) await loadChats({ unreadOnly: true, mode: 'unread' }).catch(() => null);
+  else renderAll();
+}
+
+function showChatListMode(mode = 'active') {
+  const normalizedMode = normalizeChatListMode(mode);
+  state.chatListMode = normalizedMode;
+  state.archivedView = normalizedMode === 'archived';
+  els.tabChats?.classList.toggle('active', normalizedMode === 'active');
+  els.tabUnread?.classList.toggle('active', normalizedMode === 'unread');
+  els.tabArchived?.classList.toggle('active', normalizedMode === 'archived');
+  els.tabContacts?.classList.remove('active');
+  els.chatList?.classList.remove('hidden');
+  els.contactList?.classList.add('hidden');
+  renderLabelFilters();
+}
+
+async function loadChats({ includeArchived = state.archivedView, unreadOnly = false, mode = '' } = {}) {
+  if (!state.user) return;
+  const requestedMode = normalizeChatListMode(mode || (unreadOnly ? 'unread' : (includeArchived ? 'archived' : 'active')));
+  const data = await post('/api/chats/list', {
+    includeArchived: requestedMode === 'archived',
+    unreadOnly: requestedMode === 'unread',
+    limit: 80
+  });
+  state.archivedView = requestedMode === 'archived';
+  state.chatListMode = requestedMode;
+  state.chats = Array.isArray(data.chats) ? data.chats : [];
+  sortChats();
+  if (state.activeChatId && requestedMode !== 'unread' && !state.chats.some((chat) => chat.chatId === state.activeChatId)) clearActiveChatState();
+  showChatListMode(requestedMode);
+  renderAll();
+}
+
+async function bootstrapExistingSession() {
+  if (!getSessionToken()) return false;
+  try {
+    const data = await post('/api/bootstrap', {});
+    applyBootstrap(data);
+    showAuthenticated();
+    if (state.privacyLock.enabled) lockPrivacyScreen();
+    await loadChatLabels({ force: true }).catch(() => null);
+    await openRealtime();
+    await ensureExistingPushSubscriptionRegistered();
+    await consumeAddFromUrl();
+    await consumeChatFromUrl();
+    scheduleOutboxRetry(1200);
+    return true;
+  } catch {
+    setSessionToken('');
+    return false;
+  }
+}
+
+function closeRealtime() {
+  state.realtimeManualClose = true;
+  if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+  state.realtimeReconnectTimer = 0;
+  if (state.eventSource) state.eventSource.close();
+  state.eventSource = null;
+}
+
+async function openRealtime() {
+  if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+  state.realtimeReconnectTimer = 0;
+  state.realtimeManualClose = false;
+  if (state.eventSource) state.eventSource.close();
+  state.eventSource = null;
+  const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+  const token = encodeURIComponent(tokenData.realtimeToken || '');
+  if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
+  state.eventSource = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
+  state.eventSource.addEventListener('chater_ready', () => {
+    const shouldRecover = state.realtimeRetryCount > 0;
+    state.realtimeRetryCount = 0;
+    if (shouldRecover) resyncStateFromBackend({ reloadActive: true, force: true }).catch(() => null);
+  });
+  state.eventSource.addEventListener('chater_event', (event) => {
+    const payload = JSON.parse(event.data || '{}');
+    handleRealtimeEvent(payload);
+  });
+  state.eventSource.onerror = () => {
+    if (state.realtimeManualClose || !getSessionToken()) {
+      closeRealtime();
+      return;
+    }
+    scheduleRealtimeReconnect();
+  };
+}
+
+function scheduleRealtimeReconnect() {
+  if (state.realtimeReconnectTimer) return;
+  if (state.eventSource) state.eventSource.close();
+  state.eventSource = null;
+  const delay = Math.min(30000, 1200 * (2 ** Math.min(state.realtimeRetryCount, 5)));
+  state.realtimeRetryCount += 1;
+  state.realtimeReconnectTimer = window.setTimeout(async () => {
+    state.realtimeReconnectTimer = 0;
+    if (!getSessionToken() || !state.user) return;
+    try {
+      await openRealtime();
+    } catch {
+      scheduleRealtimeReconnect();
+    }
+  }, delay);
+}
+
+function sortChats() {
+  state.chats.sort((a, b) => {
+    if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
+    return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+  });
+}
+
+function clearActiveChatState() {
+  stopPresenceRefresh();
+  if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  state.activeChatId = '';
+  state.replyToMessage = null;
+  state.editingMessage = null;
+  state.forwardingMessage = null;
+  state.scheduleModalOpen = false;
+  state.scheduledMessages = [];
+  state.scheduledLoading = false;
+  state.schedulingMessage = false;
+  state.highlightedMessageId = '';
+  state.starredPanelOpen = false;
+  state.starredMessages = [];
+  state.chatSearchQuery = '';
+  state.chatSearchResults = [];
+  state.quickRepliesOpen = false;
+  closeLinkLibrary();
+  closeContactNicknameModal();
+  closeCommandPalette();
+  if (els.chatSearchInput) els.chatSearchInput.value = '';
+  if (els.messages) els.messages.innerHTML = '';
+}
+
+function removeChat(chatId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  state.chats = state.chats.filter((item) => item.chatId !== cleanChatId);
+  if (state.activeChatId === cleanChatId) clearActiveChatState();
+}
+
+function upsertChat(chat = {}) {
+  if (!chat.chatId) return;
+  const belongsInCurrentView = state.chatListMode === 'unread'
+    ? true
+    : Boolean(chat.isArchived) === Boolean(state.archivedView);
+  if (!belongsInCurrentView) {
+    removeChat(chat.chatId);
+    return;
+  }
+  const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
+  if (index >= 0) state.chats[index] = { ...state.chats[index], ...chat };
+  else state.chats.unshift(chat);
+  sortChats();
+}
+
+function stopPresenceRefresh() {
+  if (state.presenceRefreshTimer) window.clearTimeout(state.presenceRefreshTimer);
+  state.presenceRefreshTimer = 0;
+}
+
+function applyChatPresence(chatId = '', presence = {}) {
+  const cleanChatId = String(chatId || presence.chatId || '').trim();
+  if (!cleanChatId || !presence || typeof presence !== 'object') return false;
+  const index = state.chats.findIndex((item) => item.chatId === cleanChatId);
+  if (index < 0) return false;
+  const current = state.chats[index];
+  const nextPresence = { ...(current.presence || {}), ...presence };
+  state.chats[index] = {
+    ...current,
+    presence: nextPresence,
+    otherOnline: Boolean(nextPresence.otherOnline || nextPresence.status === 'online')
+  };
+  return true;
+}
+
+function schedulePresenceRefresh(delay = 45000) {
+  stopPresenceRefresh();
+  const chat = activeChat();
+  if (!state.user || !chat?.chatId || !canShowChatPresence(chat)) return;
+  state.presenceRefreshTimer = window.setTimeout(() => {
+    refreshActiveChatPresence().catch(() => schedulePresenceRefresh(60000));
+  }, Math.max(10000, Number(delay || 45000)));
+}
+
+async function refreshActiveChatPresence({ render = true } = {}) {
+  const chat = activeChat();
+  if (!state.user || !chat?.chatId || !canShowChatPresence(chat)) {
+    stopPresenceRefresh();
+    return false;
+  }
+  const chatId = chat.chatId;
+  const data = await post('/api/chats/presence', { chatId });
+  if (state.activeChatId !== chatId) return false;
+  const changed = applyChatPresence(chatId, data.presence || {});
+  if (render && changed) renderAll();
+  schedulePresenceRefresh();
+  return changed;
+}
+
+function upsertContact(contact = {}) {
+  if (!contact.userId) return;
+  const normalized = {
+    ...contact,
+    contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
+  };
+  const index = state.contacts.findIndex((item) => item.userId === normalized.userId);
+  if (index >= 0) state.contacts[index] = { ...state.contacts[index], ...normalized };
+  else state.contacts.push(normalized);
+  state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+}
+
+function applyContactToChats(contact = {}) {
+  if (!contact?.userId) return;
+  let changed = false;
+  state.chats = state.chats.map((chat) => {
+    const other = chat.other || {};
+    if (other.userId !== contact.userId) return chat;
+    changed = true;
+    return {
+      ...chat,
+      other: {
+        ...other,
+        nickname: contact.nickname || '',
+        contactName: contact.contactName || contact.nickname || other.displayName || other.email || 'Contacto'
+      }
+    };
+  });
+  if (changed) sortChats();
+}
+
+function applyUpdatedContact(contact = {}) {
+  if (!contact?.userId) return;
+  upsertContact(contact);
+  applyContactToChats(contact);
+}
+
+function getContactByUserId(userId = '') {
+  const cleanUserId = String(userId || '').trim();
+  if (!cleanUserId) return null;
+  return state.contacts.find((contact) => contact.userId === cleanUserId) || null;
+}
+
+function upsertMessage(message = {}) {
+  if (!message.messageId || !message.chatId) return;
+  const list = state.messagesByChat.get(message.chatId) || [];
+  const index = list.findIndex((msg) => msg.messageId === message.messageId);
+  if (index >= 0) list[index] = { ...list[index], ...message };
+  else list.push(message);
+  state.messagesByChat.set(message.chatId, list);
+}
+
+function resetChatSearch({ keepInput = false } = {}) {
+  state.chatSearchQuery = '';
+  state.chatSearchResults = [];
+  state.chatSearchLoading = false;
+  state.starredPanelOpen = false;
+  state.starredMessages = [];
+  state.starredLoading = false;
+  state.highlightedMessageId = '';
+  if (!keepInput && els.chatSearchInput) els.chatSearchInput.value = '';
+  renderSearchPanel();
+}
+
+function renderSearchPanel() {
+  if (!els.chatSearchPanel) return;
+  const query = state.chatSearchQuery || els.chatSearchInput?.value?.trim() || '';
+  els.btnShowStarred?.classList.toggle('active', Boolean(state.starredPanelOpen));
+  if (state.starredPanelOpen) {
+    if (!state.activeChatId) {
+      els.chatSearchPanel.classList.add('hidden');
+      els.chatSearchPanel.innerHTML = '';
+      return;
+    }
+    els.chatSearchPanel.classList.remove('hidden');
+    if (state.starredLoading) {
+      els.chatSearchPanel.innerHTML = '<div class="ce-search-empty">Cargando mensajes destacados...</div>';
+      return;
+    }
+    if (!state.starredMessages.length) {
+      els.chatSearchPanel.innerHTML = '<div class="ce-search-empty">Aún no tienes mensajes destacados en este chat.</div>';
+      return;
+    }
+    const count = state.starredMessages.length;
+    els.chatSearchPanel.innerHTML = `
+      <div class="ce-search-summary">${count} ${count === 1 ? 'destacado' : 'destacados'} · privados para tu cuenta</div>
+      <div class="ce-search-results">
+        ${state.starredMessages.map((msg) => {
+          const mine = msg.senderUserId === state.user?.userId;
+          return `<button class="ce-search-result" type="button" data-search-message-id="${escapeHtml(msg.messageId)}">
+            <strong>★ ${mine ? 'Tú' : 'Contacto'} · ${formatMessageTime(msg.createdAt)}</strong>
+            <span>${escapeHtml(msg.excerpt || msg.text || '')}</span>
+          </button>`;
+        }).join('')}
+      </div>`;
+    return;
+  }
+  if (!state.activeChatId || (!query && !state.chatSearchLoading)) {
+    els.chatSearchPanel.classList.add('hidden');
+    els.chatSearchPanel.innerHTML = '';
+    return;
+  }
+  els.chatSearchPanel.classList.remove('hidden');
+  if (state.chatSearchLoading) {
+    els.chatSearchPanel.innerHTML = '<div class="ce-search-empty">Buscando mensajes...</div>';
+    return;
+  }
+  if (!state.chatSearchResults.length) {
+    els.chatSearchPanel.innerHTML = `<div class="ce-search-empty">No encontramos mensajes con “${escapeHtml(query)}”.</div>`;
+    return;
+  }
+  const count = state.chatSearchResults.length;
+  els.chatSearchPanel.innerHTML = `
+    <div class="ce-search-summary">${count} ${count === 1 ? 'resultado' : 'resultados'} · más recientes primero</div>
+    <div class="ce-search-results">
+      ${state.chatSearchResults.map((msg) => {
+        const mine = msg.senderUserId === state.user?.userId;
+        return `<button class="ce-search-result" type="button" data-search-message-id="${escapeHtml(msg.messageId)}">
+          <strong>${mine ? 'Tú' : 'Contacto'} · ${formatMessageTime(msg.createdAt)}</strong>
+          <span>${escapeHtml(msg.excerpt || msg.text || '')}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+
+async function searchActiveChat(query = '') {
+  const cleanQuery = String(query || '').trim();
+  state.starredPanelOpen = false;
+  if (!state.activeChatId || cleanQuery.length < 2) {
+    state.chatSearchQuery = cleanQuery;
+    state.chatSearchResults = [];
+    renderSearchPanel();
+    return;
+  }
+  state.chatSearchLoading = true;
+  state.chatSearchQuery = cleanQuery;
+  state.chatSearchResults = [];
+  renderSearchPanel();
+  try {
+    const data = await post('/api/chats/search', { chatId: state.activeChatId, query: cleanQuery, limit: 30 });
+    state.chatSearchQuery = data.query || cleanQuery;
+    state.chatSearchResults = Array.isArray(data.matches) ? data.matches : [];
+  } catch (error) {
+    state.chatSearchResults = [];
+    state.chatSearchQuery = cleanQuery;
+    els.chatSearchPanel.classList.remove('hidden');
+    els.chatSearchPanel.innerHTML = `<div class="ce-search-empty">${escapeHtml(error.message || 'No se pudo buscar en este chat.')}</div>`;
+    return;
+  } finally {
+    state.chatSearchLoading = false;
+  }
+  renderSearchPanel();
+}
+
+async function loadStarredMessages() {
+  if (!state.activeChatId) return;
+  state.starredPanelOpen = true;
+  state.starredLoading = true;
+  state.starredMessages = [];
+  state.chatSearchQuery = '';
+  if (els.chatSearchInput) els.chatSearchInput.value = '';
+  renderSearchPanel();
+  try {
+    const data = await post('/api/chats/starred', { chatId: state.activeChatId, limit: 80 });
+    state.starredMessages = Array.isArray(data.messages) ? data.messages : [];
+  } catch (error) {
+    state.starredMessages = [];
+    els.chatSearchPanel.classList.remove('hidden');
+    els.chatSearchPanel.innerHTML = `<div class="ce-search-empty">${escapeHtml(error.message || 'No se pudieron cargar los mensajes destacados.')}</div>`;
+    return;
+  } finally {
+    state.starredLoading = false;
+  }
+  renderSearchPanel();
+}
+
+function syncStarredPanelMessage(message = {}) {
+  if (!message?.messageId) return;
+  const index = state.starredMessages.findIndex((item) => item.messageId === message.messageId);
+  if (message.isStarred) {
+    if (index >= 0) state.starredMessages[index] = { ...state.starredMessages[index], ...message };
+    else state.starredMessages.unshift(message);
+  } else if (index >= 0) {
+    state.starredMessages.splice(index, 1);
+  }
+}
+
+async function setMessageStar(messageId = '', starred = true) {
+  if (!state.activeChatId || !messageId) return;
+  const data = await post('/api/chats/star', { chatId: state.activeChatId, messageId, starred });
+  upsertMessage(data.message);
+  syncStarredPanelMessage(data.message);
+  syncGlobalStarredMessage(data.message);
+  renderAll();
+}
+
+async function setMessagePinned(messageId = '', pinned = true) {
+  if (!state.activeChatId || !messageId) return;
+  const data = await post('/api/chats/message-pin', { chatId: state.activeChatId, messageId, pinned });
+  if (data.chat) upsertChat(data.chat);
+  syncPinnedStateForChat(state.activeChatId, data.pinnedMessageIds || data.chat?.pinnedMessageIds || []);
+  upsertMessage(data.message);
+  renderAll();
+  showTemporaryDraftStatus(data.pinned ? 'Mensaje fijado en este chat.' : 'Mensaje desfijado.');
+}
+
+async function openSearchResult(messageId = '') {
+  if (!state.activeChatId || !messageId) return;
+  state.highlightedMessageId = messageId;
+  const currentMessages = state.messagesByChat.get(state.activeChatId) || [];
+  if (!currentMessages.some((msg) => msg.messageId === messageId)) {
+    const data = await post('/api/chats/messages', { chatId: state.activeChatId, limit: 500 });
+    state.messagesByChat.set(state.activeChatId, data.messages || []);
+  }
+  renderAll();
+  window.setTimeout(focusHighlightedMessage, 30);
+}
+
+async function resyncStateFromBackend({ reloadActive = false, force = false } = {}) {
+  if (!getSessionToken() || !state.user) return false;
+  if (state.syncInFlight) return state.syncInFlight;
+  const elapsed = Date.now() - Number(state.lastSyncAt || 0);
+  if (!force && elapsed > 0 && elapsed < 5000) return false;
+  state.syncInFlight = (async () => {
+    const previousActiveChatId = state.activeChatId;
+    const data = await post('/api/bootstrap', {});
+    const previousLabelFilter = state.activeLabelFilter;
+    applyBootstrap(data);
+    await loadChatLabels({ force: true }).catch(() => null);
+    if (previousLabelFilter && state.labels.some((item) => item.label.toLowerCase() === previousLabelFilter.toLowerCase())) state.activeLabelFilter = previousLabelFilter;
+    state.lastSyncAt = Date.now();
+    if (previousActiveChatId && state.chats.some((chat) => chat.chatId === previousActiveChatId)) {
+      state.activeChatId = previousActiveChatId;
+      if (reloadActive) {
+        const messages = await post('/api/chats/messages', { chatId: previousActiveChatId });
+        state.messagesByChat.set(previousActiveChatId, messages.messages || []);
+      }
+    } else if (previousActiveChatId) {
+      state.activeChatId = '';
+    }
+    renderAll();
+    return true;
+  })();
+  try {
+    return await state.syncInFlight;
+  } finally {
+    state.syncInFlight = null;
+  }
+}
+
+function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
+  const chatId = String(payload.chatId || data.chat?.chatId || '').trim();
+  const readerUserId = String(data.readerUserId || payload.actorUserId || '').trim();
+  const readAt = String(data.readAt || '').trim();
+  if (!chatId || !readerUserId || readerUserId === state.user?.userId || !readAt) return;
+  const readMs = Date.parse(readAt) || 0;
+  if (!readMs) return;
+  const list = state.messagesByChat.get(chatId) || [];
+  if (!list.length) return;
+  let changed = false;
+  const updated = list.map((message) => {
+    if (message.senderUserId !== state.user?.userId || isDeletedMessage(message)) return message;
+    const createdMs = Date.parse(message.createdAt || '') || 0;
+    if (!createdMs || readMs < createdMs) return message;
+    const recipientCount = Math.max(1, Number(message.recipientCount || 1));
+    const readByCount = Math.min(recipientCount, Math.max(Number(message.readByCount || 0), 1));
+    const next = {
+      ...message,
+      recipientCount,
+      readByCount,
+      receiptStatus: readByCount >= recipientCount ? 'read' : (message.receiptStatus || 'sent'),
+      readAt: readByCount >= recipientCount ? readAt : (message.readAt || '')
+    };
+    changed = changed || next.receiptStatus !== message.receiptStatus || next.readByCount !== message.readByCount || next.readAt !== message.readAt;
+    return next;
+  });
+  if (changed) state.messagesByChat.set(chatId, updated);
+}
+
+function handleRealtimeEvent(payload = {}) {
+  const data = payload.data || {};
+  const chatForThisUser = data.chatByUserId?.[state.user?.userId] || data.chat;
+  if (chatForThisUser) {
+    upsertChat(chatForThisUser);
+    if (Array.isArray(chatForThisUser.pinnedMessageIds)) syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds);
+  }
+  if (data.contact && payload.recipientUserIds?.includes?.(state.user?.userId)) applyUpdatedContact(data.contact);
+  if (data.message) {
+    if (data.message.clientMessageId) removeQueuedMessage(data.message.clientMessageId, { render: false });
+    upsertMessage(data.message);
+    if (state.replyToMessage?.messageId === data.message.messageId) {
+      state.replyToMessage = isDeletedMessage(data.message) ? null : { ...state.replyToMessage, ...data.message };
+    }
+    if (state.editingMessage?.messageId === data.message.messageId) {
+      if (isDeletedMessage(data.message)) {
+        state.editingMessage = null;
+        loadDraftForChat(state.activeChatId);
+      } else {
+        state.editingMessage = { ...state.editingMessage, ...data.message };
+      }
+    }
+  }
+  if (data.scheduledMessage?.scheduledId) {
+    if (['message.scheduled.cancelled', 'message.scheduled.sent'].includes(payload.eventType)) {
+      state.scheduledMessages = state.scheduledMessages.filter((item) => item.scheduledId !== data.scheduledMessage.scheduledId);
+    } else {
+      const index = state.scheduledMessages.findIndex((item) => item.scheduledId === data.scheduledMessage.scheduledId);
+      if (index >= 0) state.scheduledMessages[index] = { ...state.scheduledMessages[index], ...data.scheduledMessage };
+      else state.scheduledMessages.unshift(data.scheduledMessage);
+    }
+  }
+  if (payload.eventType === 'chat.draft.updated' && state.draftsOpen) loadDrafts({ silent: true }).catch(() => null);
+  if (payload.eventType === 'chat.draft.updated' && data.draft?.chatId === state.activeChatId && !state.editingMessage?.messageId) {
+    const remoteText = String(data.draft.text || '');
+    const remoteMs = remoteDraftSavedMs(data.draft);
+    const localMs = Number(readDraftPayload(state.activeChatId)?.savedAt || 0);
+    if (remoteText.trim() && remoteMs >= localMs && els.messageInput && remoteText !== els.messageInput.value) {
+      writeDraftPayload(state.activeChatId, remoteText, remoteMs || Date.now());
+      els.messageInput.value = remoteText;
+      setDraftStatus('Borrador sincronizado desde tu cuenta.');
+      updateComposerControls();
+    }
+  }
+  if (payload.eventType === 'chat.draft.deleted' && state.draftsOpen) loadDrafts({ silent: true }).catch(() => null);
+  if (payload.eventType === 'chat.draft.deleted' && (data.chatId || payload.chatId) === state.activeChatId && !state.editingMessage?.messageId) {
+    const localDraft = readDraftPayload(state.activeChatId);
+    if (localDraft?.text && localDraft.text === els.messageInput?.value) {
+      removeLocalDraftPayload(state.activeChatId);
+      els.messageInput.value = '';
+      setDraftStatus('');
+      updateComposerControls();
+    }
+  }
+  if ((payload.eventType === 'chat.privateNote.updated' || payload.eventType === 'chat.privateNote.deleted') && (data.chatId || payload.chatId) === state.activeChatId) {
+    state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes;
+    renderPrivateNotesModal();
+  }
+  if (payload.eventType === 'contact.block.updated' && data.targetUserId) {
+    applyBlockStatusForTargetUser(data.targetUserId, data.blockStatus || {});
+    if (state.voiceDictating && isChatInteractionBlocked()) stopVoiceDictation({ announce: false });
+  }
+  if (data.reminder?.reminderId) {
+    if (['chat.reminder.completed'].includes(payload.eventType)) {
+      state.reminders = state.reminders.filter((item) => item.reminderId !== data.reminder.reminderId);
+    } else {
+      const index = state.reminders.findIndex((item) => item.reminderId === data.reminder.reminderId);
+      if (index >= 0) state.reminders[index] = { ...state.reminders[index], ...data.reminder };
+      else state.reminders.unshift(data.reminder);
+      state.reminders.sort((a, b) => (Date.parse(a.remindFor || '') || 0) - (Date.parse(b.remindFor || '') || 0));
+    }
+    if (payload.eventType === 'chat.reminder.due') showTemporaryDraftStatus(`Recordatorio: ${compactText(data.reminder.text || '', 140)}`, 5200);
+    renderReminderModal();
+  }
+  if ((payload.eventType === 'chat.labels.updated' || payload.eventType === 'chat.labels.deleted') && Array.isArray(data.allLabels)) {
+    applyLabelCatalog(data.allLabels);
+    if (payload.eventType === 'chat.labels.updated' && data.chatId === state.activeChatId && state.labelsModalOpen) {
+      state.labelsDraft = normalizeChatLabelList(data.labels || []).join(', ');
+      renderLabelsModal();
+    }
+  }
+  if ((['message.star.updated', 'message.deleted', 'message.expired'].includes(payload.eventType)) && data.message) {
+    syncStarredPanelMessage(data.message);
+    syncGlobalStarredMessage(data.message);
+  }
+  if (payload.eventType === 'presence.updated' && data.chatId && data.presence) applyChatPresence(data.chatId, data.presence);
+  if (payload.eventType === 'chat.read') syncReadReceiptsFromReadEvent(payload, data);
+  if (payload.eventType === 'chat.typing' && data.userId !== state.user?.userId && payload.chatId === state.activeChatId) {
+    els.typingStatus.textContent = data.isTyping ? 'Escribiendo...' : '';
+    if (data.isTyping) window.setTimeout(() => { els.typingStatus.textContent = ''; }, 5200);
+  }
+  renderAll();
+  if (state.activeChatId && data.message?.chatId === state.activeChatId) {
+    const mine = data.message.senderUserId === state.user?.userId;
+    if (mine || isMessagesNearBottom()) markActiveRead();
+  }
+}
+
+function renderAll() {
+  renderChats();
+  renderContacts();
+  renderLabelFilters();
+  renderActiveChat();
+  renderSearchPanel();
+  renderReplyDraft();
+  renderQuickRepliesPanel();
+  renderEmojiPickerPanel();
+  renderForwardModal();
+  renderScheduleModal();
+  renderGlobalSearchModal();
+  renderGlobalStarredModal();
+  renderDraftsModal();
+  renderLinkLibraryModal();
+  renderChatBriefModal();
+  renderDateJumpModal();
+  renderCommandPalette();
+  renderContactNicknameModal();
+  renderPrivacyLockOverlay();
+  updateNotificationPauseButton();
+}
+
+function getVisibleChats() {
+  const list = Array.isArray(state.chats) ? state.chats : [];
+  const modeList = state.chatListMode === 'unread' ? list.filter(isUnreadChat) : list;
+  return modeList.filter(chatHasActiveLabel);
+}
+
+function renderChats() {
+  const visibleChats = getVisibleChats();
+  if (!visibleChats.length) {
+    const activeFilter = normalizeChatLabelName(state.activeLabelFilter || '');
+    const emptyText = activeFilter
+      ? `No hay chats con la etiqueta #${activeFilter} en esta bandeja.`
+      : (state.chatListMode === 'unread'
+        ? 'No tienes chats sin leer por ahora.'
+        : (state.archivedView
+          ? 'No tienes chats archivados.'
+          : 'Agrega un contacto por correo o QR para iniciar tu primer chat.'));
+    els.chatList.innerHTML = `<div class="ce-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  sortChats();
+  const activeFilter = normalizeChatLabelName(state.activeLabelFilter || '');
+  const unreadToolbar = state.chatListMode === 'unread'
+    ? `<div class="ce-list-toolbar" role="group" aria-label="Acciones de no leídos"><span>${visibleChats.length} ${visibleChats.length === 1 ? 'chat pendiente' : 'chats pendientes'}</span><button class="ce-link" type="button" data-mark-all-read="1">Marcar todos como leídos</button></div>`
+    : '';
+  const labelToolbar = activeFilter
+    ? `<div class="ce-list-toolbar ce-list-toolbar--label" role="status"><span>Filtro activo: #${escapeHtml(activeFilter)}</span><button class="ce-link" type="button" data-clear-label-filter="1">Quitar filtro</button></div>`
+    : '';
+  els.chatList.innerHTML = `${labelToolbar}${unreadToolbar}${getVisibleChats().map((chat) => {
+    const title = chatDisplayName(chat);
+    const subtitle = chatDisplaySubtitle(chat);
+    const queuedCount = getQueuedMessagesForChat(chat.chatId).length;
+    const last = queuedCount
+      ? `Pendiente de envío: ${queuedCount} mensaje${queuedCount === 1 ? '' : 's'}`
+      : (isDeletedMessage(chat.lastMessage) ? 'Mensaje eliminado' : (chat.lastMessage?.text || (isSelfChat(chat) ? 'Guarda aquí notas privadas.' : 'Chat abierto')));
+    const active = chat.chatId === state.activeChatId ? ' active' : '';
+    const pinned = chat.isPinned ? ' is-pinned' : '';
+    const unread = Number(chat.unread || 0) > 0 ? `<span class="ce-badge">${chat.unread}</span>` : '';
+    const muted = chat.isMuted ? '<span class="ce-muted-pill" title="Chat silenciado" aria-label="Chat silenciado">🔕</span>' : '';
+    const outbox = queuedCount ? `<span class="ce-outbox-pill" title="${queuedCount} mensaje pendiente de envío" aria-label="${queuedCount} mensaje pendiente de envío">⏳ ${queuedCount}</span>` : '';
+    const archived = chat.isArchived ? '<span class="ce-archived-pill" title="Chat archivado" aria-label="Chat archivado">Archivado</span>' : '';
+    const blockedStatus = normalizeChatBlockStatus(chat);
+    const blocked = blockedStatus.blocked ? '<span class="ce-blocked-pill" title="Comunicación pausada" aria-label="Comunicación pausada">Bloqueado</span>' : '';
+    const pinLabel = chat.isPinned ? 'Desfijar chat' : 'Fijar chat arriba';
+    const pinIcon = chat.isPinned ? '📌' : '📍';
+    const archiveLabel = chat.isArchived ? 'Restaurar chat' : 'Archivar chat';
+    const archiveIcon = chat.isArchived ? '↩' : '▣';
+    const pinButton = chat.isArchived ? '' : `<button class="ce-chat-pin${chat.isPinned ? ' active' : ''}" type="button" data-pin-chat-id="${escapeHtml(chat.chatId)}" data-pinned="${chat.isPinned ? '1' : '0'}" title="${escapeHtml(pinLabel)}" aria-label="${escapeHtml(pinLabel)}">${pinIcon}</button>`;
+    const archiveButton = `<button class="ce-chat-archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-chat-id="${escapeHtml(chat.chatId)}" data-archived="${chat.isArchived ? '1' : '0'}" title="${escapeHtml(archiveLabel)}" aria-label="${escapeHtml(archiveLabel)}">${archiveIcon}</button>`;
+    return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
+  }).join('')}`;
+}
+
+function renderContacts() {
+  if (!state.contacts.length) {
+    els.contactList.innerHTML = '<div class="ce-empty">Todavía no tienes contactos guardados.</div>';
+    return;
+  }
+  els.contactList.innerHTML = state.contacts.map((contact) => {
+    const title = contactDisplayName(contact);
+    const subtitle = contactDisplaySubtitle(contact);
+    const hasNickname = Boolean(String(contact.nickname || '').trim());
+    const nicknameLabel = hasNickname ? 'Editar apodo privado' : 'Agregar apodo privado';
+    return `<div class="ce-row ce-row--contact${hasNickname ? ' has-nickname' : ''}" data-contact-id="${escapeHtml(contact.userId)}" role="button" tabindex="0" aria-label="Abrir chat con ${escapeHtml(title)}">${avatar(contact, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span><span class="ce-row__meta"><button class="ce-contact-alias-btn" type="button" data-edit-contact-nickname="${escapeHtml(contact.userId)}" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button></span></div>`;
+  }).join('');
+}
+
+function activeChat() {
+  return state.chats.find((chat) => chat.chatId === state.activeChatId) || null;
+}
+
+function findActiveMessage(messageId = '') {
+  const cleanMessageId = String(messageId || '').trim();
+  if (!state.activeChatId || !cleanMessageId) return null;
+  const list = state.messagesByChat.get(state.activeChatId) || [];
+  return list.find((message) => message.messageId === cleanMessageId) || null;
+}
+
+function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  const pinned = new Set((Array.isArray(pinnedMessageIds) ? pinnedMessageIds : []).filter(Boolean));
+  const list = state.messagesByChat.get(cleanChatId) || [];
+  if (!list.length) return;
+  let changed = false;
+  const updated = list.map((message) => {
+    const isPinned = pinned.has(message.messageId) && !isDeletedMessage(message);
+    if (Boolean(message.isPinned) === isPinned) return message;
+    changed = true;
+    return { ...message, isPinned };
+  });
+  if (changed) state.messagesByChat.set(cleanChatId, updated);
+}
+
+function getPinnedMessagesForChat(chat = {}, messages = []) {
+  const ids = Array.isArray(chat.pinnedMessageIds) ? chat.pinnedMessageIds.filter(Boolean) : [];
+  const byId = new Map((messages || []).filter((message) => message?.messageId).map((message) => [message.messageId, message]));
+  const ordered = ids.map((messageId) => byId.get(messageId)).filter((message) => message && !isDeletedMessage(message));
+  const extra = (messages || []).filter((message) => message?.isPinned && !ids.includes(message.messageId) && !isDeletedMessage(message));
+  return [...ordered, ...extra].slice(0, 3);
+}
+
+function renderPinnedMessagesStrip(chat = {}, messages = []) {
+  const pinned = getPinnedMessagesForChat(chat, messages);
+  if (!pinned.length) return '';
+  return `<div class="ce-pinned-strip" aria-label="Mensajes fijados en este chat">
+    <strong>📌 Fijados</strong>
+    <div class="ce-pinned-strip__items">
+      ${pinned.map((message) => `
+        <span class="ce-pinned-strip__item">
+          <button type="button" data-jump-message-id="${escapeHtml(message.messageId || '')}" title="Ir al mensaje fijado">${escapeHtml(compactText(message.text || '', 120))}</button>
+          <button class="ce-pinned-strip__remove" type="button" data-unpin-message-id="${escapeHtml(message.messageId || '')}" title="Desfijar mensaje" aria-label="Desfijar mensaje">×</button>
+        </span>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function copyMessageText(messageId = '') {
+  const message = findActiveMessage(messageId);
+  if (!message || isDeletedMessage(message)) return;
+  await copyTextToClipboard(message.text || '');
+  showTemporaryDraftStatus('Mensaje copiado al portapapeles.');
+}
+
+function buildMessageDeepLink(messageId = '') {
+  const cleanMessageId = String(messageId || '').trim();
+  if (!state.activeChatId || !cleanMessageId) return '';
+  const url = new URL(window.location.href);
+  url.searchParams.set('chat', state.activeChatId);
+  url.searchParams.set('message', cleanMessageId);
+  url.hash = '';
+  return url.toString();
+}
+
+async function copyMessageLink(messageId = '') {
+  const message = findActiveMessage(messageId);
+  if (!message || isDeletedMessage(message)) return;
+  const link = buildMessageDeepLink(message.messageId);
+  await copyTextToClipboard(link);
+  showTemporaryDraftStatus('Enlace interno del mensaje copiado.');
+}
+
+function formatExportDateTime(value = '') {
+  const date = new Date(value || Date.now());
+  return date.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function safeExportFilePart(value = '') {
+  return String(value || 'chat')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'chat';
+}
+
+function buildChatExportText(chat = {}, messages = []) {
+  const contactName = chatDisplayName(chat);
+  const lines = [
+    `Exportación de chatER`,
+    `Chat con: ${contactName}`,
+    `Cuenta: ${state.user?.displayName || state.user?.email || 'Usuario chatER'}`,
+    `Generado: ${formatExportDateTime(Date.now())}`,
+    `Mensajes exportados: ${messages.length}`,
+    ''.padEnd(42, '-')
+  ];
+  for (const message of messages) {
+    const sender = message.senderUserId === state.user?.userId ? 'Tú' : contactName;
+    const date = formatExportDateTime(message.createdAt);
+    const body = isDeletedMessage(message) ? 'Mensaje eliminado' : String(message.text || '');
+    const forwarded = message.type === 'forwarded' || message.forwardedFrom?.messageId ? ' (reenviado)' : '';
+    const silent = message.silent ? ' (silencioso)' : '';
+    lines.push(`[${date}] ${sender}${forwarded}${silent}:`);
+    if (message.replyTo?.text) {
+      const replySender = message.replyTo.senderUserId === state.user?.userId ? 'Tú' : contactName;
+      lines.push(`  ↳ Respuesta a ${replySender}: ${compactText(message.replyTo.text, 160)}`);
+    }
+    lines.push(body || '(sin texto)', '');
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function downloadTextFile(filename = 'chater-export.txt', content = '') {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function exportActiveChat() {
+  const chat = activeChat();
+  if (!chat?.chatId) return;
+  showTemporaryDraftStatus('Preparando exportación del chat...', 1400);
+  const data = await post('/api/chats/messages', { chatId: chat.chatId, limit: 500 });
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+  state.messagesByChat.set(chat.chatId, messages);
+  const contactName = chatDisplayName(chat);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = `chater-${safeExportFilePart(contactName)}-${stamp}.txt`;
+  downloadTextFile(filename, buildChatExportText(chat, messages));
+  showTemporaryDraftStatus('Chat exportado en archivo de texto.');
+  renderAll();
+}
+
+function renderActiveChat() {
+  const chat = activeChat();
+  if (!chat) {
+    els.activeChatHeader.innerHTML = '<div class="ce-empty-title">Selecciona un chat</div>';
+    els.chatSearchArea?.classList.add('hidden');
+    if (els.chatSearchInput) els.chatSearchInput.disabled = true;
+    if (els.btnShowStarred) els.btnShowStarred.disabled = true;
+    els.messages.innerHTML = '<div class="ce-chat-empty">Tus conversaciones aparecerán aquí.</div>';
+    els.messageInput.disabled = true;
+    els.btnSend.disabled = true;
+    state.replyToMessage = null;
+    state.editingMessage = null;
+    state.forwardingMessage = null;
+    state.privateNotesOpen = false;
+    state.privateNotes = [];
+    state.linkLibraryOpen = false;
+    state.chatBriefOpen = false;
+    state.chatBriefLoading = false;
+    state.chatBriefError = '';
+    state.dateJumpOpen = false;
+    state.dateJumpLoading = false;
+    state.dateJumpSelected = '';
+    state.dateJumpDays = [];
+    state.dateJumpError = '';
+    state.dateJumpChatId = '';
+    resetPrivateNoteEditor();
+    state.remindersOpen = false;
+    state.reminderMessage = null;
+    state.reminders = [];
+    setDraftStatus('');
+    state.quickRepliesOpen = false;
+    renderReplyDraft();
+    renderQuickRepliesPanel();
+    state.slashCommandsOpen = false;
+    renderSlashCommandsPanel();
+    state.renderedActiveChatId = '';
+    state.scrollNewMessages = 0;
+    updateComposerControls();
+    updateScrollBottomButton();
+    return;
+  }
+  const title = chatDisplayName(chat);
+  const subtitle = chatDisplaySubtitle(chat);
+  const muteLabel = chat.isMuted ? 'Activar notificaciones de este chat' : 'Silenciar notificaciones de este chat';
+  const muteButtonHtml = isSelfChat(chat) ? '' : `
+      <button class="ce-icon-btn ce-icon-btn--mute${chat.isMuted ? ' active' : ''}" type="button" data-mute-active-chat="${chat.isMuted ? '0' : '1'}" title="${escapeHtml(muteLabel)}" aria-label="${escapeHtml(muteLabel)}">
+        ${bellIconSvg(Boolean(chat.isMuted))}
+      </button>`;
+  const blockStatus = normalizeChatBlockStatus(chat);
+  const blockLabel = blockStatus.blockedByMe ? 'Desbloquear contacto' : 'Bloquear contacto';
+  const blockButtonHtml = isSelfChat(chat) ? '' : `
+      <button class="ce-icon-btn ce-icon-btn--block${blockStatus.blockedByMe ? ' active' : ''}" type="button" data-block-active-contact="${blockStatus.blockedByMe ? '0' : '1'}" title="${escapeHtml(blockLabel)}" aria-label="${escapeHtml(blockLabel)}">
+        ${blockIconSvg(Boolean(blockStatus.blockedByMe))}
+      </button>`;
+  const nicknameLabel = chat.other?.nickname ? 'Editar apodo privado del contacto' : 'Agregar apodo privado al contacto';
+  const nicknameButtonHtml = isSelfChat(chat) ? '' : `
+      <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button>`;
+  els.activeChatHeader.innerHTML = `
+    <div class="ce-chat__identity">${renderChatAvatarWithPresence(chat)}<div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span>${renderActiveChatLabelBadges(chat)}</div></div>
+    <div class="ce-header-actions ce-chat-tools">${muteButtonHtml}${blockButtonHtml}${nicknameButtonHtml}
+      <button class="ce-icon-btn ce-icon-btn--labels" type="button" data-open-labels="1" title="Etiquetas del chat" aria-label="Editar etiquetas del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V5a2 2 0 0 1 2-2h8l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-active-chat="${chat.isArchived ? '0' : '1'}" title="${escapeHtml(chat.isArchived ? 'Restaurar chat' : 'Archivar chat')}" aria-label="${escapeHtml(chat.isArchived ? 'Restaurar chat' : 'Archivar chat')}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16l-1 5H5L4 4Zm1 7h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8Zm5 2v2h4v-2h-4Z"/></svg>
+      </button>
+      <button class="ce-icon-btn" type="button" data-share-active-chat="1" title="Copiar enlace interno del chat" aria-label="Copiar enlace interno del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a3.3 3.3 0 0 0 0-1.39l7.05-4.11A2.99 2.99 0 1 0 15 5c0 .23.03.45.08.66L8.03 9.77a3 3 0 1 0 0 4.46l7.12 4.18c-.04.18-.06.38-.06.58a2.91 2.91 0 1 0 2.91-2.91Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--brief" type="button" data-open-chat-brief="1" title="Resumen del chat" aria-label="Abrir resumen del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11.5L21 7.5V21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm10 1.7V9h4.3L15 4.7ZM7 11h10V9H7v2Zm0 4h10v-2H7v2Zm0 4h6v-2H7v2Zm10-3.8 1.3.8-.4-1.5 1.2-1h-1.5L17 12l-.6 1.5h-1.5l1.2 1-.4 1.5 1.3-.8Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--date-jump" type="button" data-open-date-jump="1" title="Ir a fecha en este chat" aria-label="Ir a fecha en este chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v9h14v-9ZM5 6v2h14V6H5Zm3 6h3v3H8v-3Zm5 0h3v3h-3v-3Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--links" type="button" data-open-link-library="1" title="Enlaces compartidos" aria-label="Abrir enlaces compartidos del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 0 0 0 6h4v2h-4a5 5 0 0 1-5-5Zm5.1 1v-2h6v2H9Zm2-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4V7Z"/></svg>
+      </button>
+      <button class="ce-icon-btn" type="button" data-unread-active-chat="1" title="Marcar como no leído" aria-label="Marcar como no leído">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 3.2V17h16V8.2l-7.4 5.1a1 1 0 0 1-1.2 0L4 8.2ZM5.4 7 12 11.56 18.6 7H5.4Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--reminders" type="button" data-open-reminders="1" title="Recordatorios privados del chat" aria-label="Abrir recordatorios privados del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm1 8.59 3.2 3.2-1.4 1.42L11 11.41V5h2v5.59ZM4 20h16v2H4v-2Z"/></svg>
+      </button>
+      <button class="ce-icon-btn ce-icon-btn--private-notes" type="button" data-open-private-notes="1" title="Notas privadas del chat" aria-label="Abrir notas privadas del chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11.5L21 7.5V21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm10 1.7V9h4.3L15 4.7ZM7 12h10v-2H7v2Zm0 4h10v-2H7v2Zm0 4h7v-2H7v2Z"/></svg>
+      </button>
+      <button class="ce-icon-btn" type="button" data-export-active-chat="1" title="Exportar chat" aria-label="Exportar chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2ZM13 4h-2v8.17L7.41 8.59 6 10l6 6 6-6-1.41-1.41L13 12.17V4Z"/></svg>
+      </button>
+    </div>`;
+  els.chatSearchArea?.classList.remove('hidden');
+  if (els.chatSearchInput) els.chatSearchInput.disabled = false;
+  if (els.btnShowStarred) els.btnShowStarred.disabled = false;
+  const messages = state.messagesByChat.get(chat.chatId) || [];
+  const queuedMessages = getQueuedMessagesForChat(chat.chatId);
+  const sameRenderedChat = state.renderedActiveChatId === chat.chatId;
+  const wasNearBottom = !sameRenderedChat || isMessagesNearBottom();
+  const previousScrollHeight = els.messages?.scrollHeight || 0;
+  const previousScrollTop = els.messages?.scrollTop || 0;
+  const previousRenderedCount = Number(state.renderedMessageCountByChat.get(chat.chatId) || 0);
+  const nextRenderedCount = messages.length + queuedMessages.length;
+  const grewWhileAway = sameRenderedChat && !wasNearBottom && nextRenderedCount > previousRenderedCount;
+  const unreadMarker = state.unreadMarkerByChatId.get(chat.chatId) || null;
+  const storedMessageHtml = messages.map((msg) => {
+    const mine = msg.senderUserId === state.user?.userId;
+    const highlighted = msg.messageId === state.highlightedMessageId ? ' is-highlighted' : '';
+    const pinned = msg.isPinned && !isDeletedMessage(msg) ? ' is-pinned-message' : '';
+    const unreadSeparator = unreadMarker?.messageId && msg.messageId === unreadMarker.messageId ? renderUnreadSeparator(unreadMarker) : '';
+    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}">${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
+  }).join('');
+  const queuedMessageHtml = queuedMessages.map(renderQueuedMessage).join('');
+  const emptyText = isChatInteractionBlocked(chat) ? 'La conversación se mantiene disponible para consulta.' : 'Envía el primer mensaje.';
+  const messageHtml = `${storedMessageHtml}${queuedMessageHtml}` || `<div class="ce-chat-empty">${escapeHtml(emptyText)}</div>`;
+  els.messages.innerHTML = `${renderChatBlockNotice(chat)}${renderPinnedMessagesStrip(chat, messages)}${messageHtml}`;
+  state.renderedActiveChatId = chat.chatId;
+  state.renderedMessageCountByChat.set(chat.chatId, nextRenderedCount);
+  if (state.highlightedMessageId) {
+    window.setTimeout(() => {
+      focusHighlightedMessage();
+      updateScrollBottomButton();
+    }, 0);
+  } else if (unreadMarker?.messageId && !sameRenderedChat) {
+    window.setTimeout(() => {
+      jumpToUnreadMarker(unreadMarker.messageId);
+      updateScrollBottomButton();
+    }, 0);
+  } else if (!sameRenderedChat || wasNearBottom) {
+    scrollMessagesToBottom({ smooth: false, resetNew: true });
+  } else {
+    els.messages.scrollTop = Math.max(0, els.messages.scrollHeight - previousScrollHeight + previousScrollTop);
+    if (grewWhileAway) state.scrollNewMessages += nextRenderedCount - previousRenderedCount;
+    updateScrollBottomButton();
+  }
+  els.messageInput.disabled = isChatInteractionBlocked(chat);
+  updateComposerControls();
+}
+
+async function selectChat(chatId) {
+  const changedChat = state.activeChatId !== chatId;
+  if (changedChat) {
+    saveActiveDraft({ announce: false });
+    if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  }
+  state.activeChatId = chatId;
+  if (changedChat) {
+    state.replyToMessage = null;
+    state.editingMessage = null;
+    state.forwardingMessage = null;
+    state.scheduleModalOpen = false;
+    state.scheduledMessages = [];
+    state.quickRepliesOpen = false;
+    state.slashCommandsOpen = false;
+    state.privateNotesOpen = false;
+    state.privateNotes = [];
+    state.linkLibraryOpen = false;
+    state.chatBriefOpen = false;
+    state.chatBriefLoading = false;
+    state.chatBriefError = '';
+    resetPrivateNoteEditor();
+    state.remindersOpen = false;
+    state.reminderMessage = null;
+    state.reminders = [];
+    resetChatSearch();
+  }
+  const chatBeforeRead = activeChat();
+  const data = await post('/api/chats/messages', { chatId });
+  let messages = Array.isArray(data.messages) ? data.messages : [];
+  const pinnedIds = new Set((activeChat()?.pinnedMessageIds || []).filter(Boolean));
+  if (pinnedIds.size && [...pinnedIds].some((messageId) => !messages.some((message) => message.messageId === messageId))) {
+    const fullData = await post('/api/chats/messages', { chatId, limit: 500 });
+    messages = Array.isArray(fullData.messages) ? fullData.messages : messages;
+  }
+  rememberUnreadMarkerForChat(chatBeforeRead, messages);
+  state.messagesByChat.set(chatId, messages);
+  renderAll();
+  loadDraftForChat(chatId);
+  updateComposerControls();
+  await markActiveRead();
+  refreshActiveChatPresence({ render: false }).catch(() => schedulePresenceRefresh(60000));
+}
+
+async function markActiveRead() {
+  if (!state.activeChatId) return;
+  try {
+    const data = await post('/api/chats/read', { chatId: state.activeChatId });
+    upsertChat(data.chat);
+    renderChats();
+  } catch {}
+}
+
+async function addContactByEmail(email) {
+  const data = await post('/api/contacts/add-email', { email });
+  upsertContact(data.contact);
+  upsertChat(data.chat);
+  await selectChat(data.chat.chatId);
+}
+
+async function addContactByCode(code) {
+  const maybeEmail = String(code || '').trim();
+  if (/^.+@.+\..+$/.test(maybeEmail) && !maybeEmail.includes('http')) return addContactByEmail(maybeEmail);
+  const data = await post('/api/contacts/add-code', { code });
+  upsertContact(data.contact);
+  upsertChat(data.chat);
+  await selectChat(data.chat.chatId);
+}
+
+async function openContactChat(userId) {
+  const data = await post('/api/chats/open', { userId });
+  upsertChat(data.chat);
+  await selectChat(data.chat.chatId);
+}
+
+async function openSelfNotesChat() {
+  const data = await post('/api/chats/self', {});
+  upsertChat(data.chat);
+  if (state.archivedView && data.chat?.isArchived === false) await loadChats({ includeArchived: false });
+  await selectChat(data.chat.chatId);
+  showTemporaryDraftStatus('Notas para mí abierto. Todo lo que guardes aquí queda en tu cuenta.');
+}
+
+async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
+  if (!state.activeChatId) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4800);
+    throw new Error(chatBlockNoticeText() || 'No puedes enviar mensajes en este chat.');
+  }
+  const chatId = state.activeChatId;
+  const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const replyToMessageId = state.replyToMessage?.messageId || '';
+  const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
+  try {
+    const data = await post('/api/chats/send', { chatId, text, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds) });
+    clearDraftForChat(chatId);
+    state.replyToMessage = null;
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    if (state.archivedView && data.chat?.isArchived === false) {
+      await loadChats({ includeArchived: false });
+      return;
+    }
+    renderAll();
+    if (silent || normalizeEphemeralSeconds(ephemeralSeconds)) {
+      const parts = [];
+      if (silent) parts.push('sin notificación push');
+      if (normalizeEphemeralSeconds(ephemeralSeconds)) parts.push(`temporal por ${formatEphemeralOption(ephemeralSeconds)}`);
+      showTemporaryDraftStatus(`Mensaje enviado ${parts.join(' y ')}.`);
+    }
+  } catch (error) {
+    if (!isRecoverableSendError(error)) throw error;
+    clearDraftForChat(chatId);
+    state.replyToMessage = null;
+    enqueueOutboxMessage({ chatId, text, clientMessageId, replyToMessageId, replyTo, silent, ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), error });
+    sendTyping(false).catch(() => null);
+  }
+}
+
+async function sendSilentCurrentMessage() {
+  if (!state.activeChatId || state.editingMessage?.messageId) return;
+  const text = String(els.messageInput?.value || '').trim();
+  if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  if (!text) {
+    els.messageInput?.focus();
+    return;
+  }
+  els.btnSilentSend && (els.btnSilentSend.disabled = true);
+  try {
+    await sendMessage(text, { silent: true, ephemeralSeconds: selectedEphemeralSeconds() });
+    if (els.messageInput) els.messageInput.value = '';
+    await sendTyping(false);
+  } finally {
+    updateComposerControls();
+    els.messageInput?.focus();
+  }
+}
+
+async function editActiveMessage(text) {
+  if (!state.activeChatId || !state.editingMessage?.messageId) return;
+  const data = await post('/api/chats/edit', { chatId: state.activeChatId, messageId: state.editingMessage.messageId, text });
+  state.editingMessage = null;
+  loadDraftForChat(state.activeChatId);
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  syncStarredPanelMessage(data.message);
+  renderAll();
+}
+
+async function deleteMessageForEveryone(messageId = '') {
+  if (!state.activeChatId || !messageId) return;
+  const ok = window.confirm('¿Eliminar este mensaje para todos? Esta acción no se puede deshacer.');
+  if (!ok) return;
+  const data = await post('/api/chats/delete', { chatId: state.activeChatId, messageId });
+  if (state.replyToMessage?.messageId === messageId) state.replyToMessage = null;
+  if (state.editingMessage?.messageId === messageId) {
+    state.editingMessage = null;
+    loadDraftForChat(state.activeChatId);
+  }
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  syncStarredPanelMessage(data.message);
+  renderAll();
+}
+
+function startReplyToMessage(messageId = '') {
+  if (!state.activeChatId || !messageId) return;
+  const list = state.messagesByChat.get(state.activeChatId) || [];
+  const message = list.find((item) => item.messageId === messageId);
+  if (!message || isDeletedMessage(message)) return;
+  state.replyToMessage = message;
+  state.editingMessage = null;
+  saveActiveDraft({ announce: false });
+  renderReplyDraft();
+  els.messageInput?.focus();
+}
+
+function startEditMessage(messageId = '') {
+  if (!state.activeChatId || !messageId) return;
+  const list = state.messagesByChat.get(state.activeChatId) || [];
+  const message = list.find((item) => item.messageId === messageId);
+  if (!message || isDeletedMessage(message) || message.senderUserId !== state.user?.userId) return;
+  saveActiveDraft({ announce: false });
+  state.editingMessage = message;
+  state.replyToMessage = null;
+  setDraftStatus('');
+  els.messageInput.value = message.text || '';
+  renderReplyDraft();
+  els.messageInput?.focus();
+  try { els.messageInput.setSelectionRange(els.messageInput.value.length, els.messageInput.value.length); } catch {}
+}
+
+function availableForwardChats() {
+  return state.chats.filter((chat) => chat.chatId && chat.chatId !== state.activeChatId && !chat.isArchived && !isChatInteractionBlocked(chat));
+}
+
+function renderForwardModal() {
+  if (!els.forwardModal || !els.forwardList || !els.forwardPreview) return;
+  const message = state.forwardingMessage;
+  if (!message?.messageId) {
+    els.forwardModal.classList.add('hidden');
+    els.forwardPreview.innerHTML = '';
+    els.forwardList.innerHTML = '';
+    return;
+  }
+  const preview = compactText(message.text || '', 260);
+  els.forwardPreview.innerHTML = `<strong>Mensaje seleccionado</strong><span>${escapeHtml(preview)}</span>`;
+  const chats = availableForwardChats();
+  if (!chats.length) {
+    els.forwardList.innerHTML = '<div class="ce-forward-empty">No hay otro chat disponible para reenviar. Agrega o abre un contacto primero.</div>';
+    return;
+  }
+  els.forwardList.innerHTML = chats.map((chat) => {
+    const other = chat.other || {};
+    const label = other.displayName || other.email || 'Contacto';
+    const last = isDeletedMessage(chat.lastMessage) ? 'Mensaje eliminado' : (chat.lastMessage?.text || 'Chat abierto');
+    return `<button class="ce-forward-target" type="button" data-forward-target-chat-id="${escapeHtml(chat.chatId)}" aria-label="Reenviar a ${escapeHtml(label)}">${avatar(other, 'small')}<span><strong>${escapeHtml(label)}</strong><em>${escapeHtml(compactText(last, 96))}</em></span></button>`;
+  }).join('');
+}
+
+function openForwardMessage(messageId = '') {
+  if (!state.activeChatId || !messageId) return;
+  const message = findActiveMessage(messageId);
+  if (!message || isDeletedMessage(message)) return;
+  state.forwardingMessage = { ...message, sourceChatId: state.activeChatId };
+  renderForwardModal();
+  els.forwardModal?.classList.remove('hidden');
+}
+
+function closeForwardModal() {
+  state.forwardingMessage = null;
+  renderForwardModal();
+}
+
+
+function readPollOptionsFromModal() {
+  return Array.from(els.pollOptions?.querySelectorAll('input[data-poll-option-input]') || [])
+    .map((input) => String(input.value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.findIndex((item) => item.toLowerCase() === value.toLowerCase()) === index)
+    .slice(0, 6);
+}
+
+function renderPollModal() {
+  if (!els.pollModal) return;
+  els.pollModal.classList.toggle('hidden', !state.pollModalOpen);
+  if (!state.pollModalOpen) return;
+  const question = String(els.pollQuestionInput?.value || '').trim();
+  const options = readPollOptionsFromModal();
+  if (els.pollPreview) {
+    els.pollPreview.innerHTML = question
+      ? `<strong>${escapeHtml(question)}</strong><span>${options.length} ${options.length === 1 ? 'opción preparada' : 'opciones preparadas'}</span>`
+      : '<strong>Pregunta de la encuesta</strong><span>Las personas del chat podrán votar una sola opción y cambiar su voto.</span>';
+  }
+  if (els.btnConfirmPoll) els.btnConfirmPoll.disabled = !state.activeChatId || isChatInteractionBlocked() || state.pollCreating || !question || options.length < 2;
+}
+
+function openPollModal() {
+  if (!state.activeChatId || state.editingMessage?.messageId) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  state.pollModalOpen = true;
+  if (els.pollQuestionInput && !els.pollQuestionInput.value) els.pollQuestionInput.value = '';
+  renderPollModal();
+  window.setTimeout(() => els.pollQuestionInput?.focus(), 0);
+}
+
+function closePollModal() {
+  state.pollModalOpen = false;
+  renderPollModal();
+}
+
+async function createPollFromModal() {
+  if (!state.activeChatId || state.pollCreating) return;
+  ensureChatInteractionAllowed();
+  const question = String(els.pollQuestionInput?.value || '').trim();
+  const options = readPollOptionsFromModal();
+  if (!question) throw new Error('Escribe la pregunta de la encuesta.');
+  if (options.length < 2) throw new Error('Agrega al menos 2 opciones diferentes.');
+  const chatId = state.activeChatId;
+  const clientMessageId = `poll_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  state.pollCreating = true;
+  renderPollModal();
+  updateComposerControls();
+  try {
+    const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId });
+    clearDraftForChat(chatId);
+    upsertChat(data.chat);
+    upsertMessage(data.message);
+    closePollModal();
+    if (els.pollForm) els.pollForm.reset();
+    renderAll();
+    showTemporaryDraftStatus('Encuesta publicada en el chat.');
+  } finally {
+    state.pollCreating = false;
+    renderPollModal();
+    updateComposerControls();
+  }
+}
+
+async function setPollVote(messageId = '', optionId = '') {
+  if (!state.activeChatId || !messageId || !optionId) return;
+  ensureChatInteractionAllowed();
+  const data = await post('/api/chats/poll/vote', { chatId: state.activeChatId, messageId, optionId });
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  renderAll();
+}
+
+function normalizeScheduleInputValue() {
+  const raw = String(els.scheduleDateTime?.value || '').trim();
+  if (!raw) return '';
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function renderScheduleModal() {
+  if (!els.scheduleModal || !els.schedulePreview || !els.scheduledList) return;
+  els.scheduleModal.classList.toggle('hidden', !state.scheduleModalOpen);
+  if (!state.scheduleModalOpen) return;
+  const text = String(els.messageInput?.value || '').trim();
+  const selectedTtl = selectedEphemeralSeconds();
+  const ttlNotice = selectedTtl ? `<em>Temporal: expira ${escapeHtml(formatEphemeralOption(selectedTtl))} después de enviarse.</em>` : '';
+  els.schedulePreview.innerHTML = text
+    ? `<strong>Mensaje listo para programar</strong><span>${escapeHtml(compactText(text, 280))}</span>${ttlNotice}`
+    : '<strong>Escribe un mensaje</strong><span>El texto del compositor aparecerá aquí antes de programarlo.</span>';
+  if (els.btnConfirmSchedule) els.btnConfirmSchedule.disabled = !text || !state.activeChatId || isChatInteractionBlocked() || state.schedulingMessage;
+  if (state.scheduledLoading) {
+    els.scheduledList.innerHTML = '<div class="ce-scheduled-empty">Cargando mensajes programados...</div>';
+    return;
+  }
+  const items = Array.isArray(state.scheduledMessages) ? state.scheduledMessages : [];
+  const pending = items.filter((item) => item.status === 'scheduled' || item.status === 'failed');
+  if (!pending.length) {
+    els.scheduledList.innerHTML = '<div class="ce-scheduled-empty">No tienes mensajes programados en este chat.</div>';
+    return;
+  }
+  els.scheduledList.innerHTML = `
+    <div class="ce-scheduled-title">Programados en este chat</div>
+    ${pending.map((item) => {
+      const failed = item.status === 'failed';
+      const silent = item.silent ? ' · sin notificación' : '';
+      const ephemeral = item.ephemeralSeconds ? ` · temporal ${escapeHtml(formatEphemeralOption(item.ephemeralSeconds))}` : '';
+      const status = failed ? `No enviado · ${escapeHtml(item.lastError || 'Revisa y programa uno nuevo')}${silent}${ephemeral}` : `Se enviará ${escapeHtml(formatScheduleDateTime(item.scheduledFor))}${silent}${ephemeral}`;
+      const cancelLabel = item.status === 'scheduled' ? 'Cancelar' : 'Quitar';
+      const cancel = ['scheduled', 'failed'].includes(item.status) ? `<button class="ce-link" type="button" data-cancel-scheduled-id="${escapeHtml(item.scheduledId || '')}">${cancelLabel}</button>` : '';
+      return `<div class="ce-scheduled-item${failed ? ' is-failed' : ''}"><span><strong>${escapeHtml(compactText(item.text || '', 160))}</strong><em>${status}</em></span>${cancel}</div>`;
+    }).join('')}`;
+}
+
+async function loadScheduledMessages({ force = false } = {}) {
+  if (!state.activeChatId || state.scheduledLoading) return;
+  if (!force && state.scheduledMessages.some((item) => item.chatId === state.activeChatId)) return;
+  state.scheduledLoading = true;
+  renderScheduleModal();
+  try {
+    const data = await post('/api/chats/scheduled/list', { chatId: state.activeChatId, limit: 80 });
+    state.scheduledMessages = Array.isArray(data.scheduledMessages) ? data.scheduledMessages : [];
+  } finally {
+    state.scheduledLoading = false;
+    renderScheduleModal();
+  }
+}
+
+async function openScheduleModal() {
+  if (!state.activeChatId || state.editingMessage?.messageId) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  const text = String(els.messageInput?.value || '').trim();
+  if (!text) {
+    els.messageInput?.focus();
+    return;
+  }
+  state.scheduleModalOpen = true;
+  const minDate = new Date(Date.now() + 60 * 1000);
+  const defaultDate = new Date(Date.now() + 10 * 60 * 1000);
+  if (els.scheduleDateTime) {
+    els.scheduleDateTime.min = toDateTimeLocalValue(minDate);
+    if (!els.scheduleDateTime.value) els.scheduleDateTime.value = toDateTimeLocalValue(defaultDate);
+  }
+  renderScheduleModal();
+  await loadScheduledMessages({ force: true }).catch((error) => {
+    els.scheduledList.innerHTML = `<div class="ce-scheduled-empty">${escapeHtml(error.message || 'No se pudieron cargar los mensajes programados.')}</div>`;
+  });
+}
+
+function closeScheduleModal() {
+  state.scheduleModalOpen = false;
+  renderScheduleModal();
+}
+
+async function scheduleCurrentMessage() {
+  if (!state.activeChatId || state.schedulingMessage) return;
+  ensureChatInteractionAllowed();
+  const text = String(els.messageInput?.value || '').trim();
+  if (!text) throw new Error('Escribe un mensaje antes de programarlo.');
+  const scheduledFor = normalizeScheduleInputValue();
+  if (!scheduledFor) throw new Error('Selecciona una fecha y hora válida.');
+  const clientMessageId = `scheduled_client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const replyToMessageId = state.replyToMessage?.messageId || '';
+  const silent = Boolean(els.scheduleSilent?.checked);
+  const ephemeralSeconds = selectedEphemeralSeconds();
+  state.schedulingMessage = true;
+  renderScheduleModal();
+  updateComposerControls();
+  try {
+    const data = await post('/api/chats/scheduled/create', { chatId: state.activeChatId, text, scheduledFor, clientMessageId, replyToMessageId, silent, ephemeralSeconds });
+    state.scheduledMessages = [data.scheduledMessage, ...state.scheduledMessages.filter((item) => item.scheduledId !== data.scheduledMessage?.scheduledId)].filter(Boolean);
+    clearDraftForChat(state.activeChatId);
+    state.replyToMessage = null;
+    if (els.messageInput) els.messageInput.value = '';
+    closeScheduleModal();
+    showTemporaryDraftStatus(`Mensaje programado para ${formatScheduleDateTime(data.scheduledMessage?.scheduledFor)}${silent ? ' sin notificación push' : ''}${ephemeralSeconds ? ` · temporal ${formatEphemeralOption(ephemeralSeconds)}` : ''}.`);
+  } finally {
+    state.schedulingMessage = false;
+    renderReplyDraft();
+    renderScheduleModal();
+    updateComposerControls();
+  }
+}
+
+async function cancelScheduledMessage(scheduledId = '') {
+  if (!scheduledId) return;
+  const data = await post('/api/chats/scheduled/cancel', { scheduledId });
+  state.scheduledMessages = state.scheduledMessages.filter((item) => item.scheduledId !== data.scheduledMessage?.scheduledId);
+  renderScheduleModal();
+  showTemporaryDraftStatus('Mensaje programado cancelado.');
+}
+
+async function forwardMessageToChat(targetChatId = '') {
+  const source = state.forwardingMessage;
+  if (!source?.messageId || !source.sourceChatId || !targetChatId) return;
+  const targetChat = state.chats.find((chat) => chat.chatId === targetChatId);
+  if (isChatInteractionBlocked(targetChat)) {
+    showTemporaryDraftStatus(chatBlockNoticeText(targetChat), 4200);
+    throw new Error(chatBlockNoticeText(targetChat) || 'No puedes reenviar mensajes a un contacto bloqueado.');
+  }
+  const clientMessageId = `forward_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const data = await post('/api/chats/forward', {
+    sourceChatId: source.sourceChatId,
+    messageId: source.messageId,
+    targetChatId,
+    clientMessageId
+  });
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  closeForwardModal();
+  renderAll();
+  showTemporaryDraftStatus('Mensaje reenviado.');
+}
+
+async function jumpToMessage(messageId = '') {
+  if (!messageId) return;
+  await openSearchResult(messageId);
+}
+
+async function setMessageReaction(messageId = '', reaction = '') {
+  if (!state.activeChatId || !messageId) return;
+  ensureChatInteractionAllowed();
+  const data = await post('/api/chats/reaction', { chatId: state.activeChatId, messageId, reaction });
+  upsertChat(data.chat);
+  upsertMessage(data.message);
+  renderAll();
+}
+
+async function setChatPinned(chatId = '', pinned = true) {
+  if (!chatId) return;
+  const data = await post('/api/chats/pin', { chatId, pinned });
+  upsertChat(data.chat);
+  renderChats();
+}
+
+async function setActiveChatMuted(muted = true) {
+  if (!state.activeChatId) return;
+  const data = await post('/api/chats/mute', { chatId: state.activeChatId, muted });
+  upsertChat(data.chat);
+  renderAll();
+  showTemporaryDraftStatus(data.muted ? 'Notificaciones silenciadas en este chat.' : 'Notificaciones activadas en este chat.');
+}
+
+function applyBlockStatusForTargetUser(targetUserId = '', blockStatus = {}) {
+  const cleanTarget = String(targetUserId || blockStatus?.targetUserId || '').trim();
+  if (!cleanTarget) return false;
+  let changed = false;
+  state.chats = state.chats.map((chat) => {
+    if (chat?.other?.userId !== cleanTarget) return chat;
+    changed = true;
+    const normalized = {
+      ...normalizeChatBlockStatus({ ...chat, blockStatus }),
+      ...blockStatus,
+      targetUserId: cleanTarget
+    };
+    return {
+      ...chat,
+      blockStatus: normalized,
+      isBlockedByMe: Boolean(normalized.blockedByMe),
+      hasBlockedMe: Boolean(normalized.blockedMe),
+      isBlocked: Boolean(normalized.blocked || normalized.blockedByMe || normalized.blockedMe)
+    };
+  });
+  if (changed) sortChats();
+  return changed;
+}
+
+async function setActiveContactBlocked(blocked = true) {
+  const chat = activeChat();
+  if (!chat?.chatId || isSelfChat(chat)) return;
+  const targetUserId = chat.other?.userId || normalizeChatBlockStatus(chat).targetUserId;
+  if (!targetUserId) throw new Error('No se pudo identificar el contacto.');
+  if (blocked) {
+    const ok = window.confirm('¿Bloquear este contacto? No podrá recibir tus mensajes desde esta conversación hasta que lo desbloquees.');
+    if (!ok) return;
+  }
+  const data = await post('/api/contacts/block', { targetUserId, blocked: Boolean(blocked) });
+  applyBlockStatusForTargetUser(targetUserId, data.blockStatus || {});
+  if (blocked && state.voiceDictating) stopVoiceDictation({ announce: false });
+  if (blocked) state.quickRepliesOpen = false;
+  if (state.blockedContactsOpen) await loadBlockedContacts({ silent: true }).catch(() => null);
+  renderAll();
+  showTemporaryDraftStatus(blocked ? 'Contacto bloqueado. Puedes desbloquearlo desde el encabezado del chat.' : 'Contacto desbloqueado. Ya puedes enviar mensajes.');
+}
+
+
+function blockedContactTitle(item = {}) {
+  const profile = item.profile || {};
+  return profile.displayName || profile.email || 'Contacto bloqueado';
+}
+
+function blockedContactSubtitle(item = {}) {
+  const profile = item.profile || {};
+  if (profile.email) return profile.email;
+  return item.targetUserId ? `ID: ${compactText(item.targetUserId, 36)}` : 'Perfil no disponible';
+}
+
+async function loadBlockedContacts({ silent = false } = {}) {
+  if (!state.user) return [];
+  state.blockedContactsLoading = true;
+  if (!silent) renderBlockedContactsModal();
+  try {
+    const data = await post('/api/contacts/blocks/list', {});
+    state.blockedContacts = Array.isArray(data.blockedContacts) ? data.blockedContacts : [];
+    return state.blockedContacts;
+  } finally {
+    state.blockedContactsLoading = false;
+    renderBlockedContactsModal();
+  }
+}
+
+function openBlockedContactsModal() {
+  if (!state.user) throw new Error('Inicia sesión para revisar tus contactos bloqueados.');
+  state.blockedContactsOpen = true;
+  renderBlockedContactsModal();
+  loadBlockedContacts({ silent: true }).catch((error) => {
+    state.blockedContactsLoading = false;
+    renderBlockedContactsModal(error);
+  });
+}
+
+function closeBlockedContactsModal() {
+  state.blockedContactsOpen = false;
+  renderBlockedContactsModal();
+}
+
+function renderBlockedContactsModal(error = null) {
+  if (!els.blockedContactsModal || !els.blockedContactsList) return;
+  els.blockedContactsModal.classList.toggle('hidden', !state.blockedContactsOpen);
+  if (!state.blockedContactsOpen) return;
+  if (state.blockedContactsLoading) {
+    els.blockedContactsList.innerHTML = '<div class="ce-blocked-contacts-empty">Cargando contactos bloqueados...</div>';
+    return;
+  }
+  if (error) {
+    els.blockedContactsList.innerHTML = `<div class="ce-blocked-contacts-empty">${escapeHtml(error.message || 'No se pudieron cargar los contactos bloqueados.')}</div>`;
+    return;
+  }
+  if (!state.blockedContacts.length) {
+    els.blockedContactsList.innerHTML = '<div class="ce-blocked-contacts-empty">No tienes contactos bloqueados. Cuando bloquees a alguien, aparecerá aquí para que puedas gestionarlo sin buscar el chat.</div>';
+    return;
+  }
+  els.blockedContactsList.innerHTML = state.blockedContacts.map((item) => {
+    const title = blockedContactTitle(item);
+    const subtitle = blockedContactSubtitle(item);
+    const date = item.blockedAt ? `Bloqueado el ${formatScheduleDateTime(item.blockedAt)}` : 'Bloqueo activo';
+    return `<article class="ce-blocked-contact">
+      ${item.profile ? avatar(item.profile, 'small') : '<span class="ce-avatar ce-avatar--small" aria-hidden="true">⛔</span>'}
+      <div class="ce-blocked-contact__body">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(subtitle)}</span>
+        <em>${escapeHtml(date)}</em>
+      </div>
+      <button class="ce-link" type="button" data-unblock-contact-id="${escapeHtml(item.targetUserId || '')}">Desbloquear</button>
+    </article>`;
+  }).join('');
+}
+
+async function unblockContactFromModal(targetUserId = '') {
+  const cleanTarget = String(targetUserId || '').trim();
+  if (!cleanTarget) throw new Error('No se pudo identificar el contacto bloqueado.');
+  const ok = window.confirm('¿Desbloquear este contacto? Podrás volver a enviarle mensajes si la otra persona no te ha bloqueado.');
+  if (!ok) return;
+  const data = await post('/api/contacts/block', { targetUserId: cleanTarget, blocked: false });
+  applyBlockStatusForTargetUser(cleanTarget, data.blockStatus || {});
+  state.blockedContacts = state.blockedContacts.filter((item) => item.targetUserId !== cleanTarget);
+  renderAll();
+  renderBlockedContactsModal();
+  showTemporaryDraftStatus('Contacto desbloqueado desde la lista de bloqueados.');
+}
+
+function resolveNicknameTarget(targetUserId = '') {
+  const cleanTarget = String(targetUserId || '').trim();
+  if (!cleanTarget) return null;
+  const contact = getContactByUserId(cleanTarget);
+  if (contact) return { ...contact };
+  const chat = activeChat();
+  if (chat?.other?.userId === cleanTarget) return { ...chat.other };
+  return null;
+}
+
+function renderContactNicknameModal() {
+  if (!els.contactNicknameModal) return;
+  els.contactNicknameModal.classList.toggle('hidden', !state.contactNicknameModalOpen);
+  if (!state.contactNicknameModalOpen) return;
+  const target = state.contactNicknameTarget || {};
+  const canonicalName = target.displayName || target.email || 'Contacto';
+  if (els.contactNicknameTitle) els.contactNicknameTitle.textContent = `Apodo privado para ${contactDisplayName(target)}`;
+  if (els.contactNicknameSubtitle) {
+    els.contactNicknameSubtitle.textContent = `Solo tú verás este nombre. El perfil real seguirá siendo ${canonicalName}${target.email ? ` · ${target.email}` : ''}.`;
+  }
+  if (els.contactNicknameInput && document.activeElement !== els.contactNicknameInput) els.contactNicknameInput.value = state.contactNicknameDraft;
+  if (els.btnSaveContactNickname) els.btnSaveContactNickname.disabled = state.contactNicknameSaving || !target.userId;
+  if (els.btnClearContactNickname) els.btnClearContactNickname.disabled = state.contactNicknameSaving || !target.userId || !String(target.nickname || state.contactNicknameDraft || '').trim();
+}
+
+function openContactNicknameModal(targetUserId = '') {
+  const target = resolveNicknameTarget(targetUserId);
+  if (!target?.userId) {
+    showTemporaryDraftStatus('No se pudo abrir el editor de apodo para este contacto.', 4200);
+    return;
+  }
+  state.contactNicknameTarget = target;
+  state.contactNicknameDraft = String(target.nickname || '').trim();
+  state.contactNicknameModalOpen = true;
+  renderContactNicknameModal();
+  window.setTimeout(() => els.contactNicknameInput?.focus(), 60);
+}
+
+function openActiveContactNicknameModal() {
+  const chat = activeChat();
+  const targetUserId = chat?.other?.userId || '';
+  if (!targetUserId || isSelfChat(chat)) return;
+  openContactNicknameModal(targetUserId);
+}
+
+function closeContactNicknameModal() {
+  state.contactNicknameModalOpen = false;
+  state.contactNicknameTarget = null;
+  state.contactNicknameDraft = '';
+  state.contactNicknameSaving = false;
+  renderContactNicknameModal();
+}
+
+async function saveContactNicknameFromModal({ clear = false } = {}) {
+  const target = state.contactNicknameTarget || {};
+  if (!target.userId || state.contactNicknameSaving) return;
+  state.contactNicknameSaving = true;
+  renderContactNicknameModal();
+  try {
+    const nickname = clear ? '' : String(els.contactNicknameInput?.value || state.contactNicknameDraft || '').trim();
+    const data = await post('/api/contacts/nickname', { targetUserId: target.userId, nickname });
+    applyUpdatedContact(data.contact || { ...target, nickname, contactName: nickname || target.displayName || target.email || 'Contacto' });
+    closeContactNicknameModal();
+    renderAll();
+    showTemporaryDraftStatus(nickname ? 'Apodo privado guardado.' : 'Apodo privado eliminado.');
+  } catch (error) {
+    alert(error.message || 'No se pudo guardar el apodo privado.');
+  } finally {
+    state.contactNicknameSaving = false;
+    renderContactNicknameModal();
+  }
+}
+
+async function markActiveChatUnread() {
+  if (!state.activeChatId) return;
+  const data = await post('/api/chats/unread', { chatId: state.activeChatId });
+  upsertChat(data.chat);
+  renderAll();
+  showTemporaryDraftStatus('Chat marcado como no leído.');
+}
+
+async function setChatArchived(chatId = '', archived = true) {
+  if (!chatId) return;
+  const data = await post('/api/chats/archive', { chatId, archived });
+  const wasActive = state.activeChatId === chatId;
+  if (wasActive && data.archived) clearActiveChatState();
+  await loadChats({ includeArchived: state.archivedView });
+  showTemporaryDraftStatus(data.archived ? 'Chat archivado. Puedes verlo en Archivados.' : 'Chat restaurado a la lista principal.');
+}
+
+async function sendTyping(isTyping) {
+  if (!state.activeChatId || (isTyping && isChatInteractionBlocked())) return;
+  try { await post('/api/chats/typing', { chatId: state.activeChatId, isTyping }); } catch {}
+}
+
+function openOwnQr() {
+  els.qrModalTitle.textContent = 'Mi código QR';
+  els.qrHelp.textContent = 'Comparte este QR para que otros te agreguen y abran un chat contigo.';
+  els.scanBox.classList.add('hidden');
+  stopScan();
+  const code = state.user?.profileCode || '';
+  els.qrBox.innerHTML = `<img src="${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg" alt="QR de mi perfil chatER"><code>${escapeHtml(code)}</code>`;
+  els.qrModal.classList.remove('hidden');
+}
+
+async function openScanQr() {
+  els.qrModalTitle.textContent = 'Escanear QR';
+  els.qrHelp.textContent = 'Escanea el QR de un contacto. Si la cámara no está disponible, pega el código o enlace.';
+  els.qrBox.innerHTML = '';
+  els.scanStatus.textContent = 'Apunta la cámara al código QR.';
+  els.scanBox.classList.remove('hidden');
+  els.qrModal.classList.remove('hidden');
+  await startScan();
+}
+
+function closeQrModal() {
+  stopScan();
+  els.qrModal.classList.add('hidden');
+  els.manualCodeInput.value = '';
+}
+
+async function startScan() {
+  if (!('BarcodeDetector' in window)) {
+    els.scanStatus.textContent = 'Este navegador no permite escanear QR directamente. Pega el código o enlace abajo.';
+    return;
+  }
+  try {
+    state.scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    els.qrVideo.srcObject = state.scanStream;
+    await els.qrVideo.play();
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    const tick = async () => {
+      if (!state.scanStream) return;
+      try {
+        const codes = await detector.detect(els.qrVideo);
+        const value = codes?.[0]?.rawValue || '';
+        if (value) {
+          els.scanStatus.textContent = 'QR detectado. Agregando contacto...';
+          await addContactByCode(value);
+          closeQrModal();
+          return;
+        }
+      } catch {}
+      state.scanTimer = window.setTimeout(tick, 700);
+    };
+    tick();
+  } catch {
+    els.scanStatus.textContent = 'No se pudo abrir la cámara. Pega el código o enlace abajo.';
+  }
+}
+
+function stopScan() {
+  if (state.scanTimer) window.clearTimeout(state.scanTimer);
+  state.scanTimer = 0;
+  if (state.scanStream) state.scanStream.getTracks().forEach((track) => track.stop());
+  state.scanStream = null;
+  if (els.qrVideo) els.qrVideo.srcObject = null;
+}
+
+async function consumeAddFromUrl() {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('add');
+  if (!code || !state.user) return;
+  try {
+    await addContactByCode(code);
+    url.searchParams.delete('add');
+    window.history.replaceState({}, '', url.toString());
+  } catch (error) {
+    alert(error.message || 'No se pudo agregar el contacto del QR.');
+  }
+}
+
+async function consumeChatFromUrl() {
+  const url = new URL(window.location.href);
+  const chatId = url.searchParams.get('chat');
+  const messageId = url.searchParams.get('message');
+  if (!chatId || !state.user) return;
+  if (state.chats.some((chat) => chat.chatId === chatId)) {
+    await selectChat(chatId).catch(() => null);
+    if (messageId) await openSearchResult(messageId).catch(() => null);
+    url.searchParams.delete('chat');
+    url.searchParams.delete('message');
+    window.history.replaceState({}, '', url.toString());
+  }
+}
+
+function buildActiveChatDeepLink() {
+  if (!state.activeChatId) return '';
+  const url = new URL(window.location.href);
+  url.searchParams.set('chat', state.activeChatId);
+  url.searchParams.delete('message');
+  url.hash = '';
+  return url.toString();
+}
+
+async function copyTextToClipboard(text = '') {
+  const clean = String(text || '').trim();
+  if (!clean) throw new Error('No hay texto disponible para copiar.');
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(clean);
+    return true;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = clean;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  if (!copied) throw new Error('No se pudo copiar automáticamente.');
+  return true;
+}
+
+async function copyActiveChatLink() {
+  const link = buildActiveChatDeepLink();
+  if (!link) throw new Error('Selecciona un chat antes de copiar su enlace.');
+  await copyTextToClipboard(link);
+  showTemporaryDraftStatus('Enlace interno del chat copiado. Solo funciona en cuentas con acceso a esta conversación.');
+}
+
+
+function normalizeLinkCandidate(value = '') {
+  let url = String(value || '').trim();
+  if (!url) return '';
+  url = url.replace(/[),.;:!?]+$/g, '');
+  try {
+    const parsed = new URL(url.startsWith('www.') ? `https://${url}` : url);
+    if (!/^https?:$/.test(parsed.protocol)) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function linkHostLabel(url = '') {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '') || 'enlace';
+  } catch {
+    return 'enlace';
+  }
+}
+
+function extractLinksFromText(text = '') {
+  const matches = String(text || '').match(/https?:\/\/[^\s<>()]+|www\.[^\s<>()]+/gi) || [];
+  return Array.from(new Set(matches.map(normalizeLinkCandidate).filter(Boolean)));
+}
+
+function getActiveChatLinks() {
+  const chat = activeChat();
+  if (!chat?.chatId) return [];
+  const messages = state.messagesByChat.get(chat.chatId) || [];
+  const links = [];
+  const seen = new Set();
+  for (const message of messages.slice().reverse()) {
+    if (!message?.messageId || isDeletedMessage(message)) continue;
+    for (const url of extractLinksFromText(message.text || '')) {
+      const dedupeKey = `${url}|${message.messageId}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      links.push({
+        url,
+        host: linkHostLabel(url),
+        messageId: message.messageId,
+        messageText: message.text || '',
+        createdAt: message.createdAt || '',
+        senderUserId: message.senderUserId || ''
+      });
+    }
+  }
+  return links;
+}
+
+function closeLinkLibrary() {
+  state.linkLibraryOpen = false;
+  state.linkLibraryQuery = '';
+  if (els.linkLibraryInput) els.linkLibraryInput.value = '';
+  renderLinkLibraryModal();
+}
+
+function openLinkLibrary(initialQuery = '') {
+  if (!state.activeChatId) throw new Error('Selecciona un chat para ver sus enlaces.');
+  state.linkLibraryOpen = true;
+  state.linkLibraryQuery = String(initialQuery || '').trim();
+  if (els.linkLibraryInput) els.linkLibraryInput.value = state.linkLibraryQuery;
+  renderLinkLibraryModal();
+  window.setTimeout(() => {
+    els.linkLibraryInput?.focus();
+    els.linkLibraryInput?.select();
+  }, 0);
+}
+
+function renderLinkLibraryModal() {
+  if (!els.linkLibraryModal || !els.linkLibraryList) return;
+  els.linkLibraryModal.classList.toggle('hidden', !state.linkLibraryOpen);
+  if (!state.linkLibraryOpen) return;
+  const chat = activeChat();
+  if (!chat?.chatId) {
+    els.linkLibraryList.innerHTML = '<div class="ce-link-library-empty">Selecciona un chat para revisar sus enlaces compartidos.</div>';
+    return;
+  }
+  const query = normalizeClientSearchText(state.linkLibraryQuery || els.linkLibraryInput?.value || '');
+  const allLinks = getActiveChatLinks();
+  const filteredLinks = query
+    ? allLinks.filter((item) => normalizeClientSearchText(`${item.url} ${item.host} ${item.messageText}`).includes(query))
+    : allLinks;
+  if (!allLinks.length) {
+    els.linkLibraryList.innerHTML = '<div class="ce-link-library-empty">Este chat todavía no tiene enlaces. Cuando alguien comparta una URL aparecerá aquí automáticamente.</div>';
+    return;
+  }
+  if (!filteredLinks.length) {
+    els.linkLibraryList.innerHTML = '<div class="ce-link-library-empty">No hay enlaces que coincidan con ese filtro.</div>';
+    return;
+  }
+  els.linkLibraryList.innerHTML = `
+    <div class="ce-link-library-summary">${filteredLinks.length} de ${allLinks.length} ${allLinks.length === 1 ? 'enlace compartido' : 'enlaces compartidos'}</div>
+    ${filteredLinks.map((item) => {
+      const mine = item.senderUserId === state.user?.userId;
+      return `<article class="ce-link-library-item">
+        <div class="ce-link-library-item__main">
+          <strong>${escapeHtml(item.host)}</strong>
+          <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a>
+          <span>${escapeHtml(mine ? 'Tú' : chatDisplayName(chat))} · ${escapeHtml(formatScheduleDateTime(item.createdAt || Date.now()))}</span>
+          <p>${escapeHtml(compactText(item.messageText || item.url, 160))}</p>
+        </div>
+        <div class="ce-link-library-item__actions">
+          <button class="ce-link" type="button" data-copy-link-url="${escapeHtml(item.url)}">Copiar</button>
+          <button class="ce-link" type="button" data-jump-link-message-id="${escapeHtml(item.messageId || '')}">Ver mensaje</button>
+        </div>
+      </article>`;
+    }).join('')}`;
+}
+
+async function copySharedLink(url = '') {
+  const cleanUrl = normalizeLinkCandidate(url);
+  if (!cleanUrl) return;
+  await copyTextToClipboard(cleanUrl);
+  showTemporaryDraftStatus('Enlace copiado al portapapeles.');
+}
+
+const chatBriefStopWords = new Set('para como pero porque sobre entre desde hasta este esta esto estos estas aquel aquella aquellos aquellas que quien quienes cual cuales cuando donde todo toda todos todas con sin por los las del una unos unas mas menos muy bien solo cada aqui ahi alli hay fue eran eres soy somos sera seria sido tiene tienen tengo hacer hace hizo hice dice dijo puede pueden podemos nuestro nuestra tus sus mis le les se me te mi tu su al el la lo de a en y o u es un no si ya ok vale gracias favor hola buen buenas dias tarde noche'.split(' '));
+const chatBriefPendingPattern = /\b(pendiente|pendientes|tarea|hacer|enviar|revisar|confirmar|pagar|llamar|responder|cotizar|aprobar|urgente|seguimiento|recordar|recordatorio|necesito|necesitamos|debo|debemos|falta|faltan|mañana|hoy|fecha|reunión|reunion|propuesta|entrega)\b/i;
+const chatBriefDecisionPattern = /\b(aprobado|aprobada|confirmado|confirmada|listo|lista|queda|quedamos|decidido|decidida|aceptado|aceptada|autorizado|autorizada|de acuerdo|perfecto|correcto|cerrado|resuelto|hecho)\b/i;
+const chatBriefQuestionPattern = /\?|\b(qué|que|cuál|cual|cuándo|cuando|dónde|donde|cómo|como|por qué|porque|quién|quien|puedes|podemos|confirmas|revisas|tienes|hay)\b/i;
+
+function chatBriefMessageText(message = {}) {
+  if (!message || isDeletedMessage(message)) return '';
+  const poll = normalizePollClient(message);
+  if (poll) return `Encuesta: ${poll.question}. Opciones: ${(poll.options || []).map((option) => option.text).join(', ')}`;
+  return String(message.text || '').replace(/\s+/g, ' ').trim();
+}
+
+function chatBriefVisibleMessages(messages = []) {
+  return (Array.isArray(messages) ? messages : [])
+    .filter((message) => message?.messageId && !isDeletedMessage(message))
+    .map((message) => ({ ...message, briefText: chatBriefMessageText(message) }))
+    .filter((message) => message.briefText);
+}
+
+function chatBriefSenderLabel(message = {}, chat = {}) {
+  return message.senderUserId === state.user?.userId ? 'Tú' : chatDisplayName(chat);
+}
+
+function chatBriefKeywordList(messages = []) {
+  const counts = new Map();
+  for (const message of messages.slice(-90)) {
+    const words = normalizeClientSearchText(message.briefText || '')
+      .split(/[^a-z0-9áéíóúñü]+/i)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 4 && word.length <= 18 && !chatBriefStopWords.has(word) && !/^\d+$/.test(word));
+    for (const word of words) counts.set(word, (counts.get(word) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8)
+    .map(([word]) => word);
+}
+
+function chatBriefPickItems(messages = [], pattern, limit = 5) {
+  const items = [];
+  const seen = new Set();
+  for (const message of messages.slice().reverse()) {
+    const text = message.briefText || '';
+    if (!pattern.test(text)) continue;
+    const key = normalizeClientSearchText(text).slice(0, 140);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(message);
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+function buildChatBriefAnalysis(chat = {}, rawMessages = []) {
+  const messages = chatBriefVisibleMessages(rawMessages);
+  const mineCount = messages.filter((message) => message.senderUserId === state.user?.userId).length;
+  const receivedCount = messages.length - mineCount;
+  const linkCount = messages.reduce((total, message) => total + extractLinksFromText(message.briefText || '').length, 0);
+  const pollsCount = messages.filter((message) => normalizePollClient(message)).length;
+  const first = messages[0];
+  const last = messages[messages.length - 1];
+  return {
+    messages,
+    stats: {
+      total: messages.length,
+      mineCount,
+      receivedCount,
+      linkCount,
+      pollsCount,
+      fromLabel: first?.createdAt ? formatScheduleDateTime(first.createdAt) : 'Sin fecha inicial',
+      toLabel: last?.createdAt ? formatScheduleDateTime(last.createdAt) : 'Sin fecha final'
+    },
+    keywords: chatBriefKeywordList(messages),
+    pending: chatBriefPickItems(messages, chatBriefPendingPattern, 6),
+    questions: chatBriefPickItems(messages, chatBriefQuestionPattern, 5),
+    decisions: chatBriefPickItems(messages, chatBriefDecisionPattern, 5),
+    recent: messages.slice(-5).reverse()
+  };
+}
+
+function buildChatBriefText(chat = {}, rawMessages = []) {
+  const brief = buildChatBriefAnalysis(chat, rawMessages);
+  const lines = [
+    `Resumen del chat · chatER`,
+    `Chat: ${chatDisplayName(chat)}`,
+    `Generado: ${formatExportDateTime(Date.now())}`,
+    `Rango: ${brief.stats.fromLabel} → ${brief.stats.toLabel}`,
+    `Mensajes analizados: ${brief.stats.total} · Tú: ${brief.stats.mineCount} · Contacto: ${brief.stats.receivedCount} · Enlaces: ${brief.stats.linkCount} · Encuestas: ${brief.stats.pollsCount}`,
+    `Temas frecuentes: ${brief.keywords.length ? brief.keywords.join(', ') : 'sin temas suficientes'}`,
+    ''.padEnd(42, '-')
+  ];
+  const appendSection = (title, items, emptyText) => {
+    lines.push('', title);
+    if (!items.length) {
+      lines.push(`- ${emptyText}`);
+      return;
+    }
+    for (const message of items) {
+      lines.push(`- [${formatExportDateTime(message.createdAt)}] ${chatBriefSenderLabel(message, chat)}: ${compactText(message.briefText, 190)}`);
+    }
+  };
+  appendSection('Pendientes detectados', brief.pending, 'No se detectaron pendientes claros en los mensajes cargados.');
+  appendSection('Preguntas recientes', brief.questions, 'No se detectaron preguntas recientes.');
+  appendSection('Acuerdos o decisiones detectadas', brief.decisions, 'No se detectaron acuerdos explícitos.');
+  appendSection('Últimos mensajes relevantes', brief.recent, 'No hay mensajes para mostrar.');
+  return `${lines.join('\n')}\n`;
+}
+
+function localDateInputKey(value = '') {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateJumpLabel(dateKey = '') {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return 'Sin fecha';
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function buildDateJumpTimeline(messages = []) {
+  const days = new Map();
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (!message?.messageId || !message.createdAt) continue;
+    const dateKey = localDateInputKey(message.createdAt);
+    if (!dateKey) continue;
+    const current = days.get(dateKey) || {
+      dateKey,
+      count: 0,
+      firstMessageId: message.messageId,
+      firstMessageAt: message.createdAt,
+      lastMessageId: message.messageId,
+      lastMessageAt: message.createdAt,
+      preview: ''
+    };
+    current.count += 1;
+    current.lastMessageId = message.messageId;
+    current.lastMessageAt = message.createdAt;
+    if (!current.preview && !isDeletedMessage(message)) current.preview = compactText(chatBriefMessageText(message) || message.text || '', 120);
+    days.set(dateKey, current);
+  }
+  return [...days.values()].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+}
+
+function closeDateJump() {
+  state.dateJumpOpen = false;
+  state.dateJumpLoading = false;
+  state.dateJumpError = '';
+  renderDateJumpModal();
+}
+
+async function loadDateJumpTimeline() {
+  const chat = activeChat();
+  if (!chat?.chatId) return;
+  const chatId = chat.chatId;
+  state.dateJumpLoading = true;
+  state.dateJumpError = '';
+  renderDateJumpModal();
+  try {
+    const data = await post('/api/chats/messages', { chatId, limit: 500 });
+    if (state.activeChatId !== chatId || state.dateJumpChatId !== chatId) return;
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    state.messagesByChat.set(chatId, messages);
+    state.dateJumpDays = buildDateJumpTimeline(messages);
+    if (!state.dateJumpSelected && state.dateJumpDays.length) state.dateJumpSelected = state.dateJumpDays[0].dateKey;
+  } catch {
+    if (state.activeChatId !== chatId || state.dateJumpChatId !== chatId) return;
+    const cached = state.messagesByChat.get(chatId) || [];
+    state.dateJumpDays = buildDateJumpTimeline(cached);
+    state.dateJumpError = 'No se pudo actualizar desde el servidor. Se muestra la línea de tiempo cargada en este dispositivo.';
+  } finally {
+    if (state.activeChatId === chatId && state.dateJumpChatId === chatId) {
+      state.dateJumpLoading = false;
+      renderDateJumpModal();
+    }
+  }
+}
+
+async function openDateJump() {
+  const chat = activeChat();
+  if (!chat?.chatId) throw new Error('Selecciona un chat para buscar por fecha.');
+  if (state.dateJumpChatId !== chat.chatId) {
+    state.dateJumpSelected = '';
+    state.dateJumpDays = [];
+    state.dateJumpError = '';
+    state.dateJumpChatId = chat.chatId;
+  }
+  state.dateJumpOpen = true;
+  state.dateJumpError = '';
+  const messages = state.messagesByChat.get(chat.chatId) || [];
+  state.dateJumpDays = buildDateJumpTimeline(messages);
+  state.dateJumpSelected = state.dateJumpSelected || localDateInputKey(messages[messages.length - 1]?.createdAt || Date.now());
+  renderDateJumpModal();
+  window.setTimeout(() => {
+    els.dateJumpInput?.focus();
+    els.dateJumpInput?.select();
+  }, 0);
+  await loadDateJumpTimeline();
+}
+
+async function jumpToDateKey(dateKey = '') {
+  const cleanDateKey = String(dateKey || state.dateJumpSelected || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDateKey)) {
+    showTemporaryDraftStatus('Selecciona una fecha válida para saltar dentro del chat.', 3600);
+    return;
+  }
+  const targetDay = state.dateJumpDays.find((item) => item.dateKey === cleanDateKey);
+  if (!targetDay?.firstMessageId) {
+    showTemporaryDraftStatus('No hay mensajes guardados para esa fecha en los últimos 500 mensajes cargados.', 4200);
+    return;
+  }
+  closeDateJump();
+  await jumpToMessage(targetDay.firstMessageId);
+  showTemporaryDraftStatus(`Saltaste al primer mensaje del ${formatDateJumpLabel(cleanDateKey)}.`, 4200);
+}
+
+function renderDateJumpModal() {
+  if (!els.dateJumpModal || !els.dateJumpList) return;
+  els.dateJumpModal.classList.toggle('hidden', !state.dateJumpOpen);
+  if (!state.dateJumpOpen) return;
+  const chat = activeChat();
+  if (els.dateJumpInput) els.dateJumpInput.value = state.dateJumpSelected || '';
+  if (!chat?.chatId) {
+    els.dateJumpList.innerHTML = '<div class="ce-date-jump-empty">Selecciona un chat para revisar su calendario de mensajes.</div>';
+    return;
+  }
+  if (state.dateJumpLoading) {
+    els.dateJumpList.innerHTML = '<div class="ce-date-jump-empty">Actualizando calendario del chat...</div>';
+    return;
+  }
+  if (!state.dateJumpDays.length) {
+    els.dateJumpList.innerHTML = `<div class="ce-date-jump-empty">${escapeHtml(state.dateJumpError || 'Este chat todavía no tiene mensajes para navegar por fecha.')}</div>`;
+    return;
+  }
+  const selected = state.dateJumpSelected || state.dateJumpDays[0]?.dateKey || '';
+  els.dateJumpList.innerHTML = `
+    ${state.dateJumpError ? `<div class="ce-date-jump-warning">${escapeHtml(state.dateJumpError)}</div>` : ''}
+    <div class="ce-date-jump-summary">${state.dateJumpDays.length} ${state.dateJumpDays.length === 1 ? 'día con mensajes' : 'días con mensajes'} disponibles en los últimos 500 mensajes.</div>
+    <div class="ce-date-jump-actions">
+      <button class="ce-btn ce-btn--primary ce-btn--small" type="button" data-jump-selected-date="1">Ir a la fecha seleccionada</button>
+      <button class="ce-link" type="button" data-refresh-date-jump="1">Actualizar</button>
+    </div>
+    <div class="ce-date-jump-days">
+      ${state.dateJumpDays.map((day) => {
+        const isSelected = day.dateKey === selected;
+        return `<button class="ce-date-jump-day${isSelected ? ' active' : ''}" type="button" data-date-jump-day="${escapeHtml(day.dateKey)}" aria-pressed="${isSelected ? 'true' : 'false'}">
+          <span><strong>${escapeHtml(formatDateJumpLabel(day.dateKey))}</strong><em>${escapeHtml(formatScheduleDateTime(day.firstMessageAt || Date.now()))} → ${escapeHtml(formatScheduleDateTime(day.lastMessageAt || Date.now()))}</em></span>
+          <b>${day.count}</b>
+          <small>${escapeHtml(day.preview || 'Sin vista previa disponible')}</small>
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function closeChatBrief() {
+  state.chatBriefOpen = false;
+  state.chatBriefLoading = false;
+  state.chatBriefError = '';
+  renderChatBriefModal();
+}
+
+async function openChatBrief() {
+  const chat = activeChat();
+  if (!chat?.chatId) throw new Error('Selecciona un chat para generar el resumen.');
+  state.chatBriefOpen = true;
+  state.chatBriefLoading = true;
+  state.chatBriefError = '';
+  renderChatBriefModal();
+  try {
+    const data = await post('/api/chats/messages', { chatId: chat.chatId, limit: 500 });
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    state.messagesByChat.set(chat.chatId, messages);
+  } catch {
+    state.chatBriefError = 'No se pudo actualizar desde el servidor. Se muestra el resumen con los mensajes ya cargados en este dispositivo.';
+  } finally {
+    state.chatBriefLoading = false;
+    renderAll();
+  }
+}
+
+function renderChatBriefItems(title = '', items = [], chat = {}, emptyText = '', options = {}) {
+  const allowReminder = Boolean(options.allowReminder);
+  const body = items.length ? items.map((message) => {
+    const reminderButton = allowReminder && message.messageId
+      ? `<button class="ce-link ce-chat-brief-reminder" type="button" data-reminder-from-brief-message-id="${escapeHtml(message.messageId || '')}">Crear recordatorio</button>`
+      : '';
+    return `<article class="ce-chat-brief-item">
+      <div><strong>${escapeHtml(chatBriefSenderLabel(message, chat))}</strong><span>${escapeHtml(formatScheduleDateTime(message.createdAt || Date.now()))}</span></div>
+      <p>${escapeHtml(compactText(message.briefText || '', 210))}</p>
+      <div class="ce-chat-brief-item__actions">
+        <button class="ce-link" type="button" data-jump-brief-message-id="${escapeHtml(message.messageId || '')}">Ver mensaje</button>
+        ${reminderButton}
+      </div>
+    </article>`;
+  }).join('') : `<div class="ce-chat-brief-empty">${escapeHtml(emptyText)}</div>`;
+  return `<section class="ce-chat-brief-section"><h3>${escapeHtml(title)}</h3>${body}</section>`;
+}
+
+function renderChatBriefModal() {
+  if (!els.chatBriefModal || !els.chatBriefList) return;
+  els.chatBriefModal.classList.toggle('hidden', !state.chatBriefOpen);
+  if (!state.chatBriefOpen) return;
+  const chat = activeChat();
+  if (!chat?.chatId) {
+    els.chatBriefList.innerHTML = '<div class="ce-chat-brief-empty">Selecciona un chat para generar su resumen.</div>';
+    return;
+  }
+  if (state.chatBriefLoading) {
+    els.chatBriefList.innerHTML = '<div class="ce-chat-brief-empty">Preparando resumen ejecutivo del chat...</div>';
+    return;
+  }
+  const messages = state.messagesByChat.get(chat.chatId) || [];
+  const brief = buildChatBriefAnalysis(chat, messages);
+  const warning = state.chatBriefError ? `<div class="ce-chat-brief-warning">${escapeHtml(state.chatBriefError)}</div>` : '';
+  if (!brief.stats.total) {
+    els.chatBriefList.innerHTML = `${warning}<div class="ce-chat-brief-empty">Aún no hay mensajes suficientes para crear un resumen útil.</div>`;
+    return;
+  }
+  const topics = brief.keywords.length ? brief.keywords.map((word) => `<span>${escapeHtml(word)}</span>`).join('') : '<em>Sin temas repetidos todavía.</em>';
+  els.chatBriefList.innerHTML = `${warning}
+    <div class="ce-chat-brief-stats" role="list" aria-label="Indicadores del resumen">
+      <span role="listitem"><strong>${brief.stats.total}</strong><em>mensajes</em></span>
+      <span role="listitem"><strong>${brief.stats.mineCount}</strong><em>tuyos</em></span>
+      <span role="listitem"><strong>${brief.stats.receivedCount}</strong><em>del contacto</em></span>
+      <span role="listitem"><strong>${brief.stats.linkCount}</strong><em>enlaces</em></span>
+      <span role="listitem"><strong>${brief.stats.pollsCount}</strong><em>encuestas</em></span>
+    </div>
+    <div class="ce-chat-brief-range">${escapeHtml(brief.stats.fromLabel)} → ${escapeHtml(brief.stats.toLabel)}</div>
+    <div class="ce-chat-brief-topics" aria-label="Temas frecuentes">${topics}</div>
+    <div class="ce-chat-brief-actions"><button class="ce-btn ce-btn--small" type="button" data-copy-chat-brief="1">Copiar resumen</button></div>
+    ${renderChatBriefItems('Pendientes detectados', brief.pending, chat, 'No se detectaron pendientes claros en los mensajes cargados.', { allowReminder: true })}
+    ${renderChatBriefItems('Preguntas recientes', brief.questions, chat, 'No se detectaron preguntas recientes.')}
+    ${renderChatBriefItems('Acuerdos o decisiones', brief.decisions, chat, 'No se detectaron acuerdos explícitos.')}
+    ${renderChatBriefItems('Últimos mensajes relevantes', brief.recent, chat, 'No hay mensajes recientes para mostrar.')}`;
+}
+
+async function copyChatBriefToClipboard() {
+  const chat = activeChat();
+  if (!chat?.chatId) return;
+  const messages = state.messagesByChat.get(chat.chatId) || [];
+  await copyTextToClipboard(buildChatBriefText(chat, messages));
+  showTemporaryDraftStatus('Resumen del chat copiado al portapapeles.');
+}
+
+
+function resetGlobalSearchState({ keepQuery = false } = {}) {
+  if (!keepQuery) state.globalSearchQuery = '';
+  state.globalSearchResults = [];
+  state.globalSearchLoading = false;
+  state.globalSearchSearchedChats = 0;
+  if (!keepQuery && els.globalSearchInput) els.globalSearchInput.value = '';
+}
+
+function openGlobalSearch(initialQuery = '') {
+  if (!state.user) return;
+  state.globalSearchOpen = true;
+  if (initialQuery) {
+    state.globalSearchQuery = String(initialQuery || '').trim();
+    if (els.globalSearchInput) els.globalSearchInput.value = state.globalSearchQuery;
+  }
+  renderGlobalSearchModal();
+  window.setTimeout(() => {
+    els.globalSearchInput?.focus();
+    els.globalSearchInput?.select();
+  }, 0);
+}
+
+function closeGlobalSearch() {
+  state.globalSearchOpen = false;
+  renderGlobalSearchModal();
+}
+
+function globalSearchChatTitle(chat = {}) {
+  if (!chat?.chatId) return 'Chat';
+  if (chat.type === 'self') return 'Notas para mí';
+  return contactDisplayName(chat.other || {});
+}
+
+function renderGlobalSearchModal() {
+  if (!els.globalSearchModal || !els.globalSearchList) return;
+  els.globalSearchModal.classList.toggle('hidden', !state.globalSearchOpen);
+  if (!state.globalSearchOpen) return;
+  const query = state.globalSearchQuery || String(els.globalSearchInput?.value || '').trim();
+  if (state.globalSearchLoading) {
+    els.globalSearchList.innerHTML = '<div class="ce-global-search-empty">Buscando en tus conversaciones...</div>';
+    return;
+  }
+  if (!query) {
+    els.globalSearchList.innerHTML = '<div class="ce-global-search-empty">Escribe una palabra o frase para buscar en chats activos y archivados.</div>';
+    return;
+  }
+  if (query.length < 2) {
+    els.globalSearchList.innerHTML = '<div class="ce-global-search-empty">Escribe al menos 2 caracteres para iniciar la búsqueda.</div>';
+    return;
+  }
+  const results = Array.isArray(state.globalSearchResults) ? state.globalSearchResults : [];
+  if (!results.length) {
+    els.globalSearchList.innerHTML = `<div class="ce-global-search-empty">No encontramos mensajes con “${escapeHtml(query)}”.</div>`;
+    return;
+  }
+  els.globalSearchList.innerHTML = `
+    <div class="ce-global-search-summary">${results.length} ${results.length === 1 ? 'resultado' : 'resultados'} en ${state.globalSearchSearchedChats || 'tus'} chats</div>
+    ${results.map((item) => {
+      const chat = item.chat || {};
+      const message = item.message || {};
+      const mine = message.senderUserId === state.user?.userId;
+      const archived = chat.isArchived ? '<small>Archivado</small>' : '';
+      return `<button class="ce-global-search-result" type="button" data-global-search-chat-id="${escapeHtml(chat.chatId || '')}" data-global-search-message-id="${escapeHtml(message.messageId || '')}">
+        <span class="ce-global-search-result__head"><strong>${escapeHtml(globalSearchChatTitle(chat))}</strong>${archived}<em>${escapeHtml(formatMessageTime(message.createdAt))}</em></span>
+        <span class="ce-global-search-result__body"><b>${mine ? 'Tú' : 'Contacto'}:</b> ${escapeHtml(message.excerpt || message.text || '')}</span>
+      </button>`;
+    }).join('')}`;
+}
+
+async function searchAllChats(query = '') {
+  const cleanQuery = String(query || '').trim();
+  state.globalSearchQuery = cleanQuery;
+  state.globalSearchResults = [];
+  state.globalSearchSearchedChats = 0;
+  if (cleanQuery.length < 2) {
+    state.globalSearchLoading = false;
+    renderGlobalSearchModal();
+    return;
+  }
+  state.globalSearchLoading = true;
+  renderGlobalSearchModal();
+  try {
+    const data = await post('/api/chats/search-all', { query: cleanQuery, limit: 60, perChatLimit: 500, includeArchived: true });
+    state.globalSearchQuery = data.query || cleanQuery;
+    state.globalSearchResults = Array.isArray(data.matches) ? data.matches : [];
+    state.globalSearchSearchedChats = Number(data.searchedChats || 0);
+    for (const item of state.globalSearchResults) {
+      if (item.chat?.chatId) upsertChat(item.chat);
+      if (item.message?.messageId) upsertMessage(item.message);
+    }
+  } catch (error) {
+    state.globalSearchResults = [];
+    state.globalSearchSearchedChats = 0;
+    els.globalSearchList.innerHTML = `<div class="ce-global-search-empty">${escapeHtml(error.message || 'No se pudo completar la búsqueda global.')}</div>`;
+    return;
+  } finally {
+    state.globalSearchLoading = false;
+  }
+  renderGlobalSearchModal();
+}
+
+async function openGlobalSearchResult(chatId = '', messageId = '') {
+  if (!chatId) return;
+  closeGlobalSearch();
+  if (!state.chats.some((chat) => chat.chatId === chatId)) await loadChats({ includeArchived: false }).catch(() => null);
+  if (!state.chats.some((chat) => chat.chatId === chatId)) await loadChats({ includeArchived: true }).catch(() => null);
+  if (!state.chats.some((chat) => chat.chatId === chatId)) throw new Error('No se pudo abrir el chat del resultado.');
+  await selectChat(chatId);
+  if (messageId) await jumpToMessage(messageId);
+}
+
+function closeGlobalStarred() {
+  state.globalStarredOpen = false;
+  renderGlobalStarredModal();
+}
+
+function renderGlobalStarredModal() {
+  if (!els.globalStarredModal || !els.globalStarredList) return;
+  els.globalStarredModal.classList.toggle('hidden', !state.globalStarredOpen);
+  if (!state.globalStarredOpen) return;
+  if (state.globalStarredLoading) {
+    els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Cargando tus mensajes destacados...</div>';
+    return;
+  }
+  const items = Array.isArray(state.globalStarredMessages) ? state.globalStarredMessages : [];
+  if (!items.length) {
+    els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Aún no tienes mensajes destacados. Usa ★ en cualquier mensaje para guardarlo aquí.</div>';
+    return;
+  }
+  els.globalStarredList.innerHTML = `
+    <div class="ce-global-starred-summary">${items.length} ${items.length === 1 ? 'destacado' : 'destacados'} · ${state.globalStarredScannedChats || 'tus'} chats revisados</div>
+    ${items.map((item) => {
+      const chat = item.chat || {};
+      const message = item.message || {};
+      const mine = message.senderUserId === state.user?.userId;
+      const archived = chat.isArchived ? '<small>Archivado</small>' : '';
+      return `<article class="ce-global-starred-item">
+        <button class="ce-global-starred-item__main" type="button" data-global-starred-chat-id="${escapeHtml(chat.chatId || '')}" data-global-starred-message-id="${escapeHtml(message.messageId || '')}">
+          <span class="ce-global-starred-item__head"><strong>★ ${escapeHtml(globalSearchChatTitle(chat))}</strong>${archived}<em>${escapeHtml(formatMessageTime(message.createdAt))}</em></span>
+          <span class="ce-global-starred-item__body"><b>${mine ? 'Tú' : 'Contacto'}:</b> ${escapeHtml(message.excerpt || message.text || 'Mensaje destacado')}</span>
+        </button>
+        <button class="ce-link" type="button" data-global-starred-unstar-chat-id="${escapeHtml(chat.chatId || '')}" data-global-starred-unstar-message-id="${escapeHtml(message.messageId || '')}">Quitar</button>
+      </article>`;
+    }).join('')}`;
+}
+
+async function loadGlobalStarredMessages({ silent = false } = {}) {
+  if (!state.user) return [];
+  state.globalStarredLoading = !silent;
+  renderGlobalStarredModal();
+  try {
+    const data = await post('/api/chats/starred/all', { limit: 100, perChatLimit: 500, includeArchived: true });
+    state.globalStarredMessages = Array.isArray(data.messages) ? data.messages : [];
+    state.globalStarredScannedChats = Number(data.searchedChats || data.scannedChats || 0);
+    for (const item of state.globalStarredMessages) {
+      if (item.chat?.chatId) upsertChat(item.chat);
+      if (item.message?.messageId) upsertMessage(item.message);
+    }
+    return state.globalStarredMessages;
+  } finally {
+    state.globalStarredLoading = false;
+    renderGlobalStarredModal();
+  }
+}
+
+async function openGlobalStarred() {
+  if (!state.user) return;
+  state.globalStarredOpen = true;
+  renderGlobalStarredModal();
+  await loadGlobalStarredMessages();
+}
+
+async function openGlobalStarredResult(chatId = '', messageId = '') {
+  if (!chatId) return;
+  closeGlobalStarred();
+  if (!state.chats.some((chat) => chat.chatId === chatId)) await loadChats({ includeArchived: false }).catch(() => null);
+  if (!state.chats.some((chat) => chat.chatId === chatId)) await loadChats({ includeArchived: true }).catch(() => null);
+  if (!state.chats.some((chat) => chat.chatId === chatId)) throw new Error('No se pudo abrir el chat del destacado.');
+  await selectChat(chatId);
+  if (messageId) await jumpToMessage(messageId);
+}
+
+function syncGlobalStarredMessage(message = {}) {
+  if (!message?.messageId || !message?.chatId || !state.globalStarredOpen) return;
+  const index = state.globalStarredMessages.findIndex((item) => item.message?.messageId === message.messageId && item.chat?.chatId === message.chatId);
+  if (!message.isStarred || isDeletedMessage(message)) {
+    if (index >= 0) state.globalStarredMessages.splice(index, 1);
+    return;
+  }
+  const chat = state.chats.find((item) => item.chatId === message.chatId) || { chatId: message.chatId };
+  const nextItem = { chat, message: { ...message, excerpt: compactText(message.text || '', 180) } };
+  if (index >= 0) state.globalStarredMessages[index] = { ...state.globalStarredMessages[index], ...nextItem };
+  else state.globalStarredMessages.unshift(nextItem);
+  state.globalStarredMessages.sort((a, b) => (Date.parse(b.message?.createdAt || 0) || 0) - (Date.parse(a.message?.createdAt || 0) || 0));
+}
+
+async function removeGlobalStarredMessage(chatId = '', messageId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  const cleanMessageId = String(messageId || '').trim();
+  if (!cleanChatId || !cleanMessageId) return;
+  const previousActiveChatId = state.activeChatId;
+  const data = await post('/api/chats/star', { chatId: cleanChatId, messageId: cleanMessageId, starred: false });
+  if (data.message?.messageId) {
+    upsertMessage(data.message);
+    syncStarredPanelMessage(data.message);
+    syncGlobalStarredMessage(data.message);
+  } else {
+    state.globalStarredMessages = state.globalStarredMessages.filter((item) => !(item.chat?.chatId === cleanChatId && item.message?.messageId === cleanMessageId));
+  }
+  if (previousActiveChatId === cleanChatId) renderAll();
+  else renderGlobalStarredModal();
+  showTemporaryDraftStatus('Mensaje quitado de destacados.');
+}
+
+function focusChatSearchInput() {
+  if (!state.activeChatId) throw new Error('Selecciona un chat antes de buscar mensajes.');
+  els.chatSearchArea?.classList.remove('hidden');
+  if (els.chatSearchInput) {
+    els.chatSearchInput.disabled = false;
+    els.chatSearchInput.focus();
+    els.chatSearchInput.select();
+  }
+}
+
+function showContactsTab() {
+  els.tabContacts?.classList.add('active');
+  els.tabChats?.classList.remove('active');
+  els.tabUnread?.classList.remove('active');
+  els.tabArchived?.classList.remove('active');
+  els.contactList?.classList.remove('hidden');
+  els.chatList?.classList.add('hidden');
+  els.chatLabelFilters?.classList.add('hidden');
+}
+
+
+
+function cycleMessageTtl() {
+  if (!els.messageTtlSelect) return;
+  if (isChatInteractionBlocked()) {
+    showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+    return;
+  }
+  const current = selectedEphemeralSeconds();
+  const currentIndex = ephemeralOptions.indexOf(current);
+  const next = ephemeralOptions[(currentIndex + 1) % ephemeralOptions.length] || 0;
+  els.messageTtlSelect.value = String(next);
+  updateComposerControls();
+  renderScheduleModal();
+  showTemporaryDraftStatus(next ? `Mensajes temporales activados: expiran en ${formatEphemeralOption(next)}.` : 'Mensajes temporales desactivados.');
+}
+
+function getCommandPaletteCommands() {
+  const chat = activeChat();
+  const composerText = String(els.messageInput?.value || '').trim();
+  const hasChat = Boolean(chat?.chatId);
+  const blocked = isChatInteractionBlocked(chat);
+  const canSchedule = hasChat && !blocked && composerText && !state.editingMessage?.messageId && !state.schedulingMessage;
+  const unreadCount = unreadChatsCount();
+  return [
+    {
+      id: 'privacy-mode',
+      title: state.privacyMode ? 'Desactivar modo privacidad' : 'Activar modo privacidad',
+      description: 'Oculta nombres, vistas previas y mensajes cuando usas chatER en espacios compartidos.',
+      shortcut: 'Ctrl/⌘ + Shift + P',
+      enabled: Boolean(state.user),
+      run: () => togglePrivacyMode({ announce: true })
+    },
+    {
+      id: 'privacy-lock',
+      title: state.privacyLock.enabled ? 'Bloquear pantalla ahora' : 'Configurar bloqueo por PIN',
+      description: state.privacyLock.enabled
+        ? 'Oculta toda la pantalla de chatER hasta ingresar tu PIN local en este dispositivo.'
+        : 'Agrega un bloqueo local por PIN para proteger tus conversaciones en equipos compartidos.',
+      shortcut: 'Ctrl/⌘ + Alt + P',
+      enabled: Boolean(state.user),
+      run: () => runPrivacyLockShortcut()
+    },
+    {
+      id: 'compact-mode',
+      title: state.compactMode ? 'Desactivar modo compacto' : 'Activar modo compacto',
+      description: 'Ajusta la interfaz para ver más chats y mensajes en pantalla sin perder acciones importantes.',
+      shortcut: 'Ctrl/⌘ + Alt + C',
+      enabled: Boolean(state.user),
+      run: () => toggleCompactMode({ announce: true })
+    },
+    {
+      id: 'notification-pause',
+      title: isNotificationPauseActive() ? 'Desactivar No molestar' : 'Activar No molestar por 8 horas',
+      description: isNotificationPauseActive()
+        ? `Las notificaciones push están pausadas hasta ${notificationPauseUntilLabel()}.`
+        : 'Pausa todas las notificaciones push sin silenciar chats uno por uno.',
+      shortcut: '🔕 global',
+      enabled: Boolean(state.user),
+      run: () => toggleNotificationPause()
+    },
+    {
+      id: 'self-notes',
+      title: 'Abrir Notas para mí',
+      description: 'Crea o abre tu chat privado para guardar ideas, enlaces, tareas y mensajes reenviados.',
+      shortcut: 'Ctrl/⌘ + Shift + N',
+      enabled: Boolean(state.user),
+      run: () => openSelfNotesChat()
+    },
+    {
+      id: 'search-chat',
+      title: 'Buscar en este chat',
+      description: 'Encuentra mensajes dentro de la conversación activa.',
+      shortcut: 'Ctrl/⌘ + K · buscar',
+      enabled: hasChat,
+      run: () => focusChatSearchInput()
+    },
+    {
+      id: 'link-library',
+      title: 'Ver enlaces compartidos',
+      description: 'Abre una biblioteca con las URLs detectadas en el chat activo para copiarlas o volver al mensaje original.',
+      shortcut: 'Ctrl/⌘ + Alt + L',
+      enabled: hasChat,
+      run: () => openLinkLibrary()
+    },
+    {
+      id: 'chat-brief',
+      title: 'Generar resumen del chat',
+      description: 'Crea una vista ejecutiva local con pendientes, preguntas, acuerdos, temas frecuentes y últimos mensajes.',
+      shortcut: 'Ctrl/⌘ + Alt + B',
+      enabled: hasChat,
+      run: () => openChatBrief()
+    },
+    {
+      id: 'scroll-bottom',
+      title: 'Ir al final del chat',
+      description: 'Vuelve al último mensaje sin perder mensajes nuevos cuando estabas leyendo arriba.',
+      shortcut: 'Ctrl/⌘ + End',
+      enabled: hasChat,
+      run: () => scrollMessagesToBottom({ smooth: true, resetNew: true })
+    },
+    {
+      id: 'search-all-chats',
+      title: 'Buscar en todos los chats',
+      description: 'Encuentra mensajes en conversaciones activas y archivadas sin abrir chat por chat.',
+      shortcut: 'Ctrl/⌘ + Shift + F',
+      enabled: Boolean(state.user),
+      run: () => openGlobalSearch()
+    },
+    {
+      id: 'starred-inbox',
+      title: 'Abrir bandeja de destacados',
+      description: 'Reúne mensajes marcados con ★ en todos tus chats, incluidos archivados.',
+      shortcut: 'Ctrl/⌘ + Alt + S',
+      enabled: Boolean(state.user),
+      run: () => openGlobalStarred()
+    },
+    {
+      id: 'drafts-inbox',
+      title: 'Abrir borradores pendientes',
+      description: 'Continúa mensajes guardados sin revisar chat por chat.',
+      shortcut: 'Ctrl/⌘ + Alt + D',
+      enabled: Boolean(state.user),
+      run: () => openDraftsModal()
+    },
+    {
+      id: 'starred-chat',
+      title: 'Ver mensajes destacados',
+      description: 'Abre los destacados privados de este chat.',
+      shortcut: '★',
+      enabled: hasChat,
+      run: () => loadStarredMessages()
+    },
+    {
+      id: 'quick-replies',
+      title: 'Abrir respuestas rápidas',
+      description: 'Inserta o guarda textos frecuentes para responder más rápido.',
+      shortcut: '⚡',
+      enabled: hasChat,
+      run: async () => {
+        state.quickRepliesOpen = true;
+        renderQuickRepliesPanel();
+        await loadQuickReplies();
+      }
+    },
+    {
+      id: 'smart-replies',
+      title: 'Sugerir respuestas inteligentes',
+      description: 'Propone respuestas breves generadas localmente desde el contexto reciente del chat.',
+      shortcut: 'Ctrl/⌘ + Shift + G',
+      enabled: hasChat && !blocked && !state.editingMessage?.messageId && Boolean(buildSmartReplySuggestions().length),
+      run: () => openSmartReplySuggestions()
+    },
+    {
+      id: 'private-notes',
+      title: 'Abrir notas privadas del chat',
+      description: 'Guarda contexto, pendientes o datos sensibles visibles solo para tu cuenta.',
+      shortcut: 'Ctrl/⌘ + Shift + L',
+      enabled: hasChat,
+      run: () => openPrivateNotesModal()
+    },
+    {
+      id: 'chat-labels',
+      title: 'Editar etiquetas del chat',
+      description: 'Agrupa conversaciones por cliente, proyecto, prioridad o cualquier categoría personal.',
+      shortcut: 'Ctrl/⌘ + Shift + T',
+      enabled: hasChat,
+      run: () => openLabelsModal()
+    },
+    {
+      id: 'contact-nickname',
+      title: chat?.other?.nickname ? 'Editar apodo privado' : 'Agregar apodo privado',
+      description: 'Personaliza cómo ves el nombre de este contacto sin cambiar su perfil ni avisarle a la otra persona.',
+      shortcut: 'Ctrl/⌘ + Shift + Y',
+      enabled: hasChat && !isSelfChat(chat),
+      run: () => openActiveContactNicknameModal()
+    },
+    {
+      id: 'chat-reminders',
+      title: 'Abrir recordatorios del chat',
+      description: 'Crea avisos privados para volver a una conversación o mensaje importante.',
+      shortcut: 'Ctrl/⌘ + Shift + R',
+      enabled: hasChat,
+      run: () => openReminderModal()
+    },
+    {
+      id: 'create-poll',
+      title: 'Crear encuesta',
+      description: 'Publica una pregunta con opciones votables para tomar decisiones rápidas en el chat.',
+      shortcut: '📊',
+      enabled: hasChat && !blocked && !state.editingMessage?.messageId,
+      run: () => openPollModal()
+    },
+    {
+      id: 'voice-dictation',
+      title: state.voiceDictating ? 'Detener dictado por voz' : 'Dictar mensaje por voz',
+      description: isVoiceDictationSupported() ? 'Convierte tu voz en texto dentro del compositor sin enviar audio al chat.' : 'El dictado por voz no está disponible en este navegador.',
+      shortcut: 'Ctrl/⌘ + Shift + D',
+      enabled: hasChat && !blocked && !state.editingMessage?.messageId && isVoiceDictationSupported(),
+      run: () => toggleVoiceDictation()
+    },
+    {
+      id: 'cycle-ephemeral',
+      title: 'Cambiar expiración del mensaje',
+      description: `Alterna mensajes normales o temporales. Estado actual: ${formatEphemeralOption(selectedEphemeralSeconds())}.`,
+      shortcut: 'Temporal',
+      enabled: hasChat && !blocked && !state.editingMessage?.messageId,
+      run: () => cycleMessageTtl()
+    },
+    {
+      id: 'emoji-picker',
+      title: 'Insertar emoji',
+      description: 'Abre un selector local con recientes, caras, gestos, trabajo y objetos para completar el mensaje.',
+      shortcut: 'Ctrl/⌘ + Shift + E',
+      enabled: hasChat && !blocked && !state.editingMessage?.messageId,
+      run: () => toggleEmojiPicker()
+    },
+    {
+      id: 'schedule-message',
+      title: 'Programar mensaje escrito',
+      description: 'Envía el texto del compositor en una fecha futura.',
+      shortcut: 'Ctrl/⌘ + Shift + S',
+      enabled: Boolean(canSchedule),
+      run: () => openScheduleModal()
+    },
+    {
+      id: 'silent-send',
+      title: 'Enviar sin notificación',
+      description: 'Entrega el texto del compositor en el chat, pero no dispara notificación push al destinatario.',
+      shortcut: 'Ctrl/⌘ + Shift + Enter',
+      enabled: Boolean(canSchedule),
+      run: () => sendSilentCurrentMessage()
+    },
+    {
+      id: 'retry-outbox',
+      title: 'Enviar pendientes',
+      description: 'Reintenta mensajes guardados localmente cuando la conexión falló.',
+      shortcut: 'Pendientes',
+      enabled: Boolean(state.user && state.outboxMessages.length),
+      run: () => retryQueuedOutboxMessages({ chatId: state.activeChatId || '', force: true })
+    },
+    {
+      id: 'date-jump',
+      title: 'Ir a fecha en este chat',
+      description: 'Abre una línea de tiempo por día para saltar al primer mensaje de una fecha específica.',
+      shortcut: 'Ctrl/⌘ + Alt + J',
+      enabled: hasChat,
+      run: () => openDateJump()
+    },
+    {
+      id: 'copy-chat-link',
+      title: 'Copiar enlace interno del chat',
+      description: 'Guarda un enlace privado para volver a esta conversación.',
+      shortcut: '🔗',
+      enabled: hasChat,
+      run: () => copyActiveChatLink()
+    },
+    {
+      id: 'mark-chat-unread',
+      title: 'Marcar chat como no leído',
+      description: 'Deja una señal visual para volver a esta conversación más tarde.',
+      shortcut: 'Ctrl/⌘ + Shift + U',
+      enabled: hasChat,
+      run: () => markActiveChatUnread()
+    },
+    {
+      id: 'mark-all-read',
+      title: 'Marcar todos como leídos',
+      description: unreadCount ? `Limpia ${unreadCount} ${unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'} sin abrirlas una por una.` : 'Limpia la bandeja de pendientes si hay conversaciones sin leer.',
+      shortcut: 'No leídos',
+      enabled: Boolean(state.user),
+      run: () => markAllChatsRead()
+    },
+    {
+      id: 'export-chat',
+      title: 'Exportar chat en texto',
+      description: 'Descarga hasta los últimos 500 mensajes de este chat.',
+      shortcut: 'Ctrl/⌘ + E',
+      enabled: hasChat,
+      run: () => exportActiveChat()
+    },
+    {
+      id: 'toggle-mute',
+      title: chat?.isMuted ? 'Activar notificaciones del chat' : 'Silenciar notificaciones del chat',
+      description: chat?.isMuted ? 'Vuelve a recibir avisos push de esta conversación.' : 'Evita avisos push de esta conversación sin archivar el chat.',
+      shortcut: 'Ctrl/⌘ + Shift + M',
+      enabled: hasChat && !isSelfChat(chat),
+      run: () => setActiveChatMuted(!chat?.isMuted)
+    },
+    {
+      id: 'blocked-contacts',
+      title: 'Gestionar contactos bloqueados',
+      description: 'Revisa tu lista privada de bloqueados y desbloquea contactos sin buscar la conversación.',
+      shortcut: 'Bloqueados',
+      enabled: Boolean(state.user),
+      run: () => openBlockedContactsModal()
+    },
+    {
+      id: 'toggle-block',
+      title: normalizeChatBlockStatus(chat).blockedByMe ? 'Desbloquear contacto' : 'Bloquear contacto',
+      description: normalizeChatBlockStatus(chat).blockedByMe
+        ? 'Restaura el envío de mensajes hacia este contacto.'
+        : 'Pausa la comunicación con este contacto sin borrar la conversación ni tus notas.',
+      shortcut: 'Ctrl/⌘ + Shift + B',
+      enabled: hasChat && !isSelfChat(chat),
+      run: () => setActiveContactBlocked(!normalizeChatBlockStatus(chat).blockedByMe)
+    },
+    {
+      id: 'toggle-archive',
+      title: chat?.isArchived ? 'Restaurar chat' : 'Archivar chat',
+      description: chat?.isArchived ? 'Devuelve esta conversación a la bandeja principal.' : 'Limpia tu bandeja sin borrar la conversación.',
+      shortcut: 'Ctrl/⌘ + Shift + A',
+      enabled: hasChat,
+      run: () => setChatArchived(chat.chatId, !chat?.isArchived)
+    },
+    {
+      id: 'show-main-chats',
+      title: 'Abrir bandeja principal',
+      description: 'Muestra los chats activos y oculta archivados.',
+      shortcut: 'Chats',
+      enabled: Boolean(state.user),
+      run: () => loadChats({ includeArchived: false })
+    },
+    {
+      id: 'show-unread-chats',
+      title: 'Abrir no leídos',
+      description: 'Muestra conversaciones activas o archivadas que todavía requieren respuesta.',
+      shortcut: 'No leídos',
+      enabled: Boolean(state.user),
+      run: () => loadChats({ unreadOnly: true })
+    },
+    {
+      id: 'show-archived-chats',
+      title: 'Abrir archivados',
+      description: 'Revisa conversaciones guardadas fuera de la bandeja principal.',
+      shortcut: 'Archivados',
+      enabled: Boolean(state.user),
+      run: () => loadChats({ includeArchived: true })
+    },
+    {
+      id: 'show-contacts',
+      title: 'Abrir contactos',
+      description: 'Consulta tus contactos guardados y abre conversaciones.',
+      shortcut: 'Contactos',
+      enabled: Boolean(state.user),
+      run: () => showContactsTab()
+    },
+    {
+      id: 'show-my-qr',
+      title: 'Mostrar mi QR',
+      description: 'Comparte tu código para que otros te agreguen.',
+      shortcut: 'QR',
+      enabled: Boolean(state.user),
+      run: () => openOwnQr()
+    },
+    {
+      id: 'scan-qr',
+      title: 'Escanear QR o pegar código',
+      description: 'Agrega contactos por cámara, enlace o código manual.',
+      shortcut: 'Escanear',
+      enabled: Boolean(state.user),
+      run: () => openScanQr()
+    }
+  ];
+}
+
+function getFilteredCommandPaletteCommands() {
+  const query = normalizeClientSearchText(state.commandPaletteQuery || els.commandPaletteInput?.value || '');
+  const commands = getCommandPaletteCommands();
+  if (!query) return commands;
+  return commands.filter((command) => normalizeClientSearchText(`${command.title} ${command.description} ${command.shortcut}`).includes(query));
+}
+
+function renderCommandPalette() {
+  if (!els.commandPalette || !els.commandPaletteList) return;
+  els.commandPalette.classList.toggle('hidden', !state.commandPaletteOpen);
+  if (!state.commandPaletteOpen) return;
+  const commands = getFilteredCommandPaletteCommands();
+  const activeCount = commands.filter((command) => command.enabled).length;
+  if (!commands.length) {
+    els.commandPaletteList.innerHTML = '<div class="ce-command-empty">No encontramos acciones con ese texto.</div>';
+    return;
+  }
+  if (state.commandPaletteActiveIndex >= activeCount) state.commandPaletteActiveIndex = Math.max(0, activeCount - 1);
+  let enabledIndex = -1;
+  els.commandPaletteList.innerHTML = commands.map((command) => {
+    const enabled = Boolean(command.enabled);
+    if (enabled) enabledIndex += 1;
+    const active = enabled && enabledIndex === state.commandPaletteActiveIndex;
+    return `<button class="ce-command-item${active ? ' active' : ''}" type="button" data-command-id="${escapeHtml(command.id)}" ${enabled ? '' : 'disabled'}>
+      <span><strong>${escapeHtml(command.title)}</strong><em>${escapeHtml(command.description)}</em></span>
+      <kbd>${escapeHtml(command.shortcut || '')}</kbd>
+    </button>`;
+  }).join('');
+}
+
+function openCommandPalette(initialQuery = '') {
+  if (!state.user) return;
+  state.commandPaletteOpen = true;
+  state.commandPaletteQuery = String(initialQuery || '');
+  state.commandPaletteActiveIndex = 0;
+  if (els.commandPaletteInput) els.commandPaletteInput.value = state.commandPaletteQuery;
+  renderCommandPalette();
+  window.setTimeout(() => {
+    els.commandPaletteInput?.focus();
+    els.commandPaletteInput?.select();
+  }, 0);
+}
+
+function closeCommandPalette() {
+  state.commandPaletteOpen = false;
+  state.commandPaletteQuery = '';
+  state.commandPaletteActiveIndex = 0;
+  if (els.commandPaletteInput) els.commandPaletteInput.value = '';
+  renderCommandPalette();
+}
+
+async function runCommandPaletteAction(commandId = '') {
+  const command = getCommandPaletteCommands().find((item) => item.id === commandId);
+  if (!command || !command.enabled) return;
+  closeCommandPalette();
+  await command.run();
+  renderAll();
+}
+
+function runActiveCommandPaletteAction() {
+  const enabled = getFilteredCommandPaletteCommands().filter((command) => command.enabled);
+  const command = enabled[Math.max(0, Math.min(state.commandPaletteActiveIndex, enabled.length - 1))];
+  if (!command) return;
+  runCommandPaletteAction(command.id).catch((error) => alert(error.message || 'No se pudo ejecutar la acción.'));
+}
+
+function moveCommandPaletteSelection(delta = 0) {
+  const enabledCount = getFilteredCommandPaletteCommands().filter((command) => command.enabled).length;
+  if (!enabledCount) return;
+  state.commandPaletteActiveIndex = (state.commandPaletteActiveIndex + delta + enabledCount) % enabledCount;
+  renderCommandPalette();
+}
+
+function isTypingInEditableField(event) {
+  const target = event?.target;
+  if (!target) return false;
+  const tagName = String(target.tagName || '').toLowerCase();
+  return target.isContentEditable || ['input', 'textarea', 'select'].includes(tagName);
+}
+
+function bindEvents() {
+  window.addEventListener('beforeunload', () => saveActiveDraft({ announce: false }));
+  ['pointerdown', 'touchstart', 'focusin'].forEach((eventName) => {
+    document.addEventListener(eventName, () => resetPrivacyLockActivity(), { passive: true });
+  });
+  document.addEventListener('visibilitychange', handlePrivacyLockVisibilityChange);
+  window.addEventListener('keydown', (event) => {
+    if (!state.privacyLock.locked) resetPrivacyLockActivity();
+    const key = String(event.key || '').toLowerCase();
+    const platformAction = event.ctrlKey || event.metaKey;
+    if (state.privacyLock.locked) return;
+    if (key === 'escape') {
+      if (state.globalSearchOpen) closeGlobalSearch();
+      if (state.globalStarredOpen) closeGlobalStarred();
+      if (state.draftsOpen) closeDraftsModal();
+      if (state.linkLibraryOpen) closeLinkLibrary();
+      if (state.chatBriefOpen) closeChatBrief();
+      if (state.dateJumpOpen) closeDateJump();
+      if (state.commandPaletteOpen) closeCommandPalette();
+      if (state.emojiPickerOpen) closeEmojiPicker();
+      if (state.forwardingMessage?.messageId) closeForwardModal();
+      if (state.scheduleModalOpen) closeScheduleModal();
+      if (state.privateNotesOpen) closePrivateNotesModal();
+      if (state.remindersOpen) closeReminderModal();
+      if (state.labelsModalOpen) closeLabelsModal();
+      if (state.blockedContactsOpen) closeBlockedContactsModal();
+      if (state.contactNicknameModalOpen) closeContactNicknameModal();
+      return;
+    }
+    if (!state.user) return;
+    if (platformAction && event.shiftKey && key === 'p') {
+      event.preventDefault();
+      togglePrivacyMode({ announce: true });
+      if (state.commandPaletteOpen) renderCommandPalette();
+      return;
+    }
+    if (platformAction && event.altKey && key === 'p') {
+      event.preventDefault();
+      runPrivacyLockShortcut();
+      return;
+    }
+    if (platformAction && event.altKey && key === 'c') {
+      event.preventDefault();
+      toggleCompactMode({ announce: true });
+      if (state.commandPaletteOpen) renderCommandPalette();
+      return;
+    }
+    if (platformAction && event.altKey && key === 'l' && state.activeChatId) {
+      event.preventDefault();
+      openLinkLibrary();
+      return;
+    }
+    if (platformAction && event.altKey && key === 'b' && state.activeChatId) {
+      event.preventDefault();
+      openChatBrief().catch((error) => alert(error.message || 'No se pudo abrir el resumen del chat.'));
+      return;
+    }
+    if (platformAction && event.altKey && key === 'j' && state.activeChatId) {
+      event.preventDefault();
+      openDateJump().catch((error) => alert(error.message || 'No se pudo abrir el calendario del chat.'));
+      return;
+    }
+    if (platformAction && event.altKey && key === 'x') {
+      event.preventDefault();
+      openBlockedContactsModal();
+      return;
+    }
+    if (platformAction && event.altKey && key === 'd') {
+      event.preventDefault();
+      openDraftsModal().catch((error) => alert(error.message || 'No se pudieron abrir los borradores.'));
+      return;
+    }
+    if (platformAction && event.altKey && key === 's') {
+      event.preventDefault();
+      openGlobalStarred().catch((error) => alert(error.message || 'No se pudieron abrir los destacados.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'f') {
+      event.preventDefault();
+      openGlobalSearch();
+      return;
+    }
+    if (platformAction && key === 'k') {
+      event.preventDefault();
+      openCommandPalette();
+      return;
+    }
+    if (platformAction && key === 'end' && state.activeChatId) {
+      event.preventDefault();
+      scrollMessagesToBottom({ smooth: true, resetNew: true });
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'n') {
+      event.preventDefault();
+      openSelfNotesChat().catch((error) => alert(error.message || 'No se pudo abrir Notas para mí.'));
+      return;
+    }
+    if (platformAction && !event.shiftKey && key === 'e' && state.activeChatId) {
+      event.preventDefault();
+      exportActiveChat().catch((error) => alert(error.message || 'No se pudo exportar el chat.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'enter' && state.activeChatId) {
+      event.preventDefault();
+      sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'd') {
+      event.preventDefault();
+      toggleVoiceDictation();
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'e' && state.activeChatId) {
+      event.preventDefault();
+      toggleEmojiPicker();
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'g' && state.activeChatId) {
+      event.preventDefault();
+      openSmartReplySuggestions();
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 's') {
+      event.preventDefault();
+      openScheduleModal().catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'l' && state.activeChatId) {
+      event.preventDefault();
+      openPrivateNotesModal().catch((error) => alert(error.message || 'No se pudieron abrir las notas privadas.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'r' && state.activeChatId) {
+      event.preventDefault();
+      openReminderModal().catch((error) => alert(error.message || 'No se pudieron abrir los recordatorios.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 't' && state.activeChatId) {
+      event.preventDefault();
+      openLabelsModal().catch((error) => alert(error.message || 'No se pudieron abrir las etiquetas.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'y' && state.activeChatId) {
+      event.preventDefault();
+      openActiveContactNicknameModal();
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'm' && state.activeChatId) {
+      event.preventDefault();
+      const chat = activeChat();
+      if (!isSelfChat(chat)) setActiveChatMuted(!chat?.isMuted).catch((error) => alert(error.message || 'No se pudo actualizar el silencio del chat.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'b' && state.activeChatId) {
+      event.preventDefault();
+      const chat = activeChat();
+      if (!isSelfChat(chat)) setActiveContactBlocked(!normalizeChatBlockStatus(chat).blockedByMe).catch((error) => alert(error.message || 'No se pudo actualizar el bloqueo del contacto.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'u' && state.activeChatId) {
+      event.preventDefault();
+      markActiveChatUnread().catch((error) => alert(error.message || 'No se pudo marcar el chat como no leído.'));
+      return;
+    }
+    if (platformAction && event.shiftKey && key === 'a' && state.activeChatId) {
+      event.preventDefault();
+      const chat = activeChat();
+      setChatArchived(state.activeChatId, !chat?.isArchived).catch((error) => alert(error.message || 'No se pudo actualizar el archivo del chat.'));
+      return;
+    }
+    if (key === '?' && !isTypingInEditableField(event)) {
+      event.preventDefault();
+      openCommandPalette();
+    }
+  });
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    updateInstallBanner();
+  });
+  window.addEventListener('appinstalled', () => {
+    state.installPrompt = null;
+    state.installDismissed = true;
+    updateAfterLoginBanners();
+  });
+  window.addEventListener('online', () => {
+    if (state.user) {
+      resyncStateFromBackend({ reloadActive: true, force: true }).catch(() => null);
+      retryQueuedOutboxMessages({ silent: true }).catch(() => null);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveActiveDraft({ announce: false });
+    if (document.visibilityState === 'visible' && state.user) {
+      resyncStateFromBackend({ reloadActive: Boolean(state.activeChatId) }).catch(() => null);
+      refreshActiveChatPresence({ render: true }).catch(() => null);
+      scheduleOutboxRetry(1400);
+    }
+  });
+  els.messages?.addEventListener('scroll', () => updateScrollBottomButton(), { passive: true });
+  els.btnScrollBottom?.addEventListener('click', () => scrollMessagesToBottom({ smooth: true, resetNew: true }));
+
+  els.btnGoogleLogin.addEventListener('click', loginWithGoogle);
+  els.btnLogout.addEventListener('click', async () => {
+    saveActiveDraft({ announce: false });
+    if (state.voiceDictating) stopVoiceDictation({ announce: false });
+    stopPresenceRefresh();
+    await unregisterCurrentPushSubscription().catch(() => null);
+    await post('/api/auth/logout', {}).catch(() => null);
+    await signOutFirebaseSession(state.config.firebaseWebConfig || {}).catch(() => null);
+    setSessionToken('');
+    state.user = null;
+    state.contacts = [];
+    state.chats = [];
+    state.labels = [];
+    state.chatLabelsByChatId = new Map();
+    state.activeLabelFilter = '';
+    state.labelsModalOpen = false;
+    state.slashCommandsOpen = false;
+    closeEmojiPicker();
+    state.draftsOpen = false;
+    state.drafts = [];
+    state.draftsLoading = false;
+    state.globalStarredOpen = false;
+    state.globalStarredMessages = [];
+    state.globalStarredLoading = false;
+    state.globalStarredScannedChats = 0;
+    state.blockedContactsOpen = false;
+    state.blockedContacts = [];
+    state.labelsDraft = '';
+    state.archivedView = false;
+    state.messagesByChat.clear();
+    state.renderedMessageCountByChat.clear();
+    state.renderedActiveChatId = '';
+    state.scrollNewMessages = 0;
+    state.outboxMessages = [];
+    state.outboxSyncing = false;
+    state.notificationPreferences = normalizeNotificationPreferences({});
+    if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
+    state.outboxRetryTimer = 0;
+    state.activeChatId = '';
+    state.replyToMessage = null;
+    state.editingMessage = null;
+    state.forwardingMessage = null;
+    state.scheduleModalOpen = false;
+    state.scheduledMessages = [];
+    state.scheduledLoading = false;
+    state.schedulingMessage = false;
+    closePollModal();
+    state.pollCreating = false;
+    state.quickRepliesOpen = false;
+    state.quickRepliesLoaded = false;
+    state.quickReplies = [];
+    closeGlobalSearch();
+    resetGlobalSearchState();
+    closeGlobalStarred();
+    closeLinkLibrary();
+    closeChatBrief();
+    closePrivateNotesModal();
+    state.privateNotes = [];
+    closeReminderModal();
+    state.reminders = [];
+    closeLabelsModal();
+    closeCommandPalette();
+    state.privacyLock.locked = false;
+    state.privacyLock.mode = 'closed';
+    state.privacyLock.enabled = false;
+    state.privacyLock.salt = '';
+    state.privacyLock.pinHash = '';
+    renderPrivacyLockOverlay();
+    resetChatSearch();
+    showGuest();
+  });
+  els.btnInstall.addEventListener('click', async () => {
+    if (state.installPrompt) {
+      state.installPrompt.prompt();
+      await state.installPrompt.userChoice.catch(() => null);
+      state.installPrompt = null;
+    } else {
+      alert('Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.');
+    }
+    updateInstallBanner();
+  });
+  els.btnInstallLater.addEventListener('click', () => {
+    state.installDismissed = true;
+    updateInstallBanner();
+  });
+  els.btnEnablePush.addEventListener('click', async () => {
+    try {
+      await enableWebPushNotifications();
+    } catch (error) {
+      alert(error.message || 'No se pudieron activar las notificaciones.');
+    } finally {
+      state.pushState = state.pushState === 'saving' ? 'idle' : state.pushState;
+      updatePushBanner();
+    }
+  });
+  els.btnPushLater.addEventListener('click', () => {
+    state.pushDismissed = true;
+    updatePushBanner();
+  });
+  els.btnOpenSelfNotes?.addEventListener('click', () => {
+    openSelfNotesChat().catch((error) => alert(error.message || 'No se pudo abrir Notas para mí.'));
+  });
+  els.btnOpenGlobalSearch?.addEventListener('click', () => openGlobalSearch());
+  els.btnOpenGlobalStarred?.addEventListener('click', () => openGlobalStarred().catch((error) => alert(error.message || 'No se pudieron abrir los destacados.')));
+  els.btnNotificationPause?.addEventListener('click', () => {
+    toggleNotificationPause().catch((error) => alert(error.message || 'No se pudo actualizar No molestar.'));
+  });
+  els.btnOpenBlockedContacts?.addEventListener('click', () => openBlockedContactsModal());
+  els.btnCommandPalette?.addEventListener('click', () => openCommandPalette());
+  els.btnOpenDrafts?.addEventListener('click', () => openDraftsModal().catch((error) => alert(error.message || 'No se pudieron abrir los borradores.')));
+  els.btnPrivacyMode?.addEventListener('click', () => {
+    togglePrivacyMode({ announce: true });
+    if (state.commandPaletteOpen) renderCommandPalette();
+  });
+  els.btnPrivacyLock?.addEventListener('click', () => runPrivacyLockShortcut());
+  els.btnClosePrivacyLock?.addEventListener('click', closePrivacyLockSettings);
+  els.btnPrivacyLockPrimary?.addEventListener('click', () => {
+    if (state.privacyLock.locked) unlockPrivacyScreen();
+    else savePrivacyLockFromOverlay();
+  });
+  els.btnPrivacyLockSecondary?.addEventListener('click', () => {
+    if (state.privacyLock.locked) {
+      togglePrivacyMode({ announce: true });
+      return;
+    }
+    if (state.privacyLock.enabled) lockPrivacyScreen({ announce: true });
+    else closePrivacyLockSettings();
+  });
+  els.btnPrivacyLockDisable?.addEventListener('click', disablePrivacyLock);
+  els.privacyLockOverlay?.addEventListener('click', (event) => {
+    if (event.target === els.privacyLockOverlay && !state.privacyLock.locked) closePrivacyLockSettings();
+  });
+  [els.privacyLockPinInput, els.privacyLockConfirmInput].forEach((input) => {
+    input?.addEventListener('input', () => {
+      input.value = normalizePrivacyPin(input.value || '');
+      state.privacyLock.error = '';
+      renderPrivacyLockOverlay();
+    });
+    input?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      if (state.privacyLock.locked) unlockPrivacyScreen();
+      else savePrivacyLockFromOverlay();
+    });
+  });
+  els.btnCompactMode?.addEventListener('click', () => {
+    toggleCompactMode({ announce: true });
+    if (state.commandPaletteOpen) renderCommandPalette();
+  });
+  els.btnCloseGlobalSearch?.addEventListener('click', closeGlobalSearch);
+  els.globalSearchModal?.addEventListener('click', (event) => { if (event.target === els.globalSearchModal) closeGlobalSearch(); });
+  els.globalSearchForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await searchAllChats(els.globalSearchInput?.value || '').catch((error) => alert(error.message || 'No se pudo buscar en todos los chats.'));
+  });
+  els.globalSearchInput?.addEventListener('input', () => {
+    state.globalSearchQuery = String(els.globalSearchInput.value || '').trim();
+    if (!state.globalSearchQuery) resetGlobalSearchState({ keepQuery: true });
+    renderGlobalSearchModal();
+  });
+  els.globalSearchList?.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-global-search-chat-id]');
+    if (!row || !els.globalSearchList.contains(row)) return;
+    openGlobalSearchResult(row.dataset.globalSearchChatId || '', row.dataset.globalSearchMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el resultado.'));
+  });
+  els.btnCloseGlobalStarred?.addEventListener('click', closeGlobalStarred);
+  els.btnRefreshGlobalStarred?.addEventListener('click', () => loadGlobalStarredMessages().catch((error) => alert(error.message || 'No se pudieron actualizar los destacados.')));
+  els.globalStarredModal?.addEventListener('click', (event) => {
+    if (event.target === els.globalStarredModal) {
+      closeGlobalStarred();
+      return;
+    }
+    const unstar = event.target.closest('[data-global-starred-unstar-message-id]');
+    if (unstar && els.globalStarredModal.contains(unstar)) {
+      event.preventDefault();
+      removeGlobalStarredMessage(unstar.dataset.globalStarredUnstarChatId || '', unstar.dataset.globalStarredUnstarMessageId || '').catch((error) => alert(error.message || 'No se pudo quitar el destacado.'));
+      return;
+    }
+    const row = event.target.closest('[data-global-starred-chat-id]');
+    if (!row || !els.globalStarredModal.contains(row)) return;
+    openGlobalStarredResult(row.dataset.globalStarredChatId || '', row.dataset.globalStarredMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el destacado.'));
+  });
+  els.btnCloseDrafts?.addEventListener('click', closeDraftsModal);
+  els.draftsModal?.addEventListener('click', (event) => {
+    if (event.target === els.draftsModal) {
+      closeDraftsModal();
+      return;
+    }
+    const openButton = event.target.closest('[data-open-draft-chat-id]');
+    if (openButton && els.draftsModal.contains(openButton)) {
+      event.preventDefault();
+      openDraftFromList(openButton.dataset.openDraftChatId || '').catch((error) => alert(error.message || 'No se pudo abrir el borrador.'));
+      return;
+    }
+    const deleteButton = event.target.closest('[data-delete-draft-chat-id]');
+    if (deleteButton && els.draftsModal.contains(deleteButton)) {
+      event.preventDefault();
+      deleteDraftFromList(deleteButton.dataset.deleteDraftChatId || '').catch((error) => alert(error.message || 'No se pudo descartar el borrador.'));
+    }
+  });
+  els.btnCloseLinkLibrary?.addEventListener('click', closeLinkLibrary);
+  els.linkLibraryModal?.addEventListener('click', (event) => {
+    if (event.target === els.linkLibraryModal) {
+      closeLinkLibrary();
+      return;
+    }
+    const copyButton = event.target.closest('[data-copy-link-url]');
+    if (copyButton && els.linkLibraryModal.contains(copyButton)) {
+      event.preventDefault();
+      copySharedLink(copyButton.dataset.copyLinkUrl || '').catch((error) => alert(error.message || 'No se pudo copiar el enlace.'));
+      return;
+    }
+    const jumpButton = event.target.closest('[data-jump-link-message-id]');
+    if (jumpButton && els.linkLibraryModal.contains(jumpButton)) {
+      event.preventDefault();
+      const messageId = jumpButton.dataset.jumpLinkMessageId || '';
+      closeLinkLibrary();
+      jumpToMessage(messageId).catch((error) => alert(error.message || 'No se pudo abrir el mensaje del enlace.'));
+    }
+  });
+  els.linkLibraryInput?.addEventListener('input', () => {
+    state.linkLibraryQuery = String(els.linkLibraryInput.value || '').trim();
+    renderLinkLibraryModal();
+  });
+  els.btnCloseChatBrief?.addEventListener('click', closeChatBrief);
+  els.chatBriefModal?.addEventListener('click', (event) => {
+    if (event.target === els.chatBriefModal) {
+      closeChatBrief();
+      return;
+    }
+    const copyButton = event.target.closest('[data-copy-chat-brief]');
+    if (copyButton && els.chatBriefModal.contains(copyButton)) {
+      event.preventDefault();
+      copyChatBriefToClipboard().catch((error) => alert(error.message || 'No se pudo copiar el resumen.'));
+      return;
+    }
+    const reminderButton = event.target.closest('[data-reminder-from-brief-message-id]');
+    if (reminderButton && els.chatBriefModal.contains(reminderButton)) {
+      event.preventDefault();
+      openReminderFromChatBrief(reminderButton.dataset.reminderFromBriefMessageId || '').catch((error) => alert(error.message || 'No se pudo preparar el recordatorio.'));
+      return;
+    }
+    const jumpButton = event.target.closest('[data-jump-brief-message-id]');
+    if (jumpButton && els.chatBriefModal.contains(jumpButton)) {
+      event.preventDefault();
+      const messageId = jumpButton.dataset.jumpBriefMessageId || '';
+      closeChatBrief();
+      jumpToMessage(messageId).catch((error) => alert(error.message || 'No se pudo abrir el mensaje del resumen.'));
+    }
+  });
+  els.btnCloseDateJump?.addEventListener('click', closeDateJump);
+  els.dateJumpModal?.addEventListener('click', (event) => {
+    if (event.target === els.dateJumpModal) {
+      closeDateJump();
+      return;
+    }
+    const refreshButton = event.target.closest('[data-refresh-date-jump]');
+    if (refreshButton && els.dateJumpModal.contains(refreshButton)) {
+      event.preventDefault();
+      loadDateJumpTimeline().catch((error) => alert(error.message || 'No se pudo actualizar el calendario del chat.'));
+      return;
+    }
+    const selectedButton = event.target.closest('[data-jump-selected-date]');
+    if (selectedButton && els.dateJumpModal.contains(selectedButton)) {
+      event.preventDefault();
+      jumpToDateKey(state.dateJumpSelected).catch((error) => alert(error.message || 'No se pudo saltar a la fecha seleccionada.'));
+      return;
+    }
+    const dayButton = event.target.closest('[data-date-jump-day]');
+    if (dayButton && els.dateJumpModal.contains(dayButton)) {
+      event.preventDefault();
+      state.dateJumpSelected = dayButton.dataset.dateJumpDay || '';
+      renderDateJumpModal();
+      jumpToDateKey(state.dateJumpSelected).catch((error) => alert(error.message || 'No se pudo abrir esa fecha.'));
+    }
+  });
+  els.dateJumpInput?.addEventListener('input', () => {
+    state.dateJumpSelected = String(els.dateJumpInput.value || '').trim();
+    renderDateJumpModal();
+  });
+  els.dateJumpInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      jumpToDateKey(state.dateJumpSelected).catch((error) => alert(error.message || 'No se pudo saltar a esa fecha.'));
+    }
+  });
+  els.btnCloseCommandPalette?.addEventListener('click', closeCommandPalette);
+  els.commandPalette?.addEventListener('click', (event) => {
+    if (event.target === els.commandPalette) {
+      closeCommandPalette();
+      return;
+    }
+    const commandButton = event.target.closest('[data-command-id]');
+    if (!commandButton || !els.commandPalette.contains(commandButton)) return;
+    event.preventDefault();
+    runCommandPaletteAction(commandButton.dataset.commandId || '').catch((error) => alert(error.message || 'No se pudo ejecutar la acción.'));
+  });
+  els.commandPaletteInput?.addEventListener('input', () => {
+    state.commandPaletteQuery = els.commandPaletteInput.value || '';
+    state.commandPaletteActiveIndex = 0;
+    renderCommandPalette();
+  });
+  els.commandPaletteInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeCommandPalette();
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveCommandPaletteSelection(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveCommandPaletteSelection(-1);
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      runActiveCommandPaletteAction();
+    }
+  });
+  els.btnQuickReplies?.addEventListener('click', async () => {
+    if (!state.activeChatId) return;
+    if (isChatInteractionBlocked()) {
+      showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
+      return;
+    }
+    state.quickRepliesOpen = !state.quickRepliesOpen;
+    if (state.quickRepliesOpen && state.emojiPickerOpen) closeEmojiPicker();
+    renderQuickRepliesPanel();
+    if (state.quickRepliesOpen) {
+      await loadQuickReplies().catch((error) => {
+        state.quickRepliesOpen = false;
+        renderQuickRepliesPanel();
+        alert(error.message || 'No se pudieron cargar las respuestas rápidas.');
+      });
+    }
+  });
+  els.btnSmartReplySuggestions?.addEventListener('click', () => openSmartReplySuggestions());
+  els.btnEmojiPicker?.addEventListener('click', () => toggleEmojiPicker());
+  els.emojiPickerPanel?.addEventListener('click', (event) => {
+    const closeButton = event.target.closest('[data-close-emoji-picker]');
+    if (closeButton && els.emojiPickerPanel.contains(closeButton)) {
+      event.preventDefault();
+      closeEmojiPicker();
+      return;
+    }
+    const categoryButton = event.target.closest('[data-emoji-category]');
+    if (categoryButton && els.emojiPickerPanel.contains(categoryButton)) {
+      event.preventDefault();
+      state.emojiPickerCategory = normalizeEmojiCategory(categoryButton.dataset.emojiCategory || 'recientes');
+      renderEmojiPickerPanel();
+      return;
+    }
+    const emojiButton = event.target.closest('[data-insert-emoji]');
+    if (emojiButton && els.emojiPickerPanel.contains(emojiButton)) {
+      event.preventDefault();
+      insertEmojiIntoComposer(emojiButton.dataset.insertEmoji || '');
+    }
+  });
+  els.quickRepliesPanel?.addEventListener('click', (event) => {
+    const smartReplyButton = event.target.closest('[data-smart-reply-index]');
+    if (smartReplyButton && els.quickRepliesPanel.contains(smartReplyButton)) {
+      event.preventDefault();
+      insertSmartReplyByIndex(smartReplyButton.dataset.smartReplyIndex || '0');
+      return;
+    }
+    const saveButton = event.target.closest('[data-quick-reply-save-current]');
+    if (saveButton && els.quickRepliesPanel.contains(saveButton)) {
+      event.preventDefault();
+      saveCurrentTextAsQuickReply().catch((error) => alert(error.message || 'No se pudo guardar la respuesta rápida.'));
+      return;
+    }
+    const refreshButton = event.target.closest('[data-quick-replies-refresh]');
+    if (refreshButton && els.quickRepliesPanel.contains(refreshButton)) {
+      event.preventDefault();
+      loadQuickReplies({ force: true }).catch((error) => alert(error.message || 'No se pudieron actualizar las respuestas rápidas.'));
+      return;
+    }
+    const deleteButton = event.target.closest('[data-quick-reply-delete]');
+    if (deleteButton && els.quickRepliesPanel.contains(deleteButton)) {
+      event.preventDefault();
+      deleteQuickReply(deleteButton.dataset.quickReplyDelete || '').catch((error) => alert(error.message || 'No se pudo eliminar la respuesta rápida.'));
+      return;
+    }
+    const insertButton = event.target.closest('[data-quick-reply-insert]');
+    if (insertButton && els.quickRepliesPanel.contains(insertButton)) {
+      event.preventDefault();
+      insertQuickReplyText(insertButton.dataset.quickReplyInsert || '');
+    }
+  });
+  els.slashCommandsPanel?.addEventListener('click', (event) => {
+    const templateButton = event.target.closest('[data-slash-template]');
+    if (!templateButton || !els.slashCommandsPanel.contains(templateButton)) return;
+    event.preventDefault();
+    insertSlashCommandTemplate(templateButton.dataset.slashTemplate || '');
+  });
+  els.chatLabelFilters?.addEventListener('click', (event) => {
+    const filterButton = event.target.closest('[data-label-filter]');
+    if (!filterButton || !els.chatLabelFilters.contains(filterButton)) return;
+    event.preventDefault();
+    state.activeLabelFilter = normalizeChatLabelName(filterButton.dataset.labelFilter || '');
+    renderAll();
+  });
+  els.activeChatHeader?.addEventListener('click', (event) => {
+    const nicknameButton = event.target.closest('[data-edit-active-contact-nickname]');
+    if (nicknameButton && els.activeChatHeader.contains(nicknameButton)) {
+      event.preventDefault();
+      openActiveContactNicknameModal();
+      return;
+    }
+    const labelButton = event.target.closest('[data-open-labels]');
+    if (labelButton && els.activeChatHeader.contains(labelButton)) {
+      event.preventDefault();
+      openLabelsModal().catch((error) => alert(error.message || 'No se pudieron abrir las etiquetas.'));
+      return;
+    }
+    const muteButton = event.target.closest('[data-mute-active-chat]');
+    if (muteButton && els.activeChatHeader.contains(muteButton)) {
+      event.preventDefault();
+      setActiveChatMuted(muteButton.dataset.muteActiveChat === '1').catch((error) => alert(error.message || 'No se pudo actualizar el silencio del chat.'));
+      return;
+    }
+    const blockButton = event.target.closest('[data-block-active-contact]');
+    if (blockButton && els.activeChatHeader.contains(blockButton)) {
+      event.preventDefault();
+      setActiveContactBlocked(blockButton.dataset.blockActiveContact === '1').catch((error) => alert(error.message || 'No se pudo actualizar el bloqueo del contacto.'));
+      return;
+    }
+    const archiveButton = event.target.closest('[data-archive-active-chat]');
+    if (archiveButton && els.activeChatHeader.contains(archiveButton)) {
+      event.preventDefault();
+      setChatArchived(state.activeChatId, archiveButton.dataset.archiveActiveChat === '1').catch((error) => alert(error.message || 'No se pudo actualizar el archivo del chat.'));
+      return;
+    }
+    const shareButton = event.target.closest('[data-share-active-chat]');
+    if (shareButton && els.activeChatHeader.contains(shareButton)) {
+      event.preventDefault();
+      copyActiveChatLink().catch((error) => alert(error.message || 'No se pudo copiar el enlace del chat.'));
+      return;
+    }
+    const briefButton = event.target.closest('[data-open-chat-brief]');
+    if (briefButton && els.activeChatHeader.contains(briefButton)) {
+      event.preventDefault();
+      openChatBrief().catch((error) => alert(error.message || 'No se pudo abrir el resumen del chat.'));
+      return;
+    }
+    const dateJumpButton = event.target.closest('[data-open-date-jump]');
+    if (dateJumpButton && els.activeChatHeader.contains(dateJumpButton)) {
+      event.preventDefault();
+      openDateJump().catch((error) => alert(error.message || 'No se pudo abrir el calendario del chat.'));
+      return;
+    }
+    const linkLibraryButton = event.target.closest('[data-open-link-library]');
+    if (linkLibraryButton && els.activeChatHeader.contains(linkLibraryButton)) {
+      event.preventDefault();
+      openLinkLibrary();
+      return;
+    }
+    const unreadButton = event.target.closest('[data-unread-active-chat]');
+    if (unreadButton && els.activeChatHeader.contains(unreadButton)) {
+      event.preventDefault();
+      markActiveChatUnread().catch((error) => alert(error.message || 'No se pudo marcar el chat como no leído.'));
+      return;
+    }
+    const reminderButton = event.target.closest('[data-open-reminders]');
+    if (reminderButton && els.activeChatHeader.contains(reminderButton)) {
+      event.preventDefault();
+      openReminderModal().catch((error) => alert(error.message || 'No se pudieron abrir los recordatorios.'));
+      return;
+    }
+    const privateNotesButton = event.target.closest('[data-open-private-notes]');
+    if (privateNotesButton && els.activeChatHeader.contains(privateNotesButton)) {
+      event.preventDefault();
+      openPrivateNotesModal().catch((error) => alert(error.message || 'No se pudieron abrir las notas privadas.'));
+      return;
+    }
+    const exportButton = event.target.closest('[data-export-active-chat]');
+    if (!exportButton || !els.activeChatHeader.contains(exportButton)) return;
+    event.preventDefault();
+    exportActiveChat().catch((error) => alert(error.message || 'No se pudo exportar el chat.'));
+  });
+  els.btnCloseForward?.addEventListener('click', closeForwardModal);
+  els.forwardModal?.addEventListener('click', (event) => {
+    if (event.target === els.forwardModal) {
+      closeForwardModal();
+      return;
+    }
+    const targetButton = event.target.closest('[data-forward-target-chat-id]');
+    if (!targetButton || !els.forwardModal.contains(targetButton)) return;
+    event.preventDefault();
+    forwardMessageToChat(targetButton.dataset.forwardTargetChatId || '').catch((error) => alert(error.message || 'No se pudo reenviar el mensaje.'));
+  });
+  els.btnCloseReminders?.addEventListener('click', closeReminderModal);
+  els.reminderModal?.addEventListener('click', (event) => {
+    if (event.target === els.reminderModal) {
+      closeReminderModal();
+      return;
+    }
+    const jumpButton = event.target.closest('[data-jump-reminder-message-id]');
+    if (jumpButton && els.reminderModal.contains(jumpButton)) {
+      event.preventDefault();
+      jumpToMessage(jumpButton.dataset.jumpReminderMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje del recordatorio.'));
+      return;
+    }
+    const completeButton = event.target.closest('[data-complete-reminder-id]');
+    if (completeButton && els.reminderModal.contains(completeButton)) {
+      event.preventDefault();
+      completeReminder(completeButton.dataset.completeReminderId || '').catch((error) => alert(error.message || 'No se pudo completar el recordatorio.'));
+    }
+  });
+  els.reminderDateTime?.addEventListener('input', renderReminderModal);
+  els.reminderText?.addEventListener('input', () => {
+    state.reminderDraftText = String(els.reminderText.value || '');
+    renderReminderModal();
+  });
+  els.btnSaveReminder?.addEventListener('click', () => {
+    saveReminderFromModal().catch((error) => alert(error.message || 'No se pudo crear el recordatorio.'));
+  });
+  els.btnCloseLabels?.addEventListener('click', closeLabelsModal);
+  els.labelsModal?.addEventListener('click', (event) => {
+    if (event.target === els.labelsModal) {
+      closeLabelsModal();
+      return;
+    }
+    const addLabel = event.target.closest('[data-add-draft-label]');
+    if (addLabel && els.labelsModal.contains(addLabel)) {
+      event.preventDefault();
+      addLabelToDraft(addLabel.dataset.addDraftLabel || '');
+      return;
+    }
+    const removeLabel = event.target.closest('[data-remove-draft-label]');
+    if (removeLabel && els.labelsModal.contains(removeLabel)) {
+      event.preventDefault();
+      removeLabelFromDraft(removeLabel.dataset.removeDraftLabel || '');
+      return;
+    }
+    const deleteLabelButton = event.target.closest('[data-delete-chat-label]');
+    if (deleteLabelButton && els.labelsModal.contains(deleteLabelButton)) {
+      event.preventDefault();
+      deleteChatLabel(deleteLabelButton.dataset.deleteChatLabel || '').catch((error) => alert(error.message || 'No se pudo eliminar la etiqueta.'));
+    }
+  });
+  els.chatLabelsInput?.addEventListener('input', () => {
+    state.labelsDraft = els.chatLabelsInput.value || '';
+    renderLabelsModal();
+  });
+  els.chatLabelsInput?.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      saveLabelsFromModal().catch((error) => alert(error.message || 'No se pudieron guardar las etiquetas.'));
+    }
+  });
+  els.btnSaveLabels?.addEventListener('click', () => {
+    saveLabelsFromModal().catch((error) => alert(error.message || 'No se pudieron guardar las etiquetas.'));
+  });
+  els.btnCloseBlockedContacts?.addEventListener('click', closeBlockedContactsModal);
+  els.btnRefreshBlockedContacts?.addEventListener('click', () => {
+    loadBlockedContacts({ silent: false }).catch((error) => alert(error.message || 'No se pudieron actualizar los contactos bloqueados.'));
+  });
+  els.blockedContactsModal?.addEventListener('click', (event) => {
+    if (event.target === els.blockedContactsModal) closeBlockedContactsModal();
+  });
+  els.blockedContactsList?.addEventListener('click', (event) => {
+    const unblockButton = event.target.closest('[data-unblock-contact-id]');
+    if (unblockButton && els.blockedContactsList.contains(unblockButton)) {
+      event.preventDefault();
+      unblockContactFromModal(unblockButton.dataset.unblockContactId || '').catch((error) => alert(error.message || 'No se pudo desbloquear el contacto.'));
+    }
+  });
+
+  els.btnCloseContactNickname?.addEventListener('click', closeContactNicknameModal);
+  els.contactNicknameModal?.addEventListener('click', (event) => {
+    if (event.target === els.contactNicknameModal) closeContactNicknameModal();
+  });
+  els.contactNicknameInput?.addEventListener('input', () => {
+    state.contactNicknameDraft = String(els.contactNicknameInput.value || '').trim();
+    renderContactNicknameModal();
+  });
+  els.contactNicknameInput?.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      saveContactNicknameFromModal().catch((error) => alert(error.message || 'No se pudo guardar el apodo privado.'));
+    }
+  });
+  els.btnSaveContactNickname?.addEventListener('click', () => {
+    saveContactNicknameFromModal().catch((error) => alert(error.message || 'No se pudo guardar el apodo privado.'));
+  });
+  els.btnClearContactNickname?.addEventListener('click', () => {
+    saveContactNicknameFromModal({ clear: true }).catch((error) => alert(error.message || 'No se pudo eliminar el apodo privado.'));
+  });
+
+  els.btnClosePrivateNotes?.addEventListener('click', closePrivateNotesModal);
+  els.privateNotesModal?.addEventListener('click', (event) => {
+    if (event.target === els.privateNotesModal) {
+      closePrivateNotesModal();
+      return;
+    }
+    const edit = event.target.closest('[data-edit-private-note]');
+    if (edit && els.privateNotesModal.contains(edit)) {
+      event.preventDefault();
+      startEditPrivateNote(edit.dataset.editPrivateNote || '');
+      return;
+    }
+    const del = event.target.closest('[data-delete-private-note]');
+    if (del && els.privateNotesModal.contains(del)) {
+      event.preventDefault();
+      deletePrivateNote(del.dataset.deletePrivateNote || '').catch((error) => alert(error.message || 'No se pudo eliminar la nota privada.'));
+    }
+  });
+  els.btnSavePrivateNote?.addEventListener('click', () => {
+    savePrivateNoteFromModal().catch((error) => alert(error.message || 'No se pudo guardar la nota privada.'));
+  });
+  els.btnCancelPrivateNoteEdit?.addEventListener('click', () => {
+    resetPrivateNoteEditor();
+    renderPrivateNotesModal();
+  });
+  els.btnScheduleMessage?.addEventListener('click', () => {
+    openScheduleModal().catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
+  });
+  els.btnSilentSend?.addEventListener('click', () => {
+    sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
+  });
+  els.btnCreatePoll?.addEventListener('click', () => openPollModal());
+  els.btnVoiceDictation?.addEventListener('click', () => toggleVoiceDictation());
+  els.btnClosePoll?.addEventListener('click', closePollModal);
+  els.pollModal?.addEventListener('click', (event) => { if (event.target === els.pollModal) closePollModal(); });
+  els.pollForm?.addEventListener('input', renderPollModal);
+  els.pollForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    createPollFromModal().catch((error) => alert(error.message || 'No se pudo publicar la encuesta.'));
+  });
+  els.btnCloseSchedule?.addEventListener('click', closeScheduleModal);
+  els.scheduleSilent?.addEventListener('change', renderScheduleModal);
+  els.scheduleModal?.addEventListener('click', (event) => {
+    if (event.target === els.scheduleModal) {
+      closeScheduleModal();
+      return;
+    }
+    const cancel = event.target.closest('[data-cancel-scheduled-id]');
+    if (!cancel || !els.scheduleModal.contains(cancel)) return;
+    event.preventDefault();
+    cancelScheduledMessage(cancel.dataset.cancelScheduledId || '').catch((error) => alert(error.message || 'No se pudo cancelar el mensaje programado.'));
+  });
+  els.scheduleDateTime?.addEventListener('input', renderScheduleModal);
+  els.messageTtlSelect?.addEventListener('change', () => { updateComposerControls(); renderScheduleModal(); });
+  els.btnConfirmSchedule?.addEventListener('click', () => {
+    scheduleCurrentMessage().catch((error) => alert(error.message || 'No se pudo programar el mensaje.'));
+  });
+  els.addContactForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = els.contactEmailInput.value.trim();
+    if (!email) return;
+    await addContactByEmail(email).catch((error) => alert(error.message));
+    els.contactEmailInput.value = '';
+  });
+  els.chatList.addEventListener('click', (event) => {
+    const clearLabelFilterButton = event.target.closest('[data-clear-label-filter]');
+    if (clearLabelFilterButton && els.chatList.contains(clearLabelFilterButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.activeLabelFilter = '';
+      renderAll();
+      return;
+    }
+    const markAllButton = event.target.closest('[data-mark-all-read]');
+    if (markAllButton && els.chatList.contains(markAllButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      markAllChatsRead().catch((error) => alert(error.message || 'No se pudieron marcar los chats como leídos.'));
+      return;
+    }
+    const pinButton = event.target.closest('[data-pin-chat-id]');
+    if (pinButton && els.chatList.contains(pinButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const nextState = pinButton.dataset.pinned !== '1';
+      setChatPinned(pinButton.dataset.pinChatId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el chat fijado.'));
+      return;
+    }
+    const archiveButton = event.target.closest('[data-archive-chat-id]');
+    if (archiveButton && els.chatList.contains(archiveButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const nextState = archiveButton.dataset.archived !== '1';
+      setChatArchived(archiveButton.dataset.archiveChatId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el archivo del chat.'));
+      return;
+    }
+    const row = event.target.closest('[data-chat-id]');
+    if (row) selectChat(row.dataset.chatId).catch((error) => alert(error.message));
+  });
+  els.chatList.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('[data-chat-id]');
+    if (!row || event.target.closest('[data-pin-chat-id]') || event.target.closest('[data-archive-chat-id]') || event.target.closest('[data-mark-all-read]') || event.target.closest('[data-clear-label-filter]')) return;
+    event.preventDefault();
+    selectChat(row.dataset.chatId).catch((error) => alert(error.message));
+  });
+  els.contactList.addEventListener('click', (event) => {
+    const nicknameButton = event.target.closest('[data-edit-contact-nickname]');
+    if (nicknameButton && els.contactList.contains(nicknameButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      openContactNicknameModal(nicknameButton.dataset.editContactNickname || '');
+      return;
+    }
+    const row = event.target.closest('[data-contact-id]');
+    if (row) openContactChat(row.dataset.contactId).catch((error) => alert(error.message));
+  });
+  els.contactList.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('[data-contact-id]');
+    if (!row || event.target.closest('[data-edit-contact-nickname]')) return;
+    event.preventDefault();
+    openContactChat(row.dataset.contactId).catch((error) => alert(error.message));
+  });
+  els.chatSearchForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await searchActiveChat(els.chatSearchInput.value);
+  });
+  els.btnShowStarred?.addEventListener('click', async () => {
+    if (state.starredPanelOpen) {
+      state.starredPanelOpen = false;
+      renderSearchPanel();
+      return;
+    }
+    await loadStarredMessages().catch((error) => alert(error.message || 'No se pudieron abrir los destacados.'));
+  });
+  els.btnClearSearch.addEventListener('click', () => resetChatSearch());
+  els.chatSearchPanel.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-search-message-id]');
+    if (row) openSearchResult(row.dataset.searchMessageId).catch((error) => alert(error.message || 'No se pudo abrir el resultado.'));
+  });
+  els.chatSearchInput.addEventListener('input', () => {
+    if (!els.chatSearchInput.value.trim()) resetChatSearch({ keepInput: true });
+  });
+  els.replyDraft?.addEventListener('click', (event) => {
+    const cancelEdit = event.target.closest('[data-cancel-edit]');
+    if (cancelEdit) {
+      state.editingMessage = null;
+      loadDraftForChat(state.activeChatId);
+      renderReplyDraft();
+      els.messageInput?.focus();
+      return;
+    }
+    const editFocus = event.target.closest('[data-edit-focus]');
+    if (editFocus) {
+      els.messageInput?.focus();
+      return;
+    }
+    const cancel = event.target.closest('[data-cancel-reply]');
+    if (cancel) {
+      state.replyToMessage = null;
+      renderReplyDraft();
+      els.messageInput?.focus();
+      return;
+    }
+    const jump = event.target.closest('[data-jump-message-id]');
+    if (jump) jumpToMessage(jump.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
+  });
+  els.messages.addEventListener('click', (event) => {
+    const blockButton = event.target.closest('[data-block-active-contact]');
+    if (blockButton && els.messages.contains(blockButton)) {
+      event.preventDefault();
+      setActiveContactBlocked(blockButton.dataset.blockActiveContact === '1').catch((error) => alert(error.message || 'No se pudo actualizar el bloqueo del contacto.'));
+      return;
+    }
+    const unreadMarkerButton = event.target.closest('[data-jump-unread-marker]');
+    if (unreadMarkerButton && els.messages.contains(unreadMarkerButton)) {
+      event.preventDefault();
+      jumpToUnreadMarker(unreadMarkerButton.dataset.jumpUnreadMarker || '');
+      return;
+    }
+    const jumpButton = event.target.closest('[data-jump-message-id]');
+    if (jumpButton && els.messages.contains(jumpButton)) {
+      event.preventDefault();
+      jumpToMessage(jumpButton.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
+      return;
+    }
+    const replyButton = event.target.closest('[data-reply-message-id]');
+    if (replyButton && els.messages.contains(replyButton)) {
+      event.preventDefault();
+      startReplyToMessage(replyButton.dataset.replyMessageId || '');
+      return;
+    }
+    const forwardButton = event.target.closest('[data-forward-message-id]');
+    if (forwardButton && els.messages.contains(forwardButton)) {
+      event.preventDefault();
+      openForwardMessage(forwardButton.dataset.forwardMessageId || '');
+      return;
+    }
+    const editButton = event.target.closest('[data-edit-message-id]');
+    if (editButton && els.messages.contains(editButton)) {
+      event.preventDefault();
+      startEditMessage(editButton.dataset.editMessageId || '');
+      return;
+    }
+    const deleteButton = event.target.closest('[data-delete-message-id]');
+    if (deleteButton && els.messages.contains(deleteButton)) {
+      event.preventDefault();
+      deleteMessageForEveryone(deleteButton.dataset.deleteMessageId || '').catch((error) => alert(error.message || 'No se pudo eliminar el mensaje.'));
+      return;
+    }
+    const unpinButton = event.target.closest('[data-unpin-message-id]');
+    if (unpinButton && els.messages.contains(unpinButton)) {
+      event.preventDefault();
+      setMessagePinned(unpinButton.dataset.unpinMessageId || '', false).catch((error) => alert(error.message || 'No se pudo desfijar el mensaje.'));
+      return;
+    }
+    const pinButton = event.target.closest('[data-pin-message-id]');
+    if (pinButton && els.messages.contains(pinButton)) {
+      event.preventDefault();
+      const nextState = pinButton.dataset.pinned !== '1';
+      setMessagePinned(pinButton.dataset.pinMessageId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el mensaje fijado.'));
+      return;
+    }
+    const starButton = event.target.closest('[data-star-message-id]');
+    if (starButton && els.messages.contains(starButton)) {
+      event.preventDefault();
+      const nextState = starButton.dataset.starred !== '1';
+      setMessageStar(starButton.dataset.starMessageId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el destacado.'));
+      return;
+    }
+    const remindButton = event.target.closest('[data-remind-message-id]');
+    if (remindButton && els.messages.contains(remindButton)) {
+      event.preventDefault();
+      openReminderModal(remindButton.dataset.remindMessageId || '').catch((error) => alert(error.message || 'No se pudo crear el recordatorio.'));
+      return;
+    }
+    const messageLinkButton = event.target.closest('[data-copy-message-link-id]');
+    if (messageLinkButton && els.messages.contains(messageLinkButton)) {
+      event.preventDefault();
+      copyMessageLink(messageLinkButton.dataset.copyMessageLinkId || '').catch((error) => alert(error.message || 'No se pudo copiar el enlace del mensaje.'));
+      return;
+    }
+    const copyButton = event.target.closest('[data-copy-message-id]');
+    if (copyButton && els.messages.contains(copyButton)) {
+      event.preventDefault();
+      copyMessageText(copyButton.dataset.copyMessageId || '').catch((error) => alert(error.message || 'No se pudo copiar el mensaje.'));
+      return;
+    }
+    const outboxRetryButton = event.target.closest('[data-outbox-retry]');
+    if (outboxRetryButton && els.messages.contains(outboxRetryButton)) {
+      event.preventDefault();
+      const queued = state.outboxMessages.find((item) => item.clientMessageId === (outboxRetryButton.dataset.outboxRetry || ''));
+      if (queued) sendQueuedOutboxMessage(queued).catch((error) => alert(error.message || 'No se pudo reenviar el mensaje pendiente.'));
+      return;
+    }
+    const outboxDiscardButton = event.target.closest('[data-outbox-discard]');
+    if (outboxDiscardButton && els.messages.contains(outboxDiscardButton)) {
+      event.preventDefault();
+      const ok = window.confirm('¿Descartar este mensaje pendiente? Esta acción no lo enviará.');
+      if (ok) {
+        removeQueuedMessage(outboxDiscardButton.dataset.outboxDiscard || '');
+        showTemporaryDraftStatus('Mensaje pendiente descartado.');
+      }
+      return;
+    }
+    const pollVoteButton = event.target.closest('[data-poll-vote-message-id][data-poll-option-id]');
+    if (pollVoteButton && els.messages.contains(pollVoteButton)) {
+      event.preventDefault();
+      setPollVote(pollVoteButton.dataset.pollVoteMessageId || '', pollVoteButton.dataset.pollOptionId || '').catch((error) => alert(error.message || 'No se pudo registrar el voto.'));
+      return;
+    }
+    const reactionButton = event.target.closest('[data-reaction][data-message-id]');
+    if (!reactionButton || !els.messages.contains(reactionButton)) return;
+    event.preventDefault();
+    setMessageReaction(reactionButton.dataset.messageId || '', reactionButton.dataset.reaction || '').catch((error) => alert(error.message || 'No se pudo guardar la reacción.'));
+  });
+  els.tabChats.addEventListener('click', () => {
+    showChatListMode('active');
+    loadChats({ includeArchived: false }).catch((error) => alert(error.message || 'No se pudieron cargar los chats.'));
+  });
+  els.tabUnread?.addEventListener('click', () => {
+    showChatListMode('unread');
+    loadChats({ unreadOnly: true }).catch((error) => alert(error.message || 'No se pudieron cargar los chats no leídos.'));
+  });
+  els.tabArchived?.addEventListener('click', () => {
+    showChatListMode('archived');
+    loadChats({ includeArchived: true }).catch((error) => alert(error.message || 'No se pudieron cargar los chats archivados.'));
+  });
+  els.tabContacts.addEventListener('click', showContactsTab);
+  els.messageForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const text = els.messageInput.value.trim();
+    if (state.voiceDictating) stopVoiceDictation({ announce: false });
+    if (!text) return;
+    els.btnSend.disabled = true;
+    try {
+      const slashResult = await handleSlashCommandSubmit(text);
+      if (slashResult) {
+        if (slashResult.clearComposer) {
+          els.messageInput.value = '';
+          clearDraftForChat(state.activeChatId);
+        }
+        await sendTyping(false);
+        return;
+      }
+      const wasEditing = Boolean(state.editingMessage?.messageId);
+      if (wasEditing) await editActiveMessage(text);
+      else {
+        await sendMessage(text);
+        els.messageInput.value = '';
+      }
+      await sendTyping(false);
+    } catch (error) {
+      els.messageInput.value = text;
+      const fallback = state.editingMessage?.messageId
+        ? 'No se pudo guardar la edición. Tu texto se conservó para reintentar.'
+        : 'No se pudo enviar el mensaje. Tu texto se conservó para reintentar.';
+      alert(error.message || fallback);
+    } finally {
+      updateComposerControls();
+      els.messageInput.focus();
+    }
+  });
+  els.messageInput.addEventListener('input', () => {
+    scheduleActiveDraftSave();
+    updateComposerControls();
+    if (state.scheduleModalOpen) renderScheduleModal();
+    if (state.quickRepliesOpen) renderQuickRepliesPanel();
+    if (state.emojiPickerOpen) renderEmojiPickerPanel();
+    renderSlashCommandsPanel();
+    sendTyping(true);
+    if (state.typingTimer) window.clearTimeout(state.typingTimer);
+    state.typingTimer = window.setTimeout(() => sendTyping(false), 1800);
+  });
+  els.messageInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.emojiPickerOpen) {
+      closeEmojiPicker();
+      return;
+    }
+    if (event.key === 'Escape' && state.slashCommandsOpen) {
+      state.slashCommandsOpen = false;
+      renderSlashCommandsPanel();
+      return;
+    }
+    if (event.key === 'Escape' && state.editingMessage) {
+      state.editingMessage = null;
+      loadDraftForChat(state.activeChatId);
+      renderReplyDraft();
+      return;
+    }
+    if (event.key === 'Escape' && state.replyToMessage) {
+      state.replyToMessage = null;
+      renderReplyDraft();
+    }
+  });
+  els.btnShowQr.addEventListener('click', openOwnQr);
+  els.btnScanQr.addEventListener('click', openScanQr);
+  els.btnCloseQr.addEventListener('click', closeQrModal);
+  els.qrModal.addEventListener('click', (event) => { if (event.target === els.qrModal) closeQrModal(); });
+  els.manualCodeForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const value = els.manualCodeInput.value.trim();
+    if (!value) return;
+    await addContactByCode(value).then(closeQrModal).catch((error) => alert(error.message));
+  });
+}
+
+async function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      state.serviceWorkerRegistration = registration;
+      await registration.update().catch(() => null);
+    } catch {}
+  }
+}
+
+async function init() {
+  getClientId();
+  setPrivacyMode(readPrivacyModePreference(), { announce: false });
+  setCompactMode(readCompactModePreference(), { announce: false });
+  bindEvents();
+  await registerServiceWorker();
+  try {
+    await loadConfig();
+    const restored = await bootstrapExistingSession();
+    if (!restored) showGuest();
+  } catch (error) {
+    setStatus(error.message || 'No se pudo conectar con chatER.');
+    showGuest();
+  }
+}
+
+init();

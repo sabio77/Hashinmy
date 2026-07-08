@@ -1,0 +1,8 @@
+{
+  "asset": "icon-192.svg",
+  "tipo": "icono vectorial PWA",
+  "uso": "Icono instalable de chatER en 192x192 para navegadores compatibles con SVG.",
+  "descripcion": "Burbuja de chat blanca sobre fondo verde chatER, con acento circular claro y estilo profesional de mensajeria.",
+  "colores": ["#0aa884", "#ffffff", "#0f766e", "#d9fdd3"],
+  "fallback": "Si se reemplaza por PNG, mantener lectura clara en tamano pequeno, bordes redondeados y contraste alto."
+}

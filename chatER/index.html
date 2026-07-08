@@ -1,154 +1,436 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="ChatER, chat web tipo WhatsApp para sitio estático conectado a APIs memoriaBACKEND." />
-  <meta name="theme-color" content="#0b141a" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="application-name" content="ChatER" />
-  <meta name="apple-mobile-web-app-title" content="ChatER" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="assets/chater-icon-192.png" />
-  <link rel="apple-touch-icon" href="assets/chater-icon-192.png" />
-  <title>ChatER</title>
-  <script src="js/theme-bootstrap.js"></script>
-  <script src="js/memoria-backend-config.js?v=20260706-auth-reference-5"></script>
-  <script src="auth-gate.js?v=20260706-auth-reference-3"></script>
-  <link rel="stylesheet" href="css/styles.css?v=2026-07-07-profile-qr-manual-code-156" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0aa884" />
+  <meta name="description" content="chatER, mensajería privada por correo para Hashinmy." />
+  <title>chatER | Hashinmy</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg" />
+  <link rel="apple-touch-icon" sizes="192x192" href="./assets/icon-192.svg" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <main class="app-shell" aria-label="ChatER">
-    <section id="chatView" class="chat-view" aria-label="Interfaz principal de ChatER" hidden>
-      <aside class="sidebar" aria-label="Lista de conversaciones">
-        <header class="sidebar-header">
-          <button id="profileButton" class="avatar-button profile-badge" type="button" aria-label="Abrir perfil">CE</button>
-          <div id="sidebarBrandLogo" class="brand-logo sidebar-brand-logo" data-brand-logo aria-hidden="true">CE</div>
-          <div class="sidebar-title">
-            <h1>ChatER</h1>
-            <p id="userEmailLabel">Sesión activa</p>
-          </div>
-          <div class="header-actions" aria-label="Acciones principales">
-            <button id="newChatButton" class="icon-button" type="button" aria-label="Nuevo chat" data-icon="plus"></button>
-            <button id="headerCameraButton" class="icon-button" type="button" aria-label="Crear estado rápido" data-icon="camera"></button>
-            <button id="headerSearchButton" class="icon-button" type="button" aria-label="Buscar en esta sección" data-icon="search"></button>
-            <button id="toolsButton" class="icon-button" type="button" aria-label="Abrir herramientas" data-icon="more-vertical"></button>
+  <noscript>chatER necesita JavaScript para iniciar sesión y sincronizar mensajes.</noscript>
+  <main class="ce-app" id="appRoot">
+    <section class="ce-auth" id="authScreen">
+      <div class="ce-auth__card">
+        <div class="ce-logo" aria-hidden="true"><span>cE</span></div>
+        <p class="ce-eyebrow">Hashinmy · mensajería segura</p>
+        <h1>Entra a chatER con Google</h1>
+        <p>Usa tu correo como identificador. No necesitas número telefónico para crear contactos, abrir conversaciones o compartir tu QR.</p>
+        <button class="ce-btn ce-btn--primary" id="btnGoogleLogin" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.76-.07-1.49-.2-2.18H12v4.13h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.22c1.89-1.74 2.99-4.3 2.99-7.48Z"/><path d="M12 22c2.7 0 4.96-.89 6.61-2.42l-3.22-2.5c-.9.6-2.04.95-3.39.95-2.6 0-4.8-1.76-5.59-4.12H3.08v2.59A10 10 0 0 0 12 22Z"/><path d="M6.41 13.91A6 6 0 0 1 6.1 12c0-.66.11-1.31.31-1.91V7.5H3.08A10 10 0 0 0 2 12c0 1.61.39 3.13 1.08 4.5l3.33-2.59Z"/><path d="M12 5.97c1.47 0 2.79.5 3.82 1.5l2.86-2.86C16.95 3 14.7 2 12 2a10 10 0 0 0-8.92 5.5l3.33 2.59C7.2 7.73 9.4 5.97 12 5.97Z"/></svg>
+          Continuar con Google
+        </button>
+        <p class="ce-status" id="authStatus">Preparando autenticación...</p>
+      </div>
+    </section>
+
+    <section class="ce-shell hidden" id="chatScreen" aria-label="chatER">
+      <aside class="ce-sidebar">
+        <header class="ce-sidebar__header">
+          <div class="ce-user" id="userSummary"></div>
+          <div class="ce-header-actions">
+            <button class="ce-icon-btn" id="btnShowQr" type="button" title="Mi QR" aria-label="Mi QR">
+              <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3V3Zm2 2v4h4V5H5Zm8-2h8v8h-8V3Zm2 2v4h4V5h-4ZM3 13h8v8H3v-8Zm2 2v4h4v-4H5Zm10-2h2v2h-2v-2Zm4 0h2v4h-4v-2h2v-2Zm-4 4h2v4h-2v-4Zm4 2h2v2h-2v-2Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--notes" id="btnOpenSelfNotes" type="button" title="Notas para mí" aria-label="Abrir Notas para mí">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm10 1.8V8h2.2L15 5.8ZM7 10v2h8v-2H7Zm0 4v2h10v-2H7Zm0 4v2h6v-2H7Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--global-search" id="btnOpenGlobalSearch" type="button" title="Buscar en todos los chats" aria-label="Buscar en todos los chats">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.16 10.45l4.44 4.45-1.41 1.41-4.45-4.44A6.5 6.5 0 1 1 10.5 4Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm-3 4h6v1.5h-6V10Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--global-starred" id="btnOpenGlobalStarred" type="button" title="Destacados de todos los chats" aria-label="Abrir destacados de todos los chats">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.7 2.8 5.66 6.25.91-4.52 4.4 1.07 6.23L12 16.95 6.4 19.9l1.07-6.23-4.52-4.4 6.25-.91L12 2.7Zm0 4.52-1.45 2.94-3.25.47 2.35 2.29-.55 3.24L12 14.63l2.9 1.53-.55-3.24 2.35-2.29-3.25-.47L12 7.22Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--drafts" id="btnOpenDrafts" type="button" title="Borradores pendientes" aria-label="Abrir borradores pendientes">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm9 2v4h4l-4-4ZM7 11h10v2H7v-2Zm0 4h7v2H7v-2Zm0-8h5v2H7V7Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--notification-pause" id="btnNotificationPause" type="button" title="Pausar notificaciones" aria-label="Pausar notificaciones" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6v-5a7 7 0 0 0-5-6.71V3a2 2 0 0 0-4 0v1.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Zm-2.7-8.8 1.42-1.42 1.5 1.5-1.42 1.42-1.5-1.5ZM4.78 7.28l1.5-1.5L7.7 7.2 6.2 8.7 4.78 7.28ZM8 16v-5a4 4 0 0 1 8 0v5H8Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--blocked-contacts" id="btnOpenBlockedContacts" type="button" title="Contactos bloqueados" aria-label="Gestionar contactos bloqueados">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-6.32 17.75L19.75 5.68A9.96 9.96 0 0 0 12 2Zm0 20a9.96 9.96 0 0 0 6.32-2.25L4.25 5.68A10 10 0 0 0 12 22Zm0-18a7.94 7.94 0 0 1 4.83 1.64L5.64 16.83A8 8 0 0 1 12 4Zm0 16a7.94 7.94 0 0 1-4.83-1.64L18.36 7.17A8 8 0 0 1 12 20Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--privacy" id="btnPrivacyMode" type="button" title="Activar modo privacidad" aria-label="Activar modo privacidad" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.5 0 9.3 4.65 10 7-.7 2.35-4.5 7-10 7S2.7 14.35 2 12c.7-2.35 4.5-7 10-7Zm0 2C8 7 5.11 10.13 4.16 12 5.11 13.87 8 17 12 17s6.89-3.13 7.84-5C18.89 10.13 16 7 12 7Zm0 2.25A2.75 2.75 0 1 1 12 14.75 2.75 2.75 0 0 1 12 9.25Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--privacy-lock" id="btnPrivacyLock" type="button" title="Configurar bloqueo por PIN" aria-label="Configurar bloqueo por PIN" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 9h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 10 0v2Zm-8 0h6V7a3 3 0 0 0-6 0v2Zm3 4a1.8 1.8 0 0 0-1 3.3V18h2v-1.7a1.8 1.8 0 0 0-1-3.3Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--compact" id="btnCompactMode" type="button" title="Activar modo compacto" aria-label="Activar modo compacto" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5Zm0 4h16v2H4V9Zm0 4h16v2H4v-2Zm0 4h10v2H4v-2Z"/></svg>
+            </button>
+            <button class="ce-icon-btn ce-icon-btn--command" id="btnCommandPalette" type="button" title="Acciones rápidas" aria-label="Abrir acciones rápidas">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm1 3v2h10V7H5Zm0 4v2h6v-2H5Zm12.5-.5L16 12l1.5 1.5L19 12l-1.5-1.5Z"/></svg>
+            </button>
+            <button class="ce-icon-btn" id="btnLogout" type="button" title="Salir" aria-label="Salir">
+              <svg viewBox="0 0 24 24"><path d="M10 17v-2h4v-2h-4v-2l-4 3 4 3Zm-5 4h8a2 2 0 0 0 2-2v-3h-2v3H5V5h8v3h2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Zm12-5 4-4-4-4v3h-6v2h6v3Z"/></svg>
+            </button>
           </div>
         </header>
 
-        <nav class="mode-tabs" aria-label="Secciones">
-          <button class="mode-tab active" type="button" data-section="chats">Chats</button>
-          <button class="mode-tab" type="button" data-section="states">Estados</button>
-          <button class="mode-tab" type="button" data-section="calls">Llamadas</button>
-        </nav>
-
-        <section class="search-box" aria-label="Buscar conversación">
-          <input id="searchInput" type="search" placeholder="Buscar o iniciar un chat" autocomplete="off" />
-        </section>
-
-        <section id="chatList" class="chat-list" aria-label="Conversaciones disponibles"></section>
-      </aside>
-
-      <section class="chat-panel" aria-label="Conversación actual">
-        <header class="chat-header">
-          <button id="backButton" class="icon-button mobile-only" type="button" aria-label="Volver a la lista" data-icon="chevron-left"></button>
-          <div id="activeAvatar" class="contact-avatar" aria-hidden="true">A</div>
-          <div class="chat-contact-info">
-            <h2 id="activeName">Selecciona un chat</h2>
-            <p id="activeStatus">Elige una conversación para comenzar</p>
+        <div class="ce-install hidden" id="installBanner">
+          <strong>Instala chatER</strong>
+          <span>Recibe una experiencia tipo app en este dispositivo.</span>
+          <div>
+            <button id="btnInstall" class="ce-btn ce-btn--small" type="button">Instalar</button>
+            <button id="btnInstallLater" class="ce-link" type="button">Después</button>
           </div>
-          <div class="chat-header-actions">
-            <button id="audioCallButton" class="icon-button" type="button" aria-label="Iniciar llamada de voz" data-icon="phone"></button>
-            <button id="videoCallButton" class="icon-button" type="button" aria-label="Iniciar videollamada" data-icon="video"></button>
-            <button id="pinConversationButton" class="icon-button" type="button" aria-label="Fijar conversación" data-icon="pin"></button>
-            <button id="archiveConversationButton" class="icon-button" type="button" aria-label="Archivar conversación" data-icon="archive"></button>
-            <button id="conversationMenuButton" class="icon-button" type="button" aria-label="Abrir opciones de conversación" data-icon="more-vertical"></button>
+        </div>
+
+        <div class="ce-install ce-install--push hidden" id="pushBanner">
+          <strong>Activa notificaciones</strong>
+          <span>Te avisaremos cuando recibas mensajes y chatER no esté conectado en este dispositivo.</span>
+          <div>
+            <button id="btnEnablePush" class="ce-btn ce-btn--small" type="button">Activar</button>
+            <button id="btnPushLater" class="ce-link" type="button">Después</button>
           </div>
-        </header>
+        </div>
 
-        <section id="messages" class="messages" aria-live="polite"></section>
-
-        <section id="statusPanel" class="status-panel" aria-label="Estados de 24 horas" hidden></section>
-
-        <form id="messageForm" class="message-form" autocomplete="off">
-          <button id="emojiButton" class="icon-button" type="button" aria-label="Abrir emojis" data-icon="smile"></button>
-          <input id="messageInput" type="text" placeholder="Mensaje" disabled />
-          <button id="attachButton" class="icon-button" type="button" aria-label="Adjuntar archivo" data-icon="paperclip"></button>
-          <button id="cameraComposerButton" class="icon-button" type="button" aria-label="Abrir cámara o galería" data-icon="camera"></button>
-          <button id="quickComposerButton" class="icon-button" type="button" aria-label="Abrir acciones rápidas" data-icon="bolt"></button>
-          <button id="voiceNoteButton" class="icon-button voice-note-button" type="button" aria-label="Grabar nota de voz" data-icon="mic"></button>
-          <button id="sendButton" class="send-button" type="submit" aria-label="Enviar mensaje" data-icon="send" disabled hidden></button>
+        <form class="ce-add" id="addContactForm">
+          <input id="contactEmailInput" type="email" autocomplete="email" placeholder="Agregar contacto por correo" />
+          <button class="ce-icon-btn ce-icon-btn--accent" type="submit" title="Agregar" aria-label="Agregar contacto">
+            <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-8 0c1.66 0 3-1.34 3-3S8.66 6 7 6 4 7.34 4 9s1.34 3 3 3Zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm-8 .5c-.31 0-.65.02-1 .05-1.67.15-5 .98-5 2.45v3h4v-2c0-1.48.81-2.61 2.05-3.5H7Z"/></svg>
+          </button>
+          <button class="ce-icon-btn" id="btnScanQr" type="button" title="Escanear QR" aria-label="Escanear QR">
+            <svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4ZM8 8h2v2H8V8Zm6 0h2v2h-2V8Zm-6 6h2v2H8v-2Zm6 0h2v2h-2v-2Z"/></svg>
+          </button>
         </form>
 
-        <section id="emojiPanel" class="emoji-panel" aria-label="Panel de emojis" hidden></section>
+        <div class="ce-tabs" role="tablist">
+          <button class="active" id="tabChats" type="button">Chats</button>
+          <button id="tabUnread" type="button">No leídos</button>
+          <button id="tabArchived" type="button">Archivados</button>
+          <button id="tabContacts" type="button">Contactos</button>
+        </div>
+        <div class="ce-label-filter hidden" id="chatLabelFilters" aria-label="Filtrar chats por etiqueta"></div>
+        <div class="ce-list" id="chatList"></div>
+        <div class="ce-list hidden" id="contactList"></div>
+      </aside>
+
+      <section class="ce-chat">
+        <header class="ce-chat__header" id="activeChatHeader">
+          <div class="ce-empty-title">Selecciona un chat</div>
+        </header>
+        <div class="ce-chat-search-area hidden" id="chatSearchArea">
+          <form class="ce-chat-search" id="chatSearchForm" role="search" aria-label="Buscar mensajes en este chat">
+            <input id="chatSearchInput" type="search" autocomplete="off" placeholder="Buscar en este chat" disabled />
+            <button class="ce-btn ce-btn--small" type="submit">Buscar</button>
+            <button class="ce-link" id="btnClearSearch" type="button">Limpiar</button>
+            <button class="ce-link ce-link--starred" id="btnShowStarred" type="button" disabled>Destacados</button>
+          </form>
+          <div class="ce-search-panel hidden" id="chatSearchPanel" aria-live="polite"></div>
+        </div>
+        <div class="ce-messages" id="messages"></div>
+        <button class="ce-scroll-bottom hidden" id="btnScrollBottom" type="button" aria-label="Ir al final de la conversación">
+          <span>Ir al final</span>
+        </button>
+        <div class="ce-typing" id="typingStatus"></div>
+        <div class="ce-reply-draft hidden" id="replyDraft" aria-live="polite"></div>
+        <form class="ce-compose" id="messageForm">
+          <div class="ce-draft-status hidden" id="draftStatus" aria-live="polite"></div>
+          <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
+          <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
+          <div class="ce-emoji-panel hidden" id="emojiPickerPanel" aria-live="polite"></div>
+          <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled>⚡</button>
+          <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled>✨</button>
+          <button class="ce-icon-btn ce-icon-btn--emoji" id="btnEmojiPicker" type="button" title="Insertar emoji" aria-label="Insertar emoji" aria-expanded="false" disabled>😊</button>
+          <button class="ce-icon-btn ce-icon-btn--schedule" id="btnScheduleMessage" type="button" title="Programar mensaje" aria-label="Programar mensaje" disabled>⏱</button>
+          <button class="ce-icon-btn ce-icon-btn--poll" id="btnCreatePoll" type="button" title="Crear encuesta" aria-label="Crear encuesta" disabled>📊</button>
+          <button class="ce-icon-btn ce-icon-btn--voice" id="btnVoiceDictation" type="button" title="Dictar mensaje por voz" aria-label="Dictar mensaje por voz" aria-pressed="false" disabled>🎙️</button>
+          <button class="ce-icon-btn ce-icon-btn--silent" id="btnSilentSend" type="button" title="Enviar sin notificación" aria-label="Enviar sin notificación" disabled>🔕</button>
+          <label class="ce-ttl-control" title="Mensajes temporales">
+            <span>Expira</span>
+            <select id="messageTtlSelect" aria-label="Expiración del mensaje" disabled>
+              <option value="0">No expira</option>
+              <option value="3600">1 hora</option>
+              <option value="86400">24 horas</option>
+              <option value="604800">7 días</option>
+            </select>
+          </label>
+          <input id="messageInput" type="text" autocomplete="off" placeholder="Escribe un mensaje, /ayuda o 😊" disabled />
+          <button class="ce-btn ce-btn--primary" type="submit" id="btnSend" disabled>Enviar</button>
+        </form>
       </section>
-
-      <nav id="bottomNavigation" class="bottom-navigation" aria-label="Navegación principal">
-        <button class="bottom-nav-item active" type="button" data-bottom-section="chats" aria-label="Abrir chats">
-          <span data-icon="message-circle" aria-hidden="true"></span>
-          <strong>Chats</strong>
-        </button>
-        <button class="bottom-nav-item" type="button" data-bottom-section="calls" aria-label="Abrir llamadas">
-          <span data-icon="phone" aria-hidden="true"></span>
-          <strong>Llamadas</strong>
-        </button>
-        <button class="bottom-nav-item" type="button" data-bottom-section="states" aria-label="Abrir estados">
-          <span data-icon="circle-dot" aria-hidden="true"></span>
-          <strong>Novedades</strong>
-        </button>
-        <button class="bottom-nav-item" type="button" data-bottom-section="tools" aria-label="Abrir herramientas">
-          <span data-icon="settings" aria-hidden="true"></span>
-          <strong>Herramientas</strong>
-        </button>
-      </nav>
-
-      <button id="floatingActionButton" class="floating-action-button" type="button" aria-label="Acción principal" data-icon="plus" hidden></button>
     </section>
   </main>
 
-  <div id="modalOverlay" class="modal-overlay" hidden>
-    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <header class="modal-header">
-        <h2 id="modalTitle">Acción</h2>
-        <button id="modalCloseButton" class="icon-button" type="button" aria-label="Cerrar" data-icon="x"></button>
-      </header>
-      <div id="modalBody" class="modal-body"></div>
-    </section>
-  </div>
-
-  <div id="pwaUpdateBanner" class="pwa-update-banner" role="status" aria-live="polite" hidden>
-    <span>Hay una actualización disponible para ChatER.</span>
-    <button id="pwaUpdateButton" type="button">Actualizar ahora</button>
-    <button id="pwaUpdateDismissButton" type="button" aria-label="Ocultar actualización">Después</button>
-  </div>
-
-  <div id="pwaInstallPrompt" class="pwa-install-floating" role="dialog" aria-live="polite" aria-label="Instalar ChatER" hidden>
-    <div class="pwa-install-card">
-      <span class="pwa-install-icon" data-icon="download" aria-hidden="true"></span>
-      <div class="pwa-install-copy">
-        <strong>Instalar ChatER</strong>
-        <small>Agrega la app a tu pantalla principal para abrirla como aplicación instalada.</small>
+  <div class="ce-modal hidden" id="qrModal" role="dialog" aria-modal="true" aria-label="Código QR chatER">
+    <div class="ce-modal__card">
+      <button class="ce-modal__close" id="btnCloseQr" type="button" aria-label="Cerrar">×</button>
+      <h2 id="qrModalTitle">Mi código QR</h2>
+      <div class="ce-qr-box" id="qrBox"></div>
+      <p id="qrHelp">Comparte este QR para que otros te agreguen y abran un chat contigo.</p>
+      <div class="ce-scan hidden" id="scanBox">
+        <video id="qrVideo" playsinline muted></video>
+        <p id="scanStatus">Apunta la cámara al código QR.</p>
       </div>
-      <button id="pwaInstallButton" class="primary-button" type="button">Instalar app</button>
+      <form id="manualCodeForm" class="ce-manual-code">
+        <input id="manualCodeInput" type="text" placeholder="Pegar código, enlace QR o correo" />
+        <button class="ce-btn ce-btn--small" type="submit">Usar código</button>
+      </form>
     </div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-  <div id="messageEventOverlay" class="message-event-overlay" role="status" aria-live="polite" aria-label="Mensaje recibido" hidden>
-    <span class="message-event-circle" aria-hidden="true"></span>
-    <span class="visually-hidden">Mensaje recibido</span>
+  <div class="ce-modal hidden" id="forwardModal" role="dialog" aria-modal="true" aria-label="Reenviar mensaje">
+    <div class="ce-modal__card ce-forward-card">
+      <button class="ce-modal__close" id="btnCloseForward" type="button" aria-label="Cerrar">×</button>
+      <h2>Reenviar mensaje</h2>
+      <p>Selecciona el chat donde quieres compartir este mensaje. El contenido se enviará como mensaje reenviado.</p>
+      <div class="ce-forward-preview" id="forwardPreview"></div>
+      <div class="ce-forward-list" id="forwardList" aria-live="polite"></div>
+    </div>
   </div>
 
-  <script src="IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js?v=20260706-auth-reference-3" defer></script>
-  <script src="IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js?v=20260706-auth-reference-3" defer></script>
-  <script src="QRcodigosX/BLOQUE/qr-core.js?v=20260706-auth-reference-3" defer></script>
-  <script src="QRcodigosX/conexion/qr-codigosx.js?v=20260706-auth-reference-3" defer></script>
-  <script src="PERMISOSx/BLOQUE/permisos-core.js?v=20260706-auth-reference-3" defer></script>
-  <script src="PERMISOSx/conexion/permisosx.js?v=20260706-auth-reference-3" defer></script>
-  <script src="js/app.js?v=2026-07-07-profile-qr-manual-code-156" defer></script>
-  <script src="js/pwa.js?v=20260706-auth-reference-6" defer></script>
+  <div class="ce-modal hidden" id="scheduleModal" role="dialog" aria-modal="true" aria-label="Programar mensaje">
+    <div class="ce-modal__card ce-schedule-card">
+      <button class="ce-modal__close" id="btnCloseSchedule" type="button" aria-label="Cerrar">×</button>
+      <h2>Programar mensaje</h2>
+      <p>Elige cuándo quieres que chatER envíe este mensaje aunque cierres la app.</p>
+      <div class="ce-schedule-preview" id="schedulePreview"></div>
+      <label class="ce-schedule-field">
+        <span>Fecha y hora de envío</span>
+        <input id="scheduleDateTime" type="datetime-local" />
+      </label>
+      <label class="ce-schedule-check">
+        <input id="scheduleSilent" type="checkbox" />
+        <span>Enviar sin notificación push</span>
+      </label>
+      <button class="ce-btn ce-btn--primary" id="btnConfirmSchedule" type="button">Programar envío</button>
+      <div class="ce-scheduled-list" id="scheduledList" aria-live="polite"></div>
+    </div>
+  </div>
+
+
+
+  <div class="ce-modal hidden" id="pollModal" role="dialog" aria-modal="true" aria-label="Crear encuesta">
+    <form class="ce-modal__card ce-poll-card" id="pollForm">
+      <button class="ce-modal__close" id="btnClosePoll" type="button" aria-label="Cerrar">×</button>
+      <h2>Crear encuesta</h2>
+      <p>Publica una pregunta con opciones votables para decidir rápido dentro del chat.</p>
+      <div class="ce-poll-preview" id="pollPreview"></div>
+      <label class="ce-poll-field">
+        <span>Pregunta</span>
+        <input id="pollQuestionInput" type="text" maxlength="220" autocomplete="off" placeholder="Ej.: ¿Qué horario prefieren para la reunión?" />
+      </label>
+      <div class="ce-poll-options" id="pollOptions" aria-label="Opciones de encuesta">
+        <label><span>Opción 1</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Mañana" /></label>
+        <label><span>Opción 2</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Tarde" /></label>
+        <label><span>Opción 3</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Noche" /></label>
+        <label><span>Opción 4</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Otra opción" /></label>
+        <label><span>Opción 5</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Opcional" /></label>
+        <label><span>Opción 6</span><input data-poll-option-input="1" type="text" maxlength="90" autocomplete="off" placeholder="Opcional" /></label>
+      </div>
+      <button class="ce-btn ce-btn--primary" id="btnConfirmPoll" type="submit">Publicar encuesta</button>
+    </form>
+  </div>
+
+  <div class="ce-modal hidden" id="reminderModal" role="dialog" aria-modal="true" aria-label="Recordatorios privados del chat">
+    <div class="ce-modal__card ce-reminder-card">
+      <button class="ce-modal__close" id="btnCloseReminders" type="button" aria-label="Cerrar">×</button>
+      <h2 id="reminderTitle">Recordatorios privados</h2>
+      <p id="reminderChatName">Visibles solo para ti.</p>
+      <div class="ce-reminder-preview" id="reminderPreview"></div>
+      <label class="ce-reminder-field">
+        <span>Motivo del recordatorio</span>
+        <textarea id="reminderText" rows="3" maxlength="700" placeholder="Ej.: responder propuesta, revisar datos del cliente, hacer seguimiento..."></textarea>
+      </label>
+      <label class="ce-reminder-field">
+        <span>Fecha y hora del aviso</span>
+        <input id="reminderDateTime" type="datetime-local" />
+      </label>
+      <div class="ce-reminder-actions">
+        <button class="ce-btn ce-btn--primary" id="btnSaveReminder" type="button">Crear recordatorio</button>
+      </div>
+      <div class="ce-reminder-list" id="reminderList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + R · Los avisos son privados y no modifican el chat.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="privateNotesModal" role="dialog" aria-modal="true" aria-label="Notas privadas del chat">
+    <div class="ce-modal__card ce-private-notes-card">
+      <button class="ce-modal__close" id="btnClosePrivateNotes" type="button" aria-label="Cerrar">×</button>
+      <h2 id="privateNotesTitle">Notas privadas del chat</h2>
+      <p id="privateNotesChatName">Visibles solo para ti.</p>
+      <label class="ce-private-notes-editor">
+        <span>Nota privada</span>
+        <textarea id="privateNotesTextarea" rows="5" maxlength="2400" placeholder="Ej.: pendiente de enviar propuesta, dato importante del cliente, contexto para responder después..."></textarea>
+      </label>
+      <div class="ce-private-notes-actions">
+        <button class="ce-btn ce-btn--primary" id="btnSavePrivateNote" type="button">Guardar nota</button>
+        <button class="ce-link hidden" id="btnCancelPrivateNoteEdit" type="button">Cancelar edición</button>
+      </div>
+      <div class="ce-private-notes-list" id="privateNotesList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + L · Estas notas no se envían al otro participante.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="labelsModal" role="dialog" aria-modal="true" aria-label="Etiquetas del chat">
+    <div class="ce-modal__card ce-labels-card">
+      <button class="ce-modal__close" id="btnCloseLabels" type="button" aria-label="Cerrar">×</button>
+      <h2>Etiquetas del chat</h2>
+      <p id="labelsChatName">Organiza esta conversación con etiquetas personales.</p>
+      <label class="ce-label-editor">
+        <span>Etiquetas</span>
+        <input id="chatLabelsInput" type="text" maxlength="260" autocomplete="off" placeholder="Ej.: cliente, urgente, propuesta, soporte" />
+      </label>
+      <div class="ce-label-current" id="labelsCurrentList" aria-live="polite"></div>
+      <div class="ce-label-presets" id="labelsPresetList" aria-label="Etiquetas disponibles"></div>
+      <div class="ce-label-actions">
+        <button class="ce-btn ce-btn--primary" id="btnSaveLabels" type="button">Guardar etiquetas</button>
+      </div>
+      <p class="ce-command-help">Las etiquetas son privadas, se sincronizan en tu cuenta y no modifican la conversación del otro participante.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="blockedContactsModal" role="dialog" aria-modal="true" aria-label="Contactos bloqueados">
+    <div class="ce-modal__card ce-blocked-contacts-card">
+      <button class="ce-modal__close" id="btnCloseBlockedContacts" type="button" aria-label="Cerrar">×</button>
+      <h2>Contactos bloqueados</h2>
+      <p>Gestiona tu lista privada de bloqueos sin buscar conversación por conversación.</p>
+      <div class="ce-blocked-contacts-toolbar">
+        <button class="ce-btn ce-btn--small" id="btnRefreshBlockedContacts" type="button">Actualizar lista</button>
+      </div>
+      <div class="ce-blocked-contacts-list" id="blockedContactsList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + X · Al desbloquear, la conversación se conserva y vuelve a permitir mensajes si la otra persona no te bloqueó.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="contactNicknameModal" role="dialog" aria-modal="true" aria-label="Apodo privado del contacto">
+    <div class="ce-modal__card ce-contact-nickname-card">
+      <button class="ce-modal__close" id="btnCloseContactNickname" type="button" aria-label="Cerrar">×</button>
+      <h2 id="contactNicknameTitle">Apodo privado</h2>
+      <p id="contactNicknameSubtitle">Personaliza cómo ves este contacto sin cambiar su perfil real.</p>
+      <label class="ce-contact-nickname-field">
+        <span>Nombre visible solo para ti</span>
+        <input id="contactNicknameInput" type="text" maxlength="80" autocomplete="off" placeholder="Ej.: Cliente Palmer, Soporte Render, Ana ventas" />
+      </label>
+      <div class="ce-contact-nickname-actions">
+        <button class="ce-btn ce-btn--primary" id="btnSaveContactNickname" type="button">Guardar apodo</button>
+        <button class="ce-link" id="btnClearContactNickname" type="button">Quitar apodo</button>
+      </div>
+      <p class="ce-command-help">El apodo es privado, se sincroniza en tu cuenta y no notifica al contacto.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="globalSearchModal" role="dialog" aria-modal="true" aria-label="Buscar en todos los chats">
+    <div class="ce-modal__card ce-global-search-card">
+      <button class="ce-modal__close" id="btnCloseGlobalSearch" type="button" aria-label="Cerrar">×</button>
+      <h2>Buscar en todos los chats</h2>
+      <p>Encuentra mensajes en conversaciones activas y archivadas sin abrir cada chat por separado.</p>
+      <form class="ce-global-search-form" id="globalSearchForm" role="search" aria-label="Búsqueda global de mensajes">
+        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Buscar palabra, frase, enlace o dato" />
+        <button class="ce-btn ce-btn--primary" type="submit">Buscar</button>
+      </form>
+      <div class="ce-global-search-list" id="globalSearchList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + F · Los resultados respetan tus permisos de conversación.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="globalStarredModal" role="dialog" aria-modal="true" aria-label="Destacados de todos los chats">
+    <div class="ce-modal__card ce-global-starred-card">
+      <button class="ce-modal__close" id="btnCloseGlobalStarred" type="button" aria-label="Cerrar">×</button>
+      <h2>Destacados de todos los chats</h2>
+      <p>Reúne en una sola bandeja los mensajes marcados con ★ en chats activos y archivados.</p>
+      <div class="ce-global-starred-toolbar">
+        <button class="ce-btn ce-btn--small" id="btnRefreshGlobalStarred" type="button">Actualizar destacados</button>
+      </div>
+      <div class="ce-global-starred-list" id="globalStarredList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + S · Los destacados son privados y solo aparecen en tu cuenta.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="draftsModal" role="dialog" aria-modal="true" aria-label="Borradores pendientes">
+    <div class="ce-modal__card ce-drafts-card">
+      <button class="ce-modal__close" id="btnCloseDrafts" type="button" aria-label="Cerrar">×</button>
+      <h2>Borradores pendientes</h2>
+      <p>Encuentra mensajes sin enviar guardados en tu cuenta y continúa exactamente en el chat correcto.</p>
+      <div class="ce-drafts-list" id="draftsList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + D · Los borradores son privados y solo aparecen en tus dispositivos.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="linkLibraryModal" role="dialog" aria-modal="true" aria-label="Enlaces compartidos del chat">
+    <div class="ce-modal__card ce-link-library-card">
+      <button class="ce-modal__close" id="btnCloseLinkLibrary" type="button" aria-label="Cerrar">×</button>
+      <h2>Enlaces compartidos</h2>
+      <p>Revisa las URLs detectadas en este chat, cópialas o vuelve al mensaje donde se compartieron.</p>
+      <label class="ce-link-library-search">
+        <span>Filtrar enlaces</span>
+        <input id="linkLibraryInput" type="search" autocomplete="off" placeholder="Buscar por dominio, URL o texto del mensaje" />
+      </label>
+      <div class="ce-link-library-list" id="linkLibraryList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + L · La biblioteca se genera localmente desde los mensajes cargados del chat.</p>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="chatBriefModal" role="dialog" aria-modal="true" aria-label="Resumen del chat">
+    <div class="ce-modal__card ce-chat-brief-card">
+      <button class="ce-modal__close" id="btnCloseChatBrief" type="button" aria-label="Cerrar">×</button>
+      <h2>Resumen del chat</h2>
+      <p>Genera una vista ejecutiva local con pendientes, preguntas, acuerdos, temas frecuentes y últimos mensajes sin enviar contenido a servicios externos.</p>
+      <div class="ce-chat-brief-list" id="chatBriefList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + B · El resumen se calcula con los mensajes cargados de la conversación.</p>
+    </div>
+  </div>
+
+
+  <div class="ce-modal hidden" id="dateJumpModal" role="dialog" aria-modal="true" aria-label="Ir a fecha en este chat">
+    <div class="ce-modal__card ce-date-jump-card">
+      <button class="ce-modal__close" id="btnCloseDateJump" type="button" aria-label="Cerrar">×</button>
+      <h2>Ir a fecha</h2>
+      <p>Consulta el calendario de los últimos mensajes y salta al primer mensaje de un día específico sin perder el hilo del chat.</p>
+      <label class="ce-date-jump-search">
+        <span>Fecha del chat</span>
+        <input id="dateJumpInput" type="date" autocomplete="off" />
+      </label>
+      <div class="ce-date-jump-list" id="dateJumpList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + J · La línea de tiempo se calcula desde los últimos 500 mensajes disponibles.</p>
+    </div>
+  </div>
+
+  <div class="ce-lock hidden" id="privacyLockOverlay" role="dialog" aria-modal="true" aria-label="Bloqueo privado de chatER">
+    <div class="ce-lock__card">
+      <button class="ce-modal__close" id="btnClosePrivacyLock" type="button" aria-label="Cerrar bloqueo privado">×</button>
+      <div class="ce-lock__icon" aria-hidden="true">🔒</div>
+      <h2 id="privacyLockTitle">Bloqueo privado</h2>
+      <p id="privacyLockDescription">Protege la pantalla de chatER con un PIN local en este dispositivo.</p>
+      <label class="ce-lock__field">
+        <span>PIN local</span>
+        <input id="privacyLockPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="current-password" placeholder="Mínimo 4 números" />
+      </label>
+      <label class="ce-lock__field" id="privacyLockConfirmField">
+        <span>Confirmar PIN</span>
+        <input id="privacyLockConfirmInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="new-password" placeholder="Repite el PIN" />
+      </label>
+      <p class="ce-lock__error hidden" id="privacyLockError" role="alert"></p>
+      <p class="ce-lock__status" id="privacyLockStatus">El PIN nunca se envía al servidor.</p>
+      <div class="ce-lock__actions">
+        <button class="ce-btn ce-btn--primary" id="btnPrivacyLockPrimary" type="button">Activar bloqueo</button>
+        <button class="ce-link" id="btnPrivacyLockSecondary" type="button">Cancelar</button>
+        <button class="ce-link ce-lock__danger hidden" id="btnPrivacyLockDisable" type="button">Desactivar bloqueo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ce-modal hidden" id="commandPalette" role="dialog" aria-modal="true" aria-label="Acciones rápidas de chatER">
+    <div class="ce-modal__card ce-command-card">
+      <button class="ce-modal__close" id="btnCloseCommandPalette" type="button" aria-label="Cerrar">×</button>
+      <h2>Acciones rápidas</h2>
+      <p>Busca comandos, atajos y herramientas del chat activo desde un solo lugar.</p>
+      <label class="ce-command-search">
+        <span>Buscar acción</span>
+        <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Buscar, comandos /, emojis, dictar, sugerencias, voz, temporal, resumen, no molestar, bloqueados, silencioso, compacto, privacidad, bloqueo, PIN, fecha, calendario, enlaces, notas, recordatorios, etiquetas, apodos, exportar, destacados, borradores, QR..." />
+      </label>
+      <div class="ce-command-list" id="commandPaletteList" aria-live="polite"></div>
+      <p class="ce-command-help">Atajo: Ctrl/⌘ + K para abrir · Ctrl/⌘ + Alt + C activa compacto · Esc cierra</p>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

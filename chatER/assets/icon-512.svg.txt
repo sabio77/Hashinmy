@@ -1,0 +1,8 @@
+{
+  "asset": "icon-512.svg",
+  "tipo": "icono vectorial PWA",
+  "uso": "Icono instalable de chatER en 512x512 para splash, launcher y pantalla de instalacion.",
+  "descripcion": "Burbuja de chat blanca sobre gradiente verde chatER con lineas internas y sello de verificacion claro.",
+  "colores": ["#13d7a8", "#087763", "#ffffff", "#0f766e", "#d9fdd3"],
+  "fallback": "Si se reemplaza por PNG, conservar composicion centrada, margen seguro maskable y legibilidad en fondos claros u oscuros."
+}

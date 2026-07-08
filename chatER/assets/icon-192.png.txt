@@ -1,0 +1,7 @@
+{
+  "asset": "icon-192.png",
+  "size": "192x192",
+  "purpose": "PWA icon for chatER",
+  "prompt": "Professional rounded square mobile app icon for a WhatsApp-style chat app named chatER by Hashinmy. Deep emerald and teal gradient background, clean white chat bubble, subtle lowercase cE monogram, premium software brand look, high contrast, centered, no text except cE, production-ready, transparent-safe margins.",
+  "fallbackTecnicoIncluido": "El proyecto incluye un icono SVG geometrico funcional como fallback instalable; este PNG queda documentado para reemplazo visual final cuando se genere el arte definitivo."
+}

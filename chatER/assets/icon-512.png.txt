@@ -1,0 +1,7 @@
+{
+  "asset": "icon-512.png",
+  "size": "512x512",
+  "purpose": "PWA maskable icon for chatER",
+  "prompt": "High-resolution maskable PWA icon for chatER, enterprise messaging app by Hashinmy. Rounded square with emerald, mint and cyan gradient, glossy but modern, white chat bubble outline around a minimal cE monogram, professional SaaS style, safe area padding for maskable icon, no extra lettering, crisp vector-like finish.",
+  "fallbackTecnicoIncluido": "El proyecto incluye un icono SVG geometrico funcional como fallback instalable; este PNG queda documentado para reemplazo visual final de launcher y splash cuando exista el arte definitivo."
+}
