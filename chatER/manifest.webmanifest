@@ -14,6 +14,9 @@
   "orientation": "portrait-primary",
   "categories": ["social", "productivity", "business"],
   "prefer_related_applications": false,
+  "related_applications": [
+    { "platform": "webapp", "url": "./manifest.webmanifest" }
+  ],
   "icons": [
     { "src": "./assets/icon-192.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
     { "src": "./assets/icon-512.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },

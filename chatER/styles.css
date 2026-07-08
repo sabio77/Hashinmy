@@ -2200,6 +2200,98 @@ svg {
   font-weight: 900;
 }
 
+.ce-avatar-wrap--profile-action {
+  cursor: zoom-in;
+  border-radius: 999px;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ce-avatar-wrap--profile-action:hover,
+.ce-avatar-wrap--profile-action:focus-visible {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+  outline: none;
+}
+
+.ce-user {
+  cursor: zoom-in;
+}
+
+.ce-profile-card {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.ce-profile-photo {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--ce-accent), #0f766e);
+  color: #ffffff;
+  font-size: 2rem;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.9), 0 18px 36px rgba(15, 23, 42, 0.16);
+}
+
+.ce-qr-box .ce-profile-photo img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ce-profile-card__body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ce-profile-card__body strong {
+  color: var(--ce-text);
+  font-size: 1.08rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.ce-profile-card__body span {
+  color: var(--ce-muted-strong);
+  font-size: 0.92rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.ce-profile-qr {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.ce-qr-box img.ce-profile-qr__image {
+  width: min(70vw, 250px);
+  height: min(70vw, 250px);
+}
+
+.ce-profile-qr-missing {
+  width: 100%;
+  border: 1px dashed var(--ce-line-strong);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(10, 168, 132, 0.07);
+  color: var(--ce-muted-strong);
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+
 .ce-scan {
   display: grid;
   gap: 12px;
@@ -5083,12 +5175,12 @@ body.ce-compact-mode .ce-lock__card {
   }
 }
 
-/* Iteración responsive · navegación segura en PC, tablet y móvil */
+/* Iteración responsive · navegación segura en móvil */
 .ce-mobile-back {
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 620px) {
   .ce-shell {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
@@ -5637,7 +5729,7 @@ body.ce-compact-mode .ce-shell {
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 620px) {
   .ce-shell:not(.ce-shell--chat-open) .ce-sidebar,
   .ce-shell.ce-shell--chat-open .ce-chat {
     width: 100%;
@@ -7067,5 +7159,62 @@ body.ce-compact-mode .ce-chat-search input {
     right: max(10px, env(safe-area-inset-right));
     padding: 6px 10px;
     font-size: 0.76rem;
+  }
+}
+
+
+/* Iteración chatER · cierre de punto débil solicitado:
+   - Solo en móvil la lista queda como interfaz principal sin chat visible.
+   - Al abrir una conversación se muestra solo el chat con botón volver.
+   - En tablet y escritorio se preserva el layout responsive sin navegación forzada. */
+@media (max-width: 620px) {
+  .ce-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .ce-sidebar,
+  .ce-chat {
+    grid-area: 1 / 1;
+    width: 100%;
+    max-width: 100vw;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .ce-shell:not(.ce-shell--chat-open) .ce-sidebar {
+    display: flex;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  .ce-shell:not(.ce-shell--chat-open) .ce-chat {
+    display: none;
+  }
+
+  .ce-shell.ce-shell--chat-open .ce-sidebar {
+    display: none;
+  }
+
+  .ce-shell.ce-shell--chat-open .ce-chat {
+    display: grid;
+  }
+
+  .ce-mobile-back {
+    display: grid;
+  }
+}
+
+@media (min-width: 621px) {
+  .ce-mobile-back {
+    display: none !important;
+  }
+
+  .ce-shell .ce-sidebar {
+    display: flex;
+  }
+
+  .ce-shell .ce-chat {
+    display: grid;
   }
 }

@@ -10,6 +10,8 @@ const privacyLockStorageKey = 'chater_privacy_lock_v1';
 const privacyLockAutoMs = 5 * 60 * 1000;
 const privacyLockHiddenGraceMs = 30 * 1000;
 const compactModeKey = 'chater_compact_mode_v1';
+const installedStorageKey = 'chater_installed_v1';
+const installDismissedStorageKey = 'chater_install_dismissed_v1';
 const scrollBottomThresholdPx = 160;
 const quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
 const emojiPickerStorageKey = 'chater_recent_emojis_v1';
@@ -23,6 +25,10 @@ const emojiPickerCategories = [
 ];
 const ephemeralOptions = [0, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
+
+function hasInstallDismissedPersisted() {
+  try { return localStorage.getItem(installDismissedStorageKey) === '1'; } catch { return false; }
+}
 
 const state = {
   config: null,
@@ -64,7 +70,9 @@ const state = {
   realtimeRetryCount: 0,
   realtimeManualClose: false,
   installPrompt: null,
-  installDismissed: false,
+  installDismissed: hasInstallDismissedPersisted(),
+  installRelatedCheckDone: false,
+  installRelatedCheckInFlight: false,
   pushDismissed: false,
   pushState: 'idle',
   serviceWorkerRegistration: null,
@@ -280,9 +288,62 @@ function renderPresenceDot(chat = {}) {
   return '<span class="ce-presence-dot" title="En línea ahora" aria-label="En línea ahora"></span>';
 }
 
-function renderChatAvatarWithPresence(chat = {}, size = 'normal') {
+function renderChatAvatarWithPresence(chat = {}, size = 'normal', options = {}) {
   const small = size === 'small' ? ' ce-avatar-wrap--small' : '';
-  return `<span class="ce-avatar-wrap${small}">${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
+  const actionClass = options.profileAction ? ' ce-avatar-wrap--profile-action' : '';
+  const actionAttrs = options.profileAction ? ' data-open-chat-profile="1" role="button" tabindex="0" title="Ver foto, correo y QR" aria-label="Ver foto, correo y QR"' : '';
+  return `<span class="ce-avatar-wrap${small}${actionClass}"${actionAttrs}>${chatAvatar(chat, size)}${renderPresenceDot(chat)}</span>`;
+}
+
+function profileDisplayName(profile = {}) {
+  return profile.contactName || profile.nickname || profile.displayName || profile.email || 'Perfil chatER';
+}
+
+function profileDisplayEmail(profile = {}) {
+  return String(profile.email || '').trim();
+}
+
+function renderProfilePhotoForModal(profile = {}) {
+  const label = profileDisplayName(profile);
+  if (profile.photoUrl) {
+    return `<span class="ce-profile-photo"><img src="${escapeHtml(profile.photoUrl)}" alt="Foto de perfil de ${escapeHtml(label)}" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false"></span>`;
+  }
+  return `<span class="ce-profile-photo ce-profile-photo--fallback" aria-label="Foto de perfil de ${escapeHtml(label)}">${escapeHtml(initials(profile))}</span>`;
+}
+
+function renderProfileQrForModal(profile = {}) {
+  const code = String(profile.profileCode || '').trim();
+  if (!code) {
+    return '<div class="ce-profile-qr-missing">Este perfil todavía no tiene un QR disponible.</div>';
+  }
+  const label = profileDisplayName(profile);
+  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code></div>`;
+}
+
+function resolveProfileFromChat(chat = {}) {
+  if (isSelfChat(chat)) return state.user || {};
+  return chat.other || {};
+}
+
+function openProfileCard(profile = {}) {
+  const cleanProfile = profile || {};
+  const title = profileDisplayName(cleanProfile);
+  const email = profileDisplayEmail(cleanProfile);
+  els.qrModalTitle.textContent = title;
+  els.qrHelp.textContent = email ? `Correo de la cuenta: ${email}` : 'Correo no disponible para esta cuenta.';
+  els.scanBox.classList.add('hidden');
+  els.manualCodeForm?.classList.add('hidden');
+  stopScan();
+  els.qrBox.innerHTML = `
+    <article class="ce-profile-card" aria-label="Perfil de ${escapeHtml(title)}">
+      ${renderProfilePhotoForModal(cleanProfile)}
+      <div class="ce-profile-card__body">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${email ? escapeHtml(email) : 'Correo no disponible'}</span>
+      </div>
+      ${renderProfileQrForModal(cleanProfile)}
+    </article>`;
+  els.qrModal.classList.remove('hidden');
 }
 
 function formatMessageTime(value = '') {
@@ -2861,16 +2922,78 @@ function setStatus(message = '') {
   els.authStatus.textContent = message;
 }
 
+function rememberInstalledApp() {
+  try { localStorage.setItem(installedStorageKey, '1'); } catch {}
+}
+
+function hasStoredInstalledApp() {
+  try { return localStorage.getItem(installedStorageKey) === '1'; } catch { return false; }
+}
+
+function isStandaloneDisplayMode() {
+  const displayModes = ['standalone', 'minimal-ui', 'window-controls-overlay', 'fullscreen'];
+  return displayModes.some((mode) => window.matchMedia?.(`(display-mode: ${mode})`)?.matches) || window.navigator.standalone === true;
+}
+
 function isInstalled() {
-  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const standalone = isStandaloneDisplayMode();
+  if (standalone) rememberInstalledApp();
+  return standalone || hasStoredInstalledApp();
+}
+
+function canCheckInstalledRelatedApps() {
+  return typeof navigator.getInstalledRelatedApps === 'function';
+}
+
+function isInstalledRelatedAppEntry(app = {}) {
+  const platform = String(app.platform || '').toLowerCase();
+  const url = String(app.url || app.id || '').toLowerCase();
+  return platform === 'webapp' || url.includes('/chater/') || url.includes('chater');
+}
+
+async function refreshInstalledRelatedAppState() {
+  if (isInstalled()) return true;
+  if (!canCheckInstalledRelatedApps()) return false;
+  const relatedApps = await navigator.getInstalledRelatedApps().catch(() => []);
+  const installed = Array.isArray(relatedApps) && relatedApps.some(isInstalledRelatedAppEntry);
+  if (installed) rememberInstalledApp();
+  return installed;
+}
+
+function scheduleInstalledRelatedAppCheck() {
+  if (state.installRelatedCheckDone || state.installRelatedCheckInFlight || !canCheckInstalledRelatedApps()) return;
+  state.installRelatedCheckInFlight = true;
+  refreshInstalledRelatedAppState()
+    .then((installed) => {
+      state.installRelatedCheckDone = true;
+      if (installed) state.installPrompt = null;
+    })
+    .catch(() => {
+      state.installRelatedCheckDone = true;
+    })
+    .finally(() => {
+      state.installRelatedCheckInFlight = false;
+      updateInstallBanner();
+    });
+}
+
+function dismissInstallBanner() {
+  state.installDismissed = true;
+  try { localStorage.setItem(installDismissedStorageKey, '1'); } catch {}
 }
 
 function updateInstallBanner() {
-  if (!state.user || isInstalled() || state.installDismissed) {
+  if (!els.installBanner) return;
+  const installed = isInstalled();
+  const canVerifyRelatedInstall = canCheckInstalledRelatedApps();
+  const shouldVerifyBeforeShowing = Boolean(state.user && state.installPrompt && !state.installDismissed && !installed && canVerifyRelatedInstall && !state.installRelatedCheckDone);
+  if (shouldVerifyBeforeShowing || state.installRelatedCheckInFlight) {
     els.installBanner.classList.add('hidden');
+    scheduleInstalledRelatedAppCheck();
     return;
   }
-  els.installBanner.classList.remove('hidden');
+  const shouldHide = !state.user || installed || state.installDismissed || !state.installPrompt;
+  els.installBanner.classList.toggle('hidden', shouldHide);
 }
 
 function hasPushSupport() {
@@ -2885,6 +3008,9 @@ function updatePushBanner() {
 }
 
 function updateAfterLoginBanners() {
+  if (state.user && !isInstalled() && !state.installRelatedCheckDone) {
+    scheduleInstalledRelatedAppCheck();
+  }
   updateInstallBanner();
   updatePushBanner();
 }
@@ -3984,6 +4110,10 @@ function renderAll() {
 }
 
 
+function isMobileChatListPrimaryViewport() {
+  return Boolean(window.matchMedia?.('(max-width: 620px)')?.matches || window.innerWidth <= 620);
+}
+
 function updateResponsiveShellState() {
   const hasActiveChat = Boolean(state.activeChatId && activeChat());
   els.chatScreen?.classList.toggle('ce-shell--chat-open', hasActiveChat);
@@ -4051,7 +4181,7 @@ function renderChats() {
     const archiveIcon = chat.isArchived ? '↩' : '▣';
     const pinButton = chat.isArchived ? '' : `<button class="ce-chat-pin${chat.isPinned ? ' active' : ''}" type="button" data-pin-chat-id="${escapeHtml(chat.chatId)}" data-pinned="${chat.isPinned ? '1' : '0'}" title="${escapeHtml(pinLabel)}" aria-label="${escapeHtml(pinLabel)}">${pinIcon}</button>`;
     const archiveButton = `<button class="ce-chat-archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-chat-id="${escapeHtml(chat.chatId)}" data-archived="${chat.isArchived ? '1' : '0'}" title="${escapeHtml(archiveLabel)}" aria-label="${escapeHtml(archiveLabel)}">${archiveIcon}</button>`;
-    return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
+    return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small', { profileAction: true })}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
   }).join('')}`;
   setCachedHtml('chatListHtml', els.chatList, chatListHtml);
 }
@@ -4385,6 +4515,7 @@ async function selectChat(chatId) {
     state.reminderMessage = null;
     state.reminders = [];
     resetChatSearch();
+    renderAll();
   }
   const chatBeforeRead = activeChat();
   const data = await post('/api/chats/messages', { chatId });
@@ -5112,13 +5243,7 @@ async function sendTyping(isTyping) {
 }
 
 function openOwnQr() {
-  els.qrModalTitle.textContent = 'Mi código QR';
-  els.qrHelp.textContent = 'Comparte este QR para que otros te agreguen y abran un chat contigo.';
-  els.scanBox.classList.add('hidden');
-  stopScan();
-  const code = state.user?.profileCode || '';
-  els.qrBox.innerHTML = `<img src="${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg" alt="QR de mi perfil chatER"><code>${escapeHtml(code)}</code>`;
-  els.qrModal.classList.remove('hidden');
+  openProfileCard(state.user || {});
 }
 
 async function openScanQr() {
@@ -5127,6 +5252,7 @@ async function openScanQr() {
   els.qrBox.innerHTML = '';
   els.scanStatus.textContent = 'Apunta la cámara al código QR.';
   els.scanBox.classList.remove('hidden');
+  els.manualCodeForm?.classList.remove('hidden');
   els.qrModal.classList.remove('hidden');
   await startScan();
 }
@@ -5193,6 +5319,13 @@ async function consumeChatFromUrl() {
   const chatId = url.searchParams.get('chat');
   const messageId = url.searchParams.get('message');
   if (!chatId || !state.user) return;
+  if (isMobileChatListPrimaryViewport()) {
+    url.searchParams.delete('chat');
+    url.searchParams.delete('message');
+    window.history.replaceState({}, '', url.toString());
+    renderAll();
+    return;
+  }
   if (state.chats.some((chat) => chat.chatId === chatId)) {
     await selectChat(chatId).catch(() => null);
     if (messageId) await openSearchResult(messageId).catch(() => null);
@@ -6570,9 +6703,28 @@ function bindEvents() {
   });
   window.addEventListener('appinstalled', () => {
     state.installPrompt = null;
-    state.installDismissed = true;
+    state.installRelatedCheckDone = true;
+    rememberInstalledApp();
+    dismissInstallBanner();
     updateAfterLoginBanners();
   });
+  const standaloneDisplayQuery = window.matchMedia?.('(display-mode: standalone)');
+  const handleStandaloneDisplayChange = () => {
+    if (isInstalled()) {
+      state.installPrompt = null;
+      state.installRelatedCheckDone = true;
+    }
+    updateAfterLoginBanners();
+  };
+  standaloneDisplayQuery?.addEventListener?.('change', handleStandaloneDisplayChange);
+  standaloneDisplayQuery?.addListener?.(handleStandaloneDisplayChange);
+  const mobileChatViewportQuery = window.matchMedia?.('(max-width: 620px)');
+  const handleMobileChatViewportChange = () => {
+    if (state.user) updateResponsiveShellState();
+  };
+  mobileChatViewportQuery?.addEventListener?.('change', handleMobileChatViewportChange);
+  mobileChatViewportQuery?.addListener?.(handleMobileChatViewportChange);
+  window.addEventListener('resize', handleMobileChatViewportChange, { passive: true });
   window.addEventListener('online', () => {
     if (state.user) {
       if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
@@ -6593,6 +6745,9 @@ function bindEvents() {
   els.btnScrollBottom?.addEventListener('click', () => scrollMessagesToBottom({ smooth: true, resetNew: true }));
 
   els.btnGoogleLogin.addEventListener('click', loginWithGoogle);
+  els.userSummary?.addEventListener('click', () => {
+    if (state.user) openProfileCard(state.user);
+  });
   els.btnLogout.addEventListener('click', async () => {
     saveActiveDraft({ announce: false });
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
@@ -6668,7 +6823,8 @@ function bindEvents() {
   els.btnInstall.addEventListener('click', async () => {
     if (state.installPrompt) {
       state.installPrompt.prompt();
-      await state.installPrompt.userChoice.catch(() => null);
+      const choice = await state.installPrompt.userChoice.catch(() => null);
+      if (choice?.outcome === 'accepted') rememberInstalledApp();
       state.installPrompt = null;
     } else {
       alert('Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.');
@@ -6676,7 +6832,7 @@ function bindEvents() {
     updateInstallBanner();
   });
   els.btnInstallLater.addEventListener('click', () => {
-    state.installDismissed = true;
+    dismissInstallBanner();
     updateInstallBanner();
   });
   els.btnEnablePush.addEventListener('click', async () => {
@@ -7259,6 +7415,15 @@ function bindEvents() {
     els.contactEmailInput.value = '';
   });
   els.chatList.addEventListener('click', (event) => {
+    const profileButton = event.target.closest('[data-open-chat-profile]');
+    if (profileButton && els.chatList.contains(profileButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const row = profileButton.closest('[data-chat-id]');
+      const chat = state.chats.find((item) => item.chatId === row?.dataset?.chatId);
+      openProfileCard(resolveProfileFromChat(chat || {}));
+      return;
+    }
     const clearLabelFilterButton = event.target.closest('[data-clear-label-filter]');
     if (clearLabelFilterButton && els.chatList.contains(clearLabelFilterButton)) {
       event.preventDefault();
@@ -7295,6 +7460,15 @@ function bindEvents() {
   });
   els.chatList.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
+    const profileButton = event.target.closest('[data-open-chat-profile]');
+    if (profileButton && els.chatList.contains(profileButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const row = profileButton.closest('[data-chat-id]');
+      const chat = state.chats.find((item) => item.chatId === row?.dataset?.chatId);
+      openProfileCard(resolveProfileFromChat(chat || {}));
+      return;
+    }
     const row = event.target.closest('[data-chat-id]');
     if (!row || event.target.closest('[data-pin-chat-id]') || event.target.closest('[data-archive-chat-id]') || event.target.closest('[data-mark-all-read]') || event.target.closest('[data-clear-label-filter]')) return;
     event.preventDefault();
