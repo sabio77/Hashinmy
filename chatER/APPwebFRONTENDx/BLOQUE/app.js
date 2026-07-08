@@ -4,6 +4,7 @@ import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigErro
 const clientIdKey = 'chater_client_id';
 const draftStoragePrefix = 'chater_draft_v1';
 const outboxStoragePrefix = 'chater_outbox_v1';
+const deliveryAckQueueStorageKey = 'chater_delivery_ack_queue_v1';
 const privacyModeKey = 'chater_privacy_mode_v1';
 const privacyLockStorageKey = 'chater_privacy_lock_v1';
 const privacyLockAutoMs = 5 * 60 * 1000;
@@ -45,6 +46,8 @@ const state = {
   archivedView: false,
   chatListMode: 'active',
   messagesByChat: new Map(),
+  deliveryAckInFlight: new Set(),
+  deliveryAckRetryTimer: 0,
   renderedMessageCountByChat: new Map(),
   renderedActiveChatId: '',
   activeChatId: '',
@@ -327,6 +330,16 @@ function isMessagesNearBottom(threshold = scrollBottomThresholdPx) {
   return distance <= threshold;
 }
 
+function canConfirmReadInActiveChat() {
+  return Boolean(
+    state.user
+    && state.activeChatId
+    && document.visibilityState === 'visible'
+    && !document.hidden
+    && !state.privacyLock?.locked
+  );
+}
+
 function updateScrollBottomButton() {
   if (!els.btnScrollBottom) return;
   const hasActiveChat = Boolean(state.activeChatId && activeChat());
@@ -335,7 +348,7 @@ function updateScrollBottomButton() {
   state.scrollBottomVisible = shouldShow;
   els.btnScrollBottom.classList.toggle('hidden', !shouldShow);
   if (!shouldShow) state.scrollNewMessages = 0;
-  if (!shouldShow && hadPendingNewMessages && state.activeChatId && state.user) {
+  if (!shouldShow && hadPendingNewMessages && canConfirmReadInActiveChat()) {
     window.setTimeout(() => markActiveRead().catch(() => null), 0);
   }
   const label = state.scrollNewMessages > 0
@@ -350,7 +363,7 @@ function scrollMessagesToBottom({ smooth = true, resetNew = true } = {}) {
   els.messages.scrollTo({ top: els.messages.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   if (resetNew) state.scrollNewMessages = 0;
   updateScrollBottomButton();
-  if (resetNew && state.activeChatId && state.user) {
+  if (resetNew && canConfirmReadInActiveChat()) {
     window.setTimeout(() => markActiveRead().catch(() => null), smooth ? 320 : 0);
   }
 }
@@ -1637,7 +1650,8 @@ function renderMessageActions(message = {}, mine = false) {
   if (isDeletedMessage(message)) return '';
   const isPoll = message.type === 'poll' || Boolean(message.poll);
   const ownerActions = mine ? `${isPoll ? '' : renderEditButton(message)}${renderDeleteButton(message)}` : '';
-  return `${renderStarButton(message)}${renderPinMessageButton(message)}${renderReplyButton(message)}${renderForwardButton(message)}${renderReminderButton(message)}${renderMessageLinkButton(message)}${renderCopyButton(message)}${ownerActions}`;
+  const actions = `${renderStarButton(message)}${renderPinMessageButton(message)}${renderReplyButton(message)}${renderForwardButton(message)}${renderReminderButton(message)}${renderMessageLinkButton(message)}${renderCopyButton(message)}${ownerActions}`;
+  return `<span class="ce-msg-actions" aria-label="Acciones del mensaje">${actions}</span>`;
 }
 
 function renderMessageBody(message = {}, mine = false) {
@@ -1716,16 +1730,42 @@ function jumpToUnreadMarker(messageId = '') {
   return true;
 }
 
+function messageReceiptState(message = {}) {
+  const recipientCount = Math.max(0, Number(message.recipientCount || 0));
+  const readByCount = Math.max(0, Number(message.readByCount || 0));
+  const deliveredByCount = Math.max(0, Number(message.deliveredByCount || 0));
+  const read = message.receiptStatus === 'read' || (recipientCount > 0 && readByCount >= recipientCount);
+  const delivered = read || message.receiptStatus === 'delivered' || (recipientCount > 0 && deliveredByCount >= recipientCount);
+  if (read) {
+    return {
+      status: 'read',
+      className: ' is-read',
+      symbol: '✓✓',
+      label: `Leído${message.readAt ? ` · ${formatExportDateTime(message.readAt)}` : ''}`
+    };
+  }
+  if (delivered) {
+    return {
+      status: 'delivered',
+      className: ' is-delivered',
+      symbol: '✓✓',
+      label: `Entregado al destinatario${message.deliveredAt ? ` · ${formatExportDateTime(message.deliveredAt)}` : ''}`
+    };
+  }
+  return {
+    status: 'sent',
+    className: '',
+    symbol: '✓',
+    label: `Recibido por el backend${message.backendReceivedAt ? ` · ${formatExportDateTime(message.backendReceivedAt)}` : ''}`
+  };
+}
+
 function renderMessageReceipt(message = {}, mine = false) {
   if (!mine || isDeletedMessage(message)) return '';
   const recipientCount = Math.max(0, Number(message.recipientCount || 0));
   if (!recipientCount) return '';
-  const readByCount = Math.max(0, Number(message.readByCount || 0));
-  const read = message.receiptStatus === 'read' || (recipientCount > 0 && readByCount >= recipientCount);
-  const label = read
-    ? `Leído${message.readAt ? ` · ${formatExportDateTime(message.readAt)}` : ''}`
-    : 'Enviado';
-  return `<span class="ce-msg__receipt${read ? ' is-read' : ''}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${read ? '✓✓' : '✓'}</span>`;
+  const receipt = messageReceiptState(message);
+  return `<span class="ce-msg__receipt${receipt.className}" data-receipt-status="${escapeHtml(receipt.status)}" title="${escapeHtml(receipt.label)}" aria-label="${escapeHtml(receipt.label)}">${receipt.symbol}</span>`;
 }
 
 function renderMessageTime(message = {}, mine = false) {
@@ -2851,6 +2891,21 @@ function getAppMode() {
   return isInstalled() ? 'standalone' : 'browser';
 }
 
+
+function requestServiceWorkerDeliveryAckFlush() {
+  if (!('serviceWorker' in navigator)) return;
+  const message = { type: 'CHAT_ER_FLUSH_DELIVERY_ACKS' };
+  navigator.serviceWorker.ready.then((registration) => {
+    const targets = [registration?.active, navigator.serviceWorker.controller].filter(Boolean);
+    const sent = new Set();
+    for (const target of targets) {
+      if (sent.has(target)) continue;
+      sent.add(target);
+      target.postMessage(message);
+    }
+  }).catch(() => null);
+}
+
 async function getReadyServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) return null;
   if (state.serviceWorkerRegistration) return state.serviceWorkerRegistration;
@@ -2890,6 +2945,7 @@ async function enableWebPushNotifications() {
   state.pushState = 'enabled';
   state.pushDismissed = true;
   updatePushBanner();
+  requestServiceWorkerDeliveryAckFlush();
   return true;
 }
 
@@ -2912,6 +2968,7 @@ async function ensureExistingPushSubscriptionRegistered() {
     });
     state.pushState = 'enabled';
     updatePushBanner();
+    requestServiceWorkerDeliveryAckFlush();
     return true;
   } catch {
     return false;
@@ -2984,6 +3041,7 @@ async function loginWithGoogle() {
     await consumeAddFromUrl();
     await consumeChatFromUrl();
     scheduleOutboxRetry(1200);
+    flushDeliveryAckQueue({ force: true }).catch(() => null);
   } catch (error) {
     setStatus(error.message || 'No se pudo iniciar sesión.');
   } finally {
@@ -3033,7 +3091,7 @@ async function markAllChatsRead() {
   }
   const count = Number(data.updatedCount || updatedChats.length || 0);
   showTemporaryDraftStatus(count
-    ? `${count} ${count === 1 ? 'chat marcado' : 'chats marcados'} como leído${count === 1 ? '' : 's'}.`
+    ? `${count} ${count === 1 ? 'chat retirado' : 'chats retirados'} de no leídos sin enviar confirmación de lectura.`
     : 'No había chats sin leer.');
   if (state.chatListMode === 'unread' && count) await loadChats({ unreadOnly: true, mode: 'unread' }).catch(() => null);
   else renderAll();
@@ -3082,6 +3140,7 @@ async function bootstrapExistingSession() {
     await consumeAddFromUrl();
     await consumeChatFromUrl();
     scheduleOutboxRetry(1200);
+    flushDeliveryAckQueue({ force: true }).catch(() => null);
     return true;
   } catch {
     setSessionToken('');
@@ -3291,6 +3350,141 @@ function upsertMessage(message = {}) {
   state.messagesByChat.set(message.chatId, list);
 }
 
+function shouldAcknowledgeDelivery(message = {}) {
+  return Boolean(
+    state.user?.userId
+    && message?.messageId
+    && message?.chatId
+    && message.senderUserId
+    && message.senderUserId !== state.user.userId
+    && !isDeletedMessage(message)
+  );
+}
+
+function deliveryAckQueueStorageForCurrentUser() {
+  return state.user?.userId ? `${deliveryAckQueueStorageKey}:${state.user.userId}` : deliveryAckQueueStorageKey;
+}
+
+function readDeliveryAckQueue() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(deliveryAckQueueStorageForCurrentUser()) || '[]');
+    return (Array.isArray(parsed) ? parsed : [])
+      .map((item) => ({
+        chatId: String(item.chatId || '').trim(),
+        messageId: String(item.messageId || '').trim(),
+        senderUserId: String(item.senderUserId || '').trim(),
+        createdAt: String(item.createdAt || '').trim(),
+        firstQueuedAt: Number(item.firstQueuedAt || Date.now()),
+        lastAttemptAt: Number(item.lastAttemptAt || 0),
+        nextAttemptAt: Number(item.nextAttemptAt || 0),
+        attempts: Math.max(0, Number(item.attempts || 0))
+      }))
+      .filter((item) => item.chatId && item.messageId)
+      .slice(-250);
+  } catch {
+    return [];
+  }
+}
+
+function writeDeliveryAckQueue(items = []) {
+  const normalized = (Array.isArray(items) ? items : [])
+    .filter((item) => item?.chatId && item?.messageId)
+    .slice(-250);
+  try {
+    if (normalized.length) localStorage.setItem(deliveryAckQueueStorageForCurrentUser(), JSON.stringify(normalized));
+    else localStorage.removeItem(deliveryAckQueueStorageForCurrentUser());
+  } catch {}
+}
+
+function deliveryAckQueueKey(chatId = '', messageId = '') {
+  return `${String(chatId || '').trim()}:${String(messageId || '').trim()}`;
+}
+
+function removeDeliveryAckFromQueue(chatId = '', messageId = '') {
+  const key = deliveryAckQueueKey(chatId, messageId);
+  const remaining = readDeliveryAckQueue().filter((item) => deliveryAckQueueKey(item.chatId, item.messageId) !== key);
+  writeDeliveryAckQueue(remaining);
+}
+
+function queueDeliveryAck(message = {}, { attempted = false } = {}) {
+  if (!shouldAcknowledgeDelivery(message)) return;
+  const key = deliveryAckQueueKey(message.chatId, message.messageId);
+  const now = Date.now();
+  const queue = readDeliveryAckQueue();
+  const index = queue.findIndex((item) => deliveryAckQueueKey(item.chatId, item.messageId) === key);
+  const previous = index >= 0 ? queue[index] : null;
+  const attempts = attempted ? Math.min(12, Number(previous?.attempts || 0) + 1) : Number(previous?.attempts || 0);
+  const delay = attempted ? Math.min(5 * 60 * 1000, 1000 * (2 ** Math.min(8, attempts))) : 0;
+  const next = {
+    chatId: String(message.chatId || '').trim(),
+    messageId: String(message.messageId || '').trim(),
+    senderUserId: String(message.senderUserId || '').trim(),
+    createdAt: String(message.createdAt || '').trim(),
+    firstQueuedAt: Number(previous?.firstQueuedAt || now),
+    lastAttemptAt: attempted ? now : Number(previous?.lastAttemptAt || 0),
+    nextAttemptAt: now + delay,
+    attempts
+  };
+  if (index >= 0) queue[index] = next;
+  else queue.push(next);
+  writeDeliveryAckQueue(queue);
+}
+
+function scheduleDeliveryAckRetry(delayMs = 4000) {
+  if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
+  state.deliveryAckRetryTimer = window.setTimeout(() => {
+    state.deliveryAckRetryTimer = 0;
+    flushDeliveryAckQueue().catch(() => null);
+  }, Math.max(500, Number(delayMs || 4000)));
+}
+
+async function acknowledgeMessageDelivered(message = {}, { fromQueue = false } = {}) {
+  if (!shouldAcknowledgeDelivery(message)) return false;
+  const key = deliveryAckQueueKey(message.chatId, message.messageId);
+  if (state.deliveryAckInFlight.has(key)) return false;
+  if (!fromQueue) queueDeliveryAck(message);
+  state.deliveryAckInFlight.add(key);
+  try {
+    const data = await post('/api/chats/delivery', { chatId: message.chatId, messageId: message.messageId });
+    removeDeliveryAckFromQueue(message.chatId, message.messageId);
+    if (data.chat) upsertChat(data.chat);
+    if (data.message) upsertMessage(data.message);
+    return true;
+  } catch {
+    queueDeliveryAck(message, { attempted: true });
+    scheduleDeliveryAckRetry();
+    return false;
+  } finally {
+    state.deliveryAckInFlight.delete(key);
+  }
+}
+
+async function flushDeliveryAckQueue({ force = false } = {}) {
+  if (!state.user || !getSessionToken()) return false;
+  if (navigator.onLine === false && !force) return false;
+  const now = Date.now();
+  const queue = readDeliveryAckQueue();
+  const due = queue.filter((item) => force || Number(item.nextAttemptAt || 0) <= now).slice(0, 40);
+  if (!due.length) return false;
+  for (const item of due) {
+    await acknowledgeMessageDelivered({
+      chatId: item.chatId,
+      messageId: item.messageId,
+      senderUserId: item.senderUserId || 'pending',
+      createdAt: item.createdAt || ''
+    }, { fromQueue: true }).catch(() => null);
+  }
+  const pending = readDeliveryAckQueue();
+  if (pending.some((item) => Number(item.nextAttemptAt || 0) <= Date.now() + 5000)) scheduleDeliveryAckRetry(5000);
+  return true;
+}
+
+function acknowledgeMessagesDelivered(messages = []) {
+  const candidates = (Array.isArray(messages) ? messages : []).filter(shouldAcknowledgeDelivery);
+  for (const message of candidates) acknowledgeMessageDelivered(message).catch(() => null);
+  flushDeliveryAckQueue().catch(() => null);
+}
+
 function resetChatSearch({ keepInput = false } = {}) {
   state.chatSearchQuery = '';
   state.chatSearchResults = [];
@@ -3475,11 +3669,15 @@ async function resyncStateFromBackend({ reloadActive = false, force = false } = 
       if (reloadActive) {
         const messages = await post('/api/chats/messages', { chatId: previousActiveChatId });
         state.messagesByChat.set(previousActiveChatId, messages.messages || []);
+        acknowledgeMessagesDelivered(messages.messages || []);
       }
     } else if (previousActiveChatId) {
       state.activeChatId = '';
     }
     renderAll();
+    if (reloadActive && canConfirmReadInActiveChat() && isMessagesNearBottom()) {
+      await markActiveRead();
+    }
     return true;
   })();
   try {
@@ -3504,15 +3702,22 @@ function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
     const createdMs = Date.parse(message.createdAt || '') || 0;
     if (!createdMs || readMs < createdMs) return message;
     const recipientCount = Math.max(1, Number(message.recipientCount || 1));
+    const deliveredByCount = Math.min(recipientCount, Math.max(Number(message.deliveredByCount || 0), 1));
     const readByCount = Math.min(recipientCount, Math.max(Number(message.readByCount || 0), 1));
     const next = {
       ...message,
       recipientCount,
+      deliveredByCount,
+      deliveredAt: message.deliveredAt || message.backendReceivedAt || message.createdAt || '',
       readByCount,
-      receiptStatus: readByCount >= recipientCount ? 'read' : (message.receiptStatus || 'sent'),
+      receiptStatus: readByCount >= recipientCount ? 'read' : 'delivered',
       readAt: readByCount >= recipientCount ? readAt : (message.readAt || '')
     };
-    changed = changed || next.receiptStatus !== message.receiptStatus || next.readByCount !== message.readByCount || next.readAt !== message.readAt;
+    changed = changed
+      || next.receiptStatus !== message.receiptStatus
+      || next.deliveredByCount !== message.deliveredByCount
+      || next.readByCount !== message.readByCount
+      || next.readAt !== message.readAt;
     return next;
   });
   if (changed) state.messagesByChat.set(chatId, updated);
@@ -3520,24 +3725,27 @@ function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
 
 function handleRealtimeEvent(payload = {}) {
   const data = payload.data || {};
-  const chatForThisUser = data.chatByUserId?.[state.user?.userId] || data.chat;
+  const currentUserId = state.user?.userId || '';
+  const chatForThisUser = data.chatByUserId?.[currentUserId] || data.chat;
+  const messageForThisUser = data.messageByUserId?.[currentUserId] || data.message;
   if (chatForThisUser) {
     upsertChat(chatForThisUser);
     if (Array.isArray(chatForThisUser.pinnedMessageIds)) syncPinnedStateForChat(chatForThisUser.chatId, chatForThisUser.pinnedMessageIds);
   }
   if (data.contact && payload.recipientUserIds?.includes?.(state.user?.userId)) applyUpdatedContact(data.contact);
-  if (data.message) {
-    if (data.message.clientMessageId) removeQueuedMessage(data.message.clientMessageId, { render: false });
-    upsertMessage(data.message);
-    if (state.replyToMessage?.messageId === data.message.messageId) {
-      state.replyToMessage = isDeletedMessage(data.message) ? null : { ...state.replyToMessage, ...data.message };
+  if (messageForThisUser) {
+    if (messageForThisUser.clientMessageId) removeQueuedMessage(messageForThisUser.clientMessageId, { render: false });
+    upsertMessage(messageForThisUser);
+    acknowledgeMessageDelivered(messageForThisUser).catch(() => null);
+    if (state.replyToMessage?.messageId === messageForThisUser.messageId) {
+      state.replyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
     }
-    if (state.editingMessage?.messageId === data.message.messageId) {
-      if (isDeletedMessage(data.message)) {
+    if (state.editingMessage?.messageId === messageForThisUser.messageId) {
+      if (isDeletedMessage(messageForThisUser)) {
         state.editingMessage = null;
         loadDraftForChat(state.activeChatId);
       } else {
-        state.editingMessage = { ...state.editingMessage, ...data.message };
+        state.editingMessage = { ...state.editingMessage, ...messageForThisUser };
       }
     }
   }
@@ -3599,9 +3807,9 @@ function handleRealtimeEvent(payload = {}) {
       renderLabelsModal();
     }
   }
-  if ((['message.star.updated', 'message.deleted', 'message.expired'].includes(payload.eventType)) && data.message) {
-    syncStarredPanelMessage(data.message);
-    syncGlobalStarredMessage(data.message);
+  if ((['message.star.updated', 'message.deleted', 'message.expired'].includes(payload.eventType)) && messageForThisUser) {
+    syncStarredPanelMessage(messageForThisUser);
+    syncGlobalStarredMessage(messageForThisUser);
   }
   if (payload.eventType === 'presence.updated' && data.chatId && data.presence) applyChatPresence(data.chatId, data.presence);
   if (payload.eventType === 'chat.read') syncReadReceiptsFromReadEvent(payload, data);
@@ -3610,8 +3818,8 @@ function handleRealtimeEvent(payload = {}) {
     if (data.isTyping) window.setTimeout(() => { els.typingStatus.textContent = ''; }, 5200);
   }
   renderAll();
-  if (state.activeChatId && data.message?.chatId === state.activeChatId) {
-    const mine = data.message.senderUserId === state.user?.userId;
+  if (canConfirmReadInActiveChat() && messageForThisUser?.chatId === state.activeChatId) {
+    const mine = messageForThisUser.senderUserId === state.user?.userId;
     if (mine || isMessagesNearBottom()) markActiveRead();
   }
 }
@@ -3637,6 +3845,26 @@ function renderAll() {
   renderContactNicknameModal();
   renderPrivacyLockOverlay();
   updateNotificationPauseButton();
+  updateResponsiveShellState();
+}
+
+
+function updateResponsiveShellState() {
+  const hasActiveChat = Boolean(state.activeChatId && activeChat());
+  els.chatScreen?.classList.toggle('ce-shell--chat-open', hasActiveChat);
+  els.appRoot?.classList.toggle('ce-app--chat-open', hasActiveChat);
+  document.body.classList.toggle('ce-mobile-chat-open', hasActiveChat);
+}
+
+function closeResponsiveChatPane() {
+  if (!state.activeChatId) return;
+  saveActiveDraft({ announce: false });
+  clearActiveChatState();
+  renderAll();
+  window.requestAnimationFrame?.(() => {
+    const activeRow = els.chatList?.querySelector('[data-chat-id]');
+    activeRow?.focus?.();
+  });
 }
 
 function getVisibleChats() {
@@ -3662,7 +3890,7 @@ function renderChats() {
   sortChats();
   const activeFilter = normalizeChatLabelName(state.activeLabelFilter || '');
   const unreadToolbar = state.chatListMode === 'unread'
-    ? `<div class="ce-list-toolbar" role="group" aria-label="Acciones de no leídos"><span>${visibleChats.length} ${visibleChats.length === 1 ? 'chat pendiente' : 'chats pendientes'}</span><button class="ce-link" type="button" data-mark-all-read="1">Marcar todos como leídos</button></div>`
+    ? `<div class="ce-list-toolbar" role="group" aria-label="Acciones de no leídos"><span>${visibleChats.length} ${visibleChats.length === 1 ? 'chat pendiente' : 'chats pendientes'}</span><button class="ce-link" type="button" data-mark-all-read="1">Quitar de no leídos</button></div>`
     : '';
   const labelToolbar = activeFilter
     ? `<div class="ce-list-toolbar ce-list-toolbar--label" role="status"><span>Filtro activo: #${escapeHtml(activeFilter)}</span><button class="ce-link" type="button" data-clear-label-filter="1">Quitar filtro</button></div>`
@@ -3906,6 +4134,9 @@ function renderActiveChat() {
   const nicknameButtonHtml = isSelfChat(chat) ? '' : `
       <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button>`;
   els.activeChatHeader.innerHTML = `
+    <button class="ce-icon-btn ce-mobile-back" type="button" data-close-mobile-chat="1" title="Volver a conversaciones" aria-label="Volver a conversaciones">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/></svg>
+    </button>
     <div class="ce-chat__identity">${renderChatAvatarWithPresence(chat)}<div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span>${renderActiveChatLabelBadges(chat)}</div></div>
     <div class="ce-header-actions ce-chat-tools">${muteButtonHtml}${blockButtonHtml}${nicknameButtonHtml}
       <button class="ce-icon-btn ce-icon-btn--labels" type="button" data-open-labels="1" title="Etiquetas del chat" aria-label="Editar etiquetas del chat">
@@ -4023,6 +4254,7 @@ async function selectChat(chatId) {
   }
   rememberUnreadMarkerForChat(chatBeforeRead, messages);
   state.messagesByChat.set(chatId, messages);
+  acknowledgeMessagesDelivered(messages);
   renderAll();
   loadDraftForChat(chatId);
   updateComposerControls();
@@ -4031,7 +4263,7 @@ async function selectChat(chatId) {
 }
 
 async function markActiveRead() {
-  if (!state.activeChatId) return;
+  if (!canConfirmReadInActiveChat()) return;
   try {
     const data = await post('/api/chats/read', { chatId: state.activeChatId });
     upsertChat(data.chat);
@@ -5790,8 +6022,8 @@ function getCommandPaletteCommands() {
     },
     {
       id: 'mark-all-read',
-      title: 'Marcar todos como leídos',
-      description: unreadCount ? `Limpia ${unreadCount} ${unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'} sin abrirlas una por una.` : 'Limpia la bandeja de pendientes si hay conversaciones sin leer.',
+      title: 'Quitar todos de no leídos',
+      description: unreadCount ? `Limpia ${unreadCount} ${unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'} sin abrirlas ni activar checks azules.` : 'Limpia la bandeja de pendientes sin enviar confirmaciones de lectura.',
       shortcut: 'No leídos',
       enabled: Boolean(state.user),
       run: () => markAllChatsRead()
@@ -5971,6 +6203,7 @@ function isTypingInEditableField(event) {
 
 function bindEvents() {
   window.addEventListener('beforeunload', () => saveActiveDraft({ announce: false }));
+  window.addEventListener('resize', () => updateResponsiveShellState(), { passive: true });
   ['pointerdown', 'touchstart', 'focusin'].forEach((eventName) => {
     document.addEventListener(eventName, () => resetPrivacyLockActivity(), { passive: true });
   });
@@ -6158,6 +6391,7 @@ function bindEvents() {
     if (state.user) {
       resyncStateFromBackend({ reloadActive: true, force: true }).catch(() => null);
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
+      flushDeliveryAckQueue({ force: true }).catch(() => null);
     }
   });
   document.addEventListener('visibilitychange', () => {
@@ -6166,6 +6400,8 @@ function bindEvents() {
       resyncStateFromBackend({ reloadActive: Boolean(state.activeChatId) }).catch(() => null);
       refreshActiveChatPresence({ render: true }).catch(() => null);
       scheduleOutboxRetry(1400);
+      flushDeliveryAckQueue({ force: true }).catch(() => null);
+      requestServiceWorkerDeliveryAckFlush();
     }
   });
   els.messages?.addEventListener('scroll', () => updateScrollBottomButton(), { passive: true });
@@ -6209,6 +6445,8 @@ function bindEvents() {
     state.notificationPreferences = normalizeNotificationPreferences({});
     if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
     state.outboxRetryTimer = 0;
+    if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
+    state.deliveryAckRetryTimer = 0;
     state.activeChatId = '';
     state.replyToMessage = null;
     state.editingMessage = null;
@@ -6578,6 +6816,12 @@ function bindEvents() {
     renderAll();
   });
   els.activeChatHeader?.addEventListener('click', (event) => {
+    const mobileBackButton = event.target.closest('[data-close-mobile-chat]');
+    if (mobileBackButton && els.activeChatHeader.contains(mobileBackButton)) {
+      event.preventDefault();
+      closeResponsiveChatPane();
+      return;
+    }
     const nicknameButton = event.target.closest('[data-edit-active-contact-nickname]');
     if (nicknameButton && els.activeChatHeader.contains(nicknameButton)) {
       event.preventDefault();
@@ -7139,6 +7383,7 @@ async function registerServiceWorker() {
       const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       state.serviceWorkerRegistration = registration;
       await registration.update().catch(() => null);
+      requestServiceWorkerDeliveryAckFlush();
     } catch {}
   }
 }
