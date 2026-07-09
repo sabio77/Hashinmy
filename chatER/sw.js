@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v87-emoji-size-rules';
+const CACHE_NAME = 'chater-static-v89-link-contactos-chater';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',
@@ -10,6 +10,10 @@ const CORE_ASSETS = [
   './APPwebFRONTENDx/BLOQUE/app.js',
   './APPwebFRONTENDx/BLOQUE/api.js',
   './APPwebFRONTENDx/BLOQUE/firebase.auth.js',
+  './LINKminiaturasx/conexion/index.js',
+  './LINKminiaturasx/BLOQUE/link-miniaturas.js',
+  './LINKcontactosCHATERx/conexion/index.js',
+  './LINKcontactosCHATERx/BLOQUE/link-contactos-chater.js',
   './manifest.webmanifest'
 ];
 

@@ -10968,3 +10968,503 @@ body.ce-image-viewer-open {
     margin-right: calc(-7px - env(safe-area-inset-right, 0px)) !important;
   }
 }
+
+
+/* Bloque LINKminiaturasx · miniaturas de enlaces dentro de mensajes.
+   Mantiene el link original visible y separa la tarjeta clicable de la lógica del chat. */
+.ce-link-preview {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ce-link-preview .ce-msg__text {
+  min-width: 0;
+}
+
+.ce-link-preview__original {
+  color: var(--ce-accent-dark);
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.ce-msg.mine .ce-link-preview__original {
+  color: #075985;
+}
+
+.ce-link-preview__original:hover,
+.ce-link-preview__original:focus-visible {
+  color: #0369a1;
+}
+
+.ce-link-preview-card {
+  width: min(100%, 420px);
+  min-width: 0;
+  border: 1px solid rgba(14, 165, 233, 0.22);
+  border-radius: 15px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ce-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
+}
+
+.ce-link-preview-card:hover,
+.ce-link-preview-card:focus-visible {
+  border-color: rgba(14, 165, 233, 0.5);
+  background: rgba(232, 246, 255, 0.94);
+  transform: translateY(-1px);
+}
+
+.ce-link-preview-card__thumb {
+  min-height: 64px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(10, 168, 132, 0.16));
+}
+
+.ce-link-preview-card__thumb span {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ce-accent-dark);
+  font-size: 1rem;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.18);
+}
+
+.ce-link-preview-card__content {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.ce-link-preview-card__content strong,
+.ce-link-preview-card__content span,
+.ce-link-preview-card__content em,
+.ce-link-preview-card__extra {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ce-link-preview-card__content strong {
+  color: #0369a1;
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.ce-link-preview-card__content span {
+  color: var(--ce-muted-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.ce-link-preview-card__content em {
+  color: var(--ce-muted);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.ce-link-preview-card__extra {
+  color: var(--ce-accent-dark);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.ce-link-preview-card--warning {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.ce-link-preview-card--warning .ce-link-preview-card__thumb {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.14));
+}
+
+.ce-link-preview-card--warning .ce-link-preview-card__content em {
+  color: #92400e;
+}
+
+.ce-privacy-mode .ce-link-preview__original,
+.ce-privacy-mode .ce-link-preview-card__content strong,
+.ce-privacy-mode .ce-link-preview-card__content span {
+  filter: blur(4px);
+}
+
+.ce-privacy-mode .ce-msg:hover .ce-link-preview__original,
+.ce-privacy-mode .ce-msg:active .ce-link-preview__original,
+.ce-privacy-mode .ce-msg:focus-within .ce-link-preview__original,
+.ce-privacy-mode .ce-msg:hover .ce-link-preview-card__content strong,
+.ce-privacy-mode .ce-msg:active .ce-link-preview-card__content strong,
+.ce-privacy-mode .ce-msg:focus-within .ce-link-preview-card__content strong,
+.ce-privacy-mode .ce-msg:hover .ce-link-preview-card__content span,
+.ce-privacy-mode .ce-msg:active .ce-link-preview-card__content span,
+.ce-privacy-mode .ce-msg:focus-within .ce-link-preview-card__content span {
+  filter: none;
+}
+
+:root[data-theme='dark'] .ce-link-preview-card,
+body.ce-dark-mode .ce-link-preview-card {
+  background: rgba(15, 23, 42, 0.74);
+  border-color: rgba(125, 211, 252, 0.22);
+}
+
+:root[data-theme='dark'] .ce-link-preview-card:hover,
+:root[data-theme='dark'] .ce-link-preview-card:focus-visible,
+body.ce-dark-mode .ce-link-preview-card:hover,
+body.ce-dark-mode .ce-link-preview-card:focus-visible {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(125, 211, 252, 0.46);
+}
+
+:root[data-theme='dark'] .ce-link-preview-card__thumb span,
+body.ce-dark-mode .ce-link-preview-card__thumb span {
+  background: rgba(15, 23, 42, 0.86);
+  color: #7dd3fc;
+}
+
+:root[data-theme='dark'] .ce-link-preview-card__content strong,
+body.ce-dark-mode .ce-link-preview-card__content strong {
+  color: #7dd3fc;
+}
+
+@media (max-width: 520px) {
+  .ce-link-preview-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+    border-radius: 13px;
+  }
+
+  .ce-link-preview-card__thumb {
+    min-height: 56px;
+  }
+
+  .ce-link-preview-card__thumb span {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .ce-link-preview-card__content {
+    padding: 9px 10px;
+  }
+}
+
+/* Bloque LINKcontactosCHATERx · tarjetas compactas de contactos compartidos.
+   Punto débil corregido: los enlaces QR de chatER no se muestran como URL cruda dentro del mensaje. */
+.ce-shared-contact-message {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 250px);
+}
+
+.ce-shared-contact-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.ce-shared-contact-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: min(100%, 360px);
+  padding: 10px;
+  border: 1px solid rgba(17, 27, 33, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 30px rgba(17, 27, 33, 0.08);
+  color: #111b21;
+}
+
+.ce-msg.mine .ce-shared-contact-card {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.ce-shared-contact-card__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #0aa884, #13d7a8);
+  color: #ffffff;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.ce-shared-contact-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ce-shared-contact-card__avatar--fallback {
+  text-transform: uppercase;
+}
+
+.ce-shared-contact-card__body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ce-shared-contact-card__body strong,
+.ce-shared-contact-card__body span,
+.ce-shared-contact-card__body em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ce-shared-contact-card__body strong {
+  font-size: 0.94rem;
+  font-weight: 850;
+}
+
+.ce-shared-contact-card__body span {
+  color: #667781;
+  font-size: 0.82rem;
+}
+
+.ce-shared-contact-card__body em {
+  color: #0aa884;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.ce-shared-contact-card__actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ce-shared-contact-card__actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+  background: rgba(10, 168, 132, 0.12);
+  color: #05735e;
+}
+
+.ce-shared-contact-card__actions button:last-child {
+  background: #0aa884;
+  color: #ffffff;
+}
+
+.ce-shared-contact-card__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  background: rgba(102, 119, 129, 0.16);
+  color: #667781;
+}
+
+.ce-shared-contact-card--loading .ce-shared-contact-card__avatar {
+  background: linear-gradient(135deg, rgba(10, 168, 132, 0.38), rgba(19, 215, 168, 0.28));
+}
+
+.ce-shared-contact-card--missing {
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.ce-shared-contact-card--missing .ce-shared-contact-card__avatar {
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
+}
+
+.ce-shared-contact-card--missing .ce-shared-contact-card__body em {
+  color: #b91c1c;
+}
+
+.ce-profile-share {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ce-profile-share__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: #0aa884;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.ce-profile-share__toggle .ce-ui-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.ce-profile-share__menu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 360px);
+  padding: 8px;
+  border-radius: 18px;
+  background: rgba(17, 27, 33, 0.06);
+}
+
+.ce-profile-share__menu button {
+  border: 1px solid rgba(17, 27, 33, 0.1);
+  border-radius: 14px;
+  padding: 9px 8px;
+  background: #ffffff;
+  color: #111b21;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ce-contact-share-card {
+  width: min(94vw, 460px);
+}
+
+.ce-contact-share-search {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-weight: 800;
+}
+
+.ce-contact-share-search input {
+  width: 100%;
+  border: 1px solid rgba(17, 27, 33, 0.14);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.92);
+  color: inherit;
+}
+
+.ce-contact-share-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(52vh, 430px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ce-contact-share-target {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(17, 27, 33, 0.08);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ce-contact-share-target span:not(.ce-avatar) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ce-contact-share-target strong,
+.ce-contact-share-target em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ce-contact-share-target em {
+  color: #667781;
+  font-style: normal;
+  font-size: 0.82rem;
+}
+
+.ce-contact-share-target:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.ce-contact-share-empty {
+  border: 1px dashed rgba(102, 119, 129, 0.35);
+  border-radius: 18px;
+  padding: 16px;
+  color: #667781;
+  text-align: center;
+}
+
+.ce-contact-share-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ce-contact-share-pager span {
+  color: #667781;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+:root[data-theme='dark'] .ce-shared-contact-card,
+body.ce-dark-mode .ce-shared-contact-card,
+:root[data-theme='dark'] .ce-profile-share__menu button,
+body.ce-dark-mode .ce-profile-share__menu button,
+:root[data-theme='dark'] .ce-contact-share-target,
+body.ce-dark-mode .ce-contact-share-target,
+:root[data-theme='dark'] .ce-contact-share-search input,
+body.ce-dark-mode .ce-contact-share-search input {
+  background: rgba(32, 44, 51, 0.94);
+  color: #e9edef;
+  border-color: rgba(233, 237, 239, 0.1);
+}
+
+:root[data-theme='dark'] .ce-shared-contact-card__body span,
+body.ce-dark-mode .ce-shared-contact-card__body span,
+:root[data-theme='dark'] .ce-contact-share-target em,
+body.ce-dark-mode .ce-contact-share-target em,
+:root[data-theme='dark'] .ce-contact-share-empty,
+body.ce-dark-mode .ce-contact-share-empty,
+:root[data-theme='dark'] .ce-contact-share-pager span,
+body.ce-dark-mode .ce-contact-share-pager span {
+  color: #aebac1;
+}
+
+@media (max-width: 520px) {
+  .ce-profile-share__menu {
+    grid-template-columns: 1fr;
+  }
+  .ce-shared-contact-card {
+    width: 100%;
+  }
+}

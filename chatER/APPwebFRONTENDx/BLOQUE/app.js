@@ -1,5 +1,17 @@
 import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl } from './api.js';
 import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigError } from './firebase.auth.js';
+import {
+  extractLinkPreviewUrls,
+  linkPreviewHostLabel,
+  normalizeLinkPreviewUrl,
+  openLinkPreviewUrl,
+  renderLinkPreviewTextBody
+} from '../../LINKminiaturasx/conexion/index.js';
+import {
+  extractChatERContactLinks,
+  renderChatERSharedContactCards,
+  stripChatERContactLinksFromText
+} from '../../LINKcontactosCHATERx/conexion/index.js';
 
 const clientIdKey = 'chater_client_id';
 const draftStoragePrefix = 'chater_draft_v1';
@@ -124,6 +136,13 @@ const state = {
   config: null,
   user: null,
   contacts: [],
+  contactLinkPreviews: new Map(),
+  contactLinkPreviewInFlight: new Set(),
+  contactShareModalOpen: false,
+  contactShareTargetProfile: null,
+  contactShareQuery: '',
+  contactSharePage: 0,
+  contactShareSending: false,
   chats: [],
   labels: [],
   chatLabelsByChatId: new Map(),
@@ -287,6 +306,7 @@ const els = {
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
   messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
+  contactShareModal: $('contactShareModal'), contactShareSearch: $('contactShareSearch'), contactShareList: $('contactShareList'), contactSharePageInfo: $('contactSharePageInfo'), btnCloseContactShare: $('btnCloseContactShare'), btnContactSharePrev: $('btnContactSharePrev'), btnContactShareNext: $('btnContactShareNext'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
   scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnConfirmSchedule: $('btnConfirmSchedule'),
   pollModal: $('pollModal'), pollForm: $('pollForm'), pollQuestionInput: $('pollQuestionInput'), pollOptions: $('pollOptions'), pollPreview: $('pollPreview'), btnConfirmPoll: $('btnConfirmPoll'),
@@ -531,9 +551,20 @@ function isSingleEmojiMessageText(text = '') {
 
 function renderMessageTextBody(text = '', attachment = null) {
   const cleanText = String(text || '').trim();
-  if (!shouldRenderMessageTextBody(cleanText, attachment)) return '';
+  const shouldRender = shouldRenderMessageTextBody(cleanText, attachment);
+  if (!shouldRender) return '';
   const soloEmojiClass = isSingleEmojiMessageText(cleanText) ? ' ce-msg__text--solo-emoji' : '';
-  return `<p class="ce-msg__text${soloEmojiClass}">${renderEmojiAwareText(cleanText)}</p>`;
+  const textClass = `ce-msg__text${soloEmojiClass}`;
+  const sharedContactBody = renderSharedContactMessageBody(cleanText, attachment, {
+    textClass,
+    renderTextSegment: renderEmojiAwareText
+  });
+  if (sharedContactBody) return sharedContactBody;
+  return renderLinkPreviewTextBody(cleanText, {
+    shouldRender,
+    textClass,
+    renderTextSegment: renderEmojiAwareText
+  });
 }
 
 function updateAttachmentPreview() {
@@ -1092,6 +1123,28 @@ function buildProfileShareLink(profileOrCode = {}) {
   return url.toString();
 }
 
+function buildProfileQrImageUrl(profileOrCode = {}) {
+  const code = typeof profileOrCode === 'string' ? profileOrCode : profileOrCode.profileCode;
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return '';
+  const previewVersion = profileSharePreviewVersion(profileOrCode);
+  return `${getBackendUrl()}/api/profiles/${encodeURIComponent(cleanCode)}/qr.svg${previewVersion ? `?v=${encodeURIComponent(previewVersion)}` : ''}`;
+}
+
+function renderProfileShareControls(profile = {}) {
+  const shareLink = buildProfileShareLink(profile);
+  const qrSrc = buildProfileQrImageUrl(profile);
+  if (!shareLink || !qrSrc) return '';
+  return `<div class="ce-profile-share" data-profile-share-root="1">
+    <button class="ce-profile-share__toggle" type="button" data-profile-share-toggle="1" aria-expanded="false" aria-label="Compartir este perfil">${uiIcon('forward')}<span>Compartir</span></button>
+    <div class="ce-profile-share__menu hidden" data-profile-share-menu="1" aria-label="Opciones para compartir perfil">
+      <button type="button" data-profile-share-image="${escapeHtml(qrSrc)}">Imagen QR</button>
+      <button type="button" data-profile-share-copy="${escapeHtml(shareLink)}">Copiar link</button>
+      <button type="button" data-profile-share-contact="${escapeHtml(shareLink)}">Contacto</button>
+    </div>
+  </div>`;
+}
+
 function renderProfileQrForModal(profile = {}) {
   const code = String(profile.profileCode || '').trim();
   if (!code) {
@@ -1099,9 +1152,8 @@ function renderProfileQrForModal(profile = {}) {
   }
   const label = profileDisplayName(profile);
   const shareLink = buildProfileShareLink(profile);
-  const previewVersion = profileSharePreviewVersion(profile);
-  const qrSrc = `${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg${previewVersion ? `?v=${encodeURIComponent(previewVersion)}` : ''}`;
-  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${escapeHtml(qrSrc)}" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code><div class="ce-profile-qr__actions"><a class="ce-link" href="${escapeHtml(shareLink)}" target="_blank" rel="noopener">Abrir enlace de perfil</a><button class="ce-link" type="button" data-copy-profile-link="${escapeHtml(shareLink)}">Copiar enlace</button></div></div>`;
+  const qrSrc = buildProfileQrImageUrl(profile);
+  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${escapeHtml(qrSrc)}" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code><div class="ce-profile-qr__actions"><a class="ce-link" href="${escapeHtml(shareLink)}" target="_blank" rel="noopener">Abrir enlace de perfil</a><button class="ce-link" type="button" data-copy-profile-link="${escapeHtml(shareLink)}">Copiar enlace</button></div>${renderProfileShareControls(profile)}</div>`;
 }
 
 function resolveProfileFromChat(chat = {}) {
@@ -1111,6 +1163,10 @@ function resolveProfileFromChat(chat = {}) {
 
 function openProfileCard(profile = {}) {
   const cleanProfile = profile || {};
+  state.contactShareTargetProfile = cleanProfile;
+  state.contactShareModalOpen = false;
+  state.contactShareQuery = '';
+  state.contactSharePage = 0;
   const title = profileDisplayName(cleanProfile);
   const email = profileDisplayEmail(cleanProfile);
   els.qrModalTitle.textContent = title;
@@ -4715,6 +4771,138 @@ function getContactByUserId(userId = '') {
   return state.contacts.find((contact) => contact.userId === cleanUserId) || null;
 }
 
+function contactPreviewKey(code = '') {
+  return String(code || '').trim().toLowerCase();
+}
+
+function isSelfProfile(profile = {}) {
+  return Boolean(profile?.userId && state.user?.userId && profile.userId === state.user.userId);
+}
+
+function isContactSavedProfile(profile = {}) {
+  if (!profile?.userId) return false;
+  if (isSelfProfile(profile)) return true;
+  return Boolean(getContactByUserId(profile.userId));
+}
+
+function setContactLinkPreview(code = '', preview = {}) {
+  const key = contactPreviewKey(code || preview.code || preview.profile?.profileCode || '');
+  if (!key) return;
+  state.contactLinkPreviews.set(key, {
+    code: code || preview.code || preview.profile?.profileCode || '',
+    status: preview.status || 'ready',
+    profile: preview.profile || null,
+    saved: Boolean(preview.saved || (preview.profile && isContactSavedProfile(preview.profile))),
+    retryable: Boolean(preview.retryable),
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function localContactPreviewForCode(code = '') {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+  if (state.user?.profileCode === cleanCode) {
+    return { code: cleanCode, status: 'ready', profile: state.user, saved: true };
+  }
+  const contact = state.contacts.find((item) => item.profileCode === cleanCode);
+  if (contact) return { code: cleanCode, status: 'ready', profile: contact, saved: true };
+  return null;
+}
+
+function snapshotContactLinkPreviews(candidates = []) {
+  const map = new Map();
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const key = contactPreviewKey(candidate.code);
+    if (!key) continue;
+    map.set(key, state.contactLinkPreviews.get(key) || localContactPreviewForCode(candidate.code) || { code: candidate.code, status: 'loading' });
+  }
+  return map;
+}
+
+function queueChatERContactPreviewLoads(candidates = []) {
+  if (!state.user) return;
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const key = contactPreviewKey(candidate.code);
+    if (!key || state.contactLinkPreviews.has(key) || state.contactLinkPreviewInFlight.has(key)) continue;
+    const localPreview = localContactPreviewForCode(candidate.code);
+    if (localPreview) {
+      setContactLinkPreview(candidate.code, localPreview);
+      continue;
+    }
+    state.contactLinkPreviewInFlight.add(key);
+    post('/api/contacts/preview-code', { code: candidate.code, link: candidate.url || candidate.visible || '' })
+      .then((data) => {
+        setContactLinkPreview(candidate.code, {
+          code: data.code || candidate.code,
+          status: 'ready',
+          profile: data.profile || data.contact || null,
+          saved: Boolean(data.saved)
+        });
+      })
+      .catch((error) => {
+        const retryable = !error?.status || error.status >= 500 || navigator.onLine === false;
+        setContactLinkPreview(candidate.code, { code: candidate.code, status: retryable ? 'loading' : 'missing', profile: null, saved: false, retryable });
+      })
+      .finally(() => {
+        state.contactLinkPreviewInFlight.delete(key);
+        renderAll();
+      });
+  }
+}
+
+async function saveSharedContactFromCode(code = '') {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) throw new Error('El enlace de contacto no está disponible.');
+  const data = await post('/api/contacts/add-code', { code: cleanCode });
+  upsertContact(data.contact);
+  upsertChat(data.chat);
+  setContactLinkPreview(cleanCode, { code: data.contact?.profileCode || cleanCode, status: 'ready', profile: data.contact, saved: true });
+  renderAll();
+  showTemporaryDraftStatus('Contacto guardado. Puedes escribirle desde la tarjeta o desde tu lista de contactos.');
+}
+
+async function openSharedContactChat(userId = '', code = '') {
+  const cleanUserId = String(userId || '').trim();
+  if (cleanUserId) {
+    await openContactChat(cleanUserId);
+    return;
+  }
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) throw new Error('No se pudo identificar el contacto compartido.');
+  await addContactByCode(cleanCode);
+}
+
+function renderSharedContactMessageBody(text = '', attachment = null, options = {}) {
+  const cleanText = String(text || '').trim();
+  const candidates = extractChatERContactLinks(cleanText);
+  if (!candidates.length) return null;
+  queueChatERContactPreviewLoads(candidates);
+  const textWithoutContactLinks = stripChatERContactLinksFromText(cleanText);
+  const textHtml = textWithoutContactLinks
+    ? renderLinkPreviewTextBody(textWithoutContactLinks, {
+      shouldRender: true,
+      textClass: options.textClass || 'ce-msg__text',
+      renderTextSegment: options.renderTextSegment || renderEmojiAwareText
+    })
+    : '';
+  const cardsHtml = renderChatERSharedContactCards(candidates, snapshotContactLinkPreviews(candidates), {
+    isContactSaved: isContactSavedProfile,
+    isSelfProfile
+  });
+  return `<div class="ce-shared-contact-message" data-contact-preview-block="LINKcontactosCHATERx">${textHtml}${cardsHtml}</div>`;
+}
+
+function resetRetryableContactLinkPreviews() {
+  let changed = false;
+  for (const [key, preview] of state.contactLinkPreviews.entries()) {
+    if (preview?.status === 'loading' && preview?.retryable) {
+      state.contactLinkPreviews.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) renderAll();
+}
+
 function upsertMessage(message = {}) {
   if (!message.messageId || !message.chatId) return;
   const list = state.messagesByChat.get(message.chatId) || [];
@@ -5379,6 +5567,7 @@ function renderAll() {
   renderQuickRepliesPanel();
   renderIconInsertPickerPanel();
   renderForwardModal();
+  renderContactShareModal();
   renderScheduleModal();
   renderGlobalSearchModal();
   renderGlobalStarredModal();
@@ -6021,6 +6210,99 @@ function startEditMessage(messageId = '') {
 
 function availableForwardChats() {
   return state.chats.filter((chat) => chat.chatId && chat.chatId !== state.activeChatId && !chat.isArchived && !isChatInteractionBlocked(chat));
+}
+
+function contactShareRecentScore(contact = {}) {
+  const chat = state.chats.find((item) => item?.other?.userId === contact.userId && !isSelfChat(item));
+  const raw = chat?.lastMessage?.createdAt || chat?.updatedAt || chat?.createdAt || contact.updatedAt || contact.addedAt || '';
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function contactShareFilteredContacts() {
+  const query = String(state.contactShareQuery || '').trim().toLowerCase();
+  const targetProfile = state.contactShareTargetProfile || {};
+  return state.contacts
+    .filter((contact) => contact.userId && contact.userId !== targetProfile.userId)
+    .filter((contact) => {
+      if (!query) return true;
+      return [contactDisplayName(contact), contactDisplaySubtitle(contact), contact.email, contact.displayName, contact.nickname]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+    })
+    .sort((a, b) => {
+      const byRecent = contactShareRecentScore(b) - contactShareRecentScore(a);
+      if (byRecent) return byRecent;
+      return String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es');
+    });
+}
+
+function renderContactShareModal() {
+  if (!els.contactShareModal || !els.contactShareList) return;
+  if (!state.contactShareModalOpen || !state.contactShareTargetProfile?.profileCode) {
+    els.contactShareModal.classList.add('hidden');
+    if (els.contactShareList) els.contactShareList.innerHTML = '';
+    if (els.contactSharePageInfo) els.contactSharePageInfo.textContent = 'Página 1';
+    return;
+  }
+  els.contactShareModal.classList.remove('hidden');
+  if (els.contactShareSearch && els.contactShareSearch.value !== state.contactShareQuery) els.contactShareSearch.value = state.contactShareQuery;
+  const contacts = contactShareFilteredContacts();
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(contacts.length / pageSize));
+  state.contactSharePage = Math.min(Math.max(0, Number(state.contactSharePage || 0)), totalPages - 1);
+  const start = state.contactSharePage * pageSize;
+  const pageContacts = contacts.slice(start, start + pageSize);
+  if (!contacts.length) {
+    els.contactShareList.innerHTML = '<div class="ce-contact-share-empty">No hay contactos disponibles para enviar esta tarjeta. Agrega un contacto o cambia la búsqueda.</div>';
+  } else {
+    els.contactShareList.innerHTML = pageContacts.map((contact) => {
+      const title = contactDisplayName(contact);
+      const subtitle = contactDisplaySubtitle(contact);
+      const disabled = state.contactShareSending ? ' disabled' : '';
+      return `<button class="ce-contact-share-target" type="button" data-contact-share-target-id="${escapeHtml(contact.userId)}"${disabled} aria-label="Enviar contacto a ${escapeHtml(title)}">${avatar(contact, 'small')}<span><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span></button>`;
+    }).join('');
+  }
+  if (els.contactSharePageInfo) els.contactSharePageInfo.textContent = `${state.contactSharePage + 1} de ${totalPages}`;
+  if (els.btnContactSharePrev) els.btnContactSharePrev.disabled = state.contactSharePage <= 0 || state.contactShareSending;
+  if (els.btnContactShareNext) els.btnContactShareNext.disabled = state.contactSharePage >= totalPages - 1 || state.contactShareSending;
+}
+
+function openContactShareModal(profile = state.contactShareTargetProfile || {}) {
+  if (!profile?.profileCode) throw new Error('Este perfil todavía no tiene un enlace de contacto disponible.');
+  state.contactShareTargetProfile = profile;
+  state.contactShareModalOpen = true;
+  state.contactShareQuery = '';
+  state.contactSharePage = 0;
+  renderContactShareModal();
+  window.setTimeout(() => els.contactShareSearch?.focus(), 0);
+}
+
+function closeContactShareModal() {
+  state.contactShareModalOpen = false;
+  state.contactShareQuery = '';
+  state.contactSharePage = 0;
+  state.contactShareSending = false;
+  renderContactShareModal();
+}
+
+async function sendProfileShareToContact(targetUserId = '') {
+  const recipientId = String(targetUserId || '').trim();
+  const targetProfile = state.contactShareTargetProfile || {};
+  const shareLink = buildProfileShareLink(targetProfile);
+  if (!recipientId) throw new Error('Selecciona un contacto para enviar la tarjeta.');
+  if (!shareLink) throw new Error('Este perfil todavía no tiene un enlace disponible.');
+  state.contactShareSending = true;
+  renderContactShareModal();
+  try {
+    await openContactChat(recipientId);
+    await sendMessage(shareLink, { silent: false, ephemeralSeconds: selectedEphemeralSeconds(), attachment: null });
+    closeContactShareModal();
+    closeQrModal();
+    showTemporaryDraftStatus('Contacto enviado por chatER como tarjeta compacta.');
+  } finally {
+    state.contactShareSending = false;
+    renderContactShareModal();
+  }
 }
 
 function renderForwardModal() {
@@ -6678,31 +6960,46 @@ async function copyProfileShareLink(link = '') {
   showTemporaryDraftStatus('Enlace del perfil copiado. Al pegarlo en WhatsApp mostrará la vista previa de ChatER.');
 }
 
+async function shareProfileQrImage(profile = state.contactShareTargetProfile || {}) {
+  const qrUrl = buildProfileQrImageUrl(profile);
+  const shareLink = buildProfileShareLink(profile);
+  if (!qrUrl || !shareLink) throw new Error('Este perfil todavía no tiene un QR compartible.');
+  const title = `QR de ${profileDisplayName(profile)} en chatER`;
+  const text = `Agrega este contacto en chatER: ${profileDisplayName(profile)}`;
+  try {
+    const response = await fetch(qrUrl, { method: 'GET' });
+    if (!response.ok) throw new Error('No se pudo preparar la imagen QR.');
+    const blob = await response.blob();
+    const fileName = `chater-${String(profile.profileCode || 'qr').replace(/[^a-z0-9_-]/gi, '')}.svg`;
+    const file = typeof File !== 'undefined' ? new File([blob], fileName, { type: blob.type || 'image/svg+xml' }) : null;
+    if (file && navigator.canShare?.({ files: [file] }) && navigator.share) {
+      await navigator.share({ title, text, url: shareLink, files: [file] });
+      showTemporaryDraftStatus('QR compartido como imagen.');
+      return;
+    }
+    if (navigator.share) {
+      await navigator.share({ title, text, url: shareLink });
+      showTemporaryDraftStatus('Enlace del QR enviado con el menú de compartir.');
+      return;
+    }
+  } catch (error) {
+    if (/AbortError/i.test(error?.name || error?.message || '')) return;
+  }
+  await copyTextToClipboard(shareLink);
+  showTemporaryDraftStatus('Tu dispositivo no permite compartir la imagen QR aquí. Copiamos el enlace del perfil.');
+}
+
 
 function normalizeLinkCandidate(value = '') {
-  let url = String(value || '').trim();
-  if (!url) return '';
-  url = url.replace(/[),.;:!?]+$/g, '');
-  try {
-    const parsed = new URL(url.startsWith('www.') ? `https://${url}` : url);
-    if (!/^https?:$/.test(parsed.protocol)) return '';
-    return parsed.toString();
-  } catch {
-    return '';
-  }
+  return normalizeLinkPreviewUrl(value);
 }
 
 function linkHostLabel(url = '') {
-  try {
-    return new URL(url).hostname.replace(/^www\./i, '') || 'enlace';
-  } catch {
-    return 'enlace';
-  }
+  return linkPreviewHostLabel(url);
 }
 
 function extractLinksFromText(text = '') {
-  const matches = String(text || '').match(/https?:\/\/[^\s<>()]+|www\.[^\s<>()]+/gi) || [];
-  return Array.from(new Set(matches.map(normalizeLinkCandidate).filter(Boolean)));
+  return extractLinkPreviewUrls(text);
 }
 
 function getActiveChatLinks() {
@@ -8031,6 +8328,7 @@ function bindEvents() {
   window.addEventListener('online', () => {
     if (state.user) {
       if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
+      resetRetryableContactLinkPreviews();
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
     }
@@ -8068,6 +8366,13 @@ function bindEvents() {
     setSessionToken('');
     state.user = null;
     state.contacts = [];
+    state.contactLinkPreviews.clear();
+    state.contactLinkPreviewInFlight.clear();
+    state.contactShareModalOpen = false;
+    state.contactShareTargetProfile = null;
+    state.contactShareQuery = '';
+    state.contactSharePage = 0;
+    state.contactShareSending = false;
     state.chats = [];
     state.labels = [];
     state.chatLabelsByChatId = new Map();
@@ -8568,6 +8873,30 @@ function bindEvents() {
     event.preventDefault();
     exportActiveChat().catch((error) => alert(error.message || 'No se pudo exportar el chat.'));
   });
+  els.btnCloseContactShare?.addEventListener('click', closeContactShareModal);
+  els.contactShareModal?.addEventListener('click', (event) => {
+    if (event.target === els.contactShareModal) {
+      closeContactShareModal();
+      return;
+    }
+    const targetButton = event.target.closest('[data-contact-share-target-id]');
+    if (!targetButton || !els.contactShareModal.contains(targetButton)) return;
+    event.preventDefault();
+    sendProfileShareToContact(targetButton.dataset.contactShareTargetId || '').catch((error) => alert(error.message || 'No se pudo enviar el contacto por chatER.'));
+  });
+  els.contactShareSearch?.addEventListener('input', () => {
+    state.contactShareQuery = String(els.contactShareSearch.value || '');
+    state.contactSharePage = 0;
+    renderContactShareModal();
+  });
+  els.btnContactSharePrev?.addEventListener('click', () => {
+    state.contactSharePage = Math.max(0, Number(state.contactSharePage || 0) - 1);
+    renderContactShareModal();
+  });
+  els.btnContactShareNext?.addEventListener('click', () => {
+    state.contactSharePage = Number(state.contactSharePage || 0) + 1;
+    renderContactShareModal();
+  });
   els.btnCloseForward?.addEventListener('click', closeForwardModal);
   els.forwardModal?.addEventListener('click', (event) => {
     if (event.target === els.forwardModal) {
@@ -8923,6 +9252,37 @@ function bindEvents() {
     if (jump) jumpToMessage(jump.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
   });
   els.messages.addEventListener('click', (event) => {
+    const sharedContactSaveButton = event.target.closest('[data-chater-contact-save-code]');
+    if (sharedContactSaveButton && els.messages.contains(sharedContactSaveButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      saveSharedContactFromCode(sharedContactSaveButton.dataset.chaterContactSaveCode || '').catch((error) => alert(error.message || 'No se pudo guardar el contacto compartido.'));
+      closeOpenMessageControls();
+      return;
+    }
+    const sharedContactWriteButton = event.target.closest('[data-chater-contact-write-user-id], [data-chater-contact-write-code]');
+    if (sharedContactWriteButton && els.messages.contains(sharedContactWriteButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      openSharedContactChat(sharedContactWriteButton.dataset.chaterContactWriteUserId || '', sharedContactWriteButton.dataset.chaterContactWriteCode || '').catch((error) => alert(error.message || 'No se pudo abrir el chat del contacto compartido.'));
+      closeOpenMessageControls();
+      return;
+    }
+    const linkPreviewButton = event.target.closest('[data-chat-link-preview-url]');
+    if (linkPreviewButton && els.messages.contains(linkPreviewButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      openLinkPreviewUrl(linkPreviewButton.dataset.chatLinkPreviewUrl || linkPreviewButton.getAttribute('href') || '', {
+        confirm: (message) => window.confirm(message),
+        open: (url) => {
+          const opened = window.open(url, '_blank', 'noopener,noreferrer');
+          if (opened) opened.opener = null;
+          return Boolean(opened);
+        }
+      });
+      closeOpenMessageControls();
+      return;
+    }
     const imageViewerButton = event.target.closest('[data-open-image-viewer]');
     if (imageViewerButton && els.messages.contains(imageViewerButton)) {
       event.preventDefault();
@@ -9178,6 +9538,34 @@ function bindEvents() {
   els.qrModal.addEventListener('click', (event) => {
     if (event.target === els.qrModal) {
       closeQrModal();
+      return;
+    }
+    const shareToggle = event.target.closest('[data-profile-share-toggle]');
+    if (shareToggle && els.qrModal.contains(shareToggle)) {
+      event.preventDefault();
+      const root = shareToggle.closest('[data-profile-share-root]');
+      const menu = root?.querySelector?.('[data-profile-share-menu]');
+      const open = menu?.classList.contains('hidden');
+      menu?.classList.toggle('hidden', !open);
+      shareToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
+    const shareImageButton = event.target.closest('[data-profile-share-image]');
+    if (shareImageButton && els.qrModal.contains(shareImageButton)) {
+      event.preventDefault();
+      shareProfileQrImage(state.contactShareTargetProfile || state.user || {}).catch((error) => alert(error.message || 'No se pudo compartir la imagen QR.'));
+      return;
+    }
+    const shareCopyButton = event.target.closest('[data-profile-share-copy]');
+    if (shareCopyButton && els.qrModal.contains(shareCopyButton)) {
+      event.preventDefault();
+      copyProfileShareLink(shareCopyButton.dataset.profileShareCopy || '').catch((error) => alert(error.message || 'No se pudo copiar el enlace del perfil.'));
+      return;
+    }
+    const shareContactButton = event.target.closest('[data-profile-share-contact]');
+    if (shareContactButton && els.qrModal.contains(shareContactButton)) {
+      event.preventDefault();
+      openContactShareModal(state.contactShareTargetProfile || state.user || {});
       return;
     }
     const copyProfileButton = event.target.closest('[data-copy-profile-link]');
