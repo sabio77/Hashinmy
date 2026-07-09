@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0aa884" />
+  <meta name="theme-color" content="#0b141a" />
+  <meta name="color-scheme" content="light dark" />
   <meta name="description" content="chatER, mensajería privada por correo para Hashinmy." />
   <title>chatER | Hashinmy</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg" />
   <link rel="apple-touch-icon" sizes="192x192" href="./assets/icon-192.svg" />
+  <script src="./theme-bootstrap.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -128,34 +130,51 @@
         <button class="ce-scroll-bottom hidden" id="btnScrollBottom" type="button" aria-label="Ir al final de la conversación">
           <span>Ir al final</span>
         </button>
-        <div class="ce-typing" id="typingStatus"></div>
-        <div class="ce-reply-draft hidden" id="replyDraft" aria-live="polite"></div>
         <form class="ce-compose" id="messageForm">
-          <div class="ce-draft-status hidden" id="draftStatus" aria-live="polite"></div>
-          <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
-          <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
-          <div class="ce-emoji-panel hidden" id="emojiPickerPanel" aria-live="polite"></div>
-          <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite"></div>
-          <input id="fileInput" class="ce-file-input" type="file" hidden />
-          <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled>📎</button>
-          <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled>⚡</button>
-          <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled>✨</button>
-          <button class="ce-icon-btn ce-icon-btn--emoji" id="btnEmojiPicker" type="button" title="Insertar emoji" aria-label="Insertar emoji" aria-expanded="false" disabled>😊</button>
-          <button class="ce-icon-btn ce-icon-btn--schedule" id="btnScheduleMessage" type="button" title="Programar mensaje" aria-label="Programar mensaje" disabled>⏱</button>
-          <button class="ce-icon-btn ce-icon-btn--poll" id="btnCreatePoll" type="button" title="Crear encuesta" aria-label="Crear encuesta" disabled>📊</button>
-          <button class="ce-icon-btn ce-icon-btn--voice" id="btnVoiceDictation" type="button" title="Dictar mensaje por voz" aria-label="Dictar mensaje por voz" aria-pressed="false" disabled>🎙️</button>
-          <button class="ce-icon-btn ce-icon-btn--silent" id="btnSilentSend" type="button" title="Enviar sin notificación" aria-label="Enviar sin notificación" disabled>🔕</button>
-          <label class="ce-ttl-control" title="Mensajes temporales">
-            <span>Expira</span>
-            <select id="messageTtlSelect" aria-label="Expiración del mensaje" disabled>
-              <option value="0">No expira</option>
-              <option value="3600">1 hora</option>
-              <option value="86400">24 horas</option>
-              <option value="604800">7 días</option>
-            </select>
-          </label>
-          <input id="messageInput" type="text" autocomplete="off" placeholder="Escribe un mensaje, /ayuda o 😊" disabled />
-          <button class="ce-btn ce-btn--primary" type="submit" id="btnSend" disabled>Enviar</button>
+          <div class="ce-compose__top" aria-label="Opciones del mensaje">
+            <div class="ce-compose__status-stack">
+              <div class="ce-typing" id="typingStatus"></div>
+              <div class="ce-reply-draft hidden" id="replyDraft" aria-live="polite"></div>
+              <div class="ce-draft-status hidden" id="draftStatus" aria-live="polite"></div>
+              <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
+              <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
+              <div class="ce-emoji-panel hidden" id="emojiPickerPanel" aria-live="polite"></div>
+              <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite"></div>
+            </div>
+            <div class="ce-compose__toolstrip">
+              <input id="fileInput" class="ce-file-input" type="file" hidden />
+              <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled>📎</button>
+              <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled>⚡</button>
+              <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled>✨</button>
+              <button class="ce-icon-btn ce-icon-btn--emoji" id="btnEmojiPicker" type="button" title="Insertar emoji" aria-label="Insertar emoji" aria-expanded="false" disabled>😊</button>
+              <button class="ce-icon-btn ce-icon-btn--schedule" id="btnScheduleMessage" type="button" title="Programar mensaje" aria-label="Programar mensaje" disabled>⏱</button>
+              <button class="ce-icon-btn ce-icon-btn--poll" id="btnCreatePoll" type="button" title="Crear encuesta" aria-label="Crear encuesta" disabled>📊</button>
+              <button class="ce-icon-btn ce-icon-btn--voice" id="btnVoiceDictation" type="button" title="Dictar mensaje por voz" aria-label="Dictar mensaje por voz" aria-pressed="false" disabled>🎙️</button>
+            </div>
+          </div>
+          <div class="ce-compose__bottom" aria-label="Escribir y enviar">
+            <div class="ce-input-shell">
+              <button class="ce-input-prefix" id="btnSendModePrefix" type="button" title="Opciones de envío" aria-label="Opciones de envío" aria-expanded="false" disabled>✓</button>
+              <div class="ce-send-mode-menu hidden" id="sendModeMenu" role="menu" aria-label="Opciones de envío">
+                <button type="button" data-send-mode="direct" role="menuitem"><span aria-hidden="true">✓</span><strong>Directo</strong></button>
+                <button type="button" data-send-mode="schedule" role="menuitem"><span aria-hidden="true">⏱</span><strong>Programar mensaje</strong></button>
+                <button type="button" data-send-mode="silent" role="menuitem"><span aria-hidden="true">🔕</span><strong>Enviar sin notificación</strong></button>
+              </div>
+              <input id="messageInput" type="text" autocomplete="off" placeholder="Escribe un mensaje, /ayuda o 😊" disabled />
+              <label class="ce-ttl-control" title="Mensajes temporales después de lectura">
+                <span>Expira</span>
+                <select id="messageTtlSelect" aria-label="Expiración del mensaje después de lectura" disabled>
+                  <option value="0">No expira</option>
+                  <option value="180">3 min</option>
+                  <option value="3600">1 hora</option>
+                  <option value="86400">24 horas</option>
+                  <option value="604800">7 días</option>
+                </select>
+              </label>
+              <button class="ce-input-suffix" id="btnCycleTtl" type="button" title="Tiempo de expiración después de lectura" aria-label="Tiempo de expiración después de lectura" disabled>⏳</button>
+            </div>
+            <button class="ce-btn ce-btn--primary ce-send-circle" type="submit" id="btnSend" aria-label="Grabar audio" disabled>🎙️</button>
+          </div>
         </form>
       </section>
     </section>

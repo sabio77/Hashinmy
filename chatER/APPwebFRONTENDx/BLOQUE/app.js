@@ -23,7 +23,7 @@ const emojiPickerCategories = [
   { id: 'trabajo', title: 'Trabajo', icon: '💼', emojis: ['💼','📌','📎','📝','📅','⏰','✅','☑️','❌','⚠️','🚨','📣','💡','🔎','🔒','🔗','📊','📈','📦','🚀'] },
   { id: 'objetos', title: 'Objetos', icon: '⭐', emojis: ['⭐','🔥','❤️','💚','💙','💜','✨','🎉','🏆','🎯','🎁','📍','📞','📧','💬','🔔','🔕','🌟'] }
 ];
-const ephemeralOptions = [0, 3600, 24 * 3600, 7 * 24 * 3600];
+const ephemeralOptions = [0, 180, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
 
 function hasInstallDismissedPersisted() {
@@ -168,7 +168,14 @@ const state = {
   scrollNewMessages: 0,
   notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' },
   pendingAttachment: null,
-  attachmentUploading: false
+  attachmentUploading: false,
+  sendModeMenuOpen: false,
+  audioRecorder: null,
+  audioStream: null,
+  audioChunks: [],
+  audioRecording: false,
+  audioSending: false,
+  audioStartedAt: 0
 };
 
 const $ = (id) => document.getElementById(id);
@@ -179,7 +186,7 @@ const els = {
   addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
-  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'),
+  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
   scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnCloseSchedule: $('btnCloseSchedule'), btnConfirmSchedule: $('btnConfirmSchedule'),
@@ -220,12 +227,66 @@ function escapeHtml(value = '') {
 
 const R2_IMAGE_MAX_BYTES = 200 * 1024;
 const R2_GENERIC_FILE_MAX_BYTES = 15 * 1024 * 1024;
+const MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 
 function formatFileSize(bytes = 0) {
   const value = Math.max(0, Number(bytes || 0));
   if (value < 1024) return `${Math.round(value)} B`;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function getAttachmentRuntimeConfig() {
+  return state.config?.attachments || {};
+}
+
+function getInlineMediaFallbackConfig() {
+  const attachments = getAttachmentRuntimeConfig();
+  const fallback = attachments.mediaFallback || attachments.configuration?.mediaFallback || {};
+  const hasAttachmentConfig = Boolean(state.config && state.config.attachments && typeof state.config.attachments === 'object');
+  const explicitDisabled = fallback.available === false || fallback.enabled === false || attachments.mediaFallbackAvailable === false;
+  return {
+    available: fallback.available === true || fallback.enabled === true || (!hasAttachmentConfig && !explicitDisabled),
+    optimistic: !hasAttachmentConfig,
+    provider: String(fallback.provider || 'MEDIAfirmadaX-inline'),
+    maxBytes: Math.max(0, Number(fallback.maxBytes || attachments.policy?.fallbackInlineMaxBytes || MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES) || MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES)
+  };
+}
+
+function buildR2MissingConfigurationMessage() {
+  const attachments = getAttachmentRuntimeConfig();
+  const missing = Array.isArray(attachments.configuration?.missingRequired)
+    ? attachments.configuration.missingRequired
+    : [];
+  const missingLabels = missing
+    .map((group) => {
+      const aliases = Array.isArray(group.acceptedVariables) ? group.acceptedVariables.slice(0, 4).join(' / ') : '';
+      return `${group.label || group.key || 'configuración R2'}${aliases ? ` (${aliases})` : ''}`;
+    })
+    .filter(Boolean)
+    .join('; ');
+  return `Cloudflare R2 no está configurado para adjuntos de chatER. Faltan variables en el backend: ${missingLabels || 'endpoint/accountId, Access Key ID, Secret Access Key y bucket'}. En chatER_viejo las fotos podían funcionar por memoriaBACKEND/ImagenesCloudflareR2x y respaldo MEDIAfirmadaX; este backend actual firma con R2 cuando existen esas credenciales y usa respaldo MEDIAfirmadaX-inline solo para adjuntos pequeños cuando R2 falta.`;
+}
+
+function resolveAttachmentUploadModeBeforeUpload() {
+  const attachments = getAttachmentRuntimeConfig();
+  if (attachments.r2Configured === true) return 'r2';
+  const fallback = getInlineMediaFallbackConfig();
+  if (fallback.available && !fallback.optimistic) return 'media-firmada-inline';
+  if (fallback.available && fallback.optimistic) return 'r2-then-media-firmada-inline';
+  throw new Error(buildR2MissingConfigurationMessage());
+}
+
+function isR2NotConfiguredUploadError(error = {}) {
+  const code = String(error?.data?.code || error?.code || '').toUpperCase();
+  const message = String(error?.message || error?.data?.message || '').toLowerCase();
+  return code === 'R2_NOT_CONFIGURED'
+    || (message.includes('cloudflare r2') && (message.includes('no está configurado') || message.includes('not configured') || message.includes('sin configurar')));
+}
+
+function canUseInlineFallbackForPrepared(prepared = {}) {
+  const fallback = getInlineMediaFallbackConfig();
+  return Boolean(fallback.available && prepared?.file && Number(prepared.sizeBytes || 0) > 0 && Number(prepared.sizeBytes || 0) <= Number(fallback.maxBytes || 0));
 }
 
 function normalizeAttachmentClient(attachment = null) {
@@ -269,7 +330,7 @@ function updateAttachmentPreview() {
   const attachment = normalizeAttachmentClient(state.pendingAttachment);
   els.attachmentPreview.classList.toggle('hidden', !attachment && !state.attachmentUploading);
   if (state.attachmentUploading) {
-    els.attachmentPreview.innerHTML = '<span class="ce-attachment-preview__spinner" aria-hidden="true"></span><strong>Preparando adjunto...</strong><em>Comprimiendo si es imagen y subiendo directo a Cloudflare R2.</em>';
+    els.attachmentPreview.innerHTML = '<span class="ce-attachment-preview__spinner" aria-hidden="true"></span><strong>Preparando adjunto...</strong><em>Comprimiendo si es imagen y preparando subida segura.</em>';
     return;
   }
   if (!attachment) {
@@ -279,7 +340,7 @@ function updateAttachmentPreview() {
   const preview = attachment.kind === 'image'
     ? `<img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" />`
     : '<span class="ce-attachment-preview__file" aria-hidden="true">📎</span>';
-  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo en Cloudflare R2')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">×</button>`;
+  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo listo')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">×</button>`;
 }
 
 function clearPendingAttachment() {
@@ -290,13 +351,112 @@ function clearPendingAttachment() {
   updateComposerControls();
 }
 
+function isAudioRecordingSupported() {
+  return Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
+}
+
+function preferredAudioMimeType() {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  return candidates.find((mime) => {
+    try { return window.MediaRecorder?.isTypeSupported?.(mime); } catch { return false; }
+  }) || '';
+}
+
+function stopAudioStream() {
+  if (state.audioStream) {
+    for (const track of state.audioStream.getTracks?.() || []) {
+      try { track.stop(); } catch {}
+    }
+  }
+  state.audioStream = null;
+}
+
+function resetAudioRecorderState({ keepRecording = false } = {}) {
+  if (!keepRecording) state.audioRecording = false;
+  state.audioRecorder = null;
+  state.audioChunks = [];
+  state.audioStartedAt = 0;
+  stopAudioStream();
+  updateComposerControls();
+}
+
+async function finalizeAudioRecording() {
+  const chunks = Array.isArray(state.audioChunks) ? state.audioChunks.slice() : [];
+  const mimeType = state.audioRecorder?.mimeType || preferredAudioMimeType() || 'audio/webm';
+  resetAudioRecorderState();
+  if (!chunks.length) throw new Error('No se capturó audio. Intenta grabar de nuevo.');
+  const blob = new Blob(chunks, { type: mimeType });
+  if (!blob.size) throw new Error('La grabación quedó vacía. Intenta grabar de nuevo.');
+  const extension = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
+  const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: mimeType });
+  state.audioSending = true;
+  updateComposerControls();
+  try {
+    showTemporaryDraftStatus('Preparando audio para enviar...', 1800);
+    await uploadAttachmentForActiveChat(file);
+    await sendMessage('', { attachment: state.pendingAttachment, ephemeralSeconds: selectedEphemeralSeconds() });
+    clearPendingAttachment();
+    showTemporaryDraftStatus('Audio enviado.');
+  } finally {
+    state.audioSending = false;
+    updateComposerControls();
+  }
+}
+
+async function startAudioRecording() {
+  if (!state.activeChatId) throw new Error('Selecciona un chat antes de grabar audio.');
+  if (isChatInteractionBlocked()) throw new Error(chatBlockNoticeText() || 'No puedes enviar audio en este chat.');
+  if (state.editingMessage?.messageId) throw new Error('Termina la edición antes de grabar audio.');
+  if (!isAudioRecordingSupported()) throw new Error('La grabación de audio no está disponible en este navegador.');
+  if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mimeType = preferredAudioMimeType();
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  state.audioStream = stream;
+  state.audioRecorder = recorder;
+  state.audioChunks = [];
+  state.audioStartedAt = Date.now();
+  state.audioRecording = true;
+  recorder.addEventListener('dataavailable', (event) => {
+    if (event.data?.size) state.audioChunks.push(event.data);
+  });
+  recorder.addEventListener('stop', () => {
+    finalizeAudioRecording().catch((error) => {
+      state.audioSending = false;
+      resetAudioRecorderState();
+      alert(error.message || 'No se pudo enviar el audio grabado.');
+    });
+  }, { once: true });
+  recorder.addEventListener('error', () => {
+    state.audioSending = false;
+    resetAudioRecorderState();
+    alert('No se pudo completar la grabación de audio.');
+  }, { once: true });
+  recorder.start();
+  showTemporaryDraftStatus('Grabando audio. Pulsa el botón cuadrado para enviar.', 2800);
+  updateComposerControls();
+}
+
+function stopAudioRecording() {
+  if (!state.audioRecorder || !state.audioRecording) return;
+  state.audioSending = true;
+  updateComposerControls();
+  try {
+    if (state.audioRecorder.state === 'recording') state.audioRecorder.stop();
+  } catch (error) {
+    state.audioSending = false;
+    resetAudioRecorderState();
+    throw error;
+  }
+}
+
 function isImageAttachmentFile(file = null) {
   const mime = String(file?.type || '').toLowerCase();
   const name = String(file?.name || '').toLowerCase();
   return Boolean(file && mime.startsWith('image/') && mime !== 'image/gif' && mime !== 'image/svg+xml' && !name.endsWith('.svg'));
 }
 
-async function prepareFileForR2(file, onProgress = () => {}) {
+async function prepareFileForR2(file, onProgress = () => {}, options = {}) {
   if (!file) throw new Error('Selecciona un archivo para adjuntar.');
   if (isImageAttachmentFile(file)) {
     const compressor = window.ChatERImageWebpCompressorLego;
@@ -328,8 +488,9 @@ async function prepareFileForR2(file, onProgress = () => {}) {
       originalMimeType: file.type || ''
     };
   }
-  if (file.size > R2_GENERIC_FILE_MAX_BYTES) {
-    throw new Error(`El archivo supera ${formatFileSize(R2_GENERIC_FILE_MAX_BYTES)}.`);
+  const genericMaxBytes = Math.min(R2_GENERIC_FILE_MAX_BYTES, Math.max(1, Number(options.fileMaxBytes || R2_GENERIC_FILE_MAX_BYTES) || R2_GENERIC_FILE_MAX_BYTES));
+  if (file.size > genericMaxBytes) {
+    throw new Error(`El archivo supera ${formatFileSize(genericMaxBytes)}.`);
   }
   return {
     file,
@@ -345,33 +506,96 @@ async function prepareFileForR2(file, onProgress = () => {}) {
   };
 }
 
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer el adjunto para el respaldo MEDIAfirmadaX.'));
+    reader.onload = () => {
+      const raw = String(reader.result || '');
+      const commaIndex = raw.indexOf(',');
+      resolve(commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function createInlineMediaFallbackAttachment(prepared = {}) {
+  const fallback = getInlineMediaFallbackConfig();
+  if (!fallback.available) throw new Error(buildR2MissingConfigurationMessage());
+  if (prepared.sizeBytes > fallback.maxBytes) {
+    throw new Error(`Cloudflare R2 no está configurado y el respaldo ${fallback.provider} solo permite adjuntos de hasta ${formatFileSize(fallback.maxBytes)}.`);
+  }
+  const dataBase64 = await readFileAsBase64(prepared.file);
+  return post('/api/chats/attachments/media-firmada-inline', {
+    chatId: state.activeChatId,
+    kind: prepared.kind,
+    fileName: prepared.fileName,
+    mimeType: prepared.mimeType,
+    sizeBytes: prepared.sizeBytes,
+    width: prepared.width,
+    height: prepared.height,
+    sha256: prepared.sha256,
+    originalFileName: prepared.originalFileName,
+    originalMimeType: prepared.originalMimeType,
+    dataBase64
+  });
+}
+
+async function createR2AttachmentForPreparedFile(prepared = {}) {
+  const intent = await post('/api/chats/attachments/intent', {
+    chatId: state.activeChatId,
+    kind: prepared.kind,
+    fileName: prepared.fileName,
+    mimeType: prepared.mimeType,
+    sizeBytes: prepared.sizeBytes,
+    width: prepared.width,
+    height: prepared.height,
+    sha256: prepared.sha256,
+    originalFileName: prepared.originalFileName,
+    originalMimeType: prepared.originalMimeType
+  });
+  const upload = intent.upload || {};
+  await uploadToSignedUrl(upload.url, prepared.file, upload.headers || { 'Content-Type': prepared.mimeType });
+  const confirmed = await post('/api/chats/attachments/confirm', { attachmentId: intent.attachment?.attachmentId || '' });
+  return confirmed.attachment || intent.attachment;
+}
+
+async function useInlineFallbackForPreparedAttachment(prepared = {}, statusReason = 'R2 no está configurado') {
+  const fallback = getInlineMediaFallbackConfig();
+  if (!canUseInlineFallbackForPrepared(prepared)) {
+    throw new Error(`${statusReason}; el respaldo ${fallback.provider} solo permite adjuntos de hasta ${formatFileSize(fallback.maxBytes)}. Configura Cloudflare R2 para enviar archivos más grandes.`);
+  }
+  showTemporaryDraftStatus(`${statusReason}; usando respaldo seguro ${fallback.provider}...`, 1800);
+  const created = await createInlineMediaFallbackAttachment(prepared);
+  state.pendingAttachment = normalizeAttachmentClient(created.attachment);
+  showTemporaryDraftStatus(`Adjunto listo para enviar con respaldo ${fallback.provider}.`, 2400);
+}
+
 async function uploadAttachmentForActiveChat(file) {
   if (!state.activeChatId) throw new Error('Selecciona un chat antes de adjuntar archivos.');
   if (isChatInteractionBlocked()) throw new Error(chatBlockNoticeText() || 'No puedes adjuntar archivos en este chat.');
+  const uploadMode = resolveAttachmentUploadModeBeforeUpload();
   state.attachmentUploading = true;
   state.pendingAttachment = null;
   updateAttachmentPreview();
   updateComposerControls();
   try {
-    const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400));
-    showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
-    const intent = await post('/api/chats/attachments/intent', {
-      chatId: state.activeChatId,
-      kind: prepared.kind,
-      fileName: prepared.fileName,
-      mimeType: prepared.mimeType,
-      sizeBytes: prepared.sizeBytes,
-      width: prepared.width,
-      height: prepared.height,
-      sha256: prepared.sha256,
-      originalFileName: prepared.originalFileName,
-      originalMimeType: prepared.originalMimeType
+    const fallback = getInlineMediaFallbackConfig();
+    const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400), {
+      fileMaxBytes: uploadMode === 'media-firmada-inline' && fallback.maxBytes ? fallback.maxBytes : R2_GENERIC_FILE_MAX_BYTES
     });
-    const upload = intent.upload || {};
-    await uploadToSignedUrl(upload.url, prepared.file, upload.headers || { 'Content-Type': prepared.mimeType });
-    const confirmed = await post('/api/chats/attachments/confirm', { attachmentId: intent.attachment?.attachmentId || '' });
-    state.pendingAttachment = normalizeAttachmentClient(confirmed.attachment || intent.attachment);
-    showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
+    if (uploadMode === 'media-firmada-inline') {
+      await useInlineFallbackForPreparedAttachment(prepared, 'R2 no está configurado');
+      return;
+    }
+    try {
+      showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
+      state.pendingAttachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared));
+      showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
+    } catch (error) {
+      if (!isR2NotConfiguredUploadError(error)) throw error;
+      await useInlineFallbackForPreparedAttachment(prepared, 'Cloudflare R2 no está configurado en este backend');
+    }
   } finally {
     state.attachmentUploading = false;
     updateAttachmentPreview();
@@ -532,6 +756,7 @@ function selectedEphemeralSeconds() {
 
 function formatEphemeralOption(seconds = 0) {
   const value = normalizeEphemeralSeconds(seconds);
+  if (value === 180) return '3 min';
   if (value === 3600) return '1 hora';
   if (value === 24 * 3600) return '24 horas';
   if (value === 7 * 24 * 3600) return '7 días';
@@ -543,7 +768,7 @@ function formatEphemeralMessageLabel(message = {}) {
   const expireAt = message.expireAt || message.expiresAt || '';
   if (!seconds && !expireAt) return '';
   const when = expireAt ? formatScheduleDateTime(expireAt) : formatEphemeralOption(seconds);
-  return `⏳ Temporal · expira ${when}`;
+  return expireAt ? `⏳ Temporal · expira ${when}` : `⏳ Temporal · expira ${when} después de lectura`;
 }
 
 function formatPrivateNoteDateTime(value = '') {
@@ -2310,48 +2535,110 @@ async function handleSlashCommandSubmit(text = '') {
   return { handled: true, clearComposer: result?.clearComposer !== false };
 }
 
+function renderSendActionIcon(kind = 'mic') {
+  if (kind === 'save') return '✓';
+  if (kind === 'send') return '➤';
+  if (kind === 'stop') return '■';
+  if (kind === 'loading') return '…';
+  if (kind === 'waitingText') return '…';
+  return '🎙️';
+}
+
+function updateSendModeMenu() {
+  if (!els.sendModeMenu || !els.btnSendModePrefix) return;
+  const shouldOpen = Boolean(state.sendModeMenuOpen && !els.btnSendModePrefix.disabled);
+  els.sendModeMenu.classList.toggle('hidden', !shouldOpen);
+  els.btnSendModePrefix.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+}
+
+function closeSendModeMenu() {
+  state.sendModeMenuOpen = false;
+  updateSendModeMenu();
+}
+
 function updateComposerControls() {
   if (!els.messageInput || !els.btnSend) return;
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
   els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje, /ayuda o 😊');
   const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
-  const hasText = Boolean(String(els.messageInput?.value || '').trim());
-  els.btnSend.textContent = state.editingMessage?.messageId ? 'Guardar' : 'Enviar';
-  els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || (!state.editingMessage?.messageId && !hasText && !hasAttachment);
-  if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading;
-  if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked;
+  const textLength = String(els.messageInput?.value || '').trim().length;
+  const hasAnyText = textLength > 0;
+  const hasSendableText = textLength > 1;
+  const hasPendingOneCharText = hasAnyText && !hasSendableText && !hasAttachment;
+  const hasText = hasSendableText;
+  const canRecordAudio = hasChat && !blocked && !state.editingMessage?.messageId && !state.attachmentUploading && !state.audioSending && !hasAnyText && !hasAttachment;
+  const sendIcon = state.audioSending
+    ? 'loading'
+    : (state.audioRecording
+      ? 'stop'
+      : (state.editingMessage?.messageId
+        ? 'save'
+        : ((hasSendableText || hasAttachment) ? 'send' : (hasPendingOneCharText ? 'waitingText' : 'mic'))));
+  const sendActionLabel = state.audioRecording
+    ? 'Detener y enviar audio'
+    : (sendIcon === 'mic'
+      ? 'Grabar audio'
+      : (sendIcon === 'waitingText'
+        ? 'Escribe al menos 2 caracteres para enviar'
+        : (state.editingMessage?.messageId ? 'Guardar edición' : 'Enviar mensaje')));
+  els.btnSend.textContent = renderSendActionIcon(sendIcon);
+  els.btnSend.classList.toggle('ce-send-circle--mic', sendIcon === 'mic');
+  els.btnSend.classList.toggle('ce-send-circle--send', sendIcon === 'send');
+  els.btnSend.classList.toggle('ce-send-circle--recording', sendIcon === 'stop');
+  els.btnSend.classList.toggle('ce-send-circle--busy', sendIcon === 'loading');
+  els.btnSend.classList.toggle('ce-send-circle--waiting-text', sendIcon === 'waitingText');
+  els.btnSend.setAttribute('title', sendActionLabel);
+  els.btnSend.setAttribute('aria-label', sendActionLabel);
+  els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || state.audioSending || (!state.editingMessage?.messageId && !hasText && !hasAttachment && !canRecordAudio && !state.audioRecording);
+  if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading || state.audioRecording || state.audioSending;
+  if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked || state.audioRecording || state.audioSending;
+  if (els.emojiPickerPanel && state.audioRecording) {
+    state.emojiPickerOpen = false;
+  }
   if (els.btnEmojiPicker) {
-    const emojiDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
+    const emojiDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
     els.btnEmojiPicker.disabled = emojiDisabled;
     els.btnEmojiPicker.setAttribute('title', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
     els.btnEmojiPicker.setAttribute('aria-label', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
   }
   if (els.btnSmartReplySuggestions) {
     const smartReplyCount = buildSmartReplySuggestions().length;
-    els.btnSmartReplySuggestions.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || !smartReplyCount;
+    els.btnSmartReplySuggestions.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || !smartReplyCount || state.audioRecording || state.audioSending;
     const label = smartReplyCount ? `Sugerir ${smartReplyCount} respuestas inteligentes locales` : 'Sugerencias inteligentes no disponibles todavía';
     els.btnSmartReplySuggestions.setAttribute('title', label);
     els.btnSmartReplySuggestions.setAttribute('aria-label', label);
   }
   if (els.btnScheduleMessage) {
-    els.btnScheduleMessage.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId) || state.schedulingMessage;
+    els.btnScheduleMessage.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId) || state.schedulingMessage || state.audioRecording || state.audioSending;
   }
   if (els.btnCreatePoll) {
-    els.btnCreatePoll.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.pollCreating;
+    els.btnCreatePoll.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.pollCreating || state.audioRecording || state.audioSending;
   }
   renderVoiceDictationControl();
   if (els.btnSilentSend) {
-    els.btnSilentSend.disabled = !hasChat || blocked || (!hasText && !hasAttachment) || Boolean(state.editingMessage?.messageId) || state.attachmentUploading;
+    els.btnSilentSend.disabled = !hasChat || blocked || (!hasText && !hasAttachment) || Boolean(state.editingMessage?.messageId) || state.attachmentUploading || state.audioRecording || state.audioSending;
+  }
+  if (els.btnSendModePrefix) {
+    els.btnSendModePrefix.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
   }
   if (els.messageTtlSelect) {
-    els.messageTtlSelect.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
-    els.messageTtlSelect.setAttribute('aria-label', `Expiración del mensaje: ${formatEphemeralOption(selectedEphemeralSeconds())}`);
+    els.messageTtlSelect.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
+    els.messageTtlSelect.setAttribute('aria-label', `Expiración del mensaje después de lectura: ${formatEphemeralOption(selectedEphemeralSeconds())}`);
   }
+  if (els.btnCycleTtl) {
+    const ttl = selectedEphemeralSeconds();
+    els.btnCycleTtl.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
+    els.btnCycleTtl.textContent = ttl ? `⏳ ${formatEphemeralOption(ttl)}` : '⏳';
+    els.btnCycleTtl.setAttribute('title', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
+    els.btnCycleTtl.setAttribute('aria-label', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
+  }
+  updateSendModeMenu();
   if (!hasChat) {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
     state.emojiPickerOpen = false;
+    state.sendModeMenuOpen = false;
     renderQuickRepliesPanel();
   }
   renderEmojiPickerPanel();
@@ -2490,7 +2777,7 @@ function renderVoiceDictationControl() {
   if (!els.btnVoiceDictation) return;
   const supported = isVoiceDictationSupported();
   const blocked = isChatInteractionBlocked();
-  const disabled = !supported || !state.activeChatId || Boolean(state.editingMessage?.messageId) || blocked;
+  const disabled = !supported || !state.activeChatId || Boolean(state.editingMessage?.messageId) || blocked || state.audioRecording || state.audioSending;
   const label = blocked ? 'Dictado por voz no disponible con contacto bloqueado' : voiceDictationLabel();
   els.btnVoiceDictation.disabled = disabled;
   els.btnVoiceDictation.classList.toggle('active', Boolean(state.voiceDictating));
@@ -4003,6 +4290,23 @@ function syncReadReceiptsFromReadEvent(payload = {}, data = {}) {
   return changed;
 }
 
+function syncExpiringMessagesFromReadEvent(data = {}) {
+  const currentUserId = state.user?.userId || '';
+  const scopedMessages = currentUserId && Array.isArray(data.expiringMessagesByUserId?.[currentUserId])
+    ? data.expiringMessagesByUserId[currentUserId]
+    : null;
+  const messages = scopedMessages || (Array.isArray(data.expiringMessages) ? data.expiringMessages : []);
+  let changed = false;
+  for (const message of messages) {
+    if (!message?.messageId || !message?.chatId) continue;
+    upsertMessage(message);
+    syncStarredPanelMessage(message);
+    syncGlobalStarredMessage(message);
+    changed = true;
+  }
+  return changed;
+}
+
 function applyRealtimeSnapshot(data = {}) {
   const previousActiveChatId = state.activeChatId;
   if (data.user) state.user = data.user;
@@ -4129,6 +4433,10 @@ function handleRealtimeEvent(payload = {}) {
   }
   if (payload.eventType === 'chat.read') {
     shouldRender = syncReadReceiptsFromReadEvent(payload, data) || shouldRender;
+    shouldRender = syncExpiringMessagesFromReadEvent(data) || shouldRender;
+  }
+  if (payload.eventType === 'chat.unread.cleared') {
+    shouldRender = syncExpiringMessagesFromReadEvent(data) || shouldRender;
   }
   if (payload.eventType === 'chat.typing' && data.userId !== state.user?.userId && payload.chatId === state.activeChatId) {
     els.typingStatus.textContent = data.isTyping ? 'Escribiendo...' : '';
@@ -5038,7 +5346,7 @@ function renderScheduleModal() {
   if (!state.scheduleModalOpen) return;
   const text = String(els.messageInput?.value || '').trim();
   const selectedTtl = selectedEphemeralSeconds();
-  const ttlNotice = selectedTtl ? `<em>Temporal: expira ${escapeHtml(formatEphemeralOption(selectedTtl))} después de enviarse.</em>` : '';
+  const ttlNotice = selectedTtl ? `<em>Temporal: expira ${escapeHtml(formatEphemeralOption(selectedTtl))} después de que el contacto lo lea.</em>` : '';
   els.schedulePreview.innerHTML = text
     ? `<strong>Mensaje listo para programar</strong><span>${escapeHtml(compactText(text, 280))}</span>${ttlNotice}`
     : '<strong>Escribe un mensaje</strong><span>El texto del compositor aparecerá aquí antes de programarlo.</span>';
@@ -6267,7 +6575,7 @@ function cycleMessageTtl() {
   els.messageTtlSelect.value = String(next);
   updateComposerControls();
   renderScheduleModal();
-  showTemporaryDraftStatus(next ? `Mensajes temporales activados: expiran en ${formatEphemeralOption(next)}.` : 'Mensajes temporales desactivados.');
+  showTemporaryDraftStatus(next ? `Mensajes temporales activados: expiran en ${formatEphemeralOption(next)} después de lectura.` : 'Mensajes temporales desactivados.');
 }
 
 function getCommandPaletteCommands() {
@@ -7560,6 +7868,37 @@ function bindEvents() {
   els.btnSilentSend?.addEventListener('click', () => {
     sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
   });
+  els.btnSendModePrefix?.addEventListener('click', (event) => {
+    event.preventDefault();
+    state.sendModeMenuOpen = !state.sendModeMenuOpen;
+    updateSendModeMenu();
+  });
+  els.sendModeMenu?.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-send-mode]');
+    if (!option || !els.sendModeMenu.contains(option)) return;
+    event.preventDefault();
+    const mode = option.dataset.sendMode || 'direct';
+    closeSendModeMenu();
+    if (mode === 'schedule') {
+      openScheduleModal().catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
+      return;
+    }
+    if (mode === 'silent') {
+      sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
+      return;
+    }
+    showTemporaryDraftStatus('Envío directo activado.');
+    els.messageInput?.focus();
+  });
+  els.btnCycleTtl?.addEventListener('click', (event) => {
+    event.preventDefault();
+    cycleMessageTtl();
+  });
+  document.addEventListener('click', (event) => {
+    if (!state.sendModeMenuOpen) return;
+    if (els.sendModeMenu?.contains(event.target) || els.btnSendModePrefix?.contains(event.target)) return;
+    closeSendModeMenu();
+  });
   els.btnAttachFile?.addEventListener('click', () => {
     if (state.attachmentUploading) return;
     els.fileInput?.click();
@@ -7862,6 +8201,24 @@ function bindEvents() {
     const text = els.messageInput.value.trim();
     const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
+    if (!text && !hasAttachment && !state.editingMessage?.messageId) {
+      try {
+        if (state.audioRecording) stopAudioRecording();
+        else await startAudioRecording();
+      } catch (error) {
+        state.audioSending = false;
+        resetAudioRecorderState();
+        alert(error.message || 'No se pudo iniciar la grabación de audio.');
+      } finally {
+        updateComposerControls();
+      }
+      return;
+    }
+    if (!state.editingMessage?.messageId && text && text.length <= 1 && !hasAttachment) {
+      showTemporaryDraftStatus('Escribe al menos 2 caracteres para enviar texto o deja el input vacío para grabar audio.', 3600);
+      updateComposerControls();
+      return;
+    }
     if (!text && !hasAttachment) return;
     els.btnSend.disabled = true;
     try {

@@ -1,7 +1,8 @@
-const CACHE_NAME = 'chater-static-v73';
+const CACHE_NAME = 'chater-static-v79-compact-composer-send-threshold';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',
+  './theme-bootstrap.js',
   './app.js',
   './api.js',
   './firebase.auth.js',

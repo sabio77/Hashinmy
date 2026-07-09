@@ -379,20 +379,20 @@ svg {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-icon-btn--reminders {
+  :root:not([data-theme]) .ce-icon-btn--reminders{
     color: #fbbf24;
     background: rgba(245, 158, 11, 0.18);
   }
 
-  .ce-reminder-field input,
-  .ce-reminder-field textarea,
-  .ce-reminders-empty,
-  .ce-reminder {
+  :root:not([data-theme]) .ce-reminder-field input,
+  :root:not([data-theme]) .ce-reminder-field textarea,
+  :root:not([data-theme]) .ce-reminders-empty,
+  :root:not([data-theme]) .ce-reminder{
     background: rgba(255, 255, 255, 0.08);
     color: var(--ce-text);
   }
 
-  .ce-reminder.is-due {
+  :root:not([data-theme]) .ce-reminder.is-due{
     background: rgba(245, 158, 11, 0.13);
   }
 }
@@ -2557,7 +2557,7 @@ svg {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]){
     color-scheme: dark;
     --ce-bg: #07140f;
     --ce-bg-soft: #0d1f19;
@@ -2573,102 +2573,102 @@ svg {
     --ce-shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.26);
   }
 
-  body {
+  :root:not([data-theme]) body{
     background:
       radial-gradient(circle at 12% 10%, rgba(10, 168, 132, 0.19), transparent 28%),
       radial-gradient(circle at 88% 8%, rgba(19, 215, 168, 0.12), transparent 26%),
       linear-gradient(135deg, #05120e 0%, #0b1b16 56%, #09251d 100%);
   }
 
-  .ce-auth__card,
-  .ce-shell,
-  .ce-sidebar,
-  .ce-sidebar__header,
-  .ce-chat__header,
-  .ce-reply-draft,
-  .ce-compose,
-  .ce-emoji-panel,
-  .ce-quick-replies,
-  .ce-slash-panel,
-  .ce-modal__card {
+  :root:not([data-theme]) .ce-auth__card,
+  :root:not([data-theme]) .ce-shell,
+  :root:not([data-theme]) .ce-sidebar,
+  :root:not([data-theme]) .ce-sidebar__header,
+  :root:not([data-theme]) .ce-chat__header,
+  :root:not([data-theme]) .ce-reply-draft,
+  :root:not([data-theme]) .ce-compose,
+  :root:not([data-theme]) .ce-emoji-panel,
+  :root:not([data-theme]) .ce-quick-replies,
+  :root:not([data-theme]) .ce-slash-panel,
+  :root:not([data-theme]) .ce-modal__card{
     background-color: rgba(16, 35, 29, 0.9);
   }
 
-  .ce-chat-search-area,
-  .ce-search-panel {
+  :root:not([data-theme]) .ce-chat-search-area,
+  :root:not([data-theme]) .ce-search-panel{
     background: rgba(16, 35, 29, 0.72);
   }
 
-  .ce-tabs button.active,
-  .ce-msg.theirs,
-  .ce-search-result,
-  .ce-emoji-tab,
-  .ce-emoji-item,
-  .ce-quick-reply__insert,
-  .ce-quick-reply__delete,
-  .ce-slash-command,
-  .ce-add input,
-  .ce-compose input,
-  .ce-ttl-control,
-  .ce-ttl-control select,
-  .ce-chat-search input,
-  .ce-manual-code input,
-  .ce-schedule-field input,
-  .ce-poll-field input,
-  .ce-poll-options input {
+  :root:not([data-theme]) .ce-tabs button.active,
+  :root:not([data-theme]) .ce-msg.theirs,
+  :root:not([data-theme]) .ce-search-result,
+  :root:not([data-theme]) .ce-emoji-tab,
+  :root:not([data-theme]) .ce-emoji-item,
+  :root:not([data-theme]) .ce-quick-reply__insert,
+  :root:not([data-theme]) .ce-quick-reply__delete,
+  :root:not([data-theme]) .ce-slash-command,
+  :root:not([data-theme]) .ce-add input,
+  :root:not([data-theme]) .ce-compose input,
+  :root:not([data-theme]) .ce-ttl-control,
+  :root:not([data-theme]) .ce-ttl-control select,
+  :root:not([data-theme]) .ce-chat-search input,
+  :root:not([data-theme]) .ce-manual-code input,
+  :root:not([data-theme]) .ce-schedule-field input,
+  :root:not([data-theme]) .ce-poll-field input,
+  :root:not([data-theme]) .ce-poll-options input{
     background: rgba(255, 255, 255, 0.08);
     color: var(--ce-text);
   }
 
-  .ce-chat {
+  :root:not([data-theme]) .ce-chat{
     background:
       linear-gradient(rgba(7, 20, 15, 0.68), rgba(7, 20, 15, 0.74)),
       radial-gradient(circle at 18px 18px, rgba(217, 253, 211, 0.05) 2px, transparent 2px);
     background-size: auto, 36px 36px;
   }
 
-  .ce-msg__meta {
+  :root:not([data-theme]) .ce-msg__meta{
     color: rgba(236, 255, 248, 0.56);
   }
 
-  .ce-msg__receipt {
+  :root:not([data-theme]) .ce-msg__receipt{
     color: rgba(236, 255, 248, 0.46);
   }
 
-  .ce-msg__receipt.is-delivered {
+  :root:not([data-theme]) .ce-msg__receipt.is-delivered{
     color: var(--ce-accent);
   }
 
-  .ce-msg__receipt.is-read {
+  :root:not([data-theme]) .ce-msg__receipt.is-read{
     color: #60a5fa;
   }
 
-  .ce-unread-separator button,
-  .ce-reaction-picker,
-  .ce-reaction-chip,
-  .ce-reaction-btn,
-  .ce-pinned-strip,
-  .ce-pinned-strip__item button,
-  .ce-star-btn,
-  .ce-pin-msg-btn,
-  .ce-reply-btn,
-  .ce-forward-btn,
-  .ce-reminder-btn,
-  .ce-link-msg-btn,
-  .ce-copy-btn,
-  .ce-edit-btn,
-  .ce-delete-btn,
-  .ce-reply-preview,
-  .ce-reply-draft__content,
-  .ce-reply-draft__close,
-  .ce-forward-preview,
-  .ce-forward-target,
-  .ce-forward-empty,
-  .ce-schedule-preview,
-  .ce-scheduled-item,
-  .ce-scheduled-empty,
-  .ce-poll-preview,
-  .ce-poll-option {
+  :root:not([data-theme]) .ce-unread-separator button,
+  :root:not([data-theme]) .ce-reaction-picker,
+  :root:not([data-theme]) .ce-reaction-chip,
+  :root:not([data-theme]) .ce-reaction-btn,
+  :root:not([data-theme]) .ce-pinned-strip,
+  :root:not([data-theme]) .ce-pinned-strip__item button,
+  :root:not([data-theme]) .ce-star-btn,
+  :root:not([data-theme]) .ce-pin-msg-btn,
+  :root:not([data-theme]) .ce-reply-btn,
+  :root:not([data-theme]) .ce-forward-btn,
+  :root:not([data-theme]) .ce-reminder-btn,
+  :root:not([data-theme]) .ce-link-msg-btn,
+  :root:not([data-theme]) .ce-copy-btn,
+  :root:not([data-theme]) .ce-edit-btn,
+  :root:not([data-theme]) .ce-delete-btn,
+  :root:not([data-theme]) .ce-reply-preview,
+  :root:not([data-theme]) .ce-reply-draft__content,
+  :root:not([data-theme]) .ce-reply-draft__close,
+  :root:not([data-theme]) .ce-forward-preview,
+  :root:not([data-theme]) .ce-forward-target,
+  :root:not([data-theme]) .ce-forward-empty,
+  :root:not([data-theme]) .ce-schedule-preview,
+  :root:not([data-theme]) .ce-scheduled-item,
+  :root:not([data-theme]) .ce-scheduled-empty,
+  :root:not([data-theme]) .ce-poll-preview,
+  :root:not([data-theme]) .ce-poll-option{
     background: rgba(16, 35, 29, 0.92);
     color: var(--ce-text);
   }
@@ -3339,18 +3339,18 @@ svg {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-global-search-form input,
-  .ce-global-search-result {
+  :root:not([data-theme]) .ce-global-search-form input,
+  :root:not([data-theme]) .ce-global-search-result{
     background: rgba(255, 255, 255, 0.08);
     color: var(--ce-text);
   }
 
-  .ce-global-search-empty {
+  :root:not([data-theme]) .ce-global-search-empty{
     background: rgba(255, 255, 255, 0.055);
   }
 
-  .ce-global-search-result:hover,
-  .ce-global-search-result:focus {
+  :root:not([data-theme]) .ce-global-search-result:hover,
+  :root:not([data-theme]) .ce-global-search-result:focus{
     background: rgba(20, 79, 63, 0.52);
   }
 }
@@ -3491,14 +3491,14 @@ svg {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-icon-btn--private-notes {
+  :root:not([data-theme]) .ce-icon-btn--private-notes{
     color: #c4b5fd;
     background: rgba(124, 58, 237, 0.18);
   }
 
-  .ce-private-notes-editor textarea,
-  .ce-private-notes-empty,
-  .ce-private-note {
+  :root:not([data-theme]) .ce-private-notes-editor textarea,
+  :root:not([data-theme]) .ce-private-notes-empty,
+  :root:not([data-theme]) .ce-private-note{
     background: rgba(255, 255, 255, 0.08);
     color: var(--ce-text);
   }
@@ -3584,7 +3584,7 @@ svg {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-scroll-bottom {
+  :root:not([data-theme]) .ce-scroll-bottom{
     background: rgba(12, 150, 119, 0.96);
     box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36);
   }
@@ -4248,18 +4248,18 @@ body.ce-compact-mode .ce-link-library-item {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-link-library-search input,
-  .ce-link-library-item {
+  :root:not([data-theme]) .ce-link-library-search input,
+  :root:not([data-theme]) .ce-link-library-item{
     background: rgba(255, 255, 255, 0.08);
     color: var(--ce-text);
   }
 
-  .ce-link-library-empty {
+  :root:not([data-theme]) .ce-link-library-empty{
     background: rgba(255, 255, 255, 0.055);
   }
 
-  .ce-link-library-item:hover,
-  .ce-link-library-item:focus-within {
+  :root:not([data-theme]) .ce-link-library-item:hover,
+  :root:not([data-theme]) .ce-link-library-item:focus-within{
     background: rgba(20, 79, 63, 0.52);
   }
 }
@@ -4485,14 +4485,14 @@ body.ce-compact-mode .ce-chat-brief-item {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-chat-brief-stats span,
-  .ce-chat-brief-section,
-  .ce-chat-brief-item,
-  .ce-chat-brief-empty {
+  :root:not([data-theme]) .ce-chat-brief-stats span,
+  :root:not([data-theme]) .ce-chat-brief-section,
+  :root:not([data-theme]) .ce-chat-brief-item,
+  :root:not([data-theme]) .ce-chat-brief-empty{
     background: rgba(255, 255, 255, 0.075);
   }
 
-  .ce-chat-brief-warning {
+  :root:not([data-theme]) .ce-chat-brief-warning{
     background: rgba(251, 191, 36, 0.11);
   }
 }
@@ -4654,7 +4654,7 @@ body.ce-compact-mode .ce-block-notice {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-blocked-contact {
+  :root:not([data-theme]) .ce-blocked-contact{
     background: rgba(255, 255, 255, 0.075);
   }
 }
@@ -4723,8 +4723,8 @@ body.ce-compact-mode .ce-block-notice {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-contact-alias-btn,
-  .ce-contact-nickname-field input {
+  :root:not([data-theme]) .ce-contact-alias-btn,
+  :root:not([data-theme]) .ce-contact-nickname-field input{
     background: rgba(255, 255, 255, 0.075);
   }
 }
@@ -4831,7 +4831,7 @@ body.ce-compact-mode .ce-block-notice {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-draft-item {
+  :root:not([data-theme]) .ce-draft-item{
     background: rgba(255, 255, 255, 0.075);
   }
 }
@@ -4997,8 +4997,8 @@ body.ce-compact-mode .ce-block-notice {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-global-starred-empty,
-  .ce-global-starred-item {
+  :root:not([data-theme]) .ce-global-starred-empty,
+  :root:not([data-theme]) .ce-global-starred-item{
     background: rgba(255, 255, 255, 0.075);
   }
 }
@@ -5144,17 +5144,17 @@ body.ce-compact-mode .ce-lock__card {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ce-icon-btn--privacy-lock {
+  :root:not([data-theme]) .ce-icon-btn--privacy-lock{
     background: rgba(255, 255, 255, 0.09);
     color: #e2e8f0;
   }
 
-  .ce-lock__card {
+  :root:not([data-theme]) .ce-lock__card{
     background: rgba(15, 23, 42, 0.96);
     color: #f8fafc;
   }
 
-  .ce-lock__field input {
+  :root:not([data-theme]) .ce-lock__field input{
     background: rgba(255, 255, 255, 0.08);
     color: #f8fafc;
   }
@@ -7512,7 +7512,7 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]){
     color-scheme: dark;
     --ce-bg: #0b141a;
     --ce-bg-soft: #202c33;
@@ -7528,30 +7528,30 @@ body {
     --ce-shadow-soft: 0 8px 26px rgba(0, 0, 0, 0.24);
   }
 
-  body {
+  :root:not([data-theme]) body{
     background: linear-gradient(135deg, var(--ce-bg), var(--ce-bg-soft));
   }
 
-  .ce-chat {
+  :root:not([data-theme]) .ce-chat{
     background:
       linear-gradient(rgba(11, 20, 26, 0.88), rgba(11, 20, 26, 0.88)),
       radial-gradient(circle at 15px 15px, rgba(255, 255, 255, 0.045) 1.5px, transparent 2px);
     background-size: auto, 34px 34px;
   }
 
-  .ce-msg.theirs,
-  .ce-attachment-preview,
-  .ce-icon-btn,
-  .ce-ttl-control,
-  .ce-compose input,
-  .ce-chat-search input,
-  .ce-add input,
-  .ce-manual-code input {
+  :root:not([data-theme]) .ce-msg.theirs,
+  :root:not([data-theme]) .ce-attachment-preview,
+  :root:not([data-theme]) .ce-icon-btn,
+  :root:not([data-theme]) .ce-ttl-control,
+  :root:not([data-theme]) .ce-compose input,
+  :root:not([data-theme]) .ce-chat-search input,
+  :root:not([data-theme]) .ce-add input,
+  :root:not([data-theme]) .ce-manual-code input{
     background: var(--ce-panel-strong);
     color: var(--ce-text);
   }
 
-  .ce-attachment--file {
+  :root:not([data-theme]) .ce-attachment--file{
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.08);
   }
@@ -8109,4 +8109,624 @@ body.ce-dark-mode .ce-row:hover,
 body.ce-dark-mode .ce-row.active,
 body.ce-dark-mode .ce-row.is-active {
   background: #2a3942;
+}
+
+
+/* Iteración hora automática · prefers-color-scheme queda protegido para no sobreescribir el modo horario. */
+
+/* Refuerzo final de tema horario · garantiza que el modo oscuro automático use la piel de chatER_viejo aunque el sistema operativo esté en modo claro. */
+:root[data-theme='dark'] body {
+  background: linear-gradient(135deg, var(--ce-bg), var(--ce-bg-soft));
+}
+
+:root[data-theme='dark'] .ce-auth,
+:root[data-theme='dark'] .ce-auth__card,
+:root[data-theme='dark'] .ce-shell,
+:root[data-theme='dark'] .ce-sidebar,
+:root[data-theme='dark'] .ce-modal__card,
+:root[data-theme='dark'] .ce-command-palette__card,
+:root[data-theme='dark'] .ce-privacy-lock-card,
+:root[data-theme='dark'] .ce-reminder-card,
+:root[data-theme='dark'] .ce-private-notes-card,
+:root[data-theme='dark'] .ce-quick-replies-panel,
+:root[data-theme='dark'] .ce-slash-commands-panel,
+:root[data-theme='dark'] .ce-emoji-picker-panel,
+:root[data-theme='dark'] .ce-search-panel,
+:root[data-theme='dark'] .ce-pinned-strip,
+:root[data-theme='dark'] .ce-reply-preview,
+:root[data-theme='dark'] .ce-attachment-preview,
+:root[data-theme='dark'] .ce-attachment {
+  background: var(--ce-panel);
+  color: var(--ce-text);
+  border-color: var(--ce-line);
+}
+
+:root[data-theme='dark'] .ce-sidebar__header,
+:root[data-theme='dark'] .ce-chat__header,
+:root[data-theme='dark'] .ce-compose,
+:root[data-theme='dark'] .ce-add,
+:root[data-theme='dark'] .ce-tabs,
+:root[data-theme='dark'] .ce-label-filter,
+:root[data-theme='dark'] .ce-list,
+:root[data-theme='dark'] .ce-contact-tools,
+:root[data-theme='dark'] .ce-search-area,
+:root[data-theme='dark'] .ce-chat-search-area,
+:root[data-theme='dark'] .ce-install,
+:root[data-theme='dark'] .ce-unread-separator button {
+  background: var(--ce-bg-soft);
+  color: var(--ce-text);
+  border-color: var(--ce-line);
+}
+
+:root[data-theme='dark'] .ce-add input,
+:root[data-theme='dark'] .ce-search-area input,
+:root[data-theme='dark'] .ce-chat-search input,
+:root[data-theme='dark'] .ce-compose > #messageInput,
+:root[data-theme='dark'] .ce-compose input,
+:root[data-theme='dark'] .ce-modal input,
+:root[data-theme='dark'] .ce-modal textarea,
+:root[data-theme='dark'] .ce-modal select,
+:root[data-theme='dark'] .ce-ttl-control,
+:root[data-theme='dark'] .ce-ttl-control select,
+:root[data-theme='dark'] .ce-manual-code input,
+:root[data-theme='dark'] .ce-schedule-field input,
+:root[data-theme='dark'] .ce-poll-field input,
+:root[data-theme='dark'] .ce-poll-options input,
+:root[data-theme='dark'] .ce-reminder-field input,
+:root[data-theme='dark'] .ce-reminder-field textarea,
+:root[data-theme='dark'] .ce-private-notes-editor textarea,
+:root[data-theme='dark'] .ce-contact-nickname-field input,
+:root[data-theme='dark'] .ce-link-library-search input,
+:root[data-theme='dark'] .ce-date-jump-search input,
+:root[data-theme='dark'] .ce-global-search-form input,
+:root[data-theme='dark'] .ce-lock__field input {
+  background: var(--ce-bg-soft);
+  color: var(--ce-text);
+  border-color: var(--ce-line);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .ce-chat {
+  background: var(--ce-bg);
+}
+
+:root[data-theme='dark'] .ce-messages {
+  background-color: var(--ce-bg);
+  background-image:
+    radial-gradient(circle at 18px 18px, var(--ce-pattern) 0 2px, transparent 2px),
+    radial-gradient(circle at 58px 42px, var(--ce-pattern) 0 1.5px, transparent 1.5px);
+}
+
+:root[data-theme='dark'] .ce-msg.mine {
+  background: var(--ce-outgoing);
+  color: var(--ce-text);
+}
+
+:root[data-theme='dark'] .ce-msg.theirs {
+  background: var(--ce-incoming);
+  color: var(--ce-text);
+}
+
+:root[data-theme='dark'] .ce-chat-empty,
+:root[data-theme='dark'] .ce-empty,
+:root[data-theme='dark'] .ce-reminders-empty,
+:root[data-theme='dark'] .ce-reminder,
+:root[data-theme='dark'] .ce-private-notes-empty,
+:root[data-theme='dark'] .ce-private-note,
+:root[data-theme='dark'] .ce-link-library-item,
+:root[data-theme='dark'] .ce-link-library-empty,
+:root[data-theme='dark'] .ce-chat-brief-stats span,
+:root[data-theme='dark'] .ce-chat-brief-section,
+:root[data-theme='dark'] .ce-chat-brief-item,
+:root[data-theme='dark'] .ce-chat-brief-empty,
+:root[data-theme='dark'] .ce-blocked-contact,
+:root[data-theme='dark'] .ce-contact-alias-btn,
+:root[data-theme='dark'] .ce-draft-item,
+:root[data-theme='dark'] .ce-global-starred-empty,
+:root[data-theme='dark'] .ce-global-starred-item,
+:root[data-theme='dark'] .ce-global-search-result,
+:root[data-theme='dark'] .ce-date-jump-summary,
+:root[data-theme='dark'] .ce-date-jump-empty,
+:root[data-theme='dark'] .ce-date-jump-warning,
+:root[data-theme='dark'] .ce-date-jump-day,
+:root[data-theme='dark'] .ce-forward-target,
+:root[data-theme='dark'] .ce-forward-empty,
+:root[data-theme='dark'] .ce-schedule-preview,
+:root[data-theme='dark'] .ce-scheduled-item,
+:root[data-theme='dark'] .ce-scheduled-empty,
+:root[data-theme='dark'] .ce-poll-preview,
+:root[data-theme='dark'] .ce-poll-option,
+:root[data-theme='dark'] .ce-reaction-picker,
+:root[data-theme='dark'] .ce-reaction-chip,
+:root[data-theme='dark'] .ce-reaction-btn,
+:root[data-theme='dark'] .ce-reply-draft__content {
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--ce-text);
+  border-color: var(--ce-line);
+}
+
+:root[data-theme='dark'] .ce-row:hover,
+:root[data-theme='dark'] .ce-row.active,
+:root[data-theme='dark'] .ce-row.is-active,
+:root[data-theme='dark'] .ce-chat-row.active,
+:root[data-theme='dark'] .ce-chat-row.is-active,
+:root[data-theme='dark'] .ce-contact-row:hover,
+:root[data-theme='dark'] .ce-search-result:hover,
+:root[data-theme='dark'] .ce-command-item:hover,
+:root[data-theme='dark'] .ce-command-item.is-active,
+:root[data-theme='dark'] .ce-link-library-item:hover,
+:root[data-theme='dark'] .ce-link-library-item:focus-within,
+:root[data-theme='dark'] .ce-global-search-result:hover,
+:root[data-theme='dark'] .ce-global-search-result:focus {
+  background: #2a3942;
+}
+
+:root[data-theme='dark'] .ce-icon-btn,
+:root[data-theme='dark'] .ce-chat-action,
+:root[data-theme='dark'] .ce-msg-actions button,
+:root[data-theme='dark'] .ce-pinned-strip__remove,
+:root[data-theme='dark'] .ce-star-btn,
+:root[data-theme='dark'] .ce-pin-msg-btn,
+:root[data-theme='dark'] .ce-reply-btn,
+:root[data-theme='dark'] .ce-forward-btn,
+:root[data-theme='dark'] .ce-reminder-btn,
+:root[data-theme='dark'] .ce-link-msg-btn,
+:root[data-theme='dark'] .ce-copy-btn,
+:root[data-theme='dark'] .ce-edit-btn,
+:root[data-theme='dark'] .ce-delete-btn,
+:root[data-theme='dark'] .ce-reply-draft__close {
+  background: transparent;
+  color: var(--ce-muted);
+}
+
+:root[data-theme='dark'] .ce-icon-btn:hover,
+:root[data-theme='dark'] .ce-chat-action:hover,
+:root[data-theme='dark'] .ce-msg-actions button:hover,
+:root[data-theme='dark'] .ce-pinned-strip__remove:hover {
+  background: #2a3942;
+  color: var(--ce-text);
+}
+
+:root[data-theme='dark'] .ce-msg__meta,
+:root[data-theme='dark'] .ce-msg time,
+:root[data-theme='dark'] .ce-msg__receipt,
+:root[data-theme='dark'] .ce-user small,
+:root[data-theme='dark'] .ce-chat__identity small,
+:root[data-theme='dark'] .ce-chat__identity span,
+:root[data-theme='dark'] .ce-user span,
+:root[data-theme='dark'] .ce-row em,
+:root[data-theme='dark'] .ce-attachment__meta,
+:root[data-theme='dark'] .ce-attachment-preview em {
+  color: var(--ce-muted);
+}
+
+:root[data-theme='dark'] .ce-msg__receipt.is-delivered,
+:root[data-theme='dark'] .ce-msg__receipt.is-read {
+  color: #53bdeb;
+}
+
+:root[data-theme='dark'] .ce-reminder.is-due,
+:root[data-theme='dark'] .ce-chat-brief-warning {
+  background: rgba(251, 191, 36, 0.11);
+}
+
+:root[data-theme='dark'] .ce-attachment--file,
+:root[data-theme='dark'] .ce-msg.theirs .ce-attachment--file {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ce-text);
+}
+
+/* Iteración chat compacto · composer final de 2 filas bajo el scroll */
+:root {
+  --ce-compose-compact-height: 104px;
+}
+
+.ce-chat {
+  grid-template-rows: var(--ce-header) auto minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  position: relative;
+}
+
+.ce-scroll-bottom {
+  bottom: calc(var(--ce-compose-compact-height) + 14px) !important;
+}
+
+.ce-compose {
+  --ce-compose-row-top: 36px;
+  --ce-compose-row-bottom: 48px;
+  min-height: var(--ce-compose-compact-height) !important;
+  max-height: var(--ce-compose-compact-height) !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: var(--ce-compose-row-top) var(--ce-compose-row-bottom) !important;
+  gap: 7px !important;
+  align-items: stretch !important;
+  padding: 7px 12px 8px !important;
+  border-top: 1px solid var(--ce-line) !important;
+  background: var(--ce-bg-soft) !important;
+  overflow: visible !important;
+  position: relative !important;
+  z-index: 9;
+}
+
+.ce-compose__top,
+.ce-compose__bottom {
+  min-width: 0;
+  min-height: 0;
+}
+
+.ce-compose__top {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.ce-compose__bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.ce-compose__status-stack {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+}
+
+.ce-compose__status-stack > .hidden {
+  display: none !important;
+}
+
+.ce-compose__status-stack .ce-typing,
+.ce-compose__status-stack .ce-draft-status,
+.ce-compose__status-stack .ce-reply-draft,
+.ce-compose__status-stack .ce-attachment-preview {
+  min-width: 0;
+  max-width: min(100%, 520px);
+  min-height: 0;
+  margin: 0 !important;
+  padding: 7px 10px !important;
+  border-radius: 999px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ce-compose__status-stack .ce-reply-draft,
+.ce-compose__status-stack .ce-attachment-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ce-compose__status-stack .ce-attachment-preview img {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.ce-compose__status-stack .ce-attachment-preview button {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.ce-compose__toolstrip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ce-compose__toolstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.ce-compose__toolstrip .ce-icon-btn,
+.ce-compose__toolstrip button {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  flex: 0 0 auto;
+}
+
+.ce-input-shell {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto 42px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff !important;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(17, 27, 33, 0.08);
+}
+
+.ce-input-shell:focus-within {
+  border-color: rgba(10, 168, 132, 0.42);
+  box-shadow: 0 0 0 3px rgba(10, 168, 132, 0.11);
+}
+
+.ce-input-shell #messageInput,
+.ce-compose #messageInput,
+:root[data-theme='dark'] .ce-input-shell #messageInput,
+:root[data-theme='dark'] .ce-compose #messageInput,
+body.ce-dark-mode .ce-input-shell #messageInput,
+body.ce-dark-mode .ce-compose #messageInput {
+  width: 100%;
+  min-width: 0;
+  height: 40px !important;
+  min-height: 40px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 999px !important;
+  padding: 0 8px !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+.ce-input-shell #messageInput::placeholder {
+  color: #6b7280;
+}
+
+.ce-input-prefix,
+.ce-input-suffix {
+  height: 38px;
+  min-width: 38px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  gap: 3px;
+  background: #f3f4f6;
+  color: #0f172a;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ce-input-prefix:hover,
+.ce-input-suffix:hover,
+.ce-input-prefix:focus-visible,
+.ce-input-suffix:focus-visible {
+  background: #e8f5f1;
+  color: var(--ce-accent-dark);
+  outline: none;
+}
+
+.ce-input-prefix:disabled,
+.ce-input-suffix:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ce-input-suffix {
+  min-width: 42px;
+  padding: 0 9px;
+  font-size: 0.74rem;
+}
+
+.ce-ttl-control {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 1px !important;
+  min-height: 1px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.ce-send-mode-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: min(260px, calc(100vw - 32px));
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--ce-line);
+  border-radius: 16px;
+  background: var(--ce-panel);
+  color: var(--ce-text);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+}
+
+.ce-send-mode-menu.hidden {
+  display: none !important;
+}
+
+.ce-send-mode-menu button {
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ce-send-mode-menu button:hover,
+.ce-send-mode-menu button:focus-visible {
+  background: rgba(10, 168, 132, 0.1);
+  outline: none;
+}
+
+.ce-send-mode-menu strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ce-send-circle,
+.ce-compose #btnSend,
+.ce-compose .ce-send-circle {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  display: grid !important;
+  place-items: center !important;
+  background: var(--ce-accent) !important;
+  color: #ffffff !important;
+  font-size: 1.16rem !important;
+  line-height: 1 !important;
+  box-shadow: 0 10px 24px rgba(10, 168, 132, 0.24) !important;
+}
+
+.ce-send-circle--mic {
+  background: #ffffff !important;
+  color: var(--ce-accent-dark) !important;
+  border: 1px solid rgba(10, 168, 132, 0.24) !important;
+}
+
+.ce-send-circle--send {
+  background: var(--ce-accent) !important;
+  color: #ffffff !important;
+}
+
+.ce-send-circle--recording {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.ce-send-circle--busy {
+  opacity: 0.78;
+}
+
+.ce-send-circle--waiting-text {
+  background: #e5e7eb !important;
+  color: #4b5563 !important;
+  box-shadow: none !important;
+}
+
+.ce-send-circle:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none !important;
+}
+
+.ce-compose .ce-quick-replies,
+.ce-compose .ce-slash-panel,
+.ce-compose .ce-emoji-panel {
+  position: absolute !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: calc(100% + 8px) !important;
+  z-index: 18;
+  width: min(520px, calc(100vw - 32px)) !important;
+  max-height: min(310px, 42vh) !important;
+  overflow: auto !important;
+  margin: 0 !important;
+}
+
+.ce-compose .ce-emoji-panel {
+  width: min(420px, calc(100vw - 32px)) !important;
+}
+
+:root[data-theme='dark'] .ce-input-shell,
+body.ce-dark-mode .ce-input-shell {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme='dark'] .ce-send-mode-menu,
+body.ce-dark-mode .ce-send-mode-menu {
+  background: var(--ce-panel);
+  color: var(--ce-text);
+  border-color: var(--ce-line);
+}
+
+@media (max-width: 720px) {
+  :root { --ce-compose-compact-height: 98px; }
+
+  .ce-chat {
+    grid-template-rows: var(--ce-header) auto minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  }
+
+  .ce-compose {
+    --ce-compose-row-top: 34px;
+    --ce-compose-row-bottom: 46px;
+    padding: 6px 8px 8px !important;
+    gap: 6px !important;
+  }
+
+  .ce-compose__top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: 50vw;
+  }
+
+  .ce-input-shell {
+    height: 46px;
+    grid-template-columns: 36px minmax(0, 1fr) auto 40px;
+  }
+
+  .ce-input-prefix,
+  .ce-input-suffix {
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .ce-input-suffix {
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ce-send-circle,
+  .ce-compose #btnSend,
+  .ce-compose .ce-send-circle {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    min-height: 46px !important;
+  }
+
+  .ce-compose__toolstrip .ce-icon-btn,
+  .ce-compose__toolstrip button {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
 }
