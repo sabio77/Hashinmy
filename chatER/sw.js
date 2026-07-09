@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v89-link-contactos-chater';
+const CACHE_NAME = 'chater-static-v90-contact-share-ready';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',

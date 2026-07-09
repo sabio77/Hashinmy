@@ -127,6 +127,9 @@ function activeSendModeConfig() {
 
 const ephemeralOptions = [0, 180, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
+const contactPreviewRetryDelayMs = 4500;
+const contactPreviewMaxAttempts = 3;
+const contactPreviewRequestTimeoutMs = 6500;
 
 function hasInstallDismissedPersisted() {
   try { return localStorage.getItem(installDismissedStorageKey) === '1'; } catch { return false; }
@@ -138,6 +141,7 @@ const state = {
   contacts: [],
   contactLinkPreviews: new Map(),
   contactLinkPreviewInFlight: new Set(),
+  contactLinkPreviewRetryTimers: new Map(),
   contactShareModalOpen: false,
   contactShareTargetProfile: null,
   contactShareQuery: '',
@@ -4785,17 +4789,49 @@ function isContactSavedProfile(profile = {}) {
   return Boolean(getContactByUserId(profile.userId));
 }
 
+function cancelContactPreviewRetry(key = '') {
+  const cleanKey = contactPreviewKey(key);
+  const timer = cleanKey ? state.contactLinkPreviewRetryTimers.get(cleanKey) : null;
+  if (timer) window.clearTimeout(timer);
+  if (cleanKey) state.contactLinkPreviewRetryTimers.delete(cleanKey);
+}
+
+function scheduleContactPreviewRetry(key = '', delayMs = contactPreviewRetryDelayMs) {
+  const cleanKey = contactPreviewKey(key);
+  if (!cleanKey || state.contactLinkPreviewRetryTimers.has(cleanKey)) return;
+  const safeDelay = Math.max(800, Number(delayMs) || contactPreviewRetryDelayMs);
+  const timer = window.setTimeout(() => {
+    state.contactLinkPreviewRetryTimers.delete(cleanKey);
+    if (state.user) renderAll();
+  }, safeDelay);
+  state.contactLinkPreviewRetryTimers.set(cleanKey, timer);
+}
+
 function setContactLinkPreview(code = '', preview = {}) {
   const key = contactPreviewKey(code || preview.code || preview.profile?.profileCode || '');
   if (!key) return;
+  const status = preview.status || 'ready';
+  if (status !== 'loading' || !preview.retryable) cancelContactPreviewRetry(key);
   state.contactLinkPreviews.set(key, {
     code: code || preview.code || preview.profile?.profileCode || '',
-    status: preview.status || 'ready',
+    status,
     profile: preview.profile || null,
     saved: Boolean(preview.saved || (preview.profile && isContactSavedProfile(preview.profile))),
     retryable: Boolean(preview.retryable),
+    retryableExhausted: Boolean(preview.retryableExhausted),
+    attempts: Math.max(0, Number(preview.attempts || 0)),
+    nextRetryAt: Math.max(0, Number(preview.nextRetryAt || 0)),
     updatedAt: new Date().toISOString()
   });
+}
+
+function shouldRetryContactLinkPreview(preview = {}) {
+  return Boolean(
+    preview?.status === 'loading'
+    && preview.retryable
+    && Number(preview.attempts || 0) < contactPreviewMaxAttempts
+    && Date.now() >= Number(preview.nextRetryAt || 0)
+  );
 }
 
 function localContactPreviewForCode(code = '') {
@@ -4819,18 +4855,58 @@ function snapshotContactLinkPreviews(candidates = []) {
   return map;
 }
 
+async function postContactPreviewWithTimeout(body = {}) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller
+    ? window.setTimeout(() => controller.abort(), contactPreviewRequestTimeoutMs)
+    : null;
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getSessionToken();
+    if (token) headers['X-Session-Token'] = token;
+    const response = await fetch(`${getBackendUrl()}/api/contacts/preview-code`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body || {}),
+      signal: controller?.signal
+    });
+    const data = await response.json().catch(() => ({ ok: false, message: 'Respuesta inválida' }));
+    if (!response.ok || data.ok === false) {
+      const error = new Error(data.message || 'Error en la solicitud');
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    if (/AbortError/i.test(error?.name || '')) {
+      const timeoutError = new Error('La vista previa del contacto tardó demasiado.');
+      timeoutError.status = 0;
+      timeoutError.retryable = true;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+}
+
 function queueChatERContactPreviewLoads(candidates = []) {
   if (!state.user) return;
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
     const key = contactPreviewKey(candidate.code);
-    if (!key || state.contactLinkPreviews.has(key) || state.contactLinkPreviewInFlight.has(key)) continue;
+    if (!key || state.contactLinkPreviewInFlight.has(key)) continue;
     const localPreview = localContactPreviewForCode(candidate.code);
     if (localPreview) {
       setContactLinkPreview(candidate.code, localPreview);
       continue;
     }
+    const existingPreview = state.contactLinkPreviews.get(key);
+    if (existingPreview && !shouldRetryContactLinkPreview(existingPreview)) continue;
+    const previousAttempts = Math.max(0, Number(existingPreview?.attempts || 0));
+    cancelContactPreviewRetry(key);
     state.contactLinkPreviewInFlight.add(key);
-    post('/api/contacts/preview-code', { code: candidate.code, link: candidate.url || candidate.visible || '' })
+    postContactPreviewWithTimeout({ code: candidate.code, link: candidate.url || candidate.visible || '' })
       .then((data) => {
         setContactLinkPreview(candidate.code, {
           code: data.code || candidate.code,
@@ -4841,7 +4917,20 @@ function queueChatERContactPreviewLoads(candidates = []) {
       })
       .catch((error) => {
         const retryable = !error?.status || error.status >= 500 || navigator.onLine === false;
-        setContactLinkPreview(candidate.code, { code: candidate.code, status: retryable ? 'loading' : 'missing', profile: null, saved: false, retryable });
+        const attempts = previousAttempts + 1;
+        const shouldKeepTrying = retryable && attempts < contactPreviewMaxAttempts;
+        const retryDelay = contactPreviewRetryDelayMs * attempts;
+        setContactLinkPreview(candidate.code, {
+          code: candidate.code,
+          status: shouldKeepTrying ? 'loading' : 'missing',
+          profile: null,
+          saved: false,
+          retryable: shouldKeepTrying,
+          retryableExhausted: retryable && !shouldKeepTrying,
+          attempts,
+          nextRetryAt: shouldKeepTrying ? Date.now() + retryDelay : 0
+        });
+        if (shouldKeepTrying) scheduleContactPreviewRetry(key, retryDelay);
       })
       .finally(() => {
         state.contactLinkPreviewInFlight.delete(key);
@@ -4895,7 +4984,8 @@ function renderSharedContactMessageBody(text = '', attachment = null, options = 
 function resetRetryableContactLinkPreviews() {
   let changed = false;
   for (const [key, preview] of state.contactLinkPreviews.entries()) {
-    if (preview?.status === 'loading' && preview?.retryable) {
+    if ((preview?.status === 'loading' && preview?.retryable) || preview?.retryableExhausted) {
+      cancelContactPreviewRetry(key);
       state.contactLinkPreviews.delete(key);
       changed = true;
     }
@@ -6291,6 +6381,14 @@ async function sendProfileShareToContact(targetUserId = '') {
   const shareLink = buildProfileShareLink(targetProfile);
   if (!recipientId) throw new Error('Selecciona un contacto para enviar la tarjeta.');
   if (!shareLink) throw new Error('Este perfil todavía no tiene un enlace disponible.');
+  if (targetProfile.profileCode) {
+    setContactLinkPreview(targetProfile.profileCode, {
+      code: targetProfile.profileCode,
+      status: 'ready',
+      profile: targetProfile,
+      saved: isContactSavedProfile(targetProfile)
+    });
+  }
   state.contactShareSending = true;
   renderContactShareModal();
   try {
@@ -8366,6 +8464,8 @@ function bindEvents() {
     setSessionToken('');
     state.user = null;
     state.contacts = [];
+    for (const timer of state.contactLinkPreviewRetryTimers.values()) window.clearTimeout(timer);
+    state.contactLinkPreviewRetryTimers.clear();
     state.contactLinkPreviews.clear();
     state.contactLinkPreviewInFlight.clear();
     state.contactShareModalOpen = false;

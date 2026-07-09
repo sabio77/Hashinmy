@@ -137,11 +137,14 @@ function renderSharedContactCard(candidate = {}, preview = {}, options = {}) {
   const saved = Boolean(preview?.saved || (ready && typeof options.isContactSaved === 'function' && options.isContactSaved(profile)));
   const self = Boolean(ready && typeof options.isSelfProfile === 'function' && options.isSelfProfile(profile));
   const code = candidate.code || preview?.code || profile.profileCode || '';
-  const title = ready ? profileDisplayName(profile) : (missing ? 'Contacto no disponible' : 'Verificando contacto chatER');
-  const email = ready ? profileEmail(profile) : (missing ? 'El enlace no corresponde a un perfil activo.' : 'Validando perfil compartido...');
-  const stateText = self ? 'Este es tu perfil' : (saved ? 'Contacto guardado' : (ready ? 'Contacto compartido' : (missing ? 'No se puede guardar' : 'Buscando perfil')));
-  const saveDisabled = !ready || saved || self;
-  const writeDisabled = !ready || self;
+  const hasActionableCode = Boolean(String(code || '').trim());
+  const title = ready ? profileDisplayName(profile) : (missing ? 'Contacto no disponible' : 'Contacto chatER');
+  const email = ready ? profileEmail(profile) : (missing ? 'El enlace no corresponde a un perfil activo.' : 'Tarjeta de contacto enviada por chatER.');
+  const stateText = self
+    ? 'Este es tu perfil'
+    : (saved ? 'Contacto guardado' : (ready ? 'Contacto compartido' : (missing ? 'No se puede guardar' : 'Puedes guardarlo o escribirle ahora.')));
+  const saveDisabled = !hasActionableCode || missing || saved || self;
+  const writeDisabled = !hasActionableCode || missing || self;
   const saveLabel = self ? 'Tu perfil' : (saved ? 'Guardado' : 'Guardar');
   const writeLabel = self ? 'Abrir perfil' : 'Escribir';
   const readyAttrs = ready
