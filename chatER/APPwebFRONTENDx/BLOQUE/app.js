@@ -86,6 +86,7 @@ const state = {
   scanTimer: 0,
   clientId: '',
   chatSearchQuery: '',
+  chatSearchOpen: false,
   chatSearchResults: [],
   chatSearchLoading: false,
   starredPanelOpen: false,
@@ -3845,6 +3846,7 @@ function clearActiveChatState() {
   state.starredPanelOpen = false;
   state.starredMessages = [];
   state.chatSearchQuery = '';
+  state.chatSearchOpen = false;
   state.chatSearchResults = [];
   state.quickRepliesOpen = false;
   closeLinkLibrary();
@@ -4087,6 +4089,36 @@ function acknowledgeMessagesDelivered(messages = []) {
   flushDeliveryAckQueue().catch(() => null);
 }
 
+function renderChatSearchVisibility() {
+  const open = Boolean(state.activeChatId && state.chatSearchOpen);
+  els.chatSearchArea?.classList.toggle('hidden', !open);
+  if (els.chatSearchInput) els.chatSearchInput.disabled = !open;
+  if (els.btnShowStarred) els.btnShowStarred.disabled = !open;
+  const toggleButton = els.activeChatHeader?.querySelector('[data-toggle-chat-search]');
+  if (toggleButton) {
+    toggleButton.classList.toggle('active', open);
+    toggleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggleButton.setAttribute('aria-label', open ? 'Ocultar búsqueda en este chat' : 'Buscar en este chat');
+    toggleButton.setAttribute('title', open ? 'Ocultar búsqueda en este chat' : 'Buscar en este chat');
+  }
+}
+
+function setChatSearchOpen(open = false, { focus = false } = {}) {
+  state.chatSearchOpen = Boolean(open && state.activeChatId);
+  renderChatSearchVisibility();
+  if (state.chatSearchOpen && focus && els.chatSearchInput) {
+    window.requestAnimationFrame(() => {
+      els.chatSearchInput?.focus();
+      els.chatSearchInput?.select();
+    });
+  }
+}
+
+function toggleChatSearch({ focus = true } = {}) {
+  if (!state.activeChatId) throw new Error('Selecciona un chat antes de buscar mensajes.');
+  setChatSearchOpen(!state.chatSearchOpen, { focus });
+}
+
 function resetChatSearch({ keepInput = false } = {}) {
   state.chatSearchQuery = '';
   state.chatSearchResults = [];
@@ -4162,6 +4194,7 @@ function renderSearchPanel() {
 
 async function searchActiveChat(query = '') {
   const cleanQuery = String(query || '').trim();
+  setChatSearchOpen(true);
   state.starredPanelOpen = false;
   if (!state.activeChatId || cleanQuery.length < 2) {
     state.chatSearchQuery = cleanQuery;
@@ -4191,6 +4224,7 @@ async function searchActiveChat(query = '') {
 
 async function loadStarredMessages() {
   if (!state.activeChatId) return;
+  setChatSearchOpen(true);
   state.starredPanelOpen = true;
   state.starredLoading = true;
   state.starredMessages = [];
@@ -4829,9 +4863,8 @@ function renderActiveChat() {
   const chat = activeChat();
   if (!chat) {
     setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, '<div class="ce-empty-title">Selecciona un chat</div>');
-    els.chatSearchArea?.classList.add('hidden');
-    if (els.chatSearchInput) els.chatSearchInput.disabled = true;
-    if (els.btnShowStarred) els.btnShowStarred.disabled = true;
+    state.chatSearchOpen = false;
+    renderChatSearchVisibility();
     setCachedHtml('messagesHtml', els.messages, '<div class="ce-chat-empty">Tus conversaciones aparecerán aquí.</div>');
     els.messageInput.disabled = true;
     els.btnSend.disabled = true;
@@ -4882,12 +4915,16 @@ function renderActiveChat() {
   const nicknameLabel = chat.other?.nickname ? 'Editar apodo privado del contacto' : 'Agregar apodo privado al contacto';
   const nicknameButtonHtml = isSelfChat(chat) ? '' : `
       <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button>`;
+  const searchOpen = Boolean(state.activeChatId && state.chatSearchOpen);
   const activeChatHeaderHtml = `
     <button class="ce-icon-btn ce-mobile-back" type="button" data-close-mobile-chat="1" title="Volver a conversaciones" aria-label="Volver a conversaciones">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/></svg>
     </button>
     <div class="ce-chat__identity">${renderChatAvatarWithPresence(chat)}<div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span>${renderActiveChatLabelBadges(chat)}</div></div>
     <div class="ce-header-actions ce-chat-tools">${muteButtonHtml}${blockButtonHtml}${nicknameButtonHtml}
+      <button class="ce-icon-btn ce-icon-btn--chat-search${searchOpen ? ' active' : ''}" type="button" data-toggle-chat-search="1" title="${searchOpen ? 'Ocultar búsqueda en este chat' : 'Buscar en este chat'}" aria-label="${searchOpen ? 'Ocultar búsqueda en este chat' : 'Buscar en este chat'}" aria-expanded="${searchOpen ? 'true' : 'false'}" aria-controls="chatSearchArea">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.16 10.45l4.44 4.45-1.41 1.41-4.45-4.44A6.5 6.5 0 1 1 10.5 4Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/></svg>
+      </button>
       <button class="ce-icon-btn ce-icon-btn--labels" type="button" data-open-labels="1" title="Etiquetas del chat" aria-label="Editar etiquetas del chat">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V5a2 2 0 0 1 2-2h8l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/></svg>
       </button>
@@ -4920,9 +4957,7 @@ function renderActiveChat() {
       </button>
     </div>`;
   setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, activeChatHeaderHtml);
-  els.chatSearchArea?.classList.remove('hidden');
-  if (els.chatSearchInput) els.chatSearchInput.disabled = false;
-  if (els.btnShowStarred) els.btnShowStarred.disabled = false;
+  renderChatSearchVisibility();
   const messages = state.messagesByChat.get(chat.chatId) || [];
   const queuedMessages = getQueuedMessagesForChat(chat.chatId);
   const sameRenderedChat = state.renderedActiveChatId === chat.chatId;
@@ -4996,6 +5031,7 @@ async function selectChat(chatId) {
     state.remindersOpen = false;
     state.reminderMessage = null;
     state.reminders = [];
+    state.chatSearchOpen = false;
     resetChatSearch();
     renderAll();
   }
@@ -6543,12 +6579,7 @@ async function removeGlobalStarredMessage(chatId = '', messageId = '') {
 
 function focusChatSearchInput() {
   if (!state.activeChatId) throw new Error('Selecciona un chat antes de buscar mensajes.');
-  els.chatSearchArea?.classList.remove('hidden');
-  if (els.chatSearchInput) {
-    els.chatSearchInput.disabled = false;
-    els.chatSearchInput.focus();
-    els.chatSearchInput.select();
-  }
+  setChatSearchOpen(true, { focus: true });
 }
 
 function showContactsTab() {
@@ -7644,6 +7675,12 @@ function bindEvents() {
     renderAll();
   });
   els.activeChatHeader?.addEventListener('click', (event) => {
+    const chatSearchButton = event.target.closest('[data-toggle-chat-search]');
+    if (chatSearchButton && els.activeChatHeader.contains(chatSearchButton)) {
+      event.preventDefault();
+      toggleChatSearch({ focus: true });
+      return;
+    }
     const mobileBackButton = event.target.closest('[data-close-mobile-chat]');
     if (mobileBackButton && els.activeChatHeader.contains(mobileBackButton)) {
       event.preventDefault();
@@ -8049,6 +8086,13 @@ function bindEvents() {
   });
   els.chatSearchInput.addEventListener('input', () => {
     if (!els.chatSearchInput.value.trim()) resetChatSearch({ keepInput: true });
+  });
+  document.addEventListener('click', (event) => {
+    if (!state.chatSearchOpen) return;
+    const target = event.target;
+    if (els.chatSearchArea?.contains(target)) return;
+    if (target?.closest?.('[data-toggle-chat-search]')) return;
+    setChatSearchOpen(false);
   });
   els.replyDraft?.addEventListener('click', (event) => {
     const cancelEdit = event.target.closest('[data-cancel-edit]');
