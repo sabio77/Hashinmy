@@ -13,48 +13,27 @@ const compactModeKey = 'chater_compact_mode_v1';
 const installedStorageKey = 'chater_installed_v1';
 const installDismissedStorageKey = 'chater_install_dismissed_v1';
 const scrollBottomThresholdPx = 160;
-const quickReactions = ['like', 'love', 'laugh', 'surprise', 'thanks', 'important'];
-const iconInsertStorageKey = 'chater_recent_icon_inserts_v1';
+const quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
+const iconInsertStorageKey = 'chater_recent_emojis_v1';
+const iconInsertLegacyStorageKey = 'chater_recent_icon_inserts_v1';
 const iconInsertMaxRecent = 24;
-const reactionDefinitions = Object.freeze({
-  like: { icon: 'thumb', label: 'me gusta' },
-  love: { icon: 'heart', label: 'apoyo' },
-  laugh: { icon: 'laugh', label: 'risa' },
-  surprise: { icon: 'surprise', label: 'sorpresa' },
-  thanks: { icon: 'hands', label: 'agradecimiento' },
-  important: { icon: 'flame', label: 'importante' },
-  confirm: { icon: 'check', label: 'confirmación' },
-  sad: { icon: 'heart', label: 'empatía' }
-});
-const legacyReactionAliases = Object.freeze({
-  [String.fromCodePoint(0x1F44D)]: 'like',
-  [`${String.fromCodePoint(0x2764)}${String.fromCodePoint(0xFE0F)}`]: 'love',
-  [String.fromCodePoint(0x1F602)]: 'laugh',
-  [String.fromCodePoint(0x1F62E)]: 'surprise',
-  [String.fromCodePoint(0x1F64F)]: 'thanks',
-  [String.fromCodePoint(0x1F525)]: 'important',
-  [String.fromCodePoint(0x2705)]: 'confirm',
-  [String.fromCodePoint(0x1F622)]: 'sad'
-});
-const iconQuickInsertDefinitions = Object.freeze({
-  recibido: { icon: 'check', label: 'Recibido', text: 'Recibido.' },
-  gracias: { icon: 'hands', label: 'Gracias', text: 'Gracias.' },
-  reviso: { icon: 'file', label: 'Lo reviso', text: 'Lo reviso y te confirmo.' },
-  confirmado: { icon: 'checkDouble', label: 'Confirmado', text: 'Confirmado.' },
-  importante: { icon: 'flame', label: 'Importante', text: 'Importante.' },
-  acuerdo: { icon: 'heart', label: 'De acuerdo', text: 'De acuerdo.' },
-  llamada: { icon: 'mic', label: 'Llamada', text: 'Podemos revisarlo por llamada.' },
-  horario: { icon: 'schedule', label: 'Horario', text: '¿Qué horario te funciona mejor?' },
-  pendiente: { icon: 'reminder', label: 'Pendiente', text: 'Queda pendiente para seguimiento.' },
-  documento: { icon: 'attachment', label: 'Documento', text: 'Te comparto el documento.' },
-  enlace: { icon: 'link', label: 'Enlace', text: 'Te envío el enlace.' },
-  prioridad: { icon: 'star', label: 'Prioridad', text: 'Esto tiene prioridad.' }
+const allowedReactionEmojis = Object.freeze(['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '✅']);
+const reactionEmojiAliases = Object.freeze({
+  like: '👍',
+  love: '❤️',
+  laugh: '😂',
+  surprise: '😮',
+  sad: '😢',
+  thanks: '🙏',
+  important: '🔥',
+  confirm: '✅'
 });
 const iconInsertCategories = [
-  { id: 'recientes', title: 'Recientes', icon: 'timer', items: [] },
-  { id: 'respuestas', title: 'Respuestas', icon: 'reply', items: ['recibido', 'gracias', 'reviso', 'confirmado'] },
-  { id: 'seguimiento', title: 'Seguimiento', icon: 'reminder', items: ['pendiente', 'prioridad', 'importante', 'horario'] },
-  { id: 'trabajo', title: 'Trabajo', icon: 'file', items: ['documento', 'enlace', 'llamada', 'acuerdo'] }
+  { id: 'recientes', title: 'Recientes', icon: '🕘', emojis: [] },
+  { id: 'caras', title: 'Caras', icon: '😊', emojis: ['😀','😃','😄','😁','😆','😅','😂','🤣','🙂','🙃','😉','😊','😇','😍','😘','😜','🤗','🤔','😎','🥳','😬','😢','😭','😡'] },
+  { id: 'gestos', title: 'Gestos', icon: '👍', emojis: ['👍','👎','👏','🙌','🙏','🤝','💪','👌','✌️','🤞','👋','🤟','☝️','👇','👉','👈','🫶','🤲'] },
+  { id: 'trabajo', title: 'Trabajo', icon: '💼', emojis: ['💼','📌','📎','📝','📅','⏰','✅','☑️','❌','⚠️','🚨','📣','💡','🔎','🔒','🔗','📊','📈','📦','🚀'] },
+  { id: 'objetos', title: 'Objetos', icon: '⭐', emojis: ['⭐','🔥','❤️','💚','💙','💜','✨','🎉','🏆','🎯','🎁','📍','📞','📧','💬','🔔','🔕','🌟'] }
 ];
 
 const ceUiIconPaths = Object.freeze({
@@ -853,6 +832,15 @@ function formatEphemeralOption(seconds = 0) {
   if (value === 24 * 3600) return '24 horas';
   if (value === 7 * 24 * 3600) return '7 días';
   return 'No expira';
+}
+
+function formatEphemeralCompactOption(seconds = 0) {
+  const value = normalizeEphemeralSeconds(seconds);
+  if (value === 180) return '3min';
+  if (value === 3600) return '1h';
+  if (value === 24 * 3600) return '24h';
+  if (value === 7 * 24 * 3600) return '7d';
+  return '';
 }
 
 function formatEphemeralMessageLabel(message = {}) {
@@ -2066,8 +2054,8 @@ function blockIconSvg(blocked = false) {
 function normalizeReactionKey(value = '') {
   const clean = String(value || '').trim();
   if (!clean) return '';
-  if (reactionDefinitions[clean]) return clean;
-  return legacyReactionAliases[clean] || '';
+  if (allowedReactionEmojis.includes(clean)) return clean;
+  return reactionEmojiAliases[clean] || '';
 }
 
 function getMessageReactions(message = {}) {
@@ -2086,18 +2074,8 @@ function userReactionForMessage(message = {}) {
   return Object.entries(reactions).find(([, users]) => users.includes(state.user?.userId))?.[0] || '';
 }
 
-function reactionIconName(reaction = '') {
-  const key = normalizeReactionKey(reaction);
-  return reactionDefinitions[key]?.icon || 'note';
-}
-
 function reactionDisplayName(reaction = '') {
-  const key = normalizeReactionKey(reaction);
-  return reactionDefinitions[key]?.label || 'reacción';
-}
-
-function renderReactionIcon(reaction = '') {
-  return uiIcon(reactionIconName(reaction), 'ce-reaction-icon');
+  return normalizeReactionKey(reaction) || 'reacción';
 }
 
 function renderReactionSummary(message = {}) {
@@ -2110,7 +2088,7 @@ function renderReactionSummary(message = {}) {
     const active = reaction === activeReaction ? ' active' : '';
     const reactionName = reactionDisplayName(reaction);
     const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
-    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" aria-label="${escapeHtml(label)}"><span>${renderReactionIcon(reaction)}</span><strong>${count}</strong></button>`;
+    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(reaction)}</span><strong>${count}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -2120,7 +2098,7 @@ function renderReactionPicker(message = {}) {
     const active = reaction === activeReaction ? ' active' : '';
     const reactionName = reactionDisplayName(reaction);
     const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
-    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${renderReactionIcon(reaction)}</button>`;
+    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(reaction)}</button>`;
   }).join('')}</div>`;
 }
 
@@ -2492,21 +2470,21 @@ function getSlashCommandDefinitions() {
       run: async () => {
         state.slashCommandsOpen = true;
         renderSlashCommandsPanel({ force: true });
-        showTemporaryDraftStatus('Comandos rápidos abiertos. Elige uno o escribe /iconos, /encuesta, /silencio, /nota, /resumen, /fecha o /exportar.', 5600);
+        showTemporaryDraftStatus('Comandos rápidos abiertos. Elige uno o escribe /emoji, /encuesta, /silencio, /nota, /resumen, /fecha o /exportar.', 5600);
         return { clearComposer: false, keepPanelOpen: true };
       }
     },
     {
-      id: 'icon-insert',
-      names: ['icono', 'iconos'],
-      title: '/iconos',
-      description: 'Abre el selector local de iconos profesionales para insertar textos breves en el compositor.',
-      template: '/iconos',
+      id: 'emoji',
+      names: ['emoji', 'emojis', 'icono', 'iconos'],
+      title: '/emoji',
+      description: 'Abre el selector local de emojis para insertarlos en el compositor.',
+      template: '/emoji',
       enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId && !isChatInteractionBlocked()),
       run: async () => {
         state.iconInsertPanelOpen = true;
         renderIconInsertPickerPanel();
-        showTemporaryDraftStatus('Selector de iconos rápidos abierto. Elige una opción para insertarla en tu mensaje.');
+        showTemporaryDraftStatus('Selector de emojis abierto. Elige uno para insertarlo en tu mensaje.');
         return { clearComposer: true, keepPanelOpen: false };
       }
     },
@@ -2684,8 +2662,7 @@ function updateComposerControls() {
   const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
   const textLength = String(els.messageInput?.value || '').trim().length;
   const hasAnyText = textLength > 0;
-  const hasSendableText = textLength > 1;
-  const hasPendingOneCharText = hasAnyText && !hasSendableText && !hasAttachment;
+  const hasSendableText = textLength >= 1;
   const hasText = hasSendableText;
   const canRecordAudio = hasChat && !blocked && !state.editingMessage?.messageId && !state.attachmentUploading && !state.audioSending && !hasAnyText && !hasAttachment;
   const sendIcon = state.audioSending
@@ -2694,14 +2671,12 @@ function updateComposerControls() {
       ? 'stop'
       : (state.editingMessage?.messageId
         ? 'save'
-        : ((hasSendableText || hasAttachment) ? 'send' : (hasPendingOneCharText ? 'waitingText' : 'mic'))));
+        : ((hasSendableText || hasAttachment) ? 'send' : 'mic')));
   const sendActionLabel = state.audioRecording
     ? 'Detener y enviar audio'
     : (sendIcon === 'mic'
       ? 'Grabar audio'
-      : (sendIcon === 'waitingText'
-        ? 'Escribe al menos 2 caracteres para enviar'
-        : (state.editingMessage?.messageId ? 'Guardar edición' : 'Enviar mensaje')));
+      : (state.editingMessage?.messageId ? 'Guardar edición' : 'Enviar mensaje'));
   els.btnSend.innerHTML = renderSendActionIcon(sendIcon);
   els.btnSend.classList.toggle('ce-send-circle--mic', sendIcon === 'mic');
   els.btnSend.classList.toggle('ce-send-circle--send', sendIcon === 'send');
@@ -2719,8 +2694,8 @@ function updateComposerControls() {
   if (els.btnIconInsertPicker) {
     const iconInsertDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
     els.btnIconInsertPicker.disabled = iconInsertDisabled;
-    els.btnIconInsertPicker.setAttribute('title', blocked ? 'Iconos rápidos no disponibles con contacto bloqueado' : 'Insertar icono rápido');
-    els.btnIconInsertPicker.setAttribute('aria-label', blocked ? 'Iconos rápidos no disponibles con contacto bloqueado' : 'Insertar icono rápido');
+    els.btnIconInsertPicker.setAttribute('title', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
+    els.btnIconInsertPicker.setAttribute('aria-label', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
   }
   if (els.btnSmartReplySuggestions) {
     const smartReplyCount = buildSmartReplySuggestions().length;
@@ -2749,7 +2724,8 @@ function updateComposerControls() {
   if (els.btnCycleTtl) {
     const ttl = selectedEphemeralSeconds();
     els.btnCycleTtl.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
-    els.btnCycleTtl.innerHTML = ttl ? `${uiIcon('timer')}<span>${escapeHtml(formatEphemeralOption(ttl))}</span>` : uiIcon('timer');
+    const compactTtlLabel = formatEphemeralCompactOption(ttl);
+    els.btnCycleTtl.innerHTML = ttl ? `${uiIcon('timer')}<span>${escapeHtml(compactTtlLabel)}</span>` : uiIcon('timer');
     els.btnCycleTtl.setAttribute('title', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
     els.btnCycleTtl.setAttribute('aria-label', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
   }
@@ -2766,35 +2742,44 @@ function updateComposerControls() {
 }
 
 
+function isKnownEmojiInsert(value = '') {
+  const clean = String(value || '').trim();
+  if (!clean) return false;
+  return iconInsertCategories.some((category) => Array.isArray(category.emojis) && category.emojis.includes(clean));
+}
+
 function readRecentIconInserts() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(iconInsertStorageKey) || '[]');
-    return Array.isArray(parsed)
-      ? parsed.map((item) => String(item || '').trim()).filter((item) => iconQuickInsertDefinitions[item]).slice(0, iconInsertMaxRecent)
-      : [];
-  } catch {
-    return [];
-  }
+  const readList = (key) => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(parsed)
+        ? parsed.map((emoji) => String(emoji || '').trim()).filter((emoji) => emoji && isKnownEmojiInsert(emoji)).slice(0, iconInsertMaxRecent)
+        : [];
+    } catch {
+      return [];
+    }
+  };
+  return [...new Set([...readList(iconInsertStorageKey), ...readList(iconInsertLegacyStorageKey)])].slice(0, iconInsertMaxRecent);
 }
 
 function writeRecentIconInserts(items = []) {
   const clean = [...new Set((Array.isArray(items) ? items : [])
-    .map((item) => String(item || '').trim())
-    .filter((item) => iconQuickInsertDefinitions[item]))].slice(0, iconInsertMaxRecent);
+    .map((emoji) => String(emoji || '').trim())
+    .filter((emoji) => emoji && isKnownEmojiInsert(emoji)))].slice(0, iconInsertMaxRecent);
   try { localStorage.setItem(iconInsertStorageKey, JSON.stringify(clean)); } catch {}
   return clean;
 }
 
-function recordRecentIconInsert(itemId = '') {
-  const clean = String(itemId || '').trim();
-  if (!iconQuickInsertDefinitions[clean]) return [];
+function recordRecentIconInsert(emoji = '') {
+  const clean = String(emoji || '').trim();
+  if (!clean || !isKnownEmojiInsert(clean)) return [];
   return writeRecentIconInserts([clean, ...readRecentIconInserts().filter((item) => item !== clean)]);
 }
 
 function getIconInsertPickerCategories() {
   const recents = readRecentIconInserts();
   return iconInsertCategories.map((category) => category.id === 'recientes'
-    ? { ...category, items: recents.length ? recents : ['recibido', 'gracias', 'confirmado', 'reviso', 'prioridad', 'pendiente'] }
+    ? { ...category, emojis: recents.length ? recents : ['👍', '❤️', '😂', '🙏', '🔥', '✅'] }
     : category);
 }
 
@@ -2823,18 +2808,15 @@ function renderIconInsertPickerPanel() {
   els.iconInsertPickerPanel.classList.remove('hidden');
   els.iconInsertPickerPanel.innerHTML = `
     <div class="ce-icon-insert-panel__head">
-      <div><strong>Iconos rápidos</strong><span>Inserta textos breves desde una interfaz con iconos profesionales.</span></div>
+      <div><strong>Emojis rápidos</strong><span>Inserta expresiones sin salir del chat.</span></div>
       <button class="ce-link" type="button" data-close-icon-insert-picker="1">Cerrar</button>
     </div>
-    <div class="ce-icon-insert-tabs" role="tablist" aria-label="Categorías de iconos rápidos">
-      ${categories.map((category) => `<button class="ce-icon-insert-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-icon-insert-category="${escapeHtml(category.id)}">${uiIcon(category.icon, 'ce-icon-insert-tab__icon')}<span>${escapeHtml(category.title)}</span></button>`).join('')}
+    <div class="ce-icon-insert-tabs" role="tablist" aria-label="Categorías de emojis">
+      ${categories.map((category) => `<button class="ce-icon-insert-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" title="${escapeHtml(category.title)}" aria-label="${escapeHtml(category.title)}" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-icon-insert-category="${escapeHtml(category.id)}">${escapeHtml(category.icon)}</button>`).join('')}
     </div>
+    <div class="ce-icon-insert-tabs-label" aria-live="polite"><strong>${escapeHtml(activeCategory.icon || '')}</strong><span>${escapeHtml(activeCategory.title)}</span></div>
     <div class="ce-icon-insert-grid" role="list" aria-label="${escapeHtml(activeCategory.title)}">
-      ${(activeCategory.items || []).map((itemId) => {
-        const item = iconQuickInsertDefinitions[itemId];
-        if (!item) return '';
-        return `<button class="ce-icon-insert-item" type="button" role="listitem" data-insert-icon-insert="${escapeHtml(itemId)}" title="Insertar ${escapeHtml(item.label)}" aria-label="Insertar ${escapeHtml(item.label)}">${uiIcon(item.icon, 'ce-icon-insert-item__icon')}<span>${escapeHtml(item.label)}</span></button>`;
-      }).join('')}
+      ${(activeCategory.emojis || []).map((emoji) => `<button class="ce-icon-insert-item" type="button" role="listitem" data-insert-icon-insert="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`).join('')}
     </div>`;
 }
 
@@ -2859,11 +2841,9 @@ function toggleIconInsertPicker() {
   renderIconInsertPickerPanel();
 }
 
-function insertIconInsertIntoComposer(itemId = '') {
-  const clean = String(itemId || '').trim();
-  const item = iconQuickInsertDefinitions[clean];
-  const insertionText = String(item?.text || '').trim();
-  if (!insertionText || !els.messageInput) return;
+function insertIconInsertIntoComposer(emoji = '') {
+  const clean = String(emoji || '').trim();
+  if (!clean || !els.messageInput) return;
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
     return;
@@ -2875,7 +2855,7 @@ function insertIconInsertIntoComposer(itemId = '') {
   const after = current.slice(end);
   const needsSpaceBefore = before && !/\s$/.test(before);
   const needsSpaceAfter = after && !/^\s/.test(after);
-  const insertion = `${needsSpaceBefore ? ' ' : ''}${insertionText}${needsSpaceAfter ? ' ' : ''}`;
+  const insertion = `${needsSpaceBefore ? ' ' : ''}${clean}${needsSpaceAfter ? ' ' : ''}`;
   els.messageInput.value = `${before}${insertion}${after}`.trimStart();
   const nextCursor = Math.max(0, before.length + insertion.length);
   els.messageInput.focus();
@@ -6932,8 +6912,8 @@ function getCommandPaletteCommands() {
     },
     {
       id: 'icon-insert-picker',
-      title: 'Insertar icono rápido',
-      description: 'Abre un selector local con iconos profesionales y textos breves para completar el mensaje.',
+      title: 'Insertar emoji',
+      description: 'Abre un selector local de emojis y los inserta en el compositor.',
       shortcut: 'Ctrl/Cmd + Shift + E',
       enabled: hasChat && !blocked && !state.editingMessage?.messageId,
       run: () => toggleIconInsertPicker()
@@ -8385,11 +8365,6 @@ function bindEvents() {
       } finally {
         updateComposerControls();
       }
-      return;
-    }
-    if (!state.editingMessage?.messageId && text && text.length <= 1 && !hasAttachment) {
-      showTemporaryDraftStatus('Escribe al menos 2 caracteres para enviar texto o deja el input vacío para grabar audio.', 3600);
-      updateComposerControls();
       return;
     }
     if (!text && !hasAttachment) return;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v82-professional-icons-ui';
+const CACHE_NAME = 'chater-static-v84-emoji-reactions';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',

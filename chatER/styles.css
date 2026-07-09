@@ -1830,27 +1830,42 @@ svg {
 
 .ce-icon-insert-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
-  padding: 0 0 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--ce-line);
+  padding: 0 0 6px;
+  margin-bottom: 4px;
 }
 
 .ce-icon-insert-tab {
+  min-width: 38px;
+  min-height: 36px;
   border: 1px solid var(--ce-line);
   border-radius: 999px;
-  padding: 8px 10px;
+  padding: 6px 9px;
   background: rgba(247, 251, 249, 0.96);
   color: var(--ce-muted-strong);
-  font-size: 0.78rem;
+  font-size: 1.12rem;
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.ce-icon-insert-tab span {
-  margin-right: 5px;
+.ce-icon-insert-tabs-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ce-line);
+  color: var(--ce-muted-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.ce-icon-insert-tabs-label strong {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .ce-icon-insert-tab:hover,
@@ -8935,12 +8950,7 @@ body.ce-dark-mode .ce-chat-search-area {
 .ce-icon-insert-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-
-.ce-icon-insert-tab .ce-ui-icon {
-  width: 15px;
-  height: 15px;
+  justify-content: center;
 }
 
 .ce-send-dots {
@@ -8964,37 +8974,21 @@ body.ce-dark-mode .ce-chat-search-area {
   height: 18px;
 }
 
-/* Selector de iconos rápidos: usa SVG profesionales y texto de producción. */
+/* Selector de emojis recuperado desde chatER_viejo: compacto y sin texto dentro de las pestañas. */
 .ce-icon-insert-item {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 58px;
-  padding: 8px 6px;
-  font-size: 0.72rem;
+  min-height: 42px;
+  padding: 6px;
+  font-size: 1.35rem;
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1;
   text-align: center;
 }
 
-.ce-icon-insert-item .ce-ui-icon,
-.ce-icon-insert-item__icon {
-  width: 21px;
-  height: 21px;
-}
 
-.ce-icon-insert-item span {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-
-/* Refuerzo final: controles de interfaz sin símbolos Unicode visibles; todos usan SVG profesional. */
+/* Refuerzo final: controles generales conservan SVG profesional; reacciones y selector usan emojis recuperados. */
 .ce-delete-btn .ce-ui-icon,
 .ce-quick-reply__delete .ce-ui-icon,
 .ce-pinned-strip__remove .ce-ui-icon {
@@ -9014,3 +9008,180 @@ body.ce-dark-mode .ce-chat-search-area {
   height: 13px;
   vertical-align: -0.16em;
 }
+
+
+/* Iteración actual · compositor de chat con máximo 2 zonas bajo el scroll.
+   Escritorio/tablet: zona de herramientas y zona de escritura lado a lado.
+   Móvil: zona superior sobre zona inferior. */
+:root {
+  --ce-compose-compact-height: 68px;
+}
+
+.ce-chat {
+  grid-template-rows: var(--ce-header) minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  overflow: hidden !important;
+}
+
+.ce-messages {
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+#messageForm.ce-compose,
+.ce-compose {
+  min-height: var(--ce-compose-compact-height) !important;
+  max-height: var(--ce-compose-compact-height) !important;
+  height: var(--ce-compose-compact-height) !important;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.82fr) minmax(320px, 1.18fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: center !important;
+  padding: 8px 14px !important;
+  overflow: visible !important;
+}
+
+.ce-compose__top,
+.ce-compose__bottom {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 52px !important;
+  align-self: center !important;
+}
+
+.ce-compose__top {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.ce-compose__bottom {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.ce-compose__toolstrip .ce-icon-btn--schedule,
+.ce-compose__toolstrip .ce-icon-btn--voice,
+.ce-compose__toolstrip #btnScheduleMessage,
+.ce-compose__toolstrip #btnVoiceDictation {
+  display: none !important;
+}
+
+.ce-compose__status-stack {
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.ce-compose__status-stack .ce-typing,
+.ce-compose__status-stack .ce-draft-status,
+.ce-compose__status-stack .ce-reply-draft,
+.ce-compose__status-stack .ce-attachment-preview {
+  max-width: min(100%, 520px) !important;
+}
+
+.ce-input-shell {
+  height: 48px !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) max-content !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 0 4px 4px !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+.ce-input-shell #messageInput,
+.ce-compose #messageInput,
+:root[data-theme='dark'] .ce-input-shell #messageInput,
+:root[data-theme='dark'] .ce-compose #messageInput,
+body.ce-dark-mode .ce-input-shell #messageInput,
+body.ce-dark-mode .ce-compose #messageInput {
+  background: #ffffff !important;
+  color: #111827 !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 8px !important;
+}
+
+.ce-input-prefix,
+.ce-input-suffix {
+  height: 40px !important;
+  min-width: 38px !important;
+  margin: 0 !important;
+}
+
+.ce-input-suffix {
+  justify-self: end !important;
+  min-width: 44px !important;
+  max-width: 72px !important;
+  padding: 0 10px !important;
+  border-top-right-radius: 999px !important;
+  border-bottom-right-radius: 999px !important;
+}
+
+.ce-scroll-bottom {
+  bottom: calc(var(--ce-compose-compact-height) + 14px) !important;
+}
+
+.ce-chat-search-area {
+  max-height: calc(100% - var(--ce-header) - var(--ce-compose-compact-height) - 24px) !important;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --ce-compose-compact-height: 98px;
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    min-height: var(--ce-compose-compact-height) !important;
+    max-height: var(--ce-compose-compact-height) !important;
+    height: var(--ce-compose-compact-height) !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 34px 46px !important;
+    gap: 6px !important;
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .ce-compose__top {
+    height: 34px !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .ce-compose__bottom {
+    height: 46px !important;
+    grid-template-columns: minmax(0, 1fr) 46px !important;
+  }
+
+  .ce-input-shell {
+    height: 46px !important;
+    grid-template-columns: 36px minmax(0, 1fr) max-content !important;
+    padding: 4px 0 4px 4px !important;
+  }
+
+  .ce-input-prefix,
+  .ce-input-suffix {
+    height: 38px !important;
+    min-width: 36px !important;
+  }
+
+  .ce-input-suffix {
+    min-width: 42px !important;
+    max-width: 64px !important;
+    padding: 0 8px !important;
+  }
+
+  .ce-send-circle,
+  .ce-compose #btnSend,
+  .ce-compose .ce-send-circle {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    min-height: 46px !important;
+  }
+}
+
