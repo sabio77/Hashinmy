@@ -275,6 +275,8 @@ const state = {
   audioStartedAt: 0
 };
 
+let scrollBottomUpdateFrame = 0;
+
 const $ = (id) => document.getElementById(id);
 const els = {
   appRoot: $('appRoot'), authScreen: $('authScreen'), chatScreen: $('chatScreen'), btnGoogleLogin: $('btnGoogleLogin'), authStatus: $('authStatus'),
@@ -462,7 +464,7 @@ function syncRenderedAttachmentImageOrientations(root = els.messages) {
   root?.querySelectorAll?.('.ce-attachment--image img')?.forEach((image) => {
     const syncAndRefreshLayout = () => {
       syncAttachmentImageOrientationFromElement(image);
-      updateScrollBottomButton();
+      scheduleScrollBottomButtonUpdate();
     };
     if (image.complete && image.naturalWidth && image.naturalHeight) {
       syncAndRefreshLayout();
@@ -1059,13 +1061,47 @@ function renderProfilePhotoForModal(profile = {}) {
   return `<span class="ce-profile-photo ce-profile-photo--fallback" aria-label="Foto de perfil de ${escapeHtml(label)}">${escapeHtml(initials(profile))}</span>`;
 }
 
+function stablePreviewVersion(value = '') {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `pv_${(hash >>> 0).toString(36)}`;
+}
+
+function profileSharePreviewVersion(profileOrCode = {}) {
+  if (!profileOrCode || typeof profileOrCode === 'string') return '';
+  const source = [
+    profileOrCode.profileCode || '',
+    String(profileOrCode.displayName || '').trim().slice(0, 120),
+    profileOrCode.updatedAt || ''
+  ].join('|');
+  return stablePreviewVersion(source);
+}
+
+function buildProfileShareLink(profileOrCode = {}) {
+  const code = typeof profileOrCode === 'string' ? profileOrCode : profileOrCode.profileCode;
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return '';
+  const url = new URL(`${getBackendUrl()}/p/${encodeURIComponent(cleanCode)}`);
+  const previewVersion = profileSharePreviewVersion(profileOrCode);
+  if (previewVersion) url.searchParams.set('v', previewVersion);
+  return url.toString();
+}
+
 function renderProfileQrForModal(profile = {}) {
   const code = String(profile.profileCode || '').trim();
   if (!code) {
     return '<div class="ce-profile-qr-missing">Este perfil todavía no tiene un QR disponible.</div>';
   }
   const label = profileDisplayName(profile);
-  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code></div>`;
+  const shareLink = buildProfileShareLink(profile);
+  const previewVersion = profileSharePreviewVersion(profile);
+  const qrSrc = `${getBackendUrl()}/api/profiles/${encodeURIComponent(code)}/qr.svg${previewVersion ? `?v=${encodeURIComponent(previewVersion)}` : ''}`;
+  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${escapeHtml(qrSrc)}" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code><div class="ce-profile-qr__actions"><a class="ce-link" href="${escapeHtml(shareLink)}" target="_blank" rel="noopener">Abrir enlace de perfil</a><button class="ce-link" type="button" data-copy-profile-link="${escapeHtml(shareLink)}">Copiar enlace</button></div></div>`;
 }
 
 function resolveProfileFromChat(chat = {}) {
@@ -1153,6 +1189,17 @@ function toDateTimeLocalValue(date = new Date()) {
   return target.toISOString().slice(0, 16);
 }
 
+function scheduleScrollBottomButtonUpdate() {
+  if (!els.btnScrollBottom) return;
+  const requestFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 16));
+  const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
+  if (scrollBottomUpdateFrame) cancelFrame(scrollBottomUpdateFrame);
+  scrollBottomUpdateFrame = requestFrame(() => {
+    scrollBottomUpdateFrame = 0;
+    updateScrollBottomButton();
+  });
+}
+
 function isLastRenderedMessageVisible() {
   if (!els.messages) return true;
   const candidates = Array.from(els.messages.querySelectorAll('.ce-msg, .ce-chat-empty'));
@@ -1160,10 +1207,12 @@ function isLastRenderedMessageVisible() {
   if (!last) return true;
   const containerRect = els.messages.getBoundingClientRect();
   const lastRect = last.getBoundingClientRect();
-  const tolerance = 2;
-  const bottomEdgeVisible = lastRect.bottom <= containerRect.bottom + tolerance && lastRect.bottom >= containerRect.top - tolerance;
-  const messageIntersectsViewport = lastRect.top <= containerRect.bottom + tolerance && lastRect.bottom >= containerRect.top - tolerance;
-  return Boolean(bottomEdgeVisible && messageIntersectsViewport);
+  const tolerance = 6;
+  const hasUsableViewport = containerRect.height > tolerance && lastRect.height > 0;
+  if (!hasUsableViewport) return true;
+  const lastBottomVisible = lastRect.bottom <= containerRect.bottom + tolerance;
+  const lastTopReachedViewport = lastRect.top < containerRect.bottom - tolerance;
+  return Boolean(lastBottomVisible && lastTopReachedViewport);
 }
 
 function isMessagesNearBottom(threshold = scrollBottomThresholdPx) {
@@ -3372,6 +3421,7 @@ function syncIconInsertKeyboardClasses(isOpen = false) {
   const open = Boolean(isOpen);
   els.messageForm?.classList.toggle('ce-compose--emoji-keyboard', open);
   document.body?.classList.toggle('ce-emoji-keyboard-open', open);
+  scheduleScrollBottomButtonUpdate();
 }
 
 function ensureIconInsertPickerKeyboardPlacement() {
@@ -3430,9 +3480,13 @@ function toggleIconInsertPicker() {
   if (state.iconInsertPanelOpen) {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
+    state.sendModeMenuOpen = false;
+    if (state.scheduleModalOpen) closeScheduleModal();
+    if (state.pollModalOpen) closePollModal();
     els.messageInput?.blur();
     renderQuickRepliesPanel();
     renderSlashCommandsPanel();
+    updateSendModeMenu();
   }
   renderIconInsertPickerPanel();
 }
@@ -3459,8 +3513,11 @@ function insertIconInsertIntoComposer(emoji = '') {
   if (!shouldPreserveEmojiKeyboard) {
     els.messageInput.focus();
     try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
-  } else if (inputIsActive) {
-    try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+  } else {
+    if (inputIsActive) {
+      try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+    }
+    els.messageInput.blur();
   }
   recordRecentIconInsert(clean);
   scheduleActiveDraftSave();
@@ -6614,6 +6671,13 @@ async function copyActiveChatLink() {
   showTemporaryDraftStatus('Enlace interno del chat copiado. Solo funciona en cuentas con acceso a esta conversación.');
 }
 
+async function copyProfileShareLink(link = '') {
+  const cleanLink = String(link || '').trim();
+  if (!cleanLink) throw new Error('Este perfil todavía no tiene un enlace disponible.');
+  await copyTextToClipboard(cleanLink);
+  showTemporaryDraftStatus('Enlace del perfil copiado. Al pegarlo en WhatsApp mostrará la vista previa de ChatER.');
+}
+
 
 function normalizeLinkCandidate(value = '') {
   let url = String(value || '').trim();
@@ -7959,6 +8023,7 @@ function bindEvents() {
   const mobileChatViewportQuery = window.matchMedia?.('(max-width: 620px)');
   const handleMobileChatViewportChange = () => {
     if (state.user) updateResponsiveShellState();
+    scheduleScrollBottomButtonUpdate();
   };
   mobileChatViewportQuery?.addEventListener?.('change', handleMobileChatViewportChange);
   mobileChatViewportQuery?.addListener?.(handleMobileChatViewportChange);
@@ -7979,12 +8044,12 @@ function bindEvents() {
       requestServiceWorkerDeliveryAckFlush();
     }
   });
-  els.messages?.addEventListener('scroll', () => updateScrollBottomButton(), { passive: true });
+  els.messages?.addEventListener('scroll', () => scheduleScrollBottomButtonUpdate(), { passive: true });
   els.messages?.addEventListener('load', (event) => {
     const image = event.target?.closest?.('.ce-attachment--image img');
     if (image) {
       syncAttachmentImageOrientationFromElement(image);
-      updateScrollBottomButton();
+      scheduleScrollBottomButtonUpdate();
     }
   }, true);
   els.btnScrollBottom?.addEventListener('click', () => scrollMessagesToBottom({ smooth: true, resetNew: true }));
@@ -8646,7 +8711,18 @@ function bindEvents() {
   });
   els.btnSendModePrefix?.addEventListener('click', (event) => {
     event.preventDefault();
-    state.sendModeMenuOpen = !state.sendModeMenuOpen;
+    const nextOpen = !state.sendModeMenuOpen;
+    if (nextOpen) {
+      state.quickRepliesOpen = false;
+      state.slashCommandsOpen = false;
+      state.iconInsertPanelOpen = false;
+      if (state.scheduleModalOpen) closeScheduleModal();
+      if (state.pollModalOpen) closePollModal();
+      renderQuickRepliesPanel();
+      renderSlashCommandsPanel();
+      renderIconInsertPickerPanel();
+    }
+    state.sendModeMenuOpen = nextOpen;
     updateSendModeMenu();
   });
   els.sendModeMenu?.addEventListener('click', (event) => {
@@ -9099,7 +9175,17 @@ function bindEvents() {
   els.btnShowQr.addEventListener('click', openOwnQr);
   els.btnScanQr.addEventListener('click', openScanQr);
   els.btnCloseQr.addEventListener('click', closeQrModal);
-  els.qrModal.addEventListener('click', (event) => { if (event.target === els.qrModal) closeQrModal(); });
+  els.qrModal.addEventListener('click', (event) => {
+    if (event.target === els.qrModal) {
+      closeQrModal();
+      return;
+    }
+    const copyProfileButton = event.target.closest('[data-copy-profile-link]');
+    if (copyProfileButton && els.qrModal.contains(copyProfileButton)) {
+      event.preventDefault();
+      copyProfileShareLink(copyProfileButton.dataset.copyProfileLink || '').catch((error) => alert(error.message || 'No se pudo copiar el enlace del perfil.'));
+    }
+  });
   els.manualCodeForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const value = els.manualCodeInput.value.trim();

@@ -1,0 +1,7 @@
+{
+  "asset": "profile-preview-logo.png",
+  "size": "1200x630",
+  "purpose": "Imagen Open Graph para vistas previas del link público de perfil chatER en WhatsApp y apps similares.",
+  "prompt": "Production-ready Open Graph preview image for chatER by Hashinmy. 1200x630 landscape composition, deep teal and emerald gradient background, centered rounded-square app logo with white chat bubble and cE monogram, premium secure messaging brand, clear social preview contrast, no personal data, no email, no extra long text, modern SaaS look, safe margins for WhatsApp link preview cropping.",
+  "fallbackTecnicoIncluido": "Mientras este PNG no exista, el backend sirve un logo SVG geométrico público en /api/profiles/preview-logo.svg para que las vistas previas sigan mostrando una identidad visual funcional. Cuando se genere este PNG final debe ubicarse dentro de appWEB/assets con este mismo nombre."
+}
