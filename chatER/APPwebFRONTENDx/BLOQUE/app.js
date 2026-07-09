@@ -98,6 +98,21 @@ function uiIconWithText(name, text = '', extraClass = '') {
   return `${uiIcon(name, extraClass)}${cleanText ? `<span>${escapeHtml(cleanText)}</span>` : ''}`;
 }
 
+const sendModeConfigs = Object.freeze({
+  direct: { id: 'direct', icon: 'check', label: 'Envío directo', title: 'Enviar normalmente' },
+  schedule: { id: 'schedule', icon: 'schedule', label: 'Programar mensaje', title: 'Programar este mensaje' },
+  silent: { id: 'silent', icon: 'bellOff', label: 'Sin notificación', title: 'Enviar sin notificación push' }
+});
+
+function normalizeSendMode(mode = 'direct') {
+  const clean = String(mode || '').trim();
+  return Object.prototype.hasOwnProperty.call(sendModeConfigs, clean) ? clean : 'direct';
+}
+
+function activeSendModeConfig() {
+  return sendModeConfigs[normalizeSendMode(state.sendMode)] || sendModeConfigs.direct;
+}
+
 const ephemeralOptions = [0, 180, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
 
@@ -251,6 +266,7 @@ const state = {
   pendingAttachment: null,
   attachmentUploading: false,
   sendModeMenuOpen: false,
+  sendMode: 'direct',
   audioRecorder: null,
   audioStream: null,
   audioChunks: [],
@@ -270,8 +286,8 @@ const els = {
   messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
-  scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnCloseSchedule: $('btnCloseSchedule'), btnConfirmSchedule: $('btnConfirmSchedule'),
-  pollModal: $('pollModal'), pollForm: $('pollForm'), pollQuestionInput: $('pollQuestionInput'), pollOptions: $('pollOptions'), pollPreview: $('pollPreview'), btnClosePoll: $('btnClosePoll'), btnConfirmPoll: $('btnConfirmPoll'),
+  scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnConfirmSchedule: $('btnConfirmSchedule'),
+  pollModal: $('pollModal'), pollForm: $('pollForm'), pollQuestionInput: $('pollQuestionInput'), pollOptions: $('pollOptions'), pollPreview: $('pollPreview'), btnConfirmPoll: $('btnConfirmPoll'),
   globalSearchModal: $('globalSearchModal'), globalSearchForm: $('globalSearchForm'), globalSearchInput: $('globalSearchInput'), globalSearchList: $('globalSearchList'), btnCloseGlobalSearch: $('btnCloseGlobalSearch'),
   globalStarredModal: $('globalStarredModal'), globalStarredList: $('globalStarredList'), btnCloseGlobalStarred: $('btnCloseGlobalStarred'), btnRefreshGlobalStarred: $('btnRefreshGlobalStarred'),
   draftsModal: $('draftsModal'), draftsList: $('draftsList'), btnCloseDrafts: $('btnCloseDrafts'),
@@ -422,12 +438,50 @@ function attachmentFallbackText(attachment = null) {
   return normalized.kind === 'image' ? 'Imagen adjunta' : `Archivo adjunto: ${normalized.fileName}`;
 }
 
+function attachmentImageOrientationClass(attachment = null) {
+  const width = Number(attachment?.width || 0) || 0;
+  const height = Number(attachment?.height || 0) || 0;
+  if (width > 0 && height > 0 && width > height) return 'landscape';
+  return 'portrait';
+}
+
+function syncAttachmentImageOrientationFromElement(image = null) {
+  if (!image?.closest) return;
+  const attachment = image.closest('.ce-attachment--image');
+  if (!attachment) return;
+  const width = Number(image.naturalWidth || 0) || 0;
+  const height = Number(image.naturalHeight || 0) || 0;
+  if (width <= 0 || height <= 0) return;
+  const orientation = width > height ? 'landscape' : 'portrait';
+  attachment.classList.toggle('ce-attachment--landscape', orientation === 'landscape');
+  attachment.classList.toggle('ce-attachment--portrait', orientation === 'portrait');
+  attachment.dataset.imageOrientation = orientation;
+}
+
+function syncRenderedAttachmentImageOrientations(root = els.messages) {
+  root?.querySelectorAll?.('.ce-attachment--image img')?.forEach((image) => {
+    const syncAndRefreshLayout = () => {
+      syncAttachmentImageOrientationFromElement(image);
+      updateScrollBottomButton();
+    };
+    if (image.complete && image.naturalWidth && image.naturalHeight) {
+      syncAndRefreshLayout();
+      return;
+    }
+    if (image.dataset.ceOrientationBound === '1') return;
+    image.dataset.ceOrientationBound = '1';
+    image.addEventListener('load', syncAndRefreshLayout, { once: true });
+  });
+}
+
 function renderMessageAttachment(attachment = null) {
   const normalized = normalizeAttachmentClient(attachment);
   if (!normalized) return '';
   const size = normalized.sizeBytes ? ` · ${formatFileSize(normalized.sizeBytes)}` : '';
   if (normalized.kind === 'image') {
-    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a></figure>`;
+    const orientation = attachmentImageOrientationClass(normalized);
+    const imageLabel = `Ver imagen adjunta ${normalized.fileName}`;
+    return `<figure class="ce-attachment ce-attachment--image ce-attachment--${escapeHtml(orientation)}" data-image-orientation="${escapeHtml(orientation)}"><button class="ce-attachment__image-button" type="button" data-open-image-viewer="1" data-image-url="${escapeHtml(normalized.url)}" data-image-alt="${escapeHtml(normalized.fileName)}" aria-label="${escapeHtml(imageLabel)}"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></button></figure>`;
   }
   return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
@@ -504,6 +558,157 @@ function clearPendingAttachment() {
   if (els.fileInput) els.fileInput.value = '';
   updateAttachmentPreview();
   updateComposerControls();
+}
+
+const imageViewerState = {
+  scale: 1,
+  translateX: 0,
+  translateY: 0,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragBaseX: 0,
+  dragBaseY: 0,
+  lastTouchDistance: 0
+};
+
+function clampImageViewerScale(value = 1) {
+  return Math.max(1, Math.min(5, Number(value || 1)));
+}
+
+function applyImageViewerTransform() {
+  const image = document.querySelector('#ceImageViewer .ce-image-viewer__image');
+  if (!image) return;
+  image.style.transform = `translate3d(${imageViewerState.translateX}px, ${imageViewerState.translateY}px, 0) scale(${imageViewerState.scale})`;
+  image.classList.toggle('is-zoomed', imageViewerState.scale > 1.01);
+}
+
+function resetImageViewerTransform() {
+  imageViewerState.scale = 1;
+  imageViewerState.translateX = 0;
+  imageViewerState.translateY = 0;
+  imageViewerState.dragging = false;
+  applyImageViewerTransform();
+}
+
+function setImageViewerScale(nextScale = 1) {
+  const normalizedScale = clampImageViewerScale(nextScale);
+  if (normalizedScale <= 1.01) {
+    imageViewerState.translateX = 0;
+    imageViewerState.translateY = 0;
+  }
+  imageViewerState.scale = normalizedScale;
+  applyImageViewerTransform();
+}
+
+function imageViewerTouchDistance(touches = []) {
+  if (!touches || touches.length < 2) return 0;
+  const first = touches[0];
+  const second = touches[1];
+  return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+}
+
+function ensureImageViewer() {
+  let viewer = document.getElementById('ceImageViewer');
+  if (!viewer) {
+    viewer = document.createElement('div');
+    viewer.id = 'ceImageViewer';
+    viewer.className = 'ce-image-viewer hidden';
+    viewer.setAttribute('role', 'dialog');
+    viewer.setAttribute('aria-modal', 'true');
+    viewer.setAttribute('aria-label', 'Vista completa de imagen');
+    viewer.innerHTML = `
+      <button class="ce-image-viewer__close" type="button" data-image-viewer-close="1" aria-label="Cerrar imagen">${uiIcon('close')}</button>
+      <div class="ce-image-viewer__stage" data-image-viewer-stage="1">
+        <img class="ce-image-viewer__image" alt="" draggable="false" />
+      </div>
+      <div class="ce-image-viewer__controls" aria-label="Controles de zoom">
+        <button type="button" data-image-viewer-zoom="out" aria-label="Alejar">−</button>
+        <button type="button" data-image-viewer-zoom="reset" aria-label="Restablecer zoom">100%</button>
+        <button type="button" data-image-viewer-zoom="in" aria-label="Acercar">+</button>
+      </div>`;
+    document.body.appendChild(viewer);
+    const stage = viewer.querySelector('[data-image-viewer-stage]');
+    const image = viewer.querySelector('.ce-image-viewer__image');
+    viewer.addEventListener('click', (event) => {
+      if (event.target === viewer || event.target.closest('[data-image-viewer-close]')) closeImageViewer();
+    });
+    viewer.querySelectorAll('[data-image-viewer-zoom]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const action = button.dataset.imageViewerZoom;
+        if (action === 'in') setImageViewerScale(imageViewerState.scale + 0.4);
+        else if (action === 'out') setImageViewerScale(imageViewerState.scale - 0.4);
+        else resetImageViewerTransform();
+      });
+    });
+    stage?.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 0.25 : -0.25;
+      setImageViewerScale(imageViewerState.scale + delta);
+    }, { passive: false });
+    stage?.addEventListener('touchstart', (event) => {
+      if (event.touches?.length === 2) imageViewerState.lastTouchDistance = imageViewerTouchDistance(event.touches);
+    }, { passive: false });
+    stage?.addEventListener('touchmove', (event) => {
+      if (event.touches?.length !== 2) return;
+      event.preventDefault();
+      const nextDistance = imageViewerTouchDistance(event.touches);
+      if (imageViewerState.lastTouchDistance > 0 && nextDistance > 0) {
+        const delta = (nextDistance - imageViewerState.lastTouchDistance) / 180;
+        setImageViewerScale(imageViewerState.scale + delta);
+      }
+      imageViewerState.lastTouchDistance = nextDistance;
+    }, { passive: false });
+    stage?.addEventListener('touchend', () => { imageViewerState.lastTouchDistance = 0; });
+    image?.addEventListener('dblclick', () => {
+      if (imageViewerState.scale > 1.01) resetImageViewerTransform();
+      else setImageViewerScale(2.2);
+    });
+    image?.addEventListener('pointerdown', (event) => {
+      if (imageViewerState.scale <= 1.01) return;
+      imageViewerState.dragging = true;
+      imageViewerState.dragStartX = event.clientX;
+      imageViewerState.dragStartY = event.clientY;
+      imageViewerState.dragBaseX = imageViewerState.translateX;
+      imageViewerState.dragBaseY = imageViewerState.translateY;
+      image.setPointerCapture?.(event.pointerId);
+    });
+    image?.addEventListener('pointermove', (event) => {
+      if (!imageViewerState.dragging) return;
+      event.preventDefault();
+      imageViewerState.translateX = imageViewerState.dragBaseX + event.clientX - imageViewerState.dragStartX;
+      imageViewerState.translateY = imageViewerState.dragBaseY + event.clientY - imageViewerState.dragStartY;
+      applyImageViewerTransform();
+    });
+    const stopDrag = () => { imageViewerState.dragging = false; };
+    image?.addEventListener('pointerup', stopDrag);
+    image?.addEventListener('pointercancel', stopDrag);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !viewer.classList.contains('hidden')) closeImageViewer();
+    });
+  }
+  return { viewer, image: viewer.querySelector('.ce-image-viewer__image') };
+}
+
+function openImageViewer(url = '', alt = '') {
+  const cleanUrl = String(url || '').trim();
+  if (!cleanUrl) return;
+  const { viewer, image } = ensureImageViewer();
+  if (!image) return;
+  image.src = cleanUrl;
+  image.alt = String(alt || 'Imagen adjunta');
+  resetImageViewerTransform();
+  viewer.classList.remove('hidden');
+  document.body.classList.add('ce-image-viewer-open');
+}
+
+function closeImageViewer() {
+  const viewer = document.getElementById('ceImageViewer');
+  if (!viewer) return;
+  viewer.classList.add('hidden');
+  document.body.classList.remove('ce-image-viewer-open');
+  resetImageViewerTransform();
 }
 
 function isAudioRecordingSupported() {
@@ -948,8 +1153,22 @@ function toDateTimeLocalValue(date = new Date()) {
   return target.toISOString().slice(0, 16);
 }
 
+function isLastRenderedMessageVisible() {
+  if (!els.messages) return true;
+  const candidates = Array.from(els.messages.querySelectorAll('.ce-msg, .ce-chat-empty'));
+  const last = candidates.filter((node) => node && node.offsetParent !== null).pop();
+  if (!last) return true;
+  const containerRect = els.messages.getBoundingClientRect();
+  const lastRect = last.getBoundingClientRect();
+  const tolerance = 2;
+  const bottomEdgeVisible = lastRect.bottom <= containerRect.bottom + tolerance && lastRect.bottom >= containerRect.top - tolerance;
+  const messageIntersectsViewport = lastRect.top <= containerRect.bottom + tolerance && lastRect.bottom >= containerRect.top - tolerance;
+  return Boolean(bottomEdgeVisible && messageIntersectsViewport);
+}
+
 function isMessagesNearBottom(threshold = scrollBottomThresholdPx) {
   if (!els.messages) return true;
+  if (isLastRenderedMessageVisible()) return true;
   const distance = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight;
   return distance <= threshold;
 }
@@ -2950,14 +3169,64 @@ function renderSendActionIcon(kind = 'mic') {
 
 function updateSendModeMenu() {
   if (!els.sendModeMenu || !els.btnSendModePrefix) return;
+  state.sendMode = normalizeSendMode(state.sendMode);
+  const config = activeSendModeConfig();
   const shouldOpen = Boolean(state.sendModeMenuOpen && !els.btnSendModePrefix.disabled);
   els.sendModeMenu.classList.toggle('hidden', !shouldOpen);
+  els.btnSendModePrefix.innerHTML = uiIcon(config.icon);
+  els.btnSendModePrefix.classList.toggle('is-active', config.id !== 'direct');
+  els.btnSendModePrefix.setAttribute('title', config.title);
+  els.btnSendModePrefix.setAttribute('aria-label', `${config.label}. Abrir opciones de envío`);
   els.btnSendModePrefix.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  els.sendModeMenu.querySelectorAll('[data-send-mode]').forEach((option) => {
+    const active = normalizeSendMode(option.dataset.sendMode) === config.id;
+    option.classList.toggle('active', active);
+    option.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
 }
 
 function closeSendModeMenu() {
   state.sendModeMenuOpen = false;
   updateSendModeMenu();
+}
+
+function closeComposerTransientPanels({ closeSchedule = true } = {}) {
+  state.quickRepliesOpen = false;
+  state.slashCommandsOpen = false;
+  state.iconInsertPanelOpen = false;
+  state.sendModeMenuOpen = false;
+  if (closeSchedule && state.scheduleModalOpen) state.scheduleModalOpen = false;
+  if (closeSchedule && state.pollModalOpen) state.pollModalOpen = false;
+  renderQuickRepliesPanel();
+  renderIconInsertPickerPanel();
+  renderSlashCommandsPanel();
+  updateSendModeMenu();
+  if (closeSchedule) {
+    renderScheduleModal();
+    renderPollModal();
+  }
+}
+
+function shouldRestoreComposerFocusAfterSubmit({ emojiKeyboardWasOpen = false } = {}) {
+  if (!els.messageInput) return false;
+  if (emojiKeyboardWasOpen) return false;
+  if (els.messageForm?.classList.contains('ce-compose--emoji-keyboard')) return false;
+  if (document.body?.classList.contains('ce-emoji-keyboard-open')) return false;
+  return true;
+}
+
+function setSendMode(mode = 'direct', { openConfiguration = false } = {}) {
+  const nextMode = normalizeSendMode(mode);
+  state.sendMode = nextMode;
+  closeSendModeMenu();
+  if (nextMode !== 'schedule' && state.scheduleModalOpen) closeScheduleModal();
+  updateComposerControls();
+  if (nextMode === 'schedule' && openConfiguration) {
+    openScheduleModal({ allowEmptyText: true }).catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
+  } else {
+    showTemporaryDraftStatus(`${activeSendModeConfig().label} activado.`);
+    els.messageInput?.focus();
+  }
 }
 
 function updateComposerControls() {
@@ -2978,11 +3247,14 @@ function updateComposerControls() {
       : (state.editingMessage?.messageId
         ? 'save'
         : ((hasSendableText || hasAttachment) ? 'send' : 'mic')));
+  const modeConfig = activeSendModeConfig();
   const sendActionLabel = state.audioRecording
     ? 'Detener y enviar audio'
     : (sendIcon === 'mic'
       ? 'Grabar audio'
-      : (state.editingMessage?.messageId ? 'Guardar edición' : 'Enviar mensaje'));
+      : (state.editingMessage?.messageId
+        ? 'Guardar edición'
+        : (modeConfig.id === 'schedule' ? 'Programar mensaje' : (modeConfig.id === 'silent' ? 'Enviar sin notificación' : 'Enviar mensaje'))));
   els.btnSend.innerHTML = renderSendActionIcon(sendIcon);
   els.btnSend.classList.toggle('ce-send-circle--mic', sendIcon === 'mic');
   els.btnSend.classList.toggle('ce-send-circle--send', sendIcon === 'send');
@@ -3002,6 +3274,7 @@ function updateComposerControls() {
     els.btnIconInsertPicker.disabled = iconInsertDisabled;
     els.btnIconInsertPicker.setAttribute('title', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
     els.btnIconInsertPicker.setAttribute('aria-label', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
+    if (iconInsertDisabled && state.iconInsertPanelOpen) state.iconInsertPanelOpen = false;
   }
   if (els.btnSmartReplySuggestions) {
     const smartReplyCount = buildSmartReplySuggestions().length;
@@ -3095,14 +3368,34 @@ function normalizeIconInsertCategory(categoryId = '') {
   return categories.some((category) => category.id === clean) ? clean : 'recientes';
 }
 
+function syncIconInsertKeyboardClasses(isOpen = false) {
+  const open = Boolean(isOpen);
+  els.messageForm?.classList.toggle('ce-compose--emoji-keyboard', open);
+  document.body?.classList.toggle('ce-emoji-keyboard-open', open);
+}
+
+function ensureIconInsertPickerKeyboardPlacement() {
+  if (!els.messageForm || !els.iconInsertPickerPanel) return;
+  const bottomRow = els.messageForm.querySelector('.ce-compose__bottom');
+  if (bottomRow && els.iconInsertPickerPanel.previousElementSibling !== bottomRow) {
+    bottomRow.insertAdjacentElement('afterend', els.iconInsertPickerPanel);
+  } else if (!bottomRow && els.iconInsertPickerPanel.parentElement !== els.messageForm) {
+    els.messageForm.appendChild(els.iconInsertPickerPanel);
+  }
+  els.iconInsertPickerPanel.classList.add('ce-icon-insert-panel--keyboard');
+}
+
 function renderIconInsertPickerPanel() {
   if (!els.iconInsertPickerPanel) return;
+  ensureIconInsertPickerKeyboardPlacement();
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
   const canUse = hasChat && !blocked && !state.editingMessage?.messageId;
-  els.btnIconInsertPicker?.classList.toggle('active', Boolean(state.iconInsertPanelOpen && canUse));
-  els.btnIconInsertPicker?.setAttribute('aria-expanded', state.iconInsertPanelOpen && canUse ? 'true' : 'false');
-  if (!state.iconInsertPanelOpen || !canUse) {
+  const keyboardOpen = Boolean(state.iconInsertPanelOpen && canUse);
+  syncIconInsertKeyboardClasses(keyboardOpen);
+  els.btnIconInsertPicker?.classList.toggle('active', keyboardOpen);
+  els.btnIconInsertPicker?.setAttribute('aria-expanded', keyboardOpen ? 'true' : 'false');
+  if (!keyboardOpen) {
     els.iconInsertPickerPanel.classList.add('hidden');
     els.iconInsertPickerPanel.innerHTML = '';
     return;
@@ -3113,10 +3406,6 @@ function renderIconInsertPickerPanel() {
   const activeCategory = categories.find((category) => category.id === activeCategoryId) || categories[0];
   els.iconInsertPickerPanel.classList.remove('hidden');
   els.iconInsertPickerPanel.innerHTML = `
-    <div class="ce-icon-insert-panel__head">
-      <div><strong>Emojis rápidos</strong><span>Inserta expresiones sin salir del chat.</span></div>
-      <button class="ce-link" type="button" data-close-icon-insert-picker="1">Cerrar</button>
-    </div>
     <div class="ce-icon-insert-tabs" role="tablist" aria-label="Categorías de emojis">
       ${categories.map((category) => `<button class="ce-icon-insert-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" title="${escapeHtml(category.title)}" aria-label="${escapeHtml(category.title)}" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-icon-insert-category="${escapeHtml(category.id)}">${escapeHtml(category.icon)}</button>`).join('')}
     </div>
@@ -3141,6 +3430,7 @@ function toggleIconInsertPicker() {
   if (state.iconInsertPanelOpen) {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
+    els.messageInput?.blur();
     renderQuickRepliesPanel();
     renderSlashCommandsPanel();
   }
@@ -3155,8 +3445,10 @@ function insertIconInsertIntoComposer(emoji = '') {
     return;
   }
   const current = String(els.messageInput.value || '');
-  const start = Number.isFinite(els.messageInput.selectionStart) ? els.messageInput.selectionStart : current.length;
-  const end = Number.isFinite(els.messageInput.selectionEnd) ? els.messageInput.selectionEnd : start;
+  const shouldPreserveEmojiKeyboard = Boolean(state.iconInsertPanelOpen);
+  const inputIsActive = document.activeElement === els.messageInput;
+  const start = inputIsActive && Number.isFinite(els.messageInput.selectionStart) ? els.messageInput.selectionStart : current.length;
+  const end = inputIsActive && Number.isFinite(els.messageInput.selectionEnd) ? els.messageInput.selectionEnd : start;
   const before = current.slice(0, start);
   const after = current.slice(end);
   const needsSpaceBefore = before && !/\s$/.test(before);
@@ -3164,8 +3456,12 @@ function insertIconInsertIntoComposer(emoji = '') {
   const insertion = `${needsSpaceBefore ? ' ' : ''}${clean}${needsSpaceAfter ? ' ' : ''}`;
   els.messageInput.value = `${before}${insertion}${after}`.trimStart();
   const nextCursor = Math.max(0, before.length + insertion.length);
-  els.messageInput.focus();
-  try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+  if (!shouldPreserveEmojiKeyboard) {
+    els.messageInput.focus();
+    try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+  } else if (inputIsActive) {
+    try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
+  }
   recordRecentIconInsert(clean);
   scheduleActiveDraftSave();
   updateComposerControls();
@@ -5396,6 +5692,7 @@ function renderActiveChat() {
   const messageHtml = `${storedMessageHtml}${queuedMessageHtml}` || `<div class="ce-chat-empty">${escapeHtml(emptyText)}</div>`;
   const activeMessagesHtml = `${renderChatBlockNotice(chat)}${renderPinnedMessagesStrip(chat, messages)}${messageHtml}`;
   const messagesChanged = setCachedHtml('messagesHtml', els.messages, activeMessagesHtml);
+  syncRenderedAttachmentImageOrientations(els.messages);
   state.renderedActiveChatId = chat.chatId;
   state.renderedMessageCountByChat.set(chat.chatId, nextRenderedCount);
   if (!messagesChanged && sameRenderedChat && !state.highlightedMessageId && !unreadMarker?.messageId) {
@@ -5539,6 +5836,7 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
   const normalizedAttachment = normalizeAttachmentClient(attachment);
   const messageText = String(text || '').trim() || attachmentFallbackText(normalizedAttachment);
+  closeComposerTransientPanels();
   cancelActiveDraftSaveTimer();
   const streamOnly = shouldSendMessageStreamOnly();
   const queued = streamOnly ? null : upsertQueuedMessage({
@@ -5735,6 +6033,7 @@ function openPollModal() {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
     return;
   }
+  closeComposerTransientPanels();
   state.pollModalOpen = true;
   if (els.pollQuestionInput && !els.pollQuestionInput.value) els.pollQuestionInput.value = '';
   renderPollModal();
@@ -5841,14 +6140,15 @@ async function loadScheduledMessages({ force = false } = {}) {
   }
 }
 
-async function openScheduleModal() {
+async function openScheduleModal({ allowEmptyText = true } = {}) {
   if (!state.activeChatId || state.editingMessage?.messageId) return;
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
     return;
   }
+  closeComposerTransientPanels();
   const text = String(els.messageInput?.value || '').trim();
-  if (!text) {
+  if (!text && !allowEmptyText) {
     els.messageInput?.focus();
     return;
   }
@@ -5877,6 +6177,7 @@ async function scheduleCurrentMessage() {
   if (!text) throw new Error('Escribe un mensaje antes de programarlo.');
   const scheduledFor = normalizeScheduleInputValue();
   if (!scheduledFor) throw new Error('Selecciona una fecha y hora válida.');
+  closeComposerTransientPanels({ closeSchedule: false });
   const clientMessageId = `scheduled_client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const silent = Boolean(els.scheduleSilent?.checked);
@@ -7479,6 +7780,7 @@ function bindEvents() {
       if (state.iconInsertPanelOpen) closeIconInsertPicker();
       if (state.forwardingMessage?.messageId) closeForwardModal();
       if (state.scheduleModalOpen) closeScheduleModal();
+      if (state.pollModalOpen) closePollModal();
       if (state.privateNotesOpen) closePrivateNotesModal();
       if (state.remindersOpen) closeReminderModal();
       if (state.labelsModalOpen) closeLabelsModal();
@@ -7678,6 +7980,13 @@ function bindEvents() {
     }
   });
   els.messages?.addEventListener('scroll', () => updateScrollBottomButton(), { passive: true });
+  els.messages?.addEventListener('load', (event) => {
+    const image = event.target?.closest?.('.ce-attachment--image img');
+    if (image) {
+      syncAttachmentImageOrientationFromElement(image);
+      updateScrollBottomButton();
+    }
+  }, true);
   els.btnScrollBottom?.addEventListener('click', () => scrollMessagesToBottom({ smooth: true, resetNew: true }));
 
   els.btnGoogleLogin.addEventListener('click', loginWithGoogle);
@@ -8029,12 +8338,6 @@ function bindEvents() {
   els.btnSmartReplySuggestions?.addEventListener('click', () => openSmartReplySuggestions());
   els.btnIconInsertPicker?.addEventListener('click', () => toggleIconInsertPicker());
   els.iconInsertPickerPanel?.addEventListener('click', (event) => {
-    const closeButton = event.target.closest('[data-close-icon-insert-picker]');
-    if (closeButton && els.iconInsertPickerPanel.contains(closeButton)) {
-      event.preventDefault();
-      closeIconInsertPicker();
-      return;
-    }
     const categoryButton = event.target.closest('[data-icon-insert-category]');
     if (categoryButton && els.iconInsertPickerPanel.contains(categoryButton)) {
       event.preventDefault();
@@ -8048,6 +8351,24 @@ function bindEvents() {
       insertIconInsertIntoComposer(iconInsertButton.dataset.insertIconInsert || '');
     }
   });
+  document.addEventListener('pointerdown', (event) => {
+    if (!state.quickRepliesOpen && !state.slashCommandsOpen && !state.iconInsertPanelOpen && !state.sendModeMenuOpen) return;
+    const target = event.target;
+    if (state.quickRepliesOpen && !els.quickRepliesPanel?.contains(target) && !els.btnQuickReplies?.contains(target) && !els.btnSmartReplySuggestions?.contains(target)) {
+      state.quickRepliesOpen = false;
+      renderQuickRepliesPanel();
+    }
+    if (state.slashCommandsOpen && !els.slashCommandsPanel?.contains(target) && target !== els.messageInput) {
+      state.slashCommandsOpen = false;
+      renderSlashCommandsPanel();
+    }
+    if (state.iconInsertPanelOpen && !els.iconInsertPickerPanel?.contains(target) && !els.btnIconInsertPicker?.contains(target)) {
+      closeIconInsertPicker();
+    }
+    if (state.sendModeMenuOpen && !els.sendModeMenu?.contains(target) && !els.btnSendModePrefix?.contains(target)) {
+      closeSendModeMenu();
+    }
+  }, { passive: true });
   els.quickRepliesPanel?.addEventListener('click', (event) => {
     const smartReplyButton = event.target.closest('[data-smart-reply-index]');
     if (smartReplyButton && els.quickRepliesPanel.contains(smartReplyButton)) {
@@ -8318,7 +8639,7 @@ function bindEvents() {
     renderPrivateNotesModal();
   });
   els.btnScheduleMessage?.addEventListener('click', () => {
-    openScheduleModal().catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
+    setSendMode('schedule', { openConfiguration: true });
   });
   els.btnSilentSend?.addEventListener('click', () => {
     sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
@@ -8333,17 +8654,7 @@ function bindEvents() {
     if (!option || !els.sendModeMenu.contains(option)) return;
     event.preventDefault();
     const mode = option.dataset.sendMode || 'direct';
-    closeSendModeMenu();
-    if (mode === 'schedule') {
-      openScheduleModal().catch((error) => alert(error.message || 'No se pudo abrir la programación.'));
-      return;
-    }
-    if (mode === 'silent') {
-      sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
-      return;
-    }
-    showTemporaryDraftStatus('Envío directo activado.');
-    els.messageInput?.focus();
+    setSendMode(mode, { openConfiguration: mode === 'schedule' });
   });
   els.btnCycleTtl?.addEventListener('click', (event) => {
     event.preventDefault();
@@ -8356,6 +8667,7 @@ function bindEvents() {
   });
   els.btnAttachFile?.addEventListener('click', () => {
     if (state.attachmentUploading) return;
+    closeComposerTransientPanels();
     els.fileInput?.click();
   });
   els.fileInput?.addEventListener('change', () => {
@@ -8376,14 +8688,12 @@ function bindEvents() {
   });
   els.btnCreatePoll?.addEventListener('click', () => openPollModal());
   els.btnVoiceDictation?.addEventListener('click', () => toggleVoiceDictation());
-  els.btnClosePoll?.addEventListener('click', closePollModal);
   els.pollModal?.addEventListener('click', (event) => { if (event.target === els.pollModal) closePollModal(); });
   els.pollForm?.addEventListener('input', renderPollModal);
   els.pollForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     createPollFromModal().catch((error) => alert(error.message || 'No se pudo publicar la encuesta.'));
   });
-  els.btnCloseSchedule?.addEventListener('click', closeScheduleModal);
   els.scheduleSilent?.addEventListener('change', renderScheduleModal);
   els.scheduleModal?.addEventListener('click', (event) => {
     if (event.target === els.scheduleModal) {
@@ -8537,6 +8847,14 @@ function bindEvents() {
     if (jump) jumpToMessage(jump.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
   });
   els.messages.addEventListener('click', (event) => {
+    const imageViewerButton = event.target.closest('[data-open-image-viewer]');
+    if (imageViewerButton && els.messages.contains(imageViewerButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      openImageViewer(imageViewerButton.dataset.imageUrl || '', imageViewerButton.dataset.imageAlt || 'Imagen adjunta');
+      closeOpenMessageControls();
+      return;
+    }
     const messageEl = event.target.closest('.ce-msg');
     if (messageEl && els.messages.contains(messageEl)) {
       openMessageControlsForElement(messageEl);
@@ -8687,10 +9005,12 @@ function bindEvents() {
   els.tabContacts.addEventListener('click', showContactsTab);
   els.messageForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const emojiKeyboardWasOpen = Boolean(state.iconInsertPanelOpen || els.messageForm?.classList.contains('ce-compose--emoji-keyboard') || document.body?.classList.contains('ce-emoji-keyboard-open'));
     const text = els.messageInput.value.trim();
     const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
     if (!text && !hasAttachment && !state.editingMessage?.messageId) {
+      closeComposerTransientPanels();
       try {
         if (state.audioRecording) stopAudioRecording();
         else await startAudioRecording();
@@ -8704,6 +9024,7 @@ function bindEvents() {
       return;
     }
     if (!text && !hasAttachment) return;
+    closeComposerTransientPanels();
     els.btnSend.disabled = true;
     try {
       const slashResult = text ? await handleSlashCommandSubmit(text) : null;
@@ -8717,8 +9038,12 @@ function bindEvents() {
       }
       const wasEditing = Boolean(state.editingMessage?.messageId);
       if (wasEditing) await editActiveMessage(text);
-      else {
-        await sendMessage(text);
+      else if (normalizeSendMode(state.sendMode) === 'schedule') {
+        if (hasAttachment) throw new Error('La programación de mensajes solo está disponible para texto. Quita el adjunto o cambia a envío directo.');
+        await scheduleCurrentMessage();
+      } else {
+        const silent = normalizeSendMode(state.sendMode) === 'silent';
+        await sendMessage(text, { silent });
         els.messageInput.value = '';
         clearPendingAttachment();
       }
@@ -8731,8 +9056,13 @@ function bindEvents() {
       alert(error.message || fallback);
     } finally {
       updateComposerControls();
-      els.messageInput.focus();
+      if (shouldRestoreComposerFocusAfterSubmit({ emojiKeyboardWasOpen })) {
+        els.messageInput.focus();
+      }
     }
+  });
+  els.messageInput.addEventListener('focus', () => {
+    if (state.iconInsertPanelOpen) closeIconInsertPicker();
   });
   els.messageInput.addEventListener('input', () => {
     scheduleActiveDraftSave();
@@ -8793,6 +9123,7 @@ async function init() {
   getClientId();
   setPrivacyMode(readPrivacyModePreference(), { announce: false });
   setCompactMode(readCompactModePreference(), { announce: false });
+  ensureIconInsertPickerKeyboardPlacement();
   bindEvents();
   await registerServiceWorker();
   try {
