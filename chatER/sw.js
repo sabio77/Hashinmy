@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v79-compact-composer-send-threshold';
+const CACHE_NAME = 'chater-static-v82-professional-icons-ui';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',

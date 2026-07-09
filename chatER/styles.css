@@ -495,7 +495,7 @@ svg {
 }
 
 .ce-icon-btn--quick,
-.ce-icon-btn--emoji,
+.ce-icon-btn--icon-insert,
 .ce-icon-btn--schedule,
 .ce-icon-btn--poll,
 .ce-icon-btn--voice,
@@ -505,7 +505,7 @@ svg {
 }
 
 .ce-icon-btn--quick.active,
-.ce-icon-btn--emoji.active,
+.ce-icon-btn--icon-insert.active,
 .ce-icon-btn--schedule.active,
 .ce-icon-btn--poll.active,
 .ce-icon-btn--voice.active,
@@ -1136,11 +1136,19 @@ svg {
 }
 
 .ce-forwarded-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 0 0 5px;
   color: var(--ce-accent-dark);
   font-size: 0.72rem;
   font-weight: 950;
   letter-spacing: 0.02em;
+}
+
+.ce-forwarded-label .ce-ui-icon {
+  width: 13px;
+  height: 13px;
 }
 
 .ce-silent-label,
@@ -1269,9 +1277,17 @@ svg {
 }
 
 .ce-reply-preview strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--ce-accent-dark);
   font-size: 0.78rem;
   font-weight: 950;
+}
+
+.ce-reply-preview strong .ce-ui-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .ce-reply-preview span {
@@ -1686,10 +1702,16 @@ svg {
   height: 34px;
   border: 1px solid var(--ce-line);
   border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: rgba(255, 255, 255, 0.82);
   color: var(--ce-muted-strong);
-  font-size: 22px;
   line-height: 1;
+}
+
+.ce-reply-draft__close .ce-ui-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .ce-reply-draft__close:hover {
@@ -1769,7 +1791,7 @@ svg {
 }
 
 
-.ce-emoji-panel {
+.ce-icon-insert-panel {
   grid-column: 1 / -1;
   max-height: min(330px, 42vh);
   overflow: auto;
@@ -1780,7 +1802,7 @@ svg {
   box-shadow: var(--ce-shadow-soft);
 }
 
-.ce-emoji-panel__head {
+.ce-icon-insert-panel__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1790,23 +1812,23 @@ svg {
   border-bottom: 1px solid var(--ce-line);
 }
 
-.ce-emoji-panel__head strong,
-.ce-emoji-panel__head span {
+.ce-icon-insert-panel__head strong,
+.ce-icon-insert-panel__head span {
   display: block;
 }
 
-.ce-emoji-panel__head strong {
+.ce-icon-insert-panel__head strong {
   color: var(--ce-accent-dark);
   font-weight: 950;
 }
 
-.ce-emoji-panel__head span {
+.ce-icon-insert-panel__head span {
   color: var(--ce-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
 
-.ce-emoji-tabs {
+.ce-icon-insert-tabs {
   display: flex;
   gap: 8px;
   overflow-x: auto;
@@ -1815,7 +1837,7 @@ svg {
   border-bottom: 1px solid var(--ce-line);
 }
 
-.ce-emoji-tab {
+.ce-icon-insert-tab {
   border: 1px solid var(--ce-line);
   border-radius: 999px;
   padding: 8px 10px;
@@ -1827,26 +1849,26 @@ svg {
   cursor: pointer;
 }
 
-.ce-emoji-tab span {
+.ce-icon-insert-tab span {
   margin-right: 5px;
 }
 
-.ce-emoji-tab:hover,
-.ce-emoji-tab:focus-visible,
-.ce-emoji-tab.active {
+.ce-icon-insert-tab:hover,
+.ce-icon-insert-tab:focus-visible,
+.ce-icon-insert-tab.active {
   border-color: rgba(10, 168, 132, 0.36);
   background: rgba(10, 168, 132, 0.12);
   color: var(--ce-accent-dark);
   outline: 0;
 }
 
-.ce-emoji-grid {
+.ce-icon-insert-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
   gap: 8px;
 }
 
-.ce-emoji-item {
+.ce-icon-insert-item {
   min-width: 42px;
   min-height: 42px;
   border: 1px solid var(--ce-line);
@@ -1858,8 +1880,8 @@ svg {
   transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
 }
 
-.ce-emoji-item:hover,
-.ce-emoji-item:focus-visible {
+.ce-icon-insert-item:hover,
+.ce-icon-insert-item:focus-visible {
   transform: translateY(-1px) scale(1.03);
   border-color: rgba(10, 168, 132, 0.36);
   background: rgba(10, 168, 132, 0.12);
@@ -2164,10 +2186,16 @@ svg {
   height: 38px;
   border: 0;
   border-radius: 14px;
+  display: grid;
+  place-items: center;
   background: rgba(15, 23, 42, 0.06);
   color: var(--ce-text);
-  font-size: 28px;
   line-height: 1;
+}
+
+.ce-modal__close .ce-ui-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .ce-qr-box {
@@ -2587,7 +2615,7 @@ svg {
   :root:not([data-theme]) .ce-chat__header,
   :root:not([data-theme]) .ce-reply-draft,
   :root:not([data-theme]) .ce-compose,
-  :root:not([data-theme]) .ce-emoji-panel,
+  :root:not([data-theme]) .ce-icon-insert-panel,
   :root:not([data-theme]) .ce-quick-replies,
   :root:not([data-theme]) .ce-slash-panel,
   :root:not([data-theme]) .ce-modal__card{
@@ -2602,8 +2630,8 @@ svg {
   :root:not([data-theme]) .ce-tabs button.active,
   :root:not([data-theme]) .ce-msg.theirs,
   :root:not([data-theme]) .ce-search-result,
-  :root:not([data-theme]) .ce-emoji-tab,
-  :root:not([data-theme]) .ce-emoji-item,
+  :root:not([data-theme]) .ce-icon-insert-tab,
+  :root:not([data-theme]) .ce-icon-insert-item,
   :root:not([data-theme]) .ce-quick-reply__insert,
   :root:not([data-theme]) .ce-quick-reply__delete,
   :root:not([data-theme]) .ce-slash-command,
@@ -2858,7 +2886,7 @@ svg {
   }
 
   .ce-icon-btn--quick,
-  .ce-icon-btn--emoji,
+  .ce-icon-btn--icon-insert,
   .ce-icon-btn--smart-reply,
   .ce-icon-btn--schedule,
   .ce-icon-btn--poll,
@@ -2872,7 +2900,7 @@ svg {
     justify-content: center;
   }
 
-  .ce-emoji-panel__head,
+  .ce-icon-insert-panel__head,
   .ce-quick-replies__head,
   .ce-quick-replies__actions {
     align-items: stretch;
@@ -3571,16 +3599,14 @@ svg {
   gap: 8px;
 }
 
-.ce-scroll-bottom span::before {
-  content: '↓';
+.ce-scroll-bottom .ce-ui-icon {
   display: grid;
   width: 22px;
   height: 22px;
   place-items: center;
   border-radius: 999px;
+  padding: 4px;
   background: rgba(255, 255, 255, 0.2);
-  font-size: 0.92rem;
-  line-height: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -3822,7 +3848,7 @@ body.ce-compact-mode .ce-draft-status {
   font-size: 0.72rem;
 }
 
-body.ce-compact-mode .ce-emoji-panel,
+body.ce-compact-mode .ce-icon-insert-panel,
 body.ce-compact-mode .ce-quick-replies,
 body.ce-compact-mode .ce-slash-panel {
   max-height: min(270px, 34vh);
@@ -4040,8 +4066,12 @@ body.ce-compact-mode .ce-reminder {
   place-items: center;
   background: rgba(15, 23, 42, 0.1);
   color: var(--ce-muted-strong);
-  font-size: 1rem;
   line-height: 1;
+}
+
+.ce-label-token button .ce-ui-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .ce-label-preset {
@@ -5285,7 +5315,7 @@ body.ce-compact-mode .ce-lock__card {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel,
+  .ce-compose .ce-icon-insert-panel,
   .ce-compose .ce-ttl-control {
     grid-column: 1 / -1;
   }
@@ -5348,7 +5378,7 @@ body.ce-compact-mode .ce-lock__card {
   .ce-compose {
     grid-template-columns: repeat(6, minmax(42px, 1fr));
     grid-template-areas:
-      "quick smart emoji schedule poll voice"
+      "quick smart iconinsert schedule poll voice"
       "silent ttl ttl ttl ttl ttl"
       "input input input input input send";
     align-items: center;
@@ -5360,7 +5390,7 @@ body.ce-compact-mode .ce-lock__card {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -5371,7 +5401,7 @@ body.ce-compact-mode .ce-lock__card {
 
   .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
   .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
-  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--icon-insert { grid-area: iconinsert; }
   .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
   .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
   .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
@@ -5426,7 +5456,7 @@ body.ce-compact-mode .ce-lock__card {
   .ce-compose {
     grid-template-columns: repeat(4, minmax(42px, 1fr));
     grid-template-areas:
-      "quick smart emoji schedule"
+      "quick smart iconinsert schedule"
       "poll voice silent silent"
       "ttl ttl ttl ttl"
       "input input input send";
@@ -5657,7 +5687,7 @@ body.ce-compact-mode .ce-shell {
 .ce-compose > .ce-draft-status,
 .ce-compose > .ce-quick-replies,
 .ce-compose > .ce-slash-panel,
-.ce-compose > .ce-emoji-panel {
+.ce-compose > .ce-icon-insert-panel {
   min-width: 0;
   max-width: 100%;
 }
@@ -5678,7 +5708,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(6, minmax(42px, 1fr));
     grid-template-areas:
-      "quick smart emoji schedule poll voice"
+      "quick smart iconinsert schedule poll voice"
       "silent ttl ttl ttl ttl ttl"
       "input input input input input send";
     align-items: center;
@@ -5690,7 +5720,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -5701,7 +5731,7 @@ body.ce-compact-mode .ce-shell {
 
   .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
   .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
-  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--icon-insert { grid-area: iconinsert; }
   .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
   .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
   .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
@@ -5816,7 +5846,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(6, minmax(42px, 1fr));
     grid-template-areas:
-      "quick smart emoji schedule poll voice"
+      "quick smart iconinsert schedule poll voice"
       "silent ttl ttl ttl ttl ttl"
       "input input input input input send";
     align-items: center;
@@ -5828,7 +5858,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -5839,7 +5869,7 @@ body.ce-compact-mode .ce-shell {
 
   .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
   .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
-  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--icon-insert { grid-area: iconinsert; }
   .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
   .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
   .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
@@ -5949,7 +5979,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(32px, 36px)) minmax(70px, 1fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input input send";
     gap: 5px;
     padding: 7px max(8px, env(safe-area-inset-right)) max(7px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
@@ -5959,7 +5989,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -6184,7 +6214,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(32px, 36px)) minmax(72px, 1fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input send send";
     align-items: center;
     gap: 5px;
@@ -6194,7 +6224,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -6299,7 +6329,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(34px, 38px)) minmax(86px, 1fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input send send";
     align-items: center;
     gap: 6px;
@@ -6309,7 +6339,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -6424,7 +6454,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(50px, 1.6fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input send send";
     gap: 3px;
     padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
@@ -6493,7 +6523,7 @@ body.ce-compact-mode .ce-shell {
 
 .ce-compose .ce-quick-replies,
 .ce-compose .ce-slash-panel,
-.ce-compose .ce-emoji-panel {
+.ce-compose .ce-icon-insert-panel {
   max-height: min(320px, 42vh);
   overflow: auto;
   overscroll-behavior: contain;
@@ -6516,7 +6546,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(6, minmax(42px, 1fr));
     grid-template-areas:
-      "quick smart emoji schedule poll voice"
+      "quick smart iconinsert schedule poll voice"
       "silent ttl ttl ttl ttl ttl"
       "input input input input input send";
     align-items: center;
@@ -6528,7 +6558,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -6539,7 +6569,7 @@ body.ce-compact-mode .ce-shell {
 
   .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
   .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
-  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--icon-insert { grid-area: iconinsert; }
   .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
   .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
   .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
@@ -6582,7 +6612,7 @@ body.ce-compact-mode .ce-shell {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(30px, 1fr)) minmax(58px, 1.6fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input send send";
     gap: 5px;
     padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
@@ -6895,7 +6925,7 @@ body.ce-compact-mode .ce-chat-search input {
   .ce-compose {
     grid-template-columns: repeat(7, minmax(28px, 1fr)) minmax(52px, 1.35fr);
     grid-template-areas:
-      "quick smart emoji schedule poll voice silent ttl"
+      "quick smart iconinsert schedule poll voice silent ttl"
       "input input input input input input send send";
     align-items: center;
     gap: 4px;
@@ -6905,7 +6935,7 @@ body.ce-compact-mode .ce-chat-search input {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -7083,7 +7113,7 @@ body.ce-compact-mode .ce-chat-search input {
 
   .ce-compose {
     grid-template-columns: repeat(7, minmax(30px, 34px)) minmax(52px, 64px) minmax(0, 1fr) minmax(58px, 72px);
-    grid-template-areas: "quick smart emoji schedule poll voice silent ttl input send";
+    grid-template-areas: "quick smart iconinsert schedule poll voice silent ttl input send";
     align-items: center;
     gap: 4px;
     min-height: var(--ce-compose);
@@ -7093,7 +7123,7 @@ body.ce-compact-mode .ce-chat-search input {
   .ce-compose .ce-draft-status,
   .ce-compose .ce-quick-replies,
   .ce-compose .ce-slash-panel,
-  .ce-compose .ce-emoji-panel {
+  .ce-compose .ce-icon-insert-panel {
     grid-column: 1 / -1;
   }
 
@@ -7112,7 +7142,7 @@ body.ce-compact-mode .ce-chat-search input {
 
   .ce-compose > .ce-icon-btn--quick { grid-area: quick; }
   .ce-compose > .ce-icon-btn--smart-reply { grid-area: smart; }
-  .ce-compose > .ce-icon-btn--emoji { grid-area: emoji; }
+  .ce-compose > .ce-icon-btn--icon-insert { grid-area: iconinsert; }
   .ce-compose > .ce-icon-btn--schedule { grid-area: schedule; }
   .ce-compose > .ce-icon-btn--poll { grid-area: poll; }
   .ce-compose > .ce-icon-btn--voice { grid-area: voice; }
@@ -7355,7 +7385,7 @@ body {
 .ce-draft-status,
 .ce-quick-replies,
 .ce-slash-panel,
-.ce-emoji-panel,
+.ce-icon-insert-panel,
 .ce-attachment-preview {
   grid-column: 1 / -1;
 }
@@ -7449,10 +7479,16 @@ body {
   height: 32px;
   border: 0;
   border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: rgba(17, 27, 33, 0.08);
   color: var(--ce-muted-strong);
-  font-size: 20px;
   line-height: 1;
+}
+
+.ce-attachment-preview button .ce-ui-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .ce-attachment-preview button:hover,
@@ -7935,7 +7971,7 @@ body.ce-dark-mode .ce-msg__meta {
 .ce-search-panel,
 .ce-quick-replies-panel,
 .ce-slash-commands-panel,
-.ce-emoji-picker-panel {
+.ce-icon-insert-panel {
   border-color: var(--ce-line);
   background: var(--ce-panel);
   border-radius: 12px;
@@ -8130,7 +8166,7 @@ body.ce-dark-mode .ce-row.is-active {
 :root[data-theme='dark'] .ce-private-notes-card,
 :root[data-theme='dark'] .ce-quick-replies-panel,
 :root[data-theme='dark'] .ce-slash-commands-panel,
-:root[data-theme='dark'] .ce-emoji-picker-panel,
+:root[data-theme='dark'] .ce-icon-insert-panel,
 :root[data-theme='dark'] .ce-search-panel,
 :root[data-theme='dark'] .ce-pinned-strip,
 :root[data-theme='dark'] .ce-reply-preview,
@@ -8643,7 +8679,7 @@ body.ce-dark-mode .ce-compose #messageInput {
 
 .ce-compose .ce-quick-replies,
 .ce-compose .ce-slash-panel,
-.ce-compose .ce-emoji-panel {
+.ce-compose .ce-icon-insert-panel {
   position: absolute !important;
   left: 0 !important;
   right: auto !important;
@@ -8655,7 +8691,7 @@ body.ce-dark-mode .ce-compose #messageInput {
   margin: 0 !important;
 }
 
-.ce-compose .ce-emoji-panel {
+.ce-compose .ce-icon-insert-panel {
   width: min(420px, calc(100vw - 32px)) !important;
 }
 
@@ -8802,4 +8838,179 @@ body.ce-dark-mode .ce-chat-search-area {
     grid-column: 1 / -1;
     justify-self: flex-start;
   }
+}
+
+
+/* Iconografía profesional chatER: SVG inline para controles de interfaz. */
+.ce-ui-icon {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  flex: 0 0 auto;
+  fill: currentColor;
+  vertical-align: -0.14em;
+  pointer-events: none;
+}
+
+.ce-icon-btn .ce-ui-icon,
+.ce-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ce-input-prefix .ce-ui-icon,
+.ce-input-suffix .ce-ui-icon,
+.ce-send-circle .ce-ui-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ce-input-suffix {
+  gap: 4px;
+}
+
+.ce-input-suffix span {
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ce-send-mode-menu .ce-ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ce-attachment__icon .ce-ui-icon,
+.ce-attachment-preview__file .ce-ui-icon,
+.ce-msg-actions .ce-ui-icon,
+.ce-chat-pin .ce-ui-icon,
+.ce-chat-archive .ce-ui-icon,
+.ce-contact-alias-btn .ce-ui-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.ce-avatar__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ce-avatar--small .ce-avatar__icon {
+  width: 17px;
+  height: 17px;
+}
+
+.ce-silent-label,
+.ce-ephemeral-label,
+.ce-poll__label,
+.ce-muted-pill,
+.ce-outbox-pill,
+.ce-pinned-strip > strong,
+.ce-smart-replies__title strong,
+.ce-search-result strong,
+.ce-global-starred-item__head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ce-silent-label .ce-ui-icon,
+.ce-ephemeral-label .ce-ui-icon,
+.ce-poll__label .ce-ui-icon,
+.ce-muted-pill .ce-ui-icon,
+.ce-outbox-pill .ce-ui-icon,
+.ce-pinned-strip > strong .ce-ui-icon,
+.ce-smart-replies__title .ce-ui-icon,
+.ce-search-result strong .ce-ui-icon,
+.ce-global-starred-item__head .ce-ui-icon,
+.ce-msg__receipt .ce-ui-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.ce-msg__receipt .ce-ui-icon {
+  display: block;
+}
+
+.ce-icon-insert-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ce-icon-insert-tab .ce-ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.ce-send-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 1em;
+}
+
+.ce-send-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+
+.ce-reaction-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Selector de iconos rápidos: usa SVG profesionales y texto de producción. */
+.ce-icon-insert-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 58px;
+  padding: 8px 6px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.ce-icon-insert-item .ce-ui-icon,
+.ce-icon-insert-item__icon {
+  width: 21px;
+  height: 21px;
+}
+
+.ce-icon-insert-item span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* Refuerzo final: controles de interfaz sin símbolos Unicode visibles; todos usan SVG profesional. */
+.ce-delete-btn .ce-ui-icon,
+.ce-quick-reply__delete .ce-ui-icon,
+.ce-pinned-strip__remove .ce-ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.ce-chat-brief-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ce-chat-brief-range .ce-ui-icon,
+.ce-date-jump-day em .ce-ui-icon {
+  width: 13px;
+  height: 13px;
+  vertical-align: -0.16em;
 }

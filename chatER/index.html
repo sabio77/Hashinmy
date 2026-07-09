@@ -138,29 +138,29 @@
               <div class="ce-draft-status hidden" id="draftStatus" aria-live="polite"></div>
               <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
               <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
-              <div class="ce-emoji-panel hidden" id="emojiPickerPanel" aria-live="polite"></div>
+              <div class="ce-icon-insert-panel hidden" id="iconInsertPickerPanel" aria-live="polite"></div>
               <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite"></div>
             </div>
             <div class="ce-compose__toolstrip">
               <input id="fileInput" class="ce-file-input" type="file" hidden />
-              <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled>📎</button>
-              <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled>⚡</button>
-              <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled>✨</button>
-              <button class="ce-icon-btn ce-icon-btn--emoji" id="btnEmojiPicker" type="button" title="Insertar emoji" aria-label="Insertar emoji" aria-expanded="false" disabled>😊</button>
-              <button class="ce-icon-btn ce-icon-btn--schedule" id="btnScheduleMessage" type="button" title="Programar mensaje" aria-label="Programar mensaje" disabled>⏱</button>
-              <button class="ce-icon-btn ce-icon-btn--poll" id="btnCreatePoll" type="button" title="Crear encuesta" aria-label="Crear encuesta" disabled>📊</button>
-              <button class="ce-icon-btn ce-icon-btn--voice" id="btnVoiceDictation" type="button" title="Dictar mensaje por voz" aria-label="Dictar mensaje por voz" aria-pressed="false" disabled>🎙️</button>
+              <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.7 6.3a4.25 4.25 0 0 0-6.01 0L5.4 12.59a3 3 0 1 0 4.24 4.24l7.07-7.07-1.41-1.41-7.07 7.07a1 1 0 1 1-1.41-1.41l6.29-6.3a2.25 2.25 0 0 1 3.18 3.18l-7.07 7.08A4.75 4.75 0 0 1 2.5 11.25l6.72-6.72 1.42 1.42-6.72 6.71a2.75 2.75 0 0 0 3.89 3.89l7.07-7.07 1.42 1.41-7.08 7.08a4.75 4.75 0 0 1-6.71-6.72l6.72-6.72a6.25 6.25 0 1 1 8.84 8.84l-6.37 6.36-1.41-1.41 6.36-6.36a4.25 4.25 0 0 0 0-6.01Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--icon-insert" id="btnIconInsertPicker" type="button" title="Insertar icono rápido" aria-label="Insertar icono rápido" aria-expanded="false" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--schedule" id="btnScheduleMessage" type="button" title="Programar mensaje" aria-label="Programar mensaje" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v9h14v-9ZM5 6v2h14V6H5Zm8 6h-2v4.2l3.3 2 1-1.6-2.3-1.4V12Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--poll" id="btnCreatePoll" type="button" title="Crear encuesta" aria-label="Crear encuesta" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 19h14v2H5v-2Zm1-6h3v5H6v-5Zm5-8h3v13h-3V5Zm5 4h3v9h-3V9Z"/></svg></button>
+              <button class="ce-icon-btn ce-icon-btn--voice" id="btnVoiceDictation" type="button" title="Dictar mensaje por voz" aria-label="Dictar mensaje por voz" aria-pressed="false" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm5 8v1a5 5 0 0 1-10 0v-1H5v1a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12v-1h-2Z"/></svg></button>
             </div>
           </div>
           <div class="ce-compose__bottom" aria-label="Escribir y enviar">
             <div class="ce-input-shell">
-              <button class="ce-input-prefix" id="btnSendModePrefix" type="button" title="Opciones de envío" aria-label="Opciones de envío" aria-expanded="false" disabled>✓</button>
+              <button class="ce-input-prefix" id="btnSendModePrefix" type="button" title="Opciones de envío" aria-label="Opciones de envío" aria-expanded="false" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.2 16.6 4.9 12.3 3.5 13.7l5.7 5.7L21 7.6 19.6 6.2 9.2 16.6Z"/></svg></button>
               <div class="ce-send-mode-menu hidden" id="sendModeMenu" role="menu" aria-label="Opciones de envío">
-                <button type="button" data-send-mode="direct" role="menuitem"><span aria-hidden="true">✓</span><strong>Directo</strong></button>
-                <button type="button" data-send-mode="schedule" role="menuitem"><span aria-hidden="true">⏱</span><strong>Programar mensaje</strong></button>
-                <button type="button" data-send-mode="silent" role="menuitem"><span aria-hidden="true">🔕</span><strong>Enviar sin notificación</strong></button>
+                <button type="button" data-send-mode="direct" role="menuitem"><span aria-hidden="true"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.2 16.6 4.9 12.3 3.5 13.7l5.7 5.7L21 7.6 19.6 6.2 9.2 16.6Z"/></svg></span><strong>Directo</strong></button>
+                <button type="button" data-send-mode="schedule" role="menuitem"><span aria-hidden="true"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v9h14v-9ZM5 6v2h14V6H5Zm8 6h-2v4.2l3.3 2 1-1.6-2.3-1.4V12Z"/></svg></span><strong>Programar mensaje</strong></button>
+                <button type="button" data-send-mode="silent" role="menuitem"><span aria-hidden="true"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.27 3 3 4.27l3.02 3.02A7.86 7.86 0 0 0 5 11v4l-2 2v1h15.73L20.73 20 22 18.73 4.27 3ZM12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-7v-4a7 7 0 0 0-9.9-6.37l9.7 9.7.2.2V15Z"/></svg></span><strong>Enviar sin notificación</strong></button>
               </div>
-              <input id="messageInput" type="text" autocomplete="off" placeholder="Escribe un mensaje, /ayuda o 😊" disabled />
+              <input id="messageInput" type="text" autocomplete="off" placeholder="Escribe un mensaje o /ayuda" disabled />
               <label class="ce-ttl-control" title="Mensajes temporales después de lectura">
                 <span>Expira</span>
                 <select id="messageTtlSelect" aria-label="Expiración del mensaje después de lectura" disabled>
@@ -171,9 +171,9 @@
                   <option value="604800">7 días</option>
                 </select>
               </label>
-              <button class="ce-input-suffix" id="btnCycleTtl" type="button" title="Tiempo de expiración después de lectura" aria-label="Tiempo de expiración después de lectura" disabled>⏳</button>
+              <button class="ce-input-suffix" id="btnCycleTtl" type="button" title="Tiempo de expiración después de lectura" aria-label="Tiempo de expiración después de lectura" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 1H9v2h6V1Zm-4 11.6V7h2v6.4l3.2 3.2-1.4 1.4L11 14.2v-1.6ZM12 4a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z"/></svg></button>
             </div>
-            <button class="ce-btn ce-btn--primary ce-send-circle" type="submit" id="btnSend" aria-label="Grabar audio" disabled>🎙️</button>
+            <button class="ce-btn ce-btn--primary ce-send-circle" type="submit" id="btnSend" aria-label="Grabar audio" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm5 8v1a5 5 0 0 1-10 0v-1H5v1a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12v-1h-2Z"/></svg></button>
           </div>
         </form>
       </section>
@@ -182,7 +182,7 @@
 
   <div class="ce-modal hidden" id="qrModal" role="dialog" aria-modal="true" aria-label="Código QR chatER">
     <div class="ce-modal__card">
-      <button class="ce-modal__close" id="btnCloseQr" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseQr" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2 id="qrModalTitle">Mi código QR</h2>
       <div class="ce-qr-box" id="qrBox"></div>
       <p id="qrHelp">Comparte este QR para que otros te agreguen y abran un chat contigo.</p>
@@ -200,7 +200,7 @@
 
   <div class="ce-modal hidden" id="forwardModal" role="dialog" aria-modal="true" aria-label="Reenviar mensaje">
     <div class="ce-modal__card ce-forward-card">
-      <button class="ce-modal__close" id="btnCloseForward" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseForward" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Reenviar mensaje</h2>
       <p>Selecciona el chat donde quieres compartir este mensaje. El contenido se enviará como mensaje reenviado.</p>
       <div class="ce-forward-preview" id="forwardPreview"></div>
@@ -210,7 +210,7 @@
 
   <div class="ce-modal hidden" id="scheduleModal" role="dialog" aria-modal="true" aria-label="Programar mensaje">
     <div class="ce-modal__card ce-schedule-card">
-      <button class="ce-modal__close" id="btnCloseSchedule" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseSchedule" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Programar mensaje</h2>
       <p>Elige cuándo quieres que chatER envíe este mensaje aunque cierres la app.</p>
       <div class="ce-schedule-preview" id="schedulePreview"></div>
@@ -231,7 +231,7 @@
 
   <div class="ce-modal hidden" id="pollModal" role="dialog" aria-modal="true" aria-label="Crear encuesta">
     <form class="ce-modal__card ce-poll-card" id="pollForm">
-      <button class="ce-modal__close" id="btnClosePoll" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnClosePoll" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Crear encuesta</h2>
       <p>Publica una pregunta con opciones votables para decidir rápido dentro del chat.</p>
       <div class="ce-poll-preview" id="pollPreview"></div>
@@ -253,7 +253,7 @@
 
   <div class="ce-modal hidden" id="reminderModal" role="dialog" aria-modal="true" aria-label="Recordatorios privados del chat">
     <div class="ce-modal__card ce-reminder-card">
-      <button class="ce-modal__close" id="btnCloseReminders" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseReminders" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2 id="reminderTitle">Recordatorios privados</h2>
       <p id="reminderChatName">Visibles solo para ti.</p>
       <div class="ce-reminder-preview" id="reminderPreview"></div>
@@ -269,13 +269,13 @@
         <button class="ce-btn ce-btn--primary" id="btnSaveReminder" type="button">Crear recordatorio</button>
       </div>
       <div class="ce-reminder-list" id="reminderList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + R · Los avisos son privados y no modifican el chat.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Shift + R · Los avisos son privados y no modifican el chat.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="privateNotesModal" role="dialog" aria-modal="true" aria-label="Notas privadas del chat">
     <div class="ce-modal__card ce-private-notes-card">
-      <button class="ce-modal__close" id="btnClosePrivateNotes" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnClosePrivateNotes" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2 id="privateNotesTitle">Notas privadas del chat</h2>
       <p id="privateNotesChatName">Visibles solo para ti.</p>
       <label class="ce-private-notes-editor">
@@ -287,13 +287,13 @@
         <button class="ce-link hidden" id="btnCancelPrivateNoteEdit" type="button">Cancelar edición</button>
       </div>
       <div class="ce-private-notes-list" id="privateNotesList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + L · Estas notas no se envían al otro participante.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Shift + L · Estas notas no se envían al otro participante.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="labelsModal" role="dialog" aria-modal="true" aria-label="Etiquetas del chat">
     <div class="ce-modal__card ce-labels-card">
-      <button class="ce-modal__close" id="btnCloseLabels" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseLabels" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Etiquetas del chat</h2>
       <p id="labelsChatName">Organiza esta conversación con etiquetas personales.</p>
       <label class="ce-label-editor">
@@ -311,20 +311,20 @@
 
   <div class="ce-modal hidden" id="blockedContactsModal" role="dialog" aria-modal="true" aria-label="Contactos bloqueados">
     <div class="ce-modal__card ce-blocked-contacts-card">
-      <button class="ce-modal__close" id="btnCloseBlockedContacts" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseBlockedContacts" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Contactos bloqueados</h2>
       <p>Gestiona tu lista privada de bloqueos sin buscar conversación por conversación.</p>
       <div class="ce-blocked-contacts-toolbar">
         <button class="ce-btn ce-btn--small" id="btnRefreshBlockedContacts" type="button">Actualizar lista</button>
       </div>
       <div class="ce-blocked-contacts-list" id="blockedContactsList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + X · Al desbloquear, la conversación se conserva y vuelve a permitir mensajes si la otra persona no te bloqueó.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + X · Al desbloquear, la conversación se conserva y vuelve a permitir mensajes si la otra persona no te bloqueó.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="contactNicknameModal" role="dialog" aria-modal="true" aria-label="Apodo privado del contacto">
     <div class="ce-modal__card ce-contact-nickname-card">
-      <button class="ce-modal__close" id="btnCloseContactNickname" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseContactNickname" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2 id="contactNicknameTitle">Apodo privado</h2>
       <p id="contactNicknameSubtitle">Personaliza cómo ves este contacto sin cambiar su perfil real.</p>
       <label class="ce-contact-nickname-field">
@@ -341,7 +341,7 @@
 
   <div class="ce-modal hidden" id="globalSearchModal" role="dialog" aria-modal="true" aria-label="Buscar en todos los chats">
     <div class="ce-modal__card ce-global-search-card">
-      <button class="ce-modal__close" id="btnCloseGlobalSearch" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseGlobalSearch" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Buscar en todos los chats</h2>
       <p>Encuentra mensajes en conversaciones activas y archivadas sin abrir cada chat por separado.</p>
       <form class="ce-global-search-form" id="globalSearchForm" role="search" aria-label="Búsqueda global de mensajes">
@@ -349,36 +349,36 @@
         <button class="ce-btn ce-btn--primary" type="submit">Buscar</button>
       </form>
       <div class="ce-global-search-list" id="globalSearchList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Shift + F · Los resultados respetan tus permisos de conversación.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Shift + F · Los resultados respetan tus permisos de conversación.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="globalStarredModal" role="dialog" aria-modal="true" aria-label="Destacados de todos los chats">
     <div class="ce-modal__card ce-global-starred-card">
-      <button class="ce-modal__close" id="btnCloseGlobalStarred" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseGlobalStarred" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Destacados de todos los chats</h2>
-      <p>Reúne en una sola bandeja los mensajes marcados con ★ en chats activos y archivados.</p>
+      <p>Reúne en una sola bandeja los mensajes destacados en chats activos y archivados.</p>
       <div class="ce-global-starred-toolbar">
         <button class="ce-btn ce-btn--small" id="btnRefreshGlobalStarred" type="button">Actualizar destacados</button>
       </div>
       <div class="ce-global-starred-list" id="globalStarredList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + S · Los destacados son privados y solo aparecen en tu cuenta.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + S · Los destacados son privados y solo aparecen en tu cuenta.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="draftsModal" role="dialog" aria-modal="true" aria-label="Borradores pendientes">
     <div class="ce-modal__card ce-drafts-card">
-      <button class="ce-modal__close" id="btnCloseDrafts" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseDrafts" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Borradores pendientes</h2>
       <p>Encuentra mensajes sin enviar guardados en tu cuenta y continúa exactamente en el chat correcto.</p>
       <div class="ce-drafts-list" id="draftsList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + D · Los borradores son privados y solo aparecen en tus dispositivos.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + D · Los borradores son privados y solo aparecen en tus dispositivos.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="linkLibraryModal" role="dialog" aria-modal="true" aria-label="Enlaces compartidos del chat">
     <div class="ce-modal__card ce-link-library-card">
-      <button class="ce-modal__close" id="btnCloseLinkLibrary" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseLinkLibrary" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Enlaces compartidos</h2>
       <p>Revisa las URLs detectadas en este chat, cópialas o vuelve al mensaje donde se compartieron.</p>
       <label class="ce-link-library-search">
@@ -386,24 +386,24 @@
         <input id="linkLibraryInput" type="search" autocomplete="off" placeholder="Buscar por dominio, URL o texto del mensaje" />
       </label>
       <div class="ce-link-library-list" id="linkLibraryList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + L · La biblioteca se genera localmente desde los mensajes cargados del chat.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + L · La biblioteca se genera localmente desde los mensajes cargados del chat.</p>
     </div>
   </div>
 
   <div class="ce-modal hidden" id="chatBriefModal" role="dialog" aria-modal="true" aria-label="Resumen del chat">
     <div class="ce-modal__card ce-chat-brief-card">
-      <button class="ce-modal__close" id="btnCloseChatBrief" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseChatBrief" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Resumen del chat</h2>
       <p>Genera una vista ejecutiva local con pendientes, preguntas, acuerdos, temas frecuentes y últimos mensajes sin enviar contenido a servicios externos.</p>
       <div class="ce-chat-brief-list" id="chatBriefList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + B · El resumen se calcula con los mensajes cargados de la conversación.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + B · El resumen se calcula con los mensajes cargados de la conversación.</p>
     </div>
   </div>
 
 
   <div class="ce-modal hidden" id="dateJumpModal" role="dialog" aria-modal="true" aria-label="Ir a fecha en este chat">
     <div class="ce-modal__card ce-date-jump-card">
-      <button class="ce-modal__close" id="btnCloseDateJump" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseDateJump" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Ir a fecha</h2>
       <p>Consulta el calendario de los últimos mensajes y salta al primer mensaje de un día específico sin perder el hilo del chat.</p>
       <label class="ce-date-jump-search">
@@ -411,14 +411,14 @@
         <input id="dateJumpInput" type="date" autocomplete="off" />
       </label>
       <div class="ce-date-jump-list" id="dateJumpList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + Alt + J · La línea de tiempo se calcula desde los últimos 500 mensajes disponibles.</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + Alt + J · La línea de tiempo se calcula desde los últimos 500 mensajes disponibles.</p>
     </div>
   </div>
 
   <div class="ce-lock hidden" id="privacyLockOverlay" role="dialog" aria-modal="true" aria-label="Bloqueo privado de chatER">
     <div class="ce-lock__card">
-      <button class="ce-modal__close" id="btnClosePrivacyLock" type="button" aria-label="Cerrar bloqueo privado">×</button>
-      <div class="ce-lock__icon" aria-hidden="true">🔒</div>
+      <button class="ce-modal__close" id="btnClosePrivacyLock" type="button" aria-label="Cerrar bloqueo privado"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
+      <div class="ce-lock__icon" aria-hidden="true"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 0 1 4 0v2h-4V7Zm3 10.73V19h-2v-1.27a2 2 0 1 1 2 0Z"/></svg></div>
       <h2 id="privacyLockTitle">Bloqueo privado</h2>
       <p id="privacyLockDescription">Protege la pantalla de chatER con un PIN local en este dispositivo.</p>
       <label class="ce-lock__field">
@@ -441,15 +441,15 @@
 
   <div class="ce-modal hidden" id="commandPalette" role="dialog" aria-modal="true" aria-label="Acciones rápidas de chatER">
     <div class="ce-modal__card ce-command-card">
-      <button class="ce-modal__close" id="btnCloseCommandPalette" type="button" aria-label="Cerrar">×</button>
+      <button class="ce-modal__close" id="btnCloseCommandPalette" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
       <h2>Acciones rápidas</h2>
       <p>Busca comandos, atajos y herramientas del chat activo desde un solo lugar.</p>
       <label class="ce-command-search">
         <span>Buscar acción</span>
-        <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Buscar, comandos /, emojis, dictar, sugerencias, voz, temporal, resumen, no molestar, bloqueados, silencioso, compacto, privacidad, bloqueo, PIN, fecha, calendario, enlaces, notas, recordatorios, etiquetas, apodos, exportar, destacados, borradores, QR..." />
+        <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Buscar, comandos /, iconos rápidos, dictar, sugerencias, voz, temporal, resumen, no molestar, bloqueados, silencioso, compacto, privacidad, bloqueo, PIN, fecha, calendario, enlaces, notas, recordatorios, etiquetas, apodos, exportar, destacados, borradores, QR..." />
       </label>
       <div class="ce-command-list" id="commandPaletteList" aria-live="polite"></div>
-      <p class="ce-command-help">Atajo: Ctrl/⌘ + K para abrir · Ctrl/⌘ + Alt + C activa compacto · Esc cierra</p>
+      <p class="ce-command-help">Atajo: Ctrl/Cmd + K para abrir · Ctrl/Cmd + Alt + C activa compacto · Esc cierra</p>
     </div>
   </div>
 

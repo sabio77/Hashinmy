@@ -13,16 +13,107 @@ const compactModeKey = 'chater_compact_mode_v1';
 const installedStorageKey = 'chater_installed_v1';
 const installDismissedStorageKey = 'chater_install_dismissed_v1';
 const scrollBottomThresholdPx = 160;
-const quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
-const emojiPickerStorageKey = 'chater_recent_emojis_v1';
-const emojiPickerMaxRecent = 24;
-const emojiPickerCategories = [
-  { id: 'recientes', title: 'Recientes', icon: '🕘', emojis: [] },
-  { id: 'caras', title: 'Caras', icon: '😊', emojis: ['😀','😃','😄','😁','😆','😅','😂','🤣','🙂','🙃','😉','😊','😇','😍','😘','😜','🤗','🤔','😎','🥳','😬','😢','😭','😡'] },
-  { id: 'gestos', title: 'Gestos', icon: '👍', emojis: ['👍','👎','👏','🙌','🙏','🤝','💪','👌','✌️','🤞','👋','🤟','☝️','👇','👉','👈','🫶','🤲'] },
-  { id: 'trabajo', title: 'Trabajo', icon: '💼', emojis: ['💼','📌','📎','📝','📅','⏰','✅','☑️','❌','⚠️','🚨','📣','💡','🔎','🔒','🔗','📊','📈','📦','🚀'] },
-  { id: 'objetos', title: 'Objetos', icon: '⭐', emojis: ['⭐','🔥','❤️','💚','💙','💜','✨','🎉','🏆','🎯','🎁','📍','📞','📧','💬','🔔','🔕','🌟'] }
+const quickReactions = ['like', 'love', 'laugh', 'surprise', 'thanks', 'important'];
+const iconInsertStorageKey = 'chater_recent_icon_inserts_v1';
+const iconInsertMaxRecent = 24;
+const reactionDefinitions = Object.freeze({
+  like: { icon: 'thumb', label: 'me gusta' },
+  love: { icon: 'heart', label: 'apoyo' },
+  laugh: { icon: 'laugh', label: 'risa' },
+  surprise: { icon: 'surprise', label: 'sorpresa' },
+  thanks: { icon: 'hands', label: 'agradecimiento' },
+  important: { icon: 'flame', label: 'importante' },
+  confirm: { icon: 'check', label: 'confirmación' },
+  sad: { icon: 'heart', label: 'empatía' }
+});
+const legacyReactionAliases = Object.freeze({
+  [String.fromCodePoint(0x1F44D)]: 'like',
+  [`${String.fromCodePoint(0x2764)}${String.fromCodePoint(0xFE0F)}`]: 'love',
+  [String.fromCodePoint(0x1F602)]: 'laugh',
+  [String.fromCodePoint(0x1F62E)]: 'surprise',
+  [String.fromCodePoint(0x1F64F)]: 'thanks',
+  [String.fromCodePoint(0x1F525)]: 'important',
+  [String.fromCodePoint(0x2705)]: 'confirm',
+  [String.fromCodePoint(0x1F622)]: 'sad'
+});
+const iconQuickInsertDefinitions = Object.freeze({
+  recibido: { icon: 'check', label: 'Recibido', text: 'Recibido.' },
+  gracias: { icon: 'hands', label: 'Gracias', text: 'Gracias.' },
+  reviso: { icon: 'file', label: 'Lo reviso', text: 'Lo reviso y te confirmo.' },
+  confirmado: { icon: 'checkDouble', label: 'Confirmado', text: 'Confirmado.' },
+  importante: { icon: 'flame', label: 'Importante', text: 'Importante.' },
+  acuerdo: { icon: 'heart', label: 'De acuerdo', text: 'De acuerdo.' },
+  llamada: { icon: 'mic', label: 'Llamada', text: 'Podemos revisarlo por llamada.' },
+  horario: { icon: 'schedule', label: 'Horario', text: '¿Qué horario te funciona mejor?' },
+  pendiente: { icon: 'reminder', label: 'Pendiente', text: 'Queda pendiente para seguimiento.' },
+  documento: { icon: 'attachment', label: 'Documento', text: 'Te comparto el documento.' },
+  enlace: { icon: 'link', label: 'Enlace', text: 'Te envío el enlace.' },
+  prioridad: { icon: 'star', label: 'Prioridad', text: 'Esto tiene prioridad.' }
+});
+const iconInsertCategories = [
+  { id: 'recientes', title: 'Recientes', icon: 'timer', items: [] },
+  { id: 'respuestas', title: 'Respuestas', icon: 'reply', items: ['recibido', 'gracias', 'reviso', 'confirmado'] },
+  { id: 'seguimiento', title: 'Seguimiento', icon: 'reminder', items: ['pendiente', 'prioridad', 'importante', 'horario'] },
+  { id: 'trabajo', title: 'Trabajo', icon: 'file', items: ['documento', 'enlace', 'llamada', 'acuerdo'] }
 ];
+
+const ceUiIconPaths = Object.freeze({
+  "attachment": "<path d=\"M17.7 6.3a4.25 4.25 0 0 0-6.01 0L5.4 12.59a3 3 0 1 0 4.24 4.24l7.07-7.07-1.41-1.41-7.07 7.07a1 1 0 1 1-1.41-1.41l6.29-6.3a2.25 2.25 0 0 1 3.18 3.18l-7.07 7.08A4.75 4.75 0 0 1 2.5 11.25l6.72-6.72 1.42 1.42-6.72 6.71a2.75 2.75 0 0 0 3.89 3.89l7.07-7.07 1.42 1.41-7.08 7.08a4.75 4.75 0 0 1-6.71-6.72l6.72-6.72a6.25 6.25 0 1 1 8.84 8.84l-6.37 6.36-1.41-1.41 6.36-6.36a4.25 4.25 0 0 0 0-6.01Z\"/>",
+  "bolt": "<path d=\"M13 2 4 14h6l-1 8 9-12h-6l1-8Z\"/>",
+  "spark": "<path d=\"M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z\"/>",
+  "sparkles": "<path d=\"M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z\"/>",
+  "schedule": "<path d=\"M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v9h14v-9ZM5 6v2h14V6H5Zm8 6h-2v4.2l3.3 2 1-1.6-2.3-1.4V12Z\"/>",
+  "poll": "<path d=\"M5 19h14v2H5v-2Zm1-6h3v5H6v-5Zm5-8h3v13h-3V5Zm5 4h3v9h-3V9Z\"/>",
+  "mic": "<path d=\"M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm5 8v1a5 5 0 0 1-10 0v-1H5v1a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12v-1h-2Z\"/>",
+  "check": "<path d=\"M9.2 16.6 4.9 12.3 3.5 13.7l5.7 5.7L21 7.6 19.6 6.2 9.2 16.6Z\"/>",
+  "send": "<path d=\"M3 20.5V3.5L21 12 3 20.5Zm2-3.1L15.85 12 5 6.6v3.8l5.8 1.6L5 13.6v3.8Z\"/>",
+  "stop": "<path d=\"M6 6h12v12H6V6Z\"/>",
+  "bellOff": "<path d=\"M4.27 3 3 4.27l3.02 3.02A7.86 7.86 0 0 0 5 11v4l-2 2v1h15.73L20.73 20 22 18.73 4.27 3ZM12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-7v-4a7 7 0 0 0-9.9-6.37l9.7 9.7.2.2V15Z\"/>",
+  "timer": "<path d=\"M15 1H9v2h6V1Zm-4 11.6V7h2v6.4l3.2 3.2-1.4 1.4L11 14.2v-1.6ZM12 4a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z\"/>",
+  "hourglass": "<path d=\"M6 2h12v6.2L14.2 12 18 15.8V22H6v-6.2L9.8 12 6 8.2V2Zm2 2v3.4l4 4 4-4V4H8Zm4 8.6-4 4V20h8v-3.4l-4-4Z\"/>",
+  "file": "<path d=\"M6 2h8l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.5V8h4.5L13 3.5ZM7 12h10v2H7v-2Zm0 4h10v2H7v-2Z\"/>",
+  "note": "<path d=\"M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM7 11h10v2H7v-2Zm0 4h10v2H7v-2Zm0 4h6v-2H7v2Z\"/>",
+  "star": "<path d=\"m12 2.6 2.9 5.88 6.5.95-4.7 4.58 1.11 6.47L12 17.42l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.6Z\"/>",
+  "starOutline": "<path d=\"m12 6.84 1.56 3.16 3.49.51-2.52 2.46.59 3.47L12 14.8l-3.12 1.64.59-3.47-2.52-2.46 3.49-.51L12 6.84Zm0-4.24L9.1 8.48l-6.5.95 4.7 4.58-1.11 6.47L12 17.42l5.81 3.06-1.11-6.47 4.7-4.58-6.5-.95L12 2.6Z\"/>",
+  "pin": "<path d=\"M14 2 22 10l-2 2-1.5-1.5-4.4 4.4.4 3.1-1.4 1.4-4.25-4.25L4 20l-1.4-1.4 4.85-4.85L3.2 9.5l1.4-1.4 3.1.4 4.4-4.4L10 2h4Z\"/>",
+  "pinOutline": "<path d=\"m14.1 4.9 5 5-.75.75-1.42-1.42-5.1 5.1.38 2.8-.2.2-5.34-5.34.2-.2 2.8.38 5.1-5.1-1.42-1.42.75-.75Zm.0-2.83-3.58 3.58 1.42 1.42-3.0 3.0-2.8-.38-2.38 2.38 4.25 4.25L3 21l1.4 1.4 4.99-4.99 4.25 4.25 2.38-2.38-.38-2.8 3-3 1.42 1.42 3.58-3.58-9.54-9.54Z\"/>",
+  "link": "<path d=\"M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 0 0 0 6h4v2h-4a5 5 0 0 1-5-5Zm5.1 1v-2h6v2H9Zm2-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4V7Z\"/>",
+  "reminder": "<path d=\"M12 2a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm1 8.59 3.2 3.2-1.4 1.42L11 11.41V5h2v5.59ZM4 20h16v2H4v-2Z\"/>",
+  "edit": "<path d=\"M4 17.25V21h3.75L18.8 9.95l-3.75-3.75L4 17.25ZM20.7 8.05a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z\"/>",
+  "copy": "<path d=\"M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z\"/>",
+  "reply": "<path d=\"M10 8V4l-7 7 7 7v-4h5.5c2.5 0 4.5 2 4.5 4.5V20h2v-1.5A6.5 6.5 0 0 0 15.5 12H10V8Z\"/>",
+  "forward": "<path d=\"M14 8V4l7 7-7 7v-4H8.5C6 14 4 16 4 18.5V20H2v-1.5A6.5 6.5 0 0 1 8.5 12H14V8Z\"/>",
+  "nickname": "<path d=\"M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V5a2 2 0 0 1 2-2h8l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z\"/>",
+  "blocked": "<path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 0 1 5.3 13.98L6.02 6.7A7.97 7.97 0 0 1 12 4ZM4 12c0-1.46.39-2.82 1.08-4l10.92 10.92A8 8 0 0 1 4 12Z\"/>",
+  "lock": "<path d=\"M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 0 1 4 0v2h-4V7Zm3 10.73V19h-2v-1.27a2 2 0 1 1 2 0Z\"/>",
+  "contactOff": "<path d=\"M4.27 3 3 4.27l4.06 4.06A5.96 5.96 0 0 0 6 11a6 6 0 0 0 9.67 4.75L19.73 19.8 21 18.53 4.27 3ZM12 5a6 6 0 0 1 5.2 8.98L8.02 4.8A5.96 5.96 0 0 1 12 5ZM4 22c0-3.1 4-5 8-5 1.48 0 2.95.26 4.22.78l-1.62 1.62A9.25 9.25 0 0 0 12 19c-3.31 0-6 1.34-6 3H4Z\"/>",
+  "checkDouble": "<path d=\"m8.1 16.2-3.3-3.3-1.4 1.4 4.7 4.7 8.5-8.5-1.4-1.4-7.1 7.1Z\"/><path d=\"m13.1 16.2-1.8-1.8-1.4 1.4 3.2 3.2 8.5-8.5-1.4-1.4-7.1 7.1Z\"/>",
+  "archive": "<path d=\"M4 4h16l-1 5H5L4 4Zm1 7h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8Zm5 2v2h4v-2h-4Z\"/>",
+  "thumb": "<path d=\"M2 21h4V9H2v12Zm20-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1 1 0 0 0-.29-.7L13.3 1.33 6.72 7.91A2 2 0 0 0 6 9.33V19a2 2 0 0 0 2 2h8.5a2 2 0 0 0 1.84-1.22l3.02-7.05A2 2 0 0 0 22 12v-2Z\"/>",
+  "heart": "<path d=\"M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5A5.45 5.45 0 0 1 7.5 3 5.99 5.99 0 0 1 12 5.09 5.99 5.99 0 0 1 16.5 3 5.45 5.45 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35Z\"/>",
+  "laugh": "<path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM8 8.5l2 1.5-2 1.5-1-1.5 1-1.5Zm8 0 1 1.5-1 1.5-2-1.5 2-1.5ZM7.2 14h9.6a5 5 0 0 1-9.6 0Z\"/>",
+  "surprise": "<path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM8.5 8.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4Zm7 0a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4ZM12 14a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z\"/>",
+  "hands": "<path d=\"M7 2h2v8H7V2Zm8 0h2v8h-2V2ZM4 8h2v7a3 3 0 0 0 3 3h1v4H8a5 5 0 0 1-5-5V8h1Zm14 0h2v9a5 5 0 0 1-5 5h-2v-4h1a3 3 0 0 0 3-3V8h1Zm-7-4h2v18h-2V4Z\"/>",
+  "flame": "<path d=\"M13.5 2.5c.6 3.1-1.6 4.4-3.2 6.1-1.4 1.5-2.3 3.1-1.3 5.1.7-1.8 2-2.9 3.7-4 .2 2.1 2.3 3.2 2.3 5.6A3 3 0 0 1 12 18.4a3.2 3.2 0 0 1-3.2-3.2H7A5 5 0 0 0 12 22a6 6 0 0 0 6-6c0-3.5-2.5-5.6-3.7-7.8-.8-1.4-1-3-.8-5.7Z\"/>",
+  "close": "<path d=\"M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z\"/>",
+  "trash": "<path d=\"M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm3 2 .5 8h1.7l-.3-8H9Zm4.1 0-.3 8h1.7l.5-8h-1.9Z\"/>",
+  "arrowDown": "<path d=\"M11 4h2v12.17l5.59-5.58L20 12l-8 8-8-8 1.41-1.41L11 16.17V4Z\"/>",
+  "arrowRight": "<path d=\"M13 5 20 12l-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5Z\"/>",
+  "undo": "<path d=\"M7 7V3L2 8l5 5V9h8a4 4 0 0 1 0 8H9v2h6a6 6 0 0 0 0-12H7Z\"/>"
+});
+
+function uiIcon(name, extraClass = '') {
+  const cleanName = String(name || '').trim();
+  const paths = ceUiIconPaths[cleanName] || ceUiIconPaths.note;
+  const className = ['ce-ui-icon', String(extraClass || '').trim()].filter(Boolean).join(' ');
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
+}
+
+function uiIconWithText(name, text = '', extraClass = '') {
+  const cleanText = String(text || '').trim();
+  return `${uiIcon(name, extraClass)}${cleanText ? `<span>${escapeHtml(cleanText)}</span>` : ''}`;
+}
+
 const ephemeralOptions = [0, 180, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
 
@@ -94,8 +185,8 @@ const state = {
   starredLoading: false,
   quickRepliesOpen: false,
   slashCommandsOpen: false,
-  emojiPickerOpen: false,
-  emojiPickerCategory: 'recientes',
+  iconInsertPanelOpen: false,
+  iconInsertCategory: 'recientes',
   quickRepliesLoaded: false,
   quickRepliesLoading: false,
   quickReplies: [],
@@ -187,7 +278,7 @@ const els = {
   addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
-  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
+  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
   scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnCloseSchedule: $('btnCloseSchedule'), btnConfirmSchedule: $('btnConfirmSchedule'),
@@ -323,7 +414,7 @@ function renderMessageAttachment(attachment = null) {
   if (normalized.kind === 'image') {
     return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a><figcaption>${escapeHtml(normalized.fileName)}${escapeHtml(size)}</figcaption></figure>`;
   }
-  return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">📎</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
+  return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
 
 function updateAttachmentPreview() {
@@ -340,8 +431,8 @@ function updateAttachmentPreview() {
   }
   const preview = attachment.kind === 'image'
     ? `<img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" />`
-    : '<span class="ce-attachment-preview__file" aria-hidden="true">📎</span>';
-  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo listo')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">×</button>`;
+    : `<span class="ce-attachment-preview__file" aria-hidden="true">${uiIcon('attachment')}</span>`;
+  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo listo')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">${uiIcon('close')}</button>`;
 }
 
 function clearPendingAttachment() {
@@ -625,7 +716,7 @@ function isSelfChat(chat = {}) {
 }
 
 function notesAvatar(size = 'normal') {
-  return `<span class="ce-avatar ce-avatar--${size} ce-avatar--notes" aria-hidden="true">📝</span>`;
+  return `<span class="ce-avatar ce-avatar--${size} ce-avatar--notes" aria-hidden="true">${uiIcon('note', 'ce-avatar__icon')}</span>`;
 }
 
 function contactDisplayName(contact = {}) {
@@ -769,7 +860,7 @@ function formatEphemeralMessageLabel(message = {}) {
   const expireAt = message.expireAt || message.expiresAt || '';
   if (!seconds && !expireAt) return '';
   const when = expireAt ? formatScheduleDateTime(expireAt) : formatEphemeralOption(seconds);
-  return expireAt ? `⏳ Temporal · expira ${when}` : `⏳ Temporal · expira ${when} después de lectura`;
+  return expireAt ? `Temporal · expira ${when}` : `Temporal · expira ${when} después de lectura`;
 }
 
 function formatPrivateNoteDateTime(value = '') {
@@ -815,7 +906,7 @@ function updateScrollBottomButton() {
   const label = state.scrollNewMessages > 0
     ? `${state.scrollNewMessages} ${state.scrollNewMessages === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}`
     : 'Ir al final';
-  els.btnScrollBottom.innerHTML = `<span>${escapeHtml(label)}</span>`;
+  els.btnScrollBottom.innerHTML = `<span>${uiIcon('arrowDown')}${escapeHtml(label)}</span>`;
   els.btnScrollBottom.setAttribute('aria-label', label === 'Ir al final' ? 'Ir al final de la conversación' : `${label}. Ir al final de la conversación`);
 }
 
@@ -832,7 +923,7 @@ function scrollMessagesToBottom({ smooth = true, resetNew = true } = {}) {
 function compactText(value = '', max = 220) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim();
   const safeMax = Math.min(320, Math.max(60, Number(max || 220)));
-  return clean.length > safeMax ? `${clean.slice(0, safeMax - 1)}…` : clean;
+  return clean.length > safeMax ? `${clean.slice(0, safeMax - 3)}...` : clean;
 }
 
 function normalizeClientSearchText(value = '') {
@@ -1417,7 +1508,7 @@ function renderLabelsModal() {
   if (els.chatLabelsInput && document.activeElement !== els.chatLabelsInput) els.chatLabelsInput.value = state.labelsDraft;
   if (els.btnSaveLabels) els.btnSaveLabels.disabled = state.labelsSaving || !chat?.chatId;
   els.labelsCurrentList.innerHTML = current.length
-    ? current.map((label) => `<span class="ce-label-token">#${escapeHtml(label)} <button type="button" data-remove-draft-label="${escapeHtml(label)}" aria-label="Quitar etiqueta ${escapeHtml(label)}">×</button></span>`).join('')
+    ? current.map((label) => `<span class="ce-label-token">#${escapeHtml(label)} <button type="button" data-remove-draft-label="${escapeHtml(label)}" aria-label="Quitar etiqueta ${escapeHtml(label)}">${uiIcon('close')}</button></span>`).join('')
     : '<div class="ce-label-empty">Este chat todavía no tiene etiquetas.</div>';
   const currentLower = new Set(current.map((label) => label.toLowerCase()));
   const presets = (state.labels || []).filter((item) => !currentLower.has(item.label.toLowerCase())).slice(0, 20);
@@ -1593,7 +1684,7 @@ function renderQueuedMessage(queued = {}) {
     ? 'Enviando pendiente...'
     : (failed ? `Pendiente sin enviar${queued.lastError ? ` · ${queued.lastError}` : ''}` : 'Pendiente · se enviará al recuperar conexión');
   const replyPreview = queued.replyTo?.text
-    ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>↩ ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
+    ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>${uiIcon('reply')} ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
     : '';
   return `<article class="ce-msg mine ce-msg--outbox${failed ? ' is-failed' : ''}${sending ? ' is-sending' : ''}" data-client-message-id="${escapeHtml(queued.clientMessageId)}" data-outbox-id="${escapeHtml(queued.clientMessageId)}">
     <div class="ce-outbox-actions">
@@ -1601,11 +1692,11 @@ function renderQueuedMessage(queued = {}) {
       <button type="button" data-outbox-discard="${escapeHtml(queued.clientMessageId)}" ${sending ? 'disabled' : ''}>Descartar</button>
     </div>
     ${replyPreview}
-    ${queued.silent ? '<div class="ce-silent-label" aria-label="Mensaje pendiente silencioso">🔕 Sin notificación</div>' : ''}
+    ${queued.silent ? `<div class="ce-silent-label" aria-label="Mensaje pendiente silencioso">${uiIcon('bellOff')}<span>Sin notificación</span></div>` : ''}
     ${queued.ephemeralSeconds ? `<div class="ce-ephemeral-label" aria-label="Mensaje pendiente temporal">${escapeHtml(formatEphemeralOption(queued.ephemeralSeconds))} · temporal</div>` : ''}
     ${renderMessageAttachment(queued.attachment)}
     <p class="ce-msg__text">${escapeHtml(queued.text)}</p>
-    <span class="ce-msg__meta ce-msg__meta--outbox"><time>${formatMessageTime(queued.createdAt)}</time><span class="ce-msg__receipt" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${sending ? '…' : '⏳'}</span></span>
+    <span class="ce-msg__meta ce-msg__meta--outbox"><time>${formatMessageTime(queued.createdAt)}</time><span class="ce-msg__receipt" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${sending ? '<span class="ce-send-dots" aria-hidden="true"><i></i><i></i><i></i></span>' : uiIcon('hourglass')}</span></span>
   </article>`;
 }
 
@@ -1972,9 +2063,22 @@ function blockIconSvg(blocked = false) {
     : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.85 0 3.55.63 4.9 1.69L5.69 16.9A7.96 7.96 0 0 1 12 4Zm0 16a7.96 7.96 0 0 1-4.9-1.69L18.31 7.1A8 8 0 0 1 12 20Z"/></svg>';
 }
 
+function normalizeReactionKey(value = '') {
+  const clean = String(value || '').trim();
+  if (!clean) return '';
+  if (reactionDefinitions[clean]) return clean;
+  return legacyReactionAliases[clean] || '';
+}
+
 function getMessageReactions(message = {}) {
   const source = message.reactions && typeof message.reactions === 'object' ? message.reactions : {};
-  return Object.fromEntries(Object.entries(source).filter(([, users]) => Array.isArray(users) && users.length));
+  const normalized = {};
+  for (const [rawReaction, users] of Object.entries(source)) {
+    const reactionKey = normalizeReactionKey(rawReaction);
+    if (!reactionKey || !Array.isArray(users) || !users.length) continue;
+    normalized[reactionKey] = Array.from(new Set([...(normalized[reactionKey] || []), ...users.filter(Boolean)]));
+  }
+  return Object.fromEntries(Object.entries(normalized).filter(([, users]) => Array.isArray(users) && users.length));
 }
 
 function userReactionForMessage(message = {}) {
@@ -1982,28 +2086,43 @@ function userReactionForMessage(message = {}) {
   return Object.entries(reactions).find(([, users]) => users.includes(state.user?.userId))?.[0] || '';
 }
 
+function reactionIconName(reaction = '') {
+  const key = normalizeReactionKey(reaction);
+  return reactionDefinitions[key]?.icon || 'note';
+}
+
+function reactionDisplayName(reaction = '') {
+  const key = normalizeReactionKey(reaction);
+  return reactionDefinitions[key]?.label || 'reacción';
+}
+
+function renderReactionIcon(reaction = '') {
+  return uiIcon(reactionIconName(reaction), 'ce-reaction-icon');
+}
+
 function renderReactionSummary(message = {}) {
   const reactions = getMessageReactions(message);
   const entries = Object.entries(reactions);
   if (!entries.length) return '';
   const activeReaction = userReactionForMessage(message);
-  return `<div class="ce-reaction-summary" aria-label="Reacciones del mensaje">${entries.map(([emoji, users]) => {
+  return `<div class="ce-reaction-summary" aria-label="Reacciones del mensaje">${entries.map(([reaction, users]) => {
     const count = Array.from(new Set(users)).length;
-    const active = emoji === activeReaction ? ' active' : '';
-    const label = emoji === activeReaction ? `Quitar reacción ${emoji}` : `Reaccionar con ${emoji}`;
-    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(emoji)}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(emoji)}</span><strong>${count}</strong></button>`;
+    const active = reaction === activeReaction ? ' active' : '';
+    const reactionName = reactionDisplayName(reaction);
+    const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
+    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" aria-label="${escapeHtml(label)}"><span>${renderReactionIcon(reaction)}</span><strong>${count}</strong></button>`;
   }).join('')}</div>`;
 }
 
 function renderReactionPicker(message = {}) {
   const activeReaction = userReactionForMessage(message);
-  return `<div class="ce-reaction-picker" aria-label="Reaccionar al mensaje">${quickReactions.map((emoji) => {
-    const active = emoji === activeReaction ? ' active' : '';
-    const label = emoji === activeReaction ? `Quitar reacción ${emoji}` : `Reaccionar con ${emoji}`;
-    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(emoji)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(emoji)}</button>`;
+  return `<div class="ce-reaction-picker" aria-label="Reaccionar al mensaje">${quickReactions.map((reaction) => {
+    const active = reaction === activeReaction ? ' active' : '';
+    const reactionName = reactionDisplayName(reaction);
+    const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
+    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${renderReactionIcon(reaction)}</button>`;
   }).join('')}</div>`;
 }
-
 
 function normalizePollClient(message = {}) {
   const poll = message.poll && typeof message.poll === 'object' ? message.poll : null;
@@ -2046,7 +2165,7 @@ function renderPollMessage(message = {}) {
   }).join('');
   const help = selectedOptionId ? 'Toca tu opción otra vez para quitar el voto.' : 'Elige una opción para votar.';
   return `<section class="ce-poll" aria-label="Encuesta">
-    <div class="ce-poll__label">📊 Encuesta</div>
+    <div class="ce-poll__label">${uiIcon('poll')}<span>Encuesta</span></div>
     <h3>${escapeHtml(poll.question)}</h3>
     <div class="ce-poll__options">${optionsHtml}</div>
     <small>${totalVotes} ${totalVotes === 1 ? 'voto' : 'votos'} · ${help}</small>
@@ -2055,51 +2174,51 @@ function renderPollMessage(message = {}) {
 
 function renderStarButton(message = {}) {
   const active = message.isStarred ? ' active' : '';
-  const symbol = message.isStarred ? '★' : '☆';
+  const icon = message.isStarred ? uiIcon('star') : uiIcon('starOutline');
   const label = message.isStarred ? 'Quitar de mensajes destacados' : 'Destacar mensaje';
-  return `<button class="ce-star-btn${active}" type="button" data-star-message-id="${escapeHtml(message.messageId || '')}" data-starred="${message.isStarred ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${symbol}</button>`;
+  return `<button class="ce-star-btn${active}" type="button" data-star-message-id="${escapeHtml(message.messageId || '')}" data-starred="${message.isStarred ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
 }
 
 function renderPinMessageButton(message = {}) {
   const active = message.isPinned ? ' active' : '';
-  const symbol = message.isPinned ? '📌' : '📍';
+  const icon = message.isPinned ? uiIcon('pin') : uiIcon('pinOutline');
   const label = message.isPinned ? 'Desfijar mensaje de este chat' : 'Fijar mensaje en este chat';
-  return `<button class="ce-pin-msg-btn${active}" type="button" data-pin-message-id="${escapeHtml(message.messageId || '')}" data-pinned="${message.isPinned ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${symbol}</button>`;
+  return `<button class="ce-pin-msg-btn${active}" type="button" data-pin-message-id="${escapeHtml(message.messageId || '')}" data-pinned="${message.isPinned ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
 }
 
 function renderReplyButton(message = {}) {
   const label = 'Responder este mensaje';
-  return `<button class="ce-reply-btn" type="button" data-reply-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">↩</button>`;
+  return `<button class="ce-reply-btn" type="button" data-reply-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reply')}</button>`;
 }
 
 function renderForwardButton(message = {}) {
   const label = 'Reenviar mensaje';
-  return `<button class="ce-forward-btn" type="button" data-forward-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">↪</button>`;
+  return `<button class="ce-forward-btn" type="button" data-forward-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('forward')}</button>`;
 }
 
 function renderMessageLinkButton(message = {}) {
   const label = 'Copiar enlace interno del mensaje';
-  return `<button class="ce-link-msg-btn" type="button" data-copy-message-link-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">🔗</button>`;
+  return `<button class="ce-link-msg-btn" type="button" data-copy-message-link-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('link')}</button>`;
 }
 
 function renderCopyButton(message = {}) {
   const label = 'Copiar texto del mensaje';
-  return `<button class="ce-copy-btn" type="button" data-copy-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">⧉</button>`;
+  return `<button class="ce-copy-btn" type="button" data-copy-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('copy')}</button>`;
 }
 
 function renderReminderButton(message = {}) {
   const label = 'Crear recordatorio privado de este mensaje';
-  return `<button class="ce-reminder-btn" type="button" data-remind-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">⏰</button>`;
+  return `<button class="ce-reminder-btn" type="button" data-remind-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reminder')}</button>`;
 }
 
 function renderEditButton(message = {}) {
   const label = 'Editar mensaje';
-  return `<button class="ce-edit-btn" type="button" data-edit-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">✎</button>`;
+  return `<button class="ce-edit-btn" type="button" data-edit-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('edit')}</button>`;
 }
 
 function renderDeleteButton(message = {}) {
   const label = 'Eliminar mensaje para todos';
-  return `<button class="ce-delete-btn" type="button" data-delete-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">×</button>`;
+  return `<button class="ce-delete-btn" type="button" data-delete-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('trash')}</button>`;
 }
 
 
@@ -2125,10 +2244,10 @@ function renderMessageBody(message = {}, mine = false) {
     return `<p class="ce-msg__deleted">${escapeHtml(text)}</p>`;
   }
   const forwarded = message.type === 'forwarded' || message.forwardedFrom?.messageId
-    ? '<div class="ce-forwarded-label" aria-label="Mensaje reenviado">↪ Reenviado</div>'
+    ? `<div class="ce-forwarded-label" aria-label="Mensaje reenviado">${uiIcon('forward')}<span>Reenviado</span></div>`
     : '';
   const silent = mine && message.silent
-    ? '<div class="ce-silent-label" aria-label="Mensaje enviado sin notificación">🔕 Sin notificación</div>'
+    ? `<div class="ce-silent-label" aria-label="Mensaje enviado sin notificación">${uiIcon('bellOff')}<span>Sin notificación</span></div>`
     : '';
   const ephemeral = message.ephemeralSeconds || message.expireAt
     ? `<div class="ce-ephemeral-label" aria-label="Mensaje temporal">${escapeHtml(formatEphemeralMessageLabel(message))}</div>`
@@ -2207,7 +2326,7 @@ function messageReceiptState(message = {}) {
     return {
       status: 'read',
       className: ' is-read',
-      symbol: '✓✓',
+      symbol: uiIcon('checkDouble'),
       label: `Leído${message.readAt ? ` · ${formatExportDateTime(message.readAt)}` : ''}`
     };
   }
@@ -2215,14 +2334,14 @@ function messageReceiptState(message = {}) {
     return {
       status: 'delivered',
       className: ' is-delivered',
-      symbol: '✓✓',
+      symbol: uiIcon('checkDouble'),
       label: `Entregado al destinatario${message.deliveredAt ? ` · ${formatExportDateTime(message.deliveredAt)}` : ''}`
     };
   }
   return {
     status: 'sent',
     className: '',
-    symbol: '✓',
+    symbol: uiIcon('check'),
     label: `Recibido por el backend${message.backendReceivedAt ? ` · ${formatExportDateTime(message.backendReceivedAt)}` : ''}`
   };
 }
@@ -2250,7 +2369,7 @@ function messageSenderLabel(senderUserId = '') {
 function renderReplyPreview(message = {}) {
   const reply = message.replyTo;
   if (!reply?.messageId || !reply.text) return '';
-  return `<button class="ce-reply-preview" type="button" data-jump-message-id="${escapeHtml(reply.messageId)}" aria-label="Ver mensaje respondido"><strong>↩ ${escapeHtml(messageSenderLabel(reply.senderUserId))}</strong><span>${escapeHtml(compactText(reply.text))}</span></button>`;
+  return `<button class="ce-reply-preview" type="button" data-jump-message-id="${escapeHtml(reply.messageId)}" aria-label="Ver mensaje respondido"><strong>${uiIcon('reply')} ${escapeHtml(messageSenderLabel(reply.senderUserId))}</strong><span>${escapeHtml(compactText(reply.text))}</span></button>`;
 }
 
 function renderReplyDraft() {
@@ -2263,7 +2382,7 @@ function renderReplyDraft() {
         <strong>Editando mensaje</strong>
         <span>${escapeHtml(compactText(editing.text || ''))}</span>
       </button>
-      <button class="ce-reply-draft__close" type="button" data-cancel-edit="1" aria-label="Cancelar edición">×</button>`;
+      <button class="ce-reply-draft__close" type="button" data-cancel-edit="1" aria-label="Cancelar edición">${uiIcon('close')}</button>`;
     updateComposerControls();
     return;
   }
@@ -2280,7 +2399,7 @@ function renderReplyDraft() {
       <strong>Respondiendo a ${escapeHtml(messageSenderLabel(reply.senderUserId))}</strong>
       <span>${escapeHtml(compactText(reply.text || ''))}</span>
     </button>
-    <button class="ce-reply-draft__close" type="button" data-cancel-reply="1" aria-label="Cancelar respuesta">×</button>`;
+    <button class="ce-reply-draft__close" type="button" data-cancel-reply="1" aria-label="Cancelar respuesta">${uiIcon('close')}</button>`;
   updateComposerControls();
 }
 
@@ -2373,21 +2492,21 @@ function getSlashCommandDefinitions() {
       run: async () => {
         state.slashCommandsOpen = true;
         renderSlashCommandsPanel({ force: true });
-        showTemporaryDraftStatus('Comandos rápidos abiertos. Elige uno o escribe /emoji, /encuesta, /silencio, /nota, /resumen, /fecha o /exportar.', 5600);
+        showTemporaryDraftStatus('Comandos rápidos abiertos. Elige uno o escribe /iconos, /encuesta, /silencio, /nota, /resumen, /fecha o /exportar.', 5600);
         return { clearComposer: false, keepPanelOpen: true };
       }
     },
     {
-      id: 'emoji',
-      names: ['emoji', 'emojis'],
-      title: '/emoji',
-      description: 'Abre el selector local de emojis para insertarlos en el compositor.',
-      template: '/emoji',
+      id: 'icon-insert',
+      names: ['icono', 'iconos'],
+      title: '/iconos',
+      description: 'Abre el selector local de iconos profesionales para insertar textos breves en el compositor.',
+      template: '/iconos',
       enabled: Boolean(state.activeChatId && !state.editingMessage?.messageId && !isChatInteractionBlocked()),
       run: async () => {
-        state.emojiPickerOpen = true;
-        renderEmojiPickerPanel();
-        showTemporaryDraftStatus('Selector de emojis abierto. Elige uno para insertarlo en tu mensaje.');
+        state.iconInsertPanelOpen = true;
+        renderIconInsertPickerPanel();
+        showTemporaryDraftStatus('Selector de iconos rápidos abierto. Elige una opción para insertarla en tu mensaje.');
         return { clearComposer: true, keepPanelOpen: false };
       }
     },
@@ -2504,7 +2623,7 @@ function renderSlashCommandsPanel({ force = false } = {}) {
 
 function insertSlashCommandTemplate(template = '') {
   if (!els.messageInput) return;
-  if (state.emojiPickerOpen) closeEmojiPicker();
+  if (state.iconInsertPanelOpen) closeIconInsertPicker();
   els.messageInput.value = template;
   state.slashCommandsOpen = true;
   els.messageInput.focus();
@@ -2537,12 +2656,12 @@ async function handleSlashCommandSubmit(text = '') {
 }
 
 function renderSendActionIcon(kind = 'mic') {
-  if (kind === 'save') return '✓';
-  if (kind === 'send') return '➤';
-  if (kind === 'stop') return '■';
-  if (kind === 'loading') return '…';
-  if (kind === 'waitingText') return '…';
-  return '🎙️';
+  if (kind === 'save') return uiIcon('check');
+  if (kind === 'send') return uiIcon('send');
+  if (kind === 'stop') return uiIcon('stop');
+  if (kind === 'loading') return uiIcon('timer');
+  if (kind === 'waitingText') return uiIcon('timer');
+  return uiIcon('mic');
 }
 
 function updateSendModeMenu() {
@@ -2561,7 +2680,7 @@ function updateComposerControls() {
   if (!els.messageInput || !els.btnSend) return;
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
-  els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje, /ayuda o 😊');
+  els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje o /ayuda');
   const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
   const textLength = String(els.messageInput?.value || '').trim().length;
   const hasAnyText = textLength > 0;
@@ -2583,7 +2702,7 @@ function updateComposerControls() {
       : (sendIcon === 'waitingText'
         ? 'Escribe al menos 2 caracteres para enviar'
         : (state.editingMessage?.messageId ? 'Guardar edición' : 'Enviar mensaje')));
-  els.btnSend.textContent = renderSendActionIcon(sendIcon);
+  els.btnSend.innerHTML = renderSendActionIcon(sendIcon);
   els.btnSend.classList.toggle('ce-send-circle--mic', sendIcon === 'mic');
   els.btnSend.classList.toggle('ce-send-circle--send', sendIcon === 'send');
   els.btnSend.classList.toggle('ce-send-circle--recording', sendIcon === 'stop');
@@ -2594,14 +2713,14 @@ function updateComposerControls() {
   els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || state.audioSending || (!state.editingMessage?.messageId && !hasText && !hasAttachment && !canRecordAudio && !state.audioRecording);
   if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading || state.audioRecording || state.audioSending;
   if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked || state.audioRecording || state.audioSending;
-  if (els.emojiPickerPanel && state.audioRecording) {
-    state.emojiPickerOpen = false;
+  if (els.iconInsertPickerPanel && state.audioRecording) {
+    state.iconInsertPanelOpen = false;
   }
-  if (els.btnEmojiPicker) {
-    const emojiDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
-    els.btnEmojiPicker.disabled = emojiDisabled;
-    els.btnEmojiPicker.setAttribute('title', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
-    els.btnEmojiPicker.setAttribute('aria-label', blocked ? 'Emojis no disponibles con contacto bloqueado' : 'Insertar emoji');
+  if (els.btnIconInsertPicker) {
+    const iconInsertDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
+    els.btnIconInsertPicker.disabled = iconInsertDisabled;
+    els.btnIconInsertPicker.setAttribute('title', blocked ? 'Iconos rápidos no disponibles con contacto bloqueado' : 'Insertar icono rápido');
+    els.btnIconInsertPicker.setAttribute('aria-label', blocked ? 'Iconos rápidos no disponibles con contacto bloqueado' : 'Insertar icono rápido');
   }
   if (els.btnSmartReplySuggestions) {
     const smartReplyCount = buildSmartReplySuggestions().length;
@@ -2630,7 +2749,7 @@ function updateComposerControls() {
   if (els.btnCycleTtl) {
     const ttl = selectedEphemeralSeconds();
     els.btnCycleTtl.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.audioRecording || state.audioSending;
-    els.btnCycleTtl.textContent = ttl ? `⏳ ${formatEphemeralOption(ttl)}` : '⏳';
+    els.btnCycleTtl.innerHTML = ttl ? `${uiIcon('timer')}<span>${escapeHtml(formatEphemeralOption(ttl))}</span>` : uiIcon('timer');
     els.btnCycleTtl.setAttribute('title', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
     els.btnCycleTtl.setAttribute('aria-label', ttl ? `Expira ${formatEphemeralOption(ttl)} después de lectura` : 'Sin expiración. Pulsa para cambiar.');
   }
@@ -2638,103 +2757,113 @@ function updateComposerControls() {
   if (!hasChat) {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
-    state.emojiPickerOpen = false;
+    state.iconInsertPanelOpen = false;
     state.sendModeMenuOpen = false;
     renderQuickRepliesPanel();
   }
-  renderEmojiPickerPanel();
+  renderIconInsertPickerPanel();
   renderSlashCommandsPanel();
 }
 
 
-function readRecentEmojis() {
+function readRecentIconInserts() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(emojiPickerStorageKey) || '[]');
-    return Array.isArray(parsed) ? parsed.filter((emoji) => typeof emoji === 'string' && emoji.trim()).slice(0, emojiPickerMaxRecent) : [];
+    const parsed = JSON.parse(localStorage.getItem(iconInsertStorageKey) || '[]');
+    return Array.isArray(parsed)
+      ? parsed.map((item) => String(item || '').trim()).filter((item) => iconQuickInsertDefinitions[item]).slice(0, iconInsertMaxRecent)
+      : [];
   } catch {
     return [];
   }
 }
 
-function writeRecentEmojis(emojis = []) {
-  const clean = [...new Set((Array.isArray(emojis) ? emojis : []).map((emoji) => String(emoji || '').trim()).filter(Boolean))].slice(0, emojiPickerMaxRecent);
-  try { localStorage.setItem(emojiPickerStorageKey, JSON.stringify(clean)); } catch {}
+function writeRecentIconInserts(items = []) {
+  const clean = [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => String(item || '').trim())
+    .filter((item) => iconQuickInsertDefinitions[item]))].slice(0, iconInsertMaxRecent);
+  try { localStorage.setItem(iconInsertStorageKey, JSON.stringify(clean)); } catch {}
   return clean;
 }
 
-function recordRecentEmoji(emoji = '') {
-  const clean = String(emoji || '').trim();
-  if (!clean) return [];
-  return writeRecentEmojis([clean, ...readRecentEmojis().filter((item) => item !== clean)]);
+function recordRecentIconInsert(itemId = '') {
+  const clean = String(itemId || '').trim();
+  if (!iconQuickInsertDefinitions[clean]) return [];
+  return writeRecentIconInserts([clean, ...readRecentIconInserts().filter((item) => item !== clean)]);
 }
 
-function getEmojiPickerCategories() {
-  const recents = readRecentEmojis();
-  return emojiPickerCategories.map((category) => category.id === 'recientes'
-    ? { ...category, emojis: recents.length ? recents : ['👍', '❤️', '😂', '🙏', '🔥', '✅'] }
+function getIconInsertPickerCategories() {
+  const recents = readRecentIconInserts();
+  return iconInsertCategories.map((category) => category.id === 'recientes'
+    ? { ...category, items: recents.length ? recents : ['recibido', 'gracias', 'confirmado', 'reviso', 'prioridad', 'pendiente'] }
     : category);
 }
 
-function normalizeEmojiCategory(categoryId = '') {
+function normalizeIconInsertCategory(categoryId = '') {
   const clean = String(categoryId || '').trim();
-  const categories = getEmojiPickerCategories();
+  const categories = getIconInsertPickerCategories();
   return categories.some((category) => category.id === clean) ? clean : 'recientes';
 }
 
-function renderEmojiPickerPanel() {
-  if (!els.emojiPickerPanel) return;
+function renderIconInsertPickerPanel() {
+  if (!els.iconInsertPickerPanel) return;
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
   const canUse = hasChat && !blocked && !state.editingMessage?.messageId;
-  els.btnEmojiPicker?.classList.toggle('active', Boolean(state.emojiPickerOpen && canUse));
-  els.btnEmojiPicker?.setAttribute('aria-expanded', state.emojiPickerOpen && canUse ? 'true' : 'false');
-  if (!state.emojiPickerOpen || !canUse) {
-    els.emojiPickerPanel.classList.add('hidden');
-    els.emojiPickerPanel.innerHTML = '';
+  els.btnIconInsertPicker?.classList.toggle('active', Boolean(state.iconInsertPanelOpen && canUse));
+  els.btnIconInsertPicker?.setAttribute('aria-expanded', state.iconInsertPanelOpen && canUse ? 'true' : 'false');
+  if (!state.iconInsertPanelOpen || !canUse) {
+    els.iconInsertPickerPanel.classList.add('hidden');
+    els.iconInsertPickerPanel.innerHTML = '';
     return;
   }
-  const categories = getEmojiPickerCategories();
-  const activeCategoryId = normalizeEmojiCategory(state.emojiPickerCategory);
-  state.emojiPickerCategory = activeCategoryId;
+  const categories = getIconInsertPickerCategories();
+  const activeCategoryId = normalizeIconInsertCategory(state.iconInsertCategory);
+  state.iconInsertCategory = activeCategoryId;
   const activeCategory = categories.find((category) => category.id === activeCategoryId) || categories[0];
-  els.emojiPickerPanel.classList.remove('hidden');
-  els.emojiPickerPanel.innerHTML = `
-    <div class="ce-emoji-panel__head">
-      <div><strong>Emojis rápidos</strong><span>Inserta expresiones sin salir del chat.</span></div>
-      <button class="ce-link" type="button" data-close-emoji-picker="1">Cerrar</button>
+  els.iconInsertPickerPanel.classList.remove('hidden');
+  els.iconInsertPickerPanel.innerHTML = `
+    <div class="ce-icon-insert-panel__head">
+      <div><strong>Iconos rápidos</strong><span>Inserta textos breves desde una interfaz con iconos profesionales.</span></div>
+      <button class="ce-link" type="button" data-close-icon-insert-picker="1">Cerrar</button>
     </div>
-    <div class="ce-emoji-tabs" role="tablist" aria-label="Categorías de emojis">
-      ${categories.map((category) => `<button class="ce-emoji-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-emoji-category="${escapeHtml(category.id)}"><span>${escapeHtml(category.icon)}</span>${escapeHtml(category.title)}</button>`).join('')}
+    <div class="ce-icon-insert-tabs" role="tablist" aria-label="Categorías de iconos rápidos">
+      ${categories.map((category) => `<button class="ce-icon-insert-tab${category.id === activeCategoryId ? ' active' : ''}" type="button" role="tab" aria-selected="${category.id === activeCategoryId ? 'true' : 'false'}" data-icon-insert-category="${escapeHtml(category.id)}">${uiIcon(category.icon, 'ce-icon-insert-tab__icon')}<span>${escapeHtml(category.title)}</span></button>`).join('')}
     </div>
-    <div class="ce-emoji-grid" role="list" aria-label="${escapeHtml(activeCategory.title)}">
-      ${activeCategory.emojis.map((emoji) => `<button class="ce-emoji-item" type="button" role="listitem" data-insert-emoji="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`).join('')}
+    <div class="ce-icon-insert-grid" role="list" aria-label="${escapeHtml(activeCategory.title)}">
+      ${(activeCategory.items || []).map((itemId) => {
+        const item = iconQuickInsertDefinitions[itemId];
+        if (!item) return '';
+        return `<button class="ce-icon-insert-item" type="button" role="listitem" data-insert-icon-insert="${escapeHtml(itemId)}" title="Insertar ${escapeHtml(item.label)}" aria-label="Insertar ${escapeHtml(item.label)}">${uiIcon(item.icon, 'ce-icon-insert-item__icon')}<span>${escapeHtml(item.label)}</span></button>`;
+      }).join('')}
     </div>`;
 }
 
-function closeEmojiPicker() {
-  state.emojiPickerOpen = false;
-  renderEmojiPickerPanel();
+function closeIconInsertPicker() {
+  state.iconInsertPanelOpen = false;
+  renderIconInsertPickerPanel();
 }
 
-function toggleEmojiPicker() {
+function toggleIconInsertPicker() {
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
     return;
   }
   if (!state.activeChatId || state.editingMessage?.messageId) return;
-  state.emojiPickerOpen = !state.emojiPickerOpen;
-  if (state.emojiPickerOpen) {
+  state.iconInsertPanelOpen = !state.iconInsertPanelOpen;
+  if (state.iconInsertPanelOpen) {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
     renderQuickRepliesPanel();
     renderSlashCommandsPanel();
   }
-  renderEmojiPickerPanel();
+  renderIconInsertPickerPanel();
 }
 
-function insertEmojiIntoComposer(emoji = '') {
-  const clean = String(emoji || '').trim();
-  if (!clean || !els.messageInput) return;
+function insertIconInsertIntoComposer(itemId = '') {
+  const clean = String(itemId || '').trim();
+  const item = iconQuickInsertDefinitions[clean];
+  const insertionText = String(item?.text || '').trim();
+  if (!insertionText || !els.messageInput) return;
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
     return;
@@ -2746,18 +2875,18 @@ function insertEmojiIntoComposer(emoji = '') {
   const after = current.slice(end);
   const needsSpaceBefore = before && !/\s$/.test(before);
   const needsSpaceAfter = after && !/^\s/.test(after);
-  const insertion = `${needsSpaceBefore ? ' ' : ''}${clean}${needsSpaceAfter ? ' ' : ''}`;
+  const insertion = `${needsSpaceBefore ? ' ' : ''}${insertionText}${needsSpaceAfter ? ' ' : ''}`;
   els.messageInput.value = `${before}${insertion}${after}`.trimStart();
   const nextCursor = Math.max(0, before.length + insertion.length);
   els.messageInput.focus();
   try { els.messageInput.setSelectionRange(nextCursor, nextCursor); } catch {}
-  recordRecentEmoji(clean);
+  recordRecentIconInsert(clean);
   scheduleActiveDraftSave();
   updateComposerControls();
   if (state.scheduleModalOpen) renderScheduleModal();
   if (state.quickRepliesOpen) renderQuickRepliesPanel();
   sendTyping(true);
-  renderEmojiPickerPanel();
+  renderIconInsertPickerPanel();
 }
 
 function getSpeechRecognitionConstructor() {
@@ -2979,7 +3108,7 @@ function insertSmartReplyByIndex(index = 0) {
 }
 
 function openSmartReplySuggestions() {
-  if (state.emojiPickerOpen) closeEmojiPicker();
+  if (state.iconInsertPanelOpen) closeIconInsertPicker();
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4200);
@@ -3017,7 +3146,7 @@ function renderQuickRepliesPanel() {
   const smartSuggestions = buildSmartReplySuggestions();
   const smartHtml = smartSuggestions.length ? `
     <div class="ce-smart-replies" aria-label="Sugerencias inteligentes locales">
-      <div class="ce-smart-replies__title"><strong>✨ Sugerencias inteligentes</strong><span>Generadas en este dispositivo desde el último mensaje relevante.</span></div>
+      <div class="ce-smart-replies__title"><strong>${uiIcon('spark')}<span>Sugerencias inteligentes</span></strong><span>Generadas en este dispositivo desde el último mensaje relevante.</span></div>
       <div class="ce-smart-replies__list">${smartSuggestions.map((suggestion, index) => `<button class="ce-smart-reply" type="button" data-smart-reply-index="${index}">${escapeHtml(suggestion)}</button>`).join('')}</div>
     </div>` : '';
   const saveDisabled = composerText ? '' : ' disabled';
@@ -3027,7 +3156,7 @@ function renderQuickRepliesPanel() {
         <strong>${escapeHtml(reply.title || 'Respuesta rápida')}</strong>
         <span>${escapeHtml(compactText(reply.text || '', 150))}</span>
       </button>
-      <button class="ce-quick-reply__delete" type="button" data-quick-reply-delete="${escapeHtml(reply.replyId || '')}" title="Eliminar respuesta rápida" aria-label="Eliminar respuesta rápida">×</button>
+      <button class="ce-quick-reply__delete" type="button" data-quick-reply-delete="${escapeHtml(reply.replyId || '')}" title="Eliminar respuesta rápida" aria-label="Eliminar respuesta rápida">${uiIcon('trash')}</button>
     </div>`).join('') : '<div class="ce-quick-replies__empty">Guarda frases frecuentes para responder más rápido en cualquier dispositivo.</div>';
   els.quickRepliesPanel.innerHTML = `
     <div class="ce-quick-replies__head">
@@ -4157,7 +4286,7 @@ function renderSearchPanel() {
         ${state.starredMessages.map((msg) => {
           const mine = msg.senderUserId === state.user?.userId;
           return `<button class="ce-search-result" type="button" data-search-message-id="${escapeHtml(msg.messageId)}">
-            <strong>★ ${mine ? 'Tú' : 'Contacto'} · ${formatMessageTime(msg.createdAt)}</strong>
+            <strong>${uiIcon('star')}<span>${mine ? 'Tú' : 'Contacto'} · ${formatMessageTime(msg.createdAt)}</span></strong>
             <span>${escapeHtml(msg.excerpt || msg.text || '')}</span>
           </button>`;
         }).join('')}
@@ -4609,7 +4738,7 @@ function renderAll() {
   renderSearchPanel();
   renderReplyDraft();
   renderQuickRepliesPanel();
-  renderEmojiPickerPanel();
+  renderIconInsertPickerPanel();
   renderForwardModal();
   renderScheduleModal();
   renderGlobalSearchModal();
@@ -4686,15 +4815,15 @@ function renderChats() {
     const active = chat.chatId === state.activeChatId ? ' active' : '';
     const pinned = chat.isPinned ? ' is-pinned' : '';
     const unread = Number(chat.unread || 0) > 0 ? `<span class="ce-badge">${chat.unread}</span>` : '';
-    const muted = chat.isMuted ? '<span class="ce-muted-pill" title="Chat silenciado" aria-label="Chat silenciado">🔕</span>' : '';
-    const outbox = queuedCount ? `<span class="ce-outbox-pill" title="${queuedCount} mensaje pendiente de envío" aria-label="${queuedCount} mensaje pendiente de envío">⏳ ${queuedCount}</span>` : '';
+    const muted = chat.isMuted ? `<span class="ce-muted-pill" title="Chat silenciado" aria-label="Chat silenciado">${uiIcon('bellOff')}</span>` : '';
+    const outbox = queuedCount ? `<span class="ce-outbox-pill" title="${queuedCount} mensaje pendiente de envío" aria-label="${queuedCount} mensaje pendiente de envío">${uiIcon('hourglass')}<span>${queuedCount}</span></span>` : '';
     const archived = chat.isArchived ? '<span class="ce-archived-pill" title="Chat archivado" aria-label="Chat archivado">Archivado</span>' : '';
     const blockedStatus = normalizeChatBlockStatus(chat);
     const blocked = blockedStatus.blocked ? '<span class="ce-blocked-pill" title="Comunicación pausada" aria-label="Comunicación pausada">Bloqueado</span>' : '';
     const pinLabel = chat.isPinned ? 'Desfijar chat' : 'Fijar chat arriba';
-    const pinIcon = chat.isPinned ? '📌' : '📍';
+    const pinIcon = chat.isPinned ? uiIcon('pin') : uiIcon('pinOutline');
     const archiveLabel = chat.isArchived ? 'Restaurar chat' : 'Archivar chat';
-    const archiveIcon = chat.isArchived ? '↩' : '▣';
+    const archiveIcon = chat.isArchived ? uiIcon('undo') : uiIcon('archive');
     const pinButton = chat.isArchived ? '' : `<button class="ce-chat-pin${chat.isPinned ? ' active' : ''}" type="button" data-pin-chat-id="${escapeHtml(chat.chatId)}" data-pinned="${chat.isPinned ? '1' : '0'}" title="${escapeHtml(pinLabel)}" aria-label="${escapeHtml(pinLabel)}">${pinIcon}</button>`;
     const archiveButton = `<button class="ce-chat-archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-chat-id="${escapeHtml(chat.chatId)}" data-archived="${chat.isArchived ? '1' : '0'}" title="${escapeHtml(archiveLabel)}" aria-label="${escapeHtml(archiveLabel)}">${archiveIcon}</button>`;
     return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small', { profileAction: true })}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
@@ -4712,7 +4841,7 @@ function renderContacts() {
     const subtitle = contactDisplaySubtitle(contact);
     const hasNickname = Boolean(String(contact.nickname || '').trim());
     const nicknameLabel = hasNickname ? 'Editar apodo privado' : 'Agregar apodo privado';
-    return `<div class="ce-row ce-row--contact${hasNickname ? ' has-nickname' : ''}" data-contact-id="${escapeHtml(contact.userId)}" role="button" tabindex="0" aria-label="Abrir chat con ${escapeHtml(title)}">${avatar(contact, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span><span class="ce-row__meta"><button class="ce-contact-alias-btn" type="button" data-edit-contact-nickname="${escapeHtml(contact.userId)}" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button></span></div>`;
+    return `<div class="ce-row ce-row--contact${hasNickname ? ' has-nickname' : ''}" data-contact-id="${escapeHtml(contact.userId)}" role="button" tabindex="0" aria-label="Abrir chat con ${escapeHtml(title)}">${avatar(contact, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span><span class="ce-row__meta"><button class="ce-contact-alias-btn" type="button" data-edit-contact-nickname="${escapeHtml(contact.userId)}" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">${uiIcon('nickname')}</button></span></div>`;
   }).join('');
   setCachedHtml('contactListHtml', els.contactList, contactListHtml);
 }
@@ -4756,12 +4885,12 @@ function renderPinnedMessagesStrip(chat = {}, messages = []) {
   const pinned = getPinnedMessagesForChat(chat, messages);
   if (!pinned.length) return '';
   return `<div class="ce-pinned-strip" aria-label="Mensajes fijados en este chat">
-    <strong>📌 Fijados</strong>
+    <strong>${uiIcon('pin')}<span>Fijados</span></strong>
     <div class="ce-pinned-strip__items">
       ${pinned.map((message) => `
         <span class="ce-pinned-strip__item">
           <button type="button" data-jump-message-id="${escapeHtml(message.messageId || '')}" title="Ir al mensaje fijado">${escapeHtml(compactText(message.text || '', 120))}</button>
-          <button class="ce-pinned-strip__remove" type="button" data-unpin-message-id="${escapeHtml(message.messageId || '')}" title="Desfijar mensaje" aria-label="Desfijar mensaje">×</button>
+          <button class="ce-pinned-strip__remove" type="button" data-unpin-message-id="${escapeHtml(message.messageId || '')}" title="Desfijar mensaje" aria-label="Desfijar mensaje">${uiIcon('close')}</button>
         </span>`).join('')}
     </div>
   </div>`;
@@ -4825,7 +4954,7 @@ function buildChatExportText(chat = {}, messages = []) {
     lines.push(`[${date}] ${sender}${forwarded}${silent}:`);
     if (message.replyTo?.text) {
       const replySender = message.replyTo.senderUserId === state.user?.userId ? 'Tú' : contactName;
-      lines.push(`  ↳ Respuesta a ${replySender}: ${compactText(message.replyTo.text, 160)}`);
+      lines.push(`  Respuesta a ${replySender}: ${compactText(message.replyTo.text, 160)}`);
     }
     lines.push(body || '(sin texto)', '');
   }
@@ -4914,7 +5043,7 @@ function renderActiveChat() {
       </button>`;
   const nicknameLabel = chat.other?.nickname ? 'Editar apodo privado del contacto' : 'Agregar apodo privado al contacto';
   const nicknameButtonHtml = isSelfChat(chat) ? '' : `
-      <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">🏷️</button>`;
+      <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">${uiIcon('nickname')}</button>`;
   const searchOpen = Boolean(state.activeChatId && state.chatSearchOpen);
   const activeChatHeaderHtml = `
     <button class="ce-icon-btn ce-mobile-back" type="button" data-close-mobile-chat="1" title="Volver a conversaciones" aria-label="Volver a conversaciones">
@@ -5646,7 +5775,7 @@ function renderBlockedContactsModal(error = null) {
     const subtitle = blockedContactSubtitle(item);
     const date = item.blockedAt ? `Bloqueado el ${formatScheduleDateTime(item.blockedAt)}` : 'Bloqueo activo';
     return `<article class="ce-blocked-contact">
-      ${item.profile ? avatar(item.profile, 'small') : '<span class="ce-avatar ce-avatar--small" aria-hidden="true">⛔</span>'}
+      ${item.profile ? avatar(item.profile, 'small') : `<span class="ce-avatar ce-avatar--small" aria-hidden="true">${uiIcon('contactOff', 'ce-avatar__icon')}</span>`}
       <div class="ce-blocked-contact__body">
         <strong>${escapeHtml(title)}</strong>
         <span>${escapeHtml(subtitle)}</span>
@@ -6100,7 +6229,7 @@ function buildChatBriefText(chat = {}, rawMessages = []) {
     `Resumen del chat · chatER`,
     `Chat: ${chatDisplayName(chat)}`,
     `Generado: ${formatExportDateTime(Date.now())}`,
-    `Rango: ${brief.stats.fromLabel} → ${brief.stats.toLabel}`,
+    `Rango: ${brief.stats.fromLabel} hasta ${brief.stats.toLabel}`,
     `Mensajes analizados: ${brief.stats.total} · Tú: ${brief.stats.mineCount} · Contacto: ${brief.stats.receivedCount} · Enlaces: ${brief.stats.linkCount} · Encuestas: ${brief.stats.pollsCount}`,
     `Temas frecuentes: ${brief.keywords.length ? brief.keywords.join(', ') : 'sin temas suficientes'}`,
     ''.padEnd(42, '-')
@@ -6264,7 +6393,7 @@ function renderDateJumpModal() {
       ${state.dateJumpDays.map((day) => {
         const isSelected = day.dateKey === selected;
         return `<button class="ce-date-jump-day${isSelected ? ' active' : ''}" type="button" data-date-jump-day="${escapeHtml(day.dateKey)}" aria-pressed="${isSelected ? 'true' : 'false'}">
-          <span><strong>${escapeHtml(formatDateJumpLabel(day.dateKey))}</strong><em>${escapeHtml(formatScheduleDateTime(day.firstMessageAt || Date.now()))} → ${escapeHtml(formatScheduleDateTime(day.lastMessageAt || Date.now()))}</em></span>
+          <span><strong>${escapeHtml(formatDateJumpLabel(day.dateKey))}</strong><em>${escapeHtml(formatScheduleDateTime(day.firstMessageAt || Date.now()))} ${uiIcon('arrowRight')} ${escapeHtml(formatScheduleDateTime(day.lastMessageAt || Date.now()))}</em></span>
           <b>${day.count}</b>
           <small>${escapeHtml(day.preview || 'Sin vista previa disponible')}</small>
         </button>`;
@@ -6345,7 +6474,7 @@ function renderChatBriefModal() {
       <span role="listitem"><strong>${brief.stats.linkCount}</strong><em>enlaces</em></span>
       <span role="listitem"><strong>${brief.stats.pollsCount}</strong><em>encuestas</em></span>
     </div>
-    <div class="ce-chat-brief-range">${escapeHtml(brief.stats.fromLabel)} → ${escapeHtml(brief.stats.toLabel)}</div>
+    <div class="ce-chat-brief-range"><span>${escapeHtml(brief.stats.fromLabel)}</span>${uiIcon('arrowRight')}<span>${escapeHtml(brief.stats.toLabel)}</span></div>
     <div class="ce-chat-brief-topics" aria-label="Temas frecuentes">${topics}</div>
     <div class="ce-chat-brief-actions"><button class="ce-btn ce-btn--small" type="button" data-copy-chat-brief="1">Copiar resumen</button></div>
     ${renderChatBriefItems('Pendientes detectados', brief.pending, chat, 'No se detectaron pendientes claros en los mensajes cargados.', { allowReminder: true })}
@@ -6489,7 +6618,7 @@ function renderGlobalStarredModal() {
   }
   const items = Array.isArray(state.globalStarredMessages) ? state.globalStarredMessages : [];
   if (!items.length) {
-    els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Aún no tienes mensajes destacados. Usa ★ en cualquier mensaje para guardarlo aquí.</div>';
+    els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Aún no tienes mensajes destacados. Usa la acción Destacar en cualquier mensaje para guardarlo aquí.</div>';
     return;
   }
   els.globalStarredList.innerHTML = `
@@ -6501,7 +6630,7 @@ function renderGlobalStarredModal() {
       const archived = chat.isArchived ? '<small>Archivado</small>' : '';
       return `<article class="ce-global-starred-item">
         <button class="ce-global-starred-item__main" type="button" data-global-starred-chat-id="${escapeHtml(chat.chatId || '')}" data-global-starred-message-id="${escapeHtml(message.messageId || '')}">
-          <span class="ce-global-starred-item__head"><strong>★ ${escapeHtml(globalSearchChatTitle(chat))}</strong>${archived}<em>${escapeHtml(formatMessageTime(message.createdAt))}</em></span>
+          <span class="ce-global-starred-item__head"><strong>${uiIcon('star')}<span>${escapeHtml(globalSearchChatTitle(chat))}</span></strong>${archived}<em>${escapeHtml(formatMessageTime(message.createdAt))}</em></span>
           <span class="ce-global-starred-item__body"><b>${mine ? 'Tú' : 'Contacto'}:</b> ${escapeHtml(message.excerpt || message.text || 'Mensaje destacado')}</span>
         </button>
         <button class="ce-link" type="button" data-global-starred-unstar-chat-id="${escapeHtml(chat.chatId || '')}" data-global-starred-unstar-message-id="${escapeHtml(message.messageId || '')}">Quitar</button>
@@ -6621,7 +6750,7 @@ function getCommandPaletteCommands() {
       id: 'privacy-mode',
       title: state.privacyMode ? 'Desactivar modo privacidad' : 'Activar modo privacidad',
       description: 'Oculta nombres, vistas previas y mensajes cuando usas chatER en espacios compartidos.',
-      shortcut: 'Ctrl/⌘ + Shift + P',
+      shortcut: 'Ctrl/Cmd + Shift + P',
       enabled: Boolean(state.user),
       run: () => togglePrivacyMode({ announce: true })
     },
@@ -6631,7 +6760,7 @@ function getCommandPaletteCommands() {
       description: state.privacyLock.enabled
         ? 'Oculta toda la pantalla de chatER hasta ingresar tu PIN local en este dispositivo.'
         : 'Agrega un bloqueo local por PIN para proteger tus conversaciones en equipos compartidos.',
-      shortcut: 'Ctrl/⌘ + Alt + P',
+      shortcut: 'Ctrl/Cmd + Alt + P',
       enabled: Boolean(state.user),
       run: () => runPrivacyLockShortcut()
     },
@@ -6639,7 +6768,7 @@ function getCommandPaletteCommands() {
       id: 'compact-mode',
       title: state.compactMode ? 'Desactivar modo compacto' : 'Activar modo compacto',
       description: 'Ajusta la interfaz para ver más chats y mensajes en pantalla sin perder acciones importantes.',
-      shortcut: 'Ctrl/⌘ + Alt + C',
+      shortcut: 'Ctrl/Cmd + Alt + C',
       enabled: Boolean(state.user),
       run: () => toggleCompactMode({ announce: true })
     },
@@ -6649,7 +6778,7 @@ function getCommandPaletteCommands() {
       description: isNotificationPauseActive()
         ? `Las notificaciones push están pausadas hasta ${notificationPauseUntilLabel()}.`
         : 'Pausa todas las notificaciones push sin silenciar chats uno por uno.',
-      shortcut: '🔕 global',
+      shortcut: 'No molestar',
       enabled: Boolean(state.user),
       run: () => toggleNotificationPause()
     },
@@ -6657,7 +6786,7 @@ function getCommandPaletteCommands() {
       id: 'self-notes',
       title: 'Abrir Notas para mí',
       description: 'Crea o abre tu chat privado para guardar ideas, enlaces, tareas y mensajes reenviados.',
-      shortcut: 'Ctrl/⌘ + Shift + N',
+      shortcut: 'Ctrl/Cmd + Shift + N',
       enabled: Boolean(state.user),
       run: () => openSelfNotesChat()
     },
@@ -6665,7 +6794,7 @@ function getCommandPaletteCommands() {
       id: 'search-chat',
       title: 'Buscar en este chat',
       description: 'Encuentra mensajes dentro de la conversación activa.',
-      shortcut: 'Ctrl/⌘ + K · buscar',
+      shortcut: 'Ctrl/Cmd + K · buscar',
       enabled: hasChat,
       run: () => focusChatSearchInput()
     },
@@ -6673,7 +6802,7 @@ function getCommandPaletteCommands() {
       id: 'link-library',
       title: 'Ver enlaces compartidos',
       description: 'Abre una biblioteca con las URLs detectadas en el chat activo para copiarlas o volver al mensaje original.',
-      shortcut: 'Ctrl/⌘ + Alt + L',
+      shortcut: 'Ctrl/Cmd + Alt + L',
       enabled: hasChat,
       run: () => openLinkLibrary()
     },
@@ -6681,7 +6810,7 @@ function getCommandPaletteCommands() {
       id: 'chat-brief',
       title: 'Generar resumen del chat',
       description: 'Crea una vista ejecutiva local con pendientes, preguntas, acuerdos, temas frecuentes y últimos mensajes.',
-      shortcut: 'Ctrl/⌘ + Alt + B',
+      shortcut: 'Ctrl/Cmd + Alt + B',
       enabled: hasChat,
       run: () => openChatBrief()
     },
@@ -6689,7 +6818,7 @@ function getCommandPaletteCommands() {
       id: 'scroll-bottom',
       title: 'Ir al final del chat',
       description: 'Vuelve al último mensaje sin perder mensajes nuevos cuando estabas leyendo arriba.',
-      shortcut: 'Ctrl/⌘ + End',
+      shortcut: 'Ctrl/Cmd + End',
       enabled: hasChat,
       run: () => scrollMessagesToBottom({ smooth: true, resetNew: true })
     },
@@ -6697,15 +6826,15 @@ function getCommandPaletteCommands() {
       id: 'search-all-chats',
       title: 'Buscar en todos los chats',
       description: 'Encuentra mensajes en conversaciones activas y archivadas sin abrir chat por chat.',
-      shortcut: 'Ctrl/⌘ + Shift + F',
+      shortcut: 'Ctrl/Cmd + Shift + F',
       enabled: Boolean(state.user),
       run: () => openGlobalSearch()
     },
     {
       id: 'starred-inbox',
       title: 'Abrir bandeja de destacados',
-      description: 'Reúne mensajes marcados con ★ en todos tus chats, incluidos archivados.',
-      shortcut: 'Ctrl/⌘ + Alt + S',
+      description: 'Reúne mensajes destacados en todos tus chats, incluidos archivados.',
+      shortcut: 'Ctrl/Cmd + Alt + S',
       enabled: Boolean(state.user),
       run: () => openGlobalStarred()
     },
@@ -6713,7 +6842,7 @@ function getCommandPaletteCommands() {
       id: 'drafts-inbox',
       title: 'Abrir borradores pendientes',
       description: 'Continúa mensajes guardados sin revisar chat por chat.',
-      shortcut: 'Ctrl/⌘ + Alt + D',
+      shortcut: 'Ctrl/Cmd + Alt + D',
       enabled: Boolean(state.user),
       run: () => openDraftsModal()
     },
@@ -6721,7 +6850,7 @@ function getCommandPaletteCommands() {
       id: 'starred-chat',
       title: 'Ver mensajes destacados',
       description: 'Abre los destacados privados de este chat.',
-      shortcut: '★',
+      shortcut: 'Destacados',
       enabled: hasChat,
       run: () => loadStarredMessages()
     },
@@ -6729,7 +6858,7 @@ function getCommandPaletteCommands() {
       id: 'quick-replies',
       title: 'Abrir respuestas rápidas',
       description: 'Inserta o guarda textos frecuentes para responder más rápido.',
-      shortcut: '⚡',
+      shortcut: 'Rápidas',
       enabled: hasChat,
       run: async () => {
         state.quickRepliesOpen = true;
@@ -6741,7 +6870,7 @@ function getCommandPaletteCommands() {
       id: 'smart-replies',
       title: 'Sugerir respuestas inteligentes',
       description: 'Propone respuestas breves generadas localmente desde el contexto reciente del chat.',
-      shortcut: 'Ctrl/⌘ + Shift + G',
+      shortcut: 'Ctrl/Cmd + Shift + G',
       enabled: hasChat && !blocked && !state.editingMessage?.messageId && Boolean(buildSmartReplySuggestions().length),
       run: () => openSmartReplySuggestions()
     },
@@ -6749,7 +6878,7 @@ function getCommandPaletteCommands() {
       id: 'private-notes',
       title: 'Abrir notas privadas del chat',
       description: 'Guarda contexto, pendientes o datos sensibles visibles solo para tu cuenta.',
-      shortcut: 'Ctrl/⌘ + Shift + L',
+      shortcut: 'Ctrl/Cmd + Shift + L',
       enabled: hasChat,
       run: () => openPrivateNotesModal()
     },
@@ -6757,7 +6886,7 @@ function getCommandPaletteCommands() {
       id: 'chat-labels',
       title: 'Editar etiquetas del chat',
       description: 'Agrupa conversaciones por cliente, proyecto, prioridad o cualquier categoría personal.',
-      shortcut: 'Ctrl/⌘ + Shift + T',
+      shortcut: 'Ctrl/Cmd + Shift + T',
       enabled: hasChat,
       run: () => openLabelsModal()
     },
@@ -6765,7 +6894,7 @@ function getCommandPaletteCommands() {
       id: 'contact-nickname',
       title: chat?.other?.nickname ? 'Editar apodo privado' : 'Agregar apodo privado',
       description: 'Personaliza cómo ves el nombre de este contacto sin cambiar su perfil ni avisarle a la otra persona.',
-      shortcut: 'Ctrl/⌘ + Shift + Y',
+      shortcut: 'Ctrl/Cmd + Shift + Y',
       enabled: hasChat && !isSelfChat(chat),
       run: () => openActiveContactNicknameModal()
     },
@@ -6773,7 +6902,7 @@ function getCommandPaletteCommands() {
       id: 'chat-reminders',
       title: 'Abrir recordatorios del chat',
       description: 'Crea avisos privados para volver a una conversación o mensaje importante.',
-      shortcut: 'Ctrl/⌘ + Shift + R',
+      shortcut: 'Ctrl/Cmd + Shift + R',
       enabled: hasChat,
       run: () => openReminderModal()
     },
@@ -6781,7 +6910,7 @@ function getCommandPaletteCommands() {
       id: 'create-poll',
       title: 'Crear encuesta',
       description: 'Publica una pregunta con opciones votables para tomar decisiones rápidas en el chat.',
-      shortcut: '📊',
+      shortcut: 'Encuesta',
       enabled: hasChat && !blocked && !state.editingMessage?.messageId,
       run: () => openPollModal()
     },
@@ -6789,7 +6918,7 @@ function getCommandPaletteCommands() {
       id: 'voice-dictation',
       title: state.voiceDictating ? 'Detener dictado por voz' : 'Dictar mensaje por voz',
       description: isVoiceDictationSupported() ? 'Convierte tu voz en texto dentro del compositor sin enviar audio al chat.' : 'El dictado por voz no está disponible en este navegador.',
-      shortcut: 'Ctrl/⌘ + Shift + D',
+      shortcut: 'Ctrl/Cmd + Shift + D',
       enabled: hasChat && !blocked && !state.editingMessage?.messageId && isVoiceDictationSupported(),
       run: () => toggleVoiceDictation()
     },
@@ -6802,18 +6931,18 @@ function getCommandPaletteCommands() {
       run: () => cycleMessageTtl()
     },
     {
-      id: 'emoji-picker',
-      title: 'Insertar emoji',
-      description: 'Abre un selector local con recientes, caras, gestos, trabajo y objetos para completar el mensaje.',
-      shortcut: 'Ctrl/⌘ + Shift + E',
+      id: 'icon-insert-picker',
+      title: 'Insertar icono rápido',
+      description: 'Abre un selector local con iconos profesionales y textos breves para completar el mensaje.',
+      shortcut: 'Ctrl/Cmd + Shift + E',
       enabled: hasChat && !blocked && !state.editingMessage?.messageId,
-      run: () => toggleEmojiPicker()
+      run: () => toggleIconInsertPicker()
     },
     {
       id: 'schedule-message',
       title: 'Programar mensaje escrito',
       description: 'Envía el texto del compositor en una fecha futura.',
-      shortcut: 'Ctrl/⌘ + Shift + S',
+      shortcut: 'Ctrl/Cmd + Shift + S',
       enabled: Boolean(canSchedule),
       run: () => openScheduleModal()
     },
@@ -6821,7 +6950,7 @@ function getCommandPaletteCommands() {
       id: 'silent-send',
       title: 'Enviar sin notificación',
       description: 'Entrega el texto del compositor en el chat, pero no dispara notificación push al destinatario.',
-      shortcut: 'Ctrl/⌘ + Shift + Enter',
+      shortcut: 'Ctrl/Cmd + Shift + Enter',
       enabled: Boolean(canSchedule),
       run: () => sendSilentCurrentMessage()
     },
@@ -6837,7 +6966,7 @@ function getCommandPaletteCommands() {
       id: 'date-jump',
       title: 'Ir a fecha en este chat',
       description: 'Abre una línea de tiempo por día para saltar al primer mensaje de una fecha específica.',
-      shortcut: 'Ctrl/⌘ + Alt + J',
+      shortcut: 'Ctrl/Cmd + Alt + J',
       enabled: hasChat,
       run: () => openDateJump()
     },
@@ -6845,7 +6974,7 @@ function getCommandPaletteCommands() {
       id: 'copy-chat-link',
       title: 'Copiar enlace interno del chat',
       description: 'Guarda un enlace privado para volver a esta conversación.',
-      shortcut: '🔗',
+      shortcut: 'Enlace',
       enabled: hasChat,
       run: () => copyActiveChatLink()
     },
@@ -6853,7 +6982,7 @@ function getCommandPaletteCommands() {
       id: 'mark-chat-unread',
       title: 'Marcar chat como no leído',
       description: 'Deja una señal visual para volver a esta conversación más tarde.',
-      shortcut: 'Ctrl/⌘ + Shift + U',
+      shortcut: 'Ctrl/Cmd + Shift + U',
       enabled: hasChat,
       run: () => markActiveChatUnread()
     },
@@ -6869,7 +6998,7 @@ function getCommandPaletteCommands() {
       id: 'export-chat',
       title: 'Exportar chat en texto',
       description: 'Descarga hasta los últimos 500 mensajes de este chat.',
-      shortcut: 'Ctrl/⌘ + E',
+      shortcut: 'Ctrl/Cmd + E',
       enabled: hasChat,
       run: () => exportActiveChat()
     },
@@ -6877,7 +7006,7 @@ function getCommandPaletteCommands() {
       id: 'toggle-mute',
       title: chat?.isMuted ? 'Activar notificaciones del chat' : 'Silenciar notificaciones del chat',
       description: chat?.isMuted ? 'Vuelve a recibir avisos push de esta conversación.' : 'Evita avisos push de esta conversación sin archivar el chat.',
-      shortcut: 'Ctrl/⌘ + Shift + M',
+      shortcut: 'Ctrl/Cmd + Shift + M',
       enabled: hasChat && !isSelfChat(chat),
       run: () => setActiveChatMuted(!chat?.isMuted)
     },
@@ -6895,7 +7024,7 @@ function getCommandPaletteCommands() {
       description: normalizeChatBlockStatus(chat).blockedByMe
         ? 'Restaura el envío de mensajes hacia este contacto.'
         : 'Pausa la comunicación con este contacto sin borrar la conversación ni tus notas.',
-      shortcut: 'Ctrl/⌘ + Shift + B',
+      shortcut: 'Ctrl/Cmd + Shift + B',
       enabled: hasChat && !isSelfChat(chat),
       run: () => setActiveContactBlocked(!normalizeChatBlockStatus(chat).blockedByMe)
     },
@@ -6903,7 +7032,7 @@ function getCommandPaletteCommands() {
       id: 'toggle-archive',
       title: chat?.isArchived ? 'Restaurar chat' : 'Archivar chat',
       description: chat?.isArchived ? 'Devuelve esta conversación a la bandeja principal.' : 'Limpia tu bandeja sin borrar la conversación.',
-      shortcut: 'Ctrl/⌘ + Shift + A',
+      shortcut: 'Ctrl/Cmd + Shift + A',
       enabled: hasChat,
       run: () => setChatArchived(chat.chatId, !chat?.isArchived)
     },
@@ -7058,7 +7187,7 @@ function bindEvents() {
       if (state.chatBriefOpen) closeChatBrief();
       if (state.dateJumpOpen) closeDateJump();
       if (state.commandPaletteOpen) closeCommandPalette();
-      if (state.emojiPickerOpen) closeEmojiPicker();
+      if (state.iconInsertPanelOpen) closeIconInsertPicker();
       if (state.forwardingMessage?.messageId) closeForwardModal();
       if (state.scheduleModalOpen) closeScheduleModal();
       if (state.privateNotesOpen) closePrivateNotesModal();
@@ -7153,7 +7282,7 @@ function bindEvents() {
     }
     if (platformAction && event.shiftKey && key === 'e' && state.activeChatId) {
       event.preventDefault();
-      toggleEmojiPicker();
+      toggleIconInsertPicker();
       return;
     }
     if (platformAction && event.shiftKey && key === 'g' && state.activeChatId) {
@@ -7282,7 +7411,7 @@ function bindEvents() {
     state.activeLabelFilter = '';
     state.labelsModalOpen = false;
     state.slashCommandsOpen = false;
-    closeEmojiPicker();
+    closeIconInsertPicker();
     state.draftsOpen = false;
     state.drafts = [];
     state.draftsLoading = false;
@@ -7598,7 +7727,7 @@ function bindEvents() {
       return;
     }
     state.quickRepliesOpen = !state.quickRepliesOpen;
-    if (state.quickRepliesOpen && state.emojiPickerOpen) closeEmojiPicker();
+    if (state.quickRepliesOpen && state.iconInsertPanelOpen) closeIconInsertPicker();
     renderQuickRepliesPanel();
     if (state.quickRepliesOpen) {
       await loadQuickReplies().catch((error) => {
@@ -7609,25 +7738,25 @@ function bindEvents() {
     }
   });
   els.btnSmartReplySuggestions?.addEventListener('click', () => openSmartReplySuggestions());
-  els.btnEmojiPicker?.addEventListener('click', () => toggleEmojiPicker());
-  els.emojiPickerPanel?.addEventListener('click', (event) => {
-    const closeButton = event.target.closest('[data-close-emoji-picker]');
-    if (closeButton && els.emojiPickerPanel.contains(closeButton)) {
+  els.btnIconInsertPicker?.addEventListener('click', () => toggleIconInsertPicker());
+  els.iconInsertPickerPanel?.addEventListener('click', (event) => {
+    const closeButton = event.target.closest('[data-close-icon-insert-picker]');
+    if (closeButton && els.iconInsertPickerPanel.contains(closeButton)) {
       event.preventDefault();
-      closeEmojiPicker();
+      closeIconInsertPicker();
       return;
     }
-    const categoryButton = event.target.closest('[data-emoji-category]');
-    if (categoryButton && els.emojiPickerPanel.contains(categoryButton)) {
+    const categoryButton = event.target.closest('[data-icon-insert-category]');
+    if (categoryButton && els.iconInsertPickerPanel.contains(categoryButton)) {
       event.preventDefault();
-      state.emojiPickerCategory = normalizeEmojiCategory(categoryButton.dataset.emojiCategory || 'recientes');
-      renderEmojiPickerPanel();
+      state.iconInsertCategory = normalizeIconInsertCategory(categoryButton.dataset.iconInsertCategory || 'recientes');
+      renderIconInsertPickerPanel();
       return;
     }
-    const emojiButton = event.target.closest('[data-insert-emoji]');
-    if (emojiButton && els.emojiPickerPanel.contains(emojiButton)) {
+    const iconInsertButton = event.target.closest('[data-insert-icon-insert]');
+    if (iconInsertButton && els.iconInsertPickerPanel.contains(iconInsertButton)) {
       event.preventDefault();
-      insertEmojiIntoComposer(emojiButton.dataset.insertEmoji || '');
+      insertIconInsertIntoComposer(iconInsertButton.dataset.insertIconInsert || '');
     }
   });
   els.quickRepliesPanel?.addEventListener('click', (event) => {
@@ -8299,15 +8428,15 @@ function bindEvents() {
     updateComposerControls();
     if (state.scheduleModalOpen) renderScheduleModal();
     if (state.quickRepliesOpen) renderQuickRepliesPanel();
-    if (state.emojiPickerOpen) renderEmojiPickerPanel();
+    if (state.iconInsertPanelOpen) renderIconInsertPickerPanel();
     renderSlashCommandsPanel();
     sendTyping(true);
     if (state.typingTimer) window.clearTimeout(state.typingTimer);
     state.typingTimer = window.setTimeout(() => sendTyping(false), 1800);
   });
   els.messageInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && state.emojiPickerOpen) {
-      closeEmojiPicker();
+    if (event.key === 'Escape' && state.iconInsertPanelOpen) {
+      closeIconInsertPicker();
       return;
     }
     if (event.key === 'Escape' && state.slashCommandsOpen) {
