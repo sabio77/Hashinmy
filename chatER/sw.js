@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v115-secure-delivery-ack-origin';
+const CACHE_NAME = 'chater-static-v87-emoji-size-rules';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',
@@ -10,8 +10,6 @@ const CORE_ASSETS = [
   './APPwebFRONTENDx/BLOQUE/app.js',
   './APPwebFRONTENDx/BLOQUE/api.js',
   './APPwebFRONTENDx/BLOQUE/firebase.auth.js',
-  './IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js',
-  './IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js',
   './manifest.webmanifest'
 ];
 
@@ -22,120 +20,12 @@ const OPTIONAL_ASSETS = [
   './assets/icon-512.svg'
 ];
 
-const NOTIFICATION_ICON_FALLBACK = './assets/icon-192.svg';
-const NOTIFICATION_TITLE_MAX_LENGTH = 80;
-const NOTIFICATION_BODY_MAX_LENGTH = 220;
-const NOTIFICATION_TAG_MAX_LENGTH = 90;
-const NOTIFICATION_DATA_MAX_LENGTH = 180;
-const UNSAFE_UNICODE_DIRECTION_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
-
-function stripUnsafeUnicodeControls(value = '') {
-  return String(value || '').replace(UNSAFE_UNICODE_DIRECTION_CONTROLS, '');
-}
-
-function normalizeNotificationText(value = '', fallback = '', maxLength = 160) {
-  const clean = stripUnsafeUnicodeControls(value)
-    .replace(/[\x00-\x1F\x7F]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const safeFallback = String(fallback || '').trim();
-  const text = clean || safeFallback;
-  const limit = Math.max(1, Math.min(500, Number(maxLength || 160)));
-  if (text.length <= limit) return text;
-  return `${text.slice(0, Math.max(1, limit - 1)).trimEnd()}…`;
-}
-
-function normalizeNotificationToken(value = '', { fallback = '', maxLength = NOTIFICATION_DATA_MAX_LENGTH } = {}) {
-  const clean = normalizeNotificationText(value, fallback, maxLength)
-    .replace(/[^A-Za-z0-9._:-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, Math.max(1, Math.min(240, Number(maxLength || NOTIFICATION_DATA_MAX_LENGTH))));
-  return clean || String(fallback || '').slice(0, Math.max(1, Number(maxLength || NOTIFICATION_DATA_MAX_LENGTH)));
-}
-
-function normalizeNotificationTag(value = '') {
-  return normalizeNotificationToken(value, { fallback: 'chatER', maxLength: NOTIFICATION_TAG_MAX_LENGTH }) || 'chatER';
-}
-
-function normalizeNotificationType(value = '') {
-  return normalizeNotificationToken(value, { fallback: 'chat.notification', maxLength: 80 }) || 'chat.notification';
-}
-
 const DELIVERY_ACK_DB_NAME = 'chater-delivery-acks-v1';
 const DELIVERY_ACK_STORE_NAME = 'pendingAcks';
 const DELIVERY_ACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const DELIVERY_ACK_MAX_BACKOFF_MS = 30 * 60 * 1000;
 const DELIVERY_ACK_MAX_ATTEMPTS = 96;
 const DELIVERY_ACK_SYNC_TAG = 'CHAT_ER_FLUSH_DELIVERY_ACKS';
-const DELIVERY_ACK_TRUST_ORIGIN_TAG = 'CHAT_ER_TRUST_DELIVERY_ACK_ORIGIN';
-const DELIVERY_ACK_ALLOWED_PATHNAME = '/api/chats/delivery/ack';
-const DELIVERY_ACK_TOKEN_MAX_LENGTH = 220;
-const DELIVERY_ACK_FETCH_TIMEOUT_MS = 9000;
-
-function deliveryAckTimeoutMs(value = DELIVERY_ACK_FETCH_TIMEOUT_MS) {
-  const number = Number(value || DELIVERY_ACK_FETCH_TIMEOUT_MS);
-  if (!Number.isFinite(number) || number <= 0) return DELIVERY_ACK_FETCH_TIMEOUT_MS;
-  return Math.min(30000, Math.max(3000, Math.trunc(number)));
-}
-
-async function fetchDeliveryAckWithTimeout(url = '', options = {}, timeoutMs = DELIVERY_ACK_FETCH_TIMEOUT_MS) {
-  const safeTimeoutMs = deliveryAckTimeoutMs(timeoutMs);
-  if (typeof AbortController === 'undefined') {
-    return Promise.race([
-      fetch(url, options),
-      sleep(safeTimeoutMs).then(() => {
-        const timeoutError = new Error('delivery_ack_timeout');
-        timeoutError.code = 'delivery_ack_timeout';
-        throw timeoutError;
-      })
-    ]);
-  }
-  const controller = new AbortController();
-  let timeoutId = 0;
-  try {
-    timeoutId = setTimeout(() => controller.abort(), safeTimeoutMs);
-    return await fetch(url, { ...options, signal: controller.signal });
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      const timeoutError = new Error('delivery_ack_timeout');
-      timeoutError.code = 'delivery_ack_timeout';
-      timeoutError.cause = error;
-      throw timeoutError;
-    }
-    throw error;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
-function isLocalDevelopmentOrigin(origin = self.location.origin) {
-  try {
-    const url = new URL(String(origin || self.location.origin));
-    return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function initialTrustedDeliveryAckOrigins() {
-  const origins = new Set([
-    self.location.origin,
-    'https://mapsx.app',
-    'https://www.mapsx.app'
-  ]);
-  // Punto débil corregido: la PWA publicada no debe confiar en localhost por
-  // defecto para ACK Push. Esos orígenes solo se habilitan si el propio service
-  // worker está corriendo en desarrollo local, evitando que un payload malformado
-  // intente usar el navegador como puente hacia servicios locales del usuario.
-  if (isLocalDevelopmentOrigin()) {
-    origins.add('http://localhost:10000');
-    origins.add('http://127.0.0.1:10000');
-  }
-  return origins;
-}
-
-const trustedDeliveryAckOrigins = initialTrustedDeliveryAckOrigins();
 let deliveryAckDbPromise = null;
 
 function hasIndexedDbSupport() {
@@ -178,76 +68,12 @@ async function deliveryAckStore(mode = 'readonly') {
   return tx.objectStore(DELIVERY_ACK_STORE_NAME);
 }
 
-function normalizeDeliveryAckToken(value = '') {
-  const token = String(value || '').trim();
-  if (!token || token.length > DELIVERY_ACK_TOKEN_MAX_LENGTH) return '';
-  if (!/^[A-Za-z0-9_-]+$/.test(token)) return '';
-  return token;
-}
-
-function isSecureDeliveryAckOrigin(origin = '') {
-  try {
-    const url = new URL(String(origin || '').trim());
-    if (url.protocol === 'https:') return true;
-    // HTTP solo queda disponible para pruebas locales reales. En producción el
-    // service worker no debe confiar dinámicamente en un backend público sin TLS,
-    // aunque una configuración o payload legacy intente registrarlo por mensaje.
-    if (url.protocol === 'http:' && isLocalDevelopmentOrigin(url.origin) && isLocalDevelopmentOrigin()) return true;
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-function trustedDeliveryAckOriginFromUrl(value = '') {
-  try {
-    const url = new URL(String(value || '').trim(), self.location.href);
-    if (!['http:', 'https:'].includes(url.protocol)) return '';
-    if (!url.hostname || url.username || url.password) return '';
-    return isSecureDeliveryAckOrigin(url.origin) ? url.origin : '';
-  } catch {
-    return '';
-  }
-}
-
-function rememberTrustedDeliveryAckOrigin(value = '') {
-  const origin = trustedDeliveryAckOriginFromUrl(value);
-  if (!origin) return '';
-  trustedDeliveryAckOrigins.add(origin);
-  return origin;
-}
-
-function normalizeDeliveryAckUrl(value = '') {
-  let url = null;
-  try {
-    url = new URL(String(value || '').trim());
-  } catch {
-    return '';
-  }
-  if (!isSecureDeliveryAckOrigin(url.origin)) return '';
-  if (!trustedDeliveryAckOrigins.has(url.origin)) return '';
-  if (url.username || url.password || url.search || url.hash) return '';
-  const pathname = (url.pathname || '').replace(/\/+$/, '') || '/';
-  if (pathname !== DELIVERY_ACK_ALLOWED_PATHNAME) return '';
-  url.pathname = DELIVERY_ACK_ALLOWED_PATHNAME;
-  return url.toString();
-}
-
 function normalizeDeliveryAckPayload(payload = {}) {
   const delivery = payload.delivery && typeof payload.delivery === 'object' ? payload.delivery : null;
-  const token = normalizeDeliveryAckToken(delivery?.token || '');
-  const ackUrl = normalizeDeliveryAckUrl(delivery?.ackUrl || '');
+  const token = String(delivery?.token || '').trim();
+  const ackUrl = String(delivery?.ackUrl || '').trim();
   if (!token || !ackUrl) return null;
   return { key: token, token, ackUrl };
-}
-
-function normalizeQueuedDeliveryAckItem(item = {}) {
-  const originalKey = String(item?.key || item?.token || '').trim();
-  const key = normalizeDeliveryAckToken(originalKey);
-  const token = normalizeDeliveryAckToken(item?.token || key);
-  const ackUrl = normalizeDeliveryAckUrl(item?.ackUrl || '');
-  if (!key || !token || !ackUrl) return null;
-  return { ...item, key, token, ackUrl };
 }
 
 async function getQueuedDeliveryAck(key = '') {
@@ -287,16 +113,13 @@ function isFinalDeliveryAckSkip(reason = '') {
 }
 
 async function sendDeliveryAckRequest(token = '', ackUrl = '') {
-  // Punto débil corregido: la confirmación Push ya no depende de un fetch sin
-  // límite. Si la red queda colgada, el ACK se reencola con backoff en vez de
-  // mantener vivo indefinidamente el evento push/sync del service worker.
-  const response = await fetchDeliveryAckWithTimeout(ackUrl, {
+  const response = await fetch(ackUrl, {
     method: 'POST',
     mode: 'cors',
     credentials: 'omit',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token })
-  }, DELIVERY_ACK_FETCH_TIMEOUT_MS);
+  });
   if (!response || !response.ok) return false;
   const data = await response.clone().json().catch(() => null);
   if (!data || data.ok === false) return false;
@@ -346,22 +169,19 @@ async function queuePushDeliveryAck(payload = {}) {
 }
 
 async function flushQueuedDeliveryAckItem(item = {}, { force = false } = {}) {
-  const originalKey = String(item?.key || item?.token || '').trim();
-  const normalized = normalizeQueuedDeliveryAckItem(item);
-  if (!normalized) {
-    if (originalKey) await deleteQueuedDeliveryAck(originalKey).catch(() => null);
-    return false;
-  }
-  const { key, token, ackUrl } = normalized;
+  const key = String(item.key || item.token || '').trim();
+  const token = String(item.token || key).trim();
+  const ackUrl = String(item.ackUrl || '').trim();
+  if (!key || !token || !ackUrl) return false;
   const now = Date.now();
-  const queuedAt = Number(normalized.queuedAt || now);
+  const queuedAt = Number(item.queuedAt || now);
   const expired = now - queuedAt > DELIVERY_ACK_MAX_AGE_MS;
-  const attempts = Math.max(0, Number(normalized.attempts || 0));
+  const attempts = Math.max(0, Number(item.attempts || 0));
   if (expired || attempts >= DELIVERY_ACK_MAX_ATTEMPTS) {
     await deleteQueuedDeliveryAck(key).catch(() => null);
     return false;
   }
-  if (!force && Number(normalized.nextAttemptAt || 0) > now) return false;
+  if (!force && Number(item.nextAttemptAt || 0) > now) return false;
   try {
     const sent = await sendDeliveryAckRequest(token, ackUrl);
     if (sent) {
@@ -372,7 +192,7 @@ async function flushQueuedDeliveryAckItem(item = {}, { force = false } = {}) {
   } catch (error) {
     const nextAttempts = attempts + 1;
     await putQueuedDeliveryAck({
-      ...normalized,
+      ...item,
       key,
       token,
       ackUrl,
@@ -437,59 +257,13 @@ function fallbackIconResponse(pathname = '') {
   });
 }
 
-function normalizedAssetPath(asset = '') {
-  try {
-    return new URL(asset, self.location.href).pathname;
-  } catch {
-    return '';
-  }
-}
-
-const STATIC_CACHEABLE_PATHS = new Set([...CORE_ASSETS, ...OPTIONAL_ASSETS]
-  .map(normalizedAssetPath)
-  .filter(Boolean));
-
-function isStaticCacheableRequest(request, url) {
-  if (!request || request.method !== 'GET' || !url || url.origin !== self.location.origin) return false;
-  if (url.pathname.startsWith('/api/')) return false;
-  if (request.mode === 'navigate' || request.destination === 'document') return true;
-  return STATIC_CACHEABLE_PATHS.has(url.pathname);
-}
-
-async function cacheStaticResponse(request, response) {
-  if (!response || !response.ok) return false;
-  const url = new URL(request.url);
-  if (!isStaticCacheableRequest(request, url)) return false;
-  const copy = response.clone();
-  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => null);
-  return true;
-}
-
 async function safeCacheRequest(cache, asset) {
-  const request = new Request(asset, { cache: 'reload' });
-  const pathname = normalizedAssetPath(asset);
-  const iconFallback = fallbackIconResponse(pathname);
   try {
+    const request = new Request(asset, { cache: 'reload' });
     const response = await fetch(request);
-    if (response && response.ok) {
-      await cache.put(request, response.clone());
-      return true;
-    }
-    if (iconFallback && response && response.status === 404) {
-      // Punto débil corregido: los íconos reales pueden no existir porque el
-      // proyecto solo trae prompts .txt en assets. En vez de dejar 404 repetidos
-      // o una PWA sin ícono offline, se precachea la figura geométrica fallback
-      // bajo la misma ruta para que al reemplazar el asset real se reconozca
-      // automáticamente en la siguiente versión de cache.
-      await cache.put(request, iconFallback.clone());
-      return true;
-    }
-    return false;
+    if (response && response.ok) await cache.put(request, response.clone());
+    return true;
   } catch {
-    if (iconFallback) {
-      await cache.put(request, iconFallback.clone()).catch(() => null);
-      return true;
-    }
     return false;
   }
 }
@@ -528,19 +302,23 @@ self.addEventListener('fetch', (event) => {
       try {
         const response = await fetch(event.request, { cache: 'reload' });
         if (response && response.ok) {
-          await cacheStaticResponse(event.request, response);
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => null);
           return response;
         }
       } catch {}
     }
 
-    const cached = isStaticCacheableRequest(event.request, url) ? await caches.match(event.request) : null;
+    const cached = await caches.match(event.request);
     if (cached) return cached;
 
     try {
       const response = await fetch(event.request);
       if (iconFallback && (!response || response.status === 404)) return iconFallback;
-      await cacheStaticResponse(event.request, response);
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => null);
+      }
       return response;
     } catch (error) {
       if (iconFallback) return iconFallback;
@@ -562,53 +340,6 @@ function sleep(ms = 0) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms || 0))));
 }
 
-function getServiceWorkerScopePathname() {
-  try {
-    const scopeUrl = new URL(self.registration?.scope || './', self.location.href);
-    if (scopeUrl.pathname.endsWith('/')) return scopeUrl.pathname;
-    return scopeUrl.pathname.replace(/[^/]*$/, '');
-  } catch {
-    return new URL('./', self.location.href).pathname;
-  }
-}
-
-function resolveSafeClientUrl(value = '') {
-  const fallback = new URL('./index.html', self.location.href);
-  let target = null;
-  try {
-    target = new URL(String(value || './index.html'), self.location.href);
-  } catch {
-    return fallback.toString();
-  }
-  if (!/^https?:$/i.test(target.protocol)) return fallback.toString();
-  if (target.origin !== self.location.origin) return fallback.toString();
-
-  const scopePathname = getServiceWorkerScopePathname();
-  const insideScope = target.pathname === scopePathname || target.pathname.startsWith(scopePathname);
-  if (!insideScope) return fallback.toString();
-
-  return target.toString();
-}
-
-function resolveSafeNotificationIconUrl(value = '') {
-  const fallback = new URL(NOTIFICATION_ICON_FALLBACK, self.location.href);
-  let target = null;
-  try {
-    target = new URL(String(value || NOTIFICATION_ICON_FALLBACK), self.location.href);
-  } catch {
-    return fallback.toString();
-  }
-  if (!/^https?:$/i.test(target.protocol)) return fallback.toString();
-  if (target.username || target.password) return fallback.toString();
-  if (target.origin !== self.location.origin) return fallback.toString();
-
-  const scopePathname = getServiceWorkerScopePathname();
-  const insideScope = target.pathname === scopePathname || target.pathname.startsWith(scopePathname);
-  if (!insideScope) return fallback.toString();
-
-  return target.toString();
-}
-
 
 self.addEventListener('push', (event) => {
   const payload = parsePushPayload(event);
@@ -616,27 +347,19 @@ self.addEventListener('push', (event) => {
     event.waitUntil(acknowledgePushDelivery(payload));
     return;
   }
-  const title = normalizeNotificationText(payload.title, 'chatER', NOTIFICATION_TITLE_MAX_LENGTH);
-  // Las notificaciones no deben cargar íconos desde URLs externas del payload: eso
-  // puede filtrar IP/actividad del destinatario a terceros. El avatar visual del
-  // chat sigue funcionando dentro de la app; Push usa solo assets del propio scope.
-  // Punto débil corregido: title/body/tag/data también se normalizan antes de
-  // entregarlos a showNotification para que un payload corrupto o excesivo no
-  // rompa la notificación ni deje el ACK pendiente por una excepción del navegador.
-  const safeNotificationIcon = resolveSafeNotificationIconUrl(payload.sender?.photoUrl || payload.icon || '');
-  const safeDeliveryAck = normalizeDeliveryAckPayload(payload);
+  const title = payload.title || 'chatER';
   const options = {
-    body: normalizeNotificationText(payload.body, 'Tienes un mensaje nuevo.', NOTIFICATION_BODY_MAX_LENGTH),
-    tag: normalizeNotificationTag(payload.tag || payload.chatId || 'chatER'),
+    body: payload.body || 'Tienes un mensaje nuevo.',
+    tag: payload.tag || 'chatER',
     renotify: true,
-    badge: safeNotificationIcon,
-    icon: safeNotificationIcon,
+    badge: './assets/icon-192.svg',
+    icon: payload.sender?.photoUrl || './assets/icon-192.svg',
     data: {
-      url: resolveSafeClientUrl(payload.url || './index.html'),
-      chatId: normalizeNotificationToken(payload.chatId || '', { fallback: '', maxLength: 140 }),
-      messageId: normalizeNotificationToken(payload.messageId || '', { fallback: '', maxLength: 160 }),
-      type: normalizeNotificationType(payload.type || 'chat.notification'),
-      delivery: safeDeliveryAck ? { token: safeDeliveryAck.token, ackUrl: safeDeliveryAck.ackUrl } : null
+      url: payload.url || './index.html',
+      chatId: payload.chatId || '',
+      messageId: payload.messageId || '',
+      type: payload.type || 'chat.notification',
+      delivery: payload.delivery || null
     }
   };
   event.waitUntil(Promise.allSettled([
@@ -648,10 +371,6 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('message', (event) => {
   const type = String(event.data?.type || '').trim();
-  if (type === DELIVERY_ACK_TRUST_ORIGIN_TAG) {
-    rememberTrustedDeliveryAckOrigin(event.data?.backendPublicUrl || event.data?.backendUrl || event.data?.origin || '');
-    return;
-  }
   if (type !== DELIVERY_ACK_SYNC_TAG) return;
   const work = flushQueuedDeliveryAcks({ force: true }).catch(() => null);
   if (typeof event.waitUntil === 'function') event.waitUntil(work);
@@ -664,7 +383,7 @@ self.addEventListener('sync', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = resolveSafeClientUrl(event.notification?.data?.url || './index.html');
+  const targetUrl = new URL(event.notification?.data?.url || './index.html', self.location.href).toString();
   event.waitUntil(Promise.allSettled([
     acknowledgePushDelivery({ delivery: event.notification?.data?.delivery || null }, { retries: 3, force: true }),
     (async () => {

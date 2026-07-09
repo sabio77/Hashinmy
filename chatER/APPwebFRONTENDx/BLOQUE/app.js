@@ -1,24 +1,16 @@
-import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl, SESSION_STORAGE_KEY } from './api.js';
+import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl } from './api.js';
 import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigError } from './firebase.auth.js';
 
 const clientIdKey = 'chater_client_id';
 const draftStoragePrefix = 'chater_draft_v1';
+const draftOriginStorageKey = 'chater_draft_origin_v1';
+const draftSaveDelayMs = 7 * 1000;
 const outboxStoragePrefix = 'chater_outbox_v1';
 const deliveryAckQueueStorageKey = 'chater_delivery_ack_queue_v1';
-const deliveryAckQueueMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
-const deliveryAckQueueMaxAttempts = 12;
-const realtimeLastEventStorageKey = 'chater_realtime_last_event_v1';
-const realtimeReconnectBaseMs = 1200;
-const realtimeReconnectMaxMs = 30000;
-const realtimeReconnectJitterRatio = 0.35;
 const privacyModeKey = 'chater_privacy_mode_v1';
 const privacyLockStorageKey = 'chater_privacy_lock_v1';
 const privacyLockAutoMs = 5 * 60 * 1000;
 const privacyLockHiddenGraceMs = 30 * 1000;
-const privacyLockKdfName = 'PBKDF2-SHA256';
-const privacyLockKdfIterations = 180000;
-const privacyLockMinKdfIterations = 120000;
-const privacyLockMaxKdfIterations = 600000;
 const compactModeKey = 'chater_compact_mode_v1';
 const installedStorageKey = 'chater_installed_v1';
 const installDismissedStorageKey = 'chater_install_dismissed_v1';
@@ -31,10 +23,6 @@ const iconInsertStorageKey = 'chater_recent_emojis_v1';
 const iconInsertLegacyStorageKey = 'chater_recent_icon_inserts_v1';
 const iconInsertMaxRecent = 24;
 const allowedReactionEmojis = Object.freeze(['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '✅']);
-const transientRealtimeEventTypes = new Set(['stream.snapshot', 'chat.typing', 'presence.updated']);
-const realtimeProcessedEventLimit = 600;
-const realtimeReplayCursorTtlMs = 24 * 60 * 60 * 1000;
-const streamConfirmationFallbackDelayMs = 2200;
 const reactionEmojiAliases = Object.freeze({
   like: '👍',
   love: '❤️',
@@ -114,82 +102,7 @@ const ephemeralOptions = [0, 180, 3600, 24 * 3600, 7 * 24 * 3600];
 const smartReplySuggestionLimit = 4;
 
 function hasInstallDismissedPersisted() {
-  return storageGetItem(installDismissedStorageKey) === '1';
-}
-
-const volatileStorageFallback = new Map();
-
-function storageGetItem(key = '', fallback = '') {
-  const cleanKey = String(key || '').trim();
-  if (!cleanKey) return fallback;
-  try {
-    if (typeof localStorage === 'undefined') {
-      return volatileStorageFallback.has(cleanKey) ? volatileStorageFallback.get(cleanKey) : fallback;
-    }
-    const value = localStorage.getItem(cleanKey);
-    return value === null ? fallback : value;
-  } catch {
-    return volatileStorageFallback.has(cleanKey) ? volatileStorageFallback.get(cleanKey) : fallback;
-  }
-}
-
-function storageSetItem(key = '', value = '') {
-  const cleanKey = String(key || '').trim();
-  if (!cleanKey) return false;
-  const stringValue = String(value ?? '');
-  volatileStorageFallback.set(cleanKey, stringValue);
-  try {
-    if (typeof localStorage === 'undefined') return false;
-    localStorage.setItem(cleanKey, stringValue);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function storageRemoveItem(key = '') {
-  const cleanKey = String(key || '').trim();
-  if (!cleanKey) return false;
-  volatileStorageFallback.delete(cleanKey);
-  try {
-    if (typeof localStorage === 'undefined') return false;
-    localStorage.removeItem(cleanKey);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-let generatedClientIdCounter = 0;
-
-function browserCrypto() {
-  try {
-    return window?.crypto || globalThis?.crypto || null;
-  } catch {
-    return null;
-  }
-}
-
-function secureRandomHex(bytes = 12) {
-  const length = Math.max(4, Math.min(32, Number(bytes || 12)));
-  const cryptoApi = browserCrypto();
-  try {
-    if (cryptoApi?.getRandomValues) {
-      const values = new Uint8Array(length);
-      cryptoApi.getRandomValues(values);
-      return Array.from(values).map((value) => value.toString(16).padStart(2, '0')).join('');
-    }
-  } catch {}
-  generatedClientIdCounter = (generatedClientIdCounter + 1) % 1000000;
-  const nowPart = Date.now().toString(36);
-  const perfPart = String(Math.floor((globalThis?.performance?.now?.() || 0) * 1000)).replace(/[^0-9]/g, '').slice(-12);
-  return `${nowPart}${perfPart}${generatedClientIdCounter.toString(36).padStart(4, '0')}`;
-}
-
-function createClientGeneratedId(prefix = 'client') {
-  const cleanPrefix = String(prefix || 'client').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'client';
-  const value = `${cleanPrefix}_${Date.now().toString(36)}_${secureRandomHex(16)}`;
-  return value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 160) || `${cleanPrefix}_${Date.now().toString(36)}`;
+  try { return localStorage.getItem(installDismissedStorageKey) === '1'; } catch { return false; }
 }
 
 const state = {
@@ -231,12 +144,6 @@ const state = {
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
   realtimeManualClose: false,
-  lastRealtimeEventId: '',
-  realtimeProcessedEventIds: new Set(),
-  realtimeProcessedEventOrder: [],
-  streamConfirmationFallbackTimers: new Map(),
-  realtimeStatus: 'live',
-  realtimeStatusText: '',
   installPrompt: null,
   installDismissed: hasInstallDismissedPersisted(),
   installRelatedCheckDone: false,
@@ -244,11 +151,14 @@ const state = {
   pushDismissed: false,
   pushState: 'idle',
   serviceWorkerRegistration: null,
-  sessionRestoreRetryTimer: 0,
-  sessionRestoreRetryInFlight: false,
   typingTimer: 0,
   draftSaveTimer: 0,
   draftSyncTimers: new Map(),
+  draftOriginId: '',
+  draftInputVersion: 0,
+  draftInputMetaByChat: new Map(),
+  draftLastClearedAtByChat: new Map(),
+  draftLoadSeq: 0,
   outboxMessages: [],
   outboxSyncing: false,
   outboxRetryTimer: 0,
@@ -281,8 +191,6 @@ const state = {
     mode: 'closed',
     salt: '',
     pinHash: '',
-    kdf: privacyLockKdfName,
-    iterations: privacyLockKdfIterations,
     error: '',
     status: '',
     autoLockTimer: 0,
@@ -346,11 +254,9 @@ const state = {
   audioRecorder: null,
   audioStream: null,
   audioChunks: [],
-  audioChunkBytes: 0,
   audioRecording: false,
   audioSending: false,
-  audioStartedAt: 0,
-  audioAutoStopTimer: 0
+  audioStartedAt: 0
 };
 
 const $ = (id) => document.getElementById(id);
@@ -358,7 +264,6 @@ const els = {
   appRoot: $('appRoot'), authScreen: $('authScreen'), chatScreen: $('chatScreen'), btnGoogleLogin: $('btnGoogleLogin'), authStatus: $('authStatus'),
   userSummary: $('userSummary'), btnOpenSelfNotes: $('btnOpenSelfNotes'), btnOpenGlobalSearch: $('btnOpenGlobalSearch'), btnOpenGlobalStarred: $('btnOpenGlobalStarred'), btnOpenDrafts: $('btnOpenDrafts'), btnNotificationPause: $('btnNotificationPause'), btnOpenBlockedContacts: $('btnOpenBlockedContacts'), btnPrivacyMode: $('btnPrivacyMode'), btnPrivacyLock: $('btnPrivacyLock'), btnCompactMode: $('btnCompactMode'), btnCommandPalette: $('btnCommandPalette'), btnLogout: $('btnLogout'), installBanner: $('installBanner'), btnInstall: $('btnInstall'), btnInstallLater: $('btnInstallLater'),
   pushBanner: $('pushBanner'), btnEnablePush: $('btnEnablePush'), btnPushLater: $('btnPushLater'),
-  realtimeStatusBanner: $('realtimeStatusBanner'), realtimeStatusTitle: $('realtimeStatusTitle'), realtimeStatusText: $('realtimeStatusText'),
   addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
@@ -385,60 +290,50 @@ const els = {
 
 function getClientId() {
   if (state.clientId) return state.clientId;
-  const existing = storageGetItem(clientIdKey);
+  const existing = localStorage.getItem(clientIdKey) || '';
   if (existing) {
     state.clientId = existing;
     return existing;
   }
-  const randomPart = browserCrypto()?.randomUUID?.() || createClientGeneratedId('client');
-  state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || createClientGeneratedId('client');
-  storageSetItem(clientIdKey, state.clientId);
+  const randomPart = window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `client_${Date.now()}`;
+  localStorage.setItem(clientIdKey, state.clientId);
   return state.clientId;
 }
 
-const unsafeUnicodeDirectionControls = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
-
-function stripUnsafeUnicodeControls(value = '') {
-  return String(value || '').replace(unsafeUnicodeDirectionControls, '');
-}
-
-function escapeHtml(value = '') {
-  return stripUnsafeUnicodeControls(value).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-}
-
-function isLocalHttpHost(hostname = '') {
-  return /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(String(hostname || '').trim());
-}
-
-function normalizeSafeHttpUrl(value = '', options = {}) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
+function getDraftOriginId() {
+  if (state.draftOriginId) return state.draftOriginId;
+  const createOriginId = () => {
+    const randomPart = window.crypto?.randomUUID?.() || `draft_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    return String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `draft_${Date.now()}`;
+  };
   try {
-    const baseUrl = options.baseUrl || document.baseURI;
-    const parsed = new URL(raw, baseUrl);
-    if (!['https:', 'http:'].includes(parsed.protocol)) return '';
-    if (parsed.username || parsed.password) return '';
-    if (parsed.protocol === 'http:' && !isLocalHttpHost(parsed.hostname)) return '';
-    return parsed.href;
+    const existing = sessionStorage.getItem(draftOriginStorageKey) || '';
+    if (existing) {
+      state.draftOriginId = existing;
+      return existing;
+    }
+    state.draftOriginId = createOriginId();
+    sessionStorage.setItem(draftOriginStorageKey, state.draftOriginId);
+    return state.draftOriginId;
   } catch {
-    return '';
+    state.draftOriginId = createOriginId();
+    return state.draftOriginId;
   }
 }
 
-function normalizeAttachmentDisplayUrl(value = '') {
-  return normalizeSafeHttpUrl(value, { baseUrl: getBackendUrl() });
+function isCurrentDraftOrigin(originId = '') {
+  const cleanOriginId = String(originId || '').trim();
+  return Boolean(cleanOriginId && cleanOriginId === getDraftOriginId());
 }
 
-function normalizeAvatarDisplayUrl(value = '') {
-  return normalizeSafeHttpUrl(value, { baseUrl: document.baseURI });
+function escapeHtml(value = '') {
+  return String(value || '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 }
 
 
 const R2_IMAGE_MAX_BYTES = 200 * 1024;
 const R2_GENERIC_FILE_MAX_BYTES = 15 * 1024 * 1024;
-const AUDIO_RECORDING_MAX_MS = 5 * 60 * 1000;
-const AUDIO_RECORDING_TIMESLICE_MS = 1000;
-const AUDIO_RECORDING_MAX_BYTES = Math.min(12 * 1024 * 1024, R2_GENERIC_FILE_MAX_BYTES);
 const MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 
 function formatFileSize(bytes = 0) {
@@ -504,11 +399,7 @@ function canUseInlineFallbackForPrepared(prepared = {}) {
 function normalizeAttachmentClient(attachment = null) {
   if (!attachment || typeof attachment !== 'object') return null;
   const attachmentId = String(attachment.attachmentId || attachment.id || '').trim();
-  const readUrl = normalizeAttachmentDisplayUrl(attachment.readUrl || '');
-  const directUrl = normalizeAttachmentDisplayUrl(attachment.url || '');
-  const publicUrl = normalizeAttachmentDisplayUrl(attachment.publicUrl || '');
-  const tokenizedReadUrl = /\/api\/chats\/attachments\/read\//.test(readUrl) ? readUrl : '';
-  const url = tokenizedReadUrl || readUrl || directUrl || publicUrl;
+  const url = String(attachment.url || attachment.publicUrl || attachment.readUrl || '').trim();
   if (!attachmentId || !url) return null;
   const kind = String(attachment.kind || attachment.mediaKind || '').trim().toLowerCase() === 'image' ? 'image' : 'file';
   return {
@@ -520,8 +411,8 @@ function normalizeAttachmentClient(attachment = null) {
     width: Math.max(0, Number(attachment.width || 0) || 0),
     height: Math.max(0, Number(attachment.height || 0) || 0),
     url,
-    publicUrl,
-    readUrl
+    publicUrl: String(attachment.publicUrl || '').trim(),
+    readUrl: String(attachment.readUrl || '').trim()
   };
 }
 
@@ -531,19 +422,12 @@ function attachmentFallbackText(attachment = null) {
   return normalized.kind === 'image' ? 'Imagen adjunta' : `Archivo adjunto: ${normalized.fileName}`;
 }
 
-function attachmentFallbackSize(attachment = {}) {
-  const width = Math.max(180, Math.min(360, Number(attachment.width || 0) || 260));
-  const height = Math.max(120, Math.min(320, Number(attachment.height || 0) || Math.round(width * 0.62)));
-  return { width, height };
-}
-
 function renderMessageAttachment(attachment = null) {
   const normalized = normalizeAttachmentClient(attachment);
   if (!normalized) return '';
   const size = normalized.sizeBytes ? ` · ${formatFileSize(normalized.sizeBytes)}` : '';
   if (normalized.kind === 'image') {
-    const fallbackSize = attachmentFallbackSize(normalized);
-    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" data-attachment-image="1" data-attachment-file-name="${escapeHtml(normalized.fileName)}" data-attachment-width="${fallbackSize.width}" data-attachment-height="${fallbackSize.height}" /></a></figure>`;
+    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a></figure>`;
   }
   return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
@@ -556,11 +440,44 @@ function shouldRenderMessageTextBody(text = '', attachment = null) {
   return true;
 }
 
+function splitTextIntoGraphemes(text = '') {
+  const source = String(text || '');
+  if (!source) return [];
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+      return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(source), (part) => part.segment);
+    }
+  } catch {}
+  return Array.from(source);
+}
+
+function isEmojiGrapheme(grapheme = '') {
+  const source = String(grapheme || '');
+  if (!source) return false;
+  return /\p{Extended_Pictographic}/u.test(source)
+    || /[\u{1F1E6}-\u{1F1FF}]{2}/u.test(source)
+    || /(?:[0-9#*]\uFE0F?\u20E3)/u.test(source);
+}
+
+function renderEmojiAwareText(text = '') {
+  const graphemes = splitTextIntoGraphemes(text);
+  return graphemes.map((grapheme) => (isEmojiGrapheme(grapheme)
+    ? `<span class="ce-msg-emoji">${escapeHtml(grapheme)}</span>`
+    : escapeHtml(grapheme))).join('');
+}
+
+function isSingleEmojiMessageText(text = '') {
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return false;
+  const graphemes = splitTextIntoGraphemes(cleanText);
+  return graphemes.length === 1 && isEmojiGrapheme(graphemes[0]);
+}
+
 function renderMessageTextBody(text = '', attachment = null) {
   const cleanText = String(text || '').trim();
-  return shouldRenderMessageTextBody(cleanText, attachment)
-    ? `<p class="ce-msg__text">${escapeHtml(cleanText)}</p>`
-    : '';
+  if (!shouldRenderMessageTextBody(cleanText, attachment)) return '';
+  const soloEmojiClass = isSingleEmojiMessageText(cleanText) ? ' ce-msg__text--solo-emoji' : '';
+  return `<p class="ce-msg__text${soloEmojiClass}">${renderEmojiAwareText(cleanText)}</p>`;
 }
 
 function updateAttachmentPreview() {
@@ -600,34 +517,19 @@ function preferredAudioMimeType() {
   }) || '';
 }
 
-function audioRecordingLimitMinutes() {
-  return Math.max(1, Math.round(AUDIO_RECORDING_MAX_MS / 60000));
-}
-
-function clearAudioAutoStopTimer() {
-  if (!state.audioAutoStopTimer) return;
-  try { window.clearTimeout(state.audioAutoStopTimer); } catch {}
-  state.audioAutoStopTimer = 0;
-}
-
-function stopMediaStreamTracks(stream = null) {
-  if (!stream) return;
-  for (const track of stream.getTracks?.() || []) {
-    try { track.stop(); } catch {}
-  }
-}
-
 function stopAudioStream() {
-  stopMediaStreamTracks(state.audioStream);
+  if (state.audioStream) {
+    for (const track of state.audioStream.getTracks?.() || []) {
+      try { track.stop(); } catch {}
+    }
+  }
   state.audioStream = null;
 }
 
 function resetAudioRecorderState({ keepRecording = false } = {}) {
-  clearAudioAutoStopTimer();
   if (!keepRecording) state.audioRecording = false;
   state.audioRecorder = null;
   state.audioChunks = [];
-  state.audioChunkBytes = 0;
   state.audioStartedAt = 0;
   stopAudioStream();
   updateComposerControls();
@@ -640,9 +542,6 @@ async function finalizeAudioRecording() {
   if (!chunks.length) throw new Error('No se capturó audio. Intenta grabar de nuevo.');
   const blob = new Blob(chunks, { type: mimeType });
   if (!blob.size) throw new Error('La grabación quedó vacía. Intenta grabar de nuevo.');
-  if (blob.size > AUDIO_RECORDING_MAX_BYTES) {
-    throw new Error(`La grabación supera ${formatFileSize(AUDIO_RECORDING_MAX_BYTES)}. Graba un audio más corto para enviarlo.`);
-  }
   const extension = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
   const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: mimeType });
   state.audioSending = true;
@@ -665,57 +564,31 @@ async function startAudioRecording() {
   if (state.editingMessage?.messageId) throw new Error('Termina la edición antes de grabar audio.');
   if (!isAudioRecordingSupported()) throw new Error('La grabación de audio no está disponible en este navegador.');
   if (state.voiceDictating) stopVoiceDictation({ announce: false });
-
-  let stream = null;
-  let recorder = null;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mimeType = preferredAudioMimeType();
-    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    state.audioStream = stream;
-    state.audioRecorder = recorder;
-    state.audioChunks = [];
-    state.audioChunkBytes = 0;
-    state.audioStartedAt = Date.now();
-    state.audioRecording = true;
-    recorder.addEventListener('dataavailable', (event) => {
-      if (!event.data?.size) return;
-      state.audioChunks.push(event.data);
-      state.audioChunkBytes += Number(event.data.size || 0);
-      if (state.audioChunkBytes > AUDIO_RECORDING_MAX_BYTES && recorder.state === 'recording') {
-        showTemporaryDraftStatus(`Audio demasiado grande. Límite: ${formatFileSize(AUDIO_RECORDING_MAX_BYTES)}.`, 4200);
-        stopAudioRecording();
-      }
-    });
-    recorder.addEventListener('stop', () => {
-      finalizeAudioRecording().catch((error) => {
-        state.audioSending = false;
-        resetAudioRecorderState();
-        alert(error.message || 'No se pudo enviar el audio grabado.');
-      });
-    }, { once: true });
-    recorder.addEventListener('error', () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mimeType = preferredAudioMimeType();
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  state.audioStream = stream;
+  state.audioRecorder = recorder;
+  state.audioChunks = [];
+  state.audioStartedAt = Date.now();
+  state.audioRecording = true;
+  recorder.addEventListener('dataavailable', (event) => {
+    if (event.data?.size) state.audioChunks.push(event.data);
+  });
+  recorder.addEventListener('stop', () => {
+    finalizeAudioRecording().catch((error) => {
       state.audioSending = false;
       resetAudioRecorderState();
-      alert('No se pudo completar la grabación de audio.');
-    }, { once: true });
-    state.audioAutoStopTimer = window.setTimeout(() => {
-      if (!state.audioRecorder || !state.audioRecording || state.audioSending) return;
-      showTemporaryDraftStatus(`Grabación detenida automáticamente al llegar a ${audioRecordingLimitMinutes()} minutos.`, 4200);
-      stopAudioRecording();
-    }, AUDIO_RECORDING_MAX_MS);
-    // Punto débil corregido: si MediaRecorder falla al iniciar después de obtener
-    // permiso de micrófono, se liberan los tracks y se restaura el composer.
-    // Esto evita que el micrófono quede activo o que la UI permanezca bloqueada
-    // en navegadores con soporte parcial de formatos/timeslice.
-    recorder.start(AUDIO_RECORDING_TIMESLICE_MS);
-  } catch (error) {
-    if (state.audioStream === stream || state.audioRecorder === recorder) resetAudioRecorderState();
-    else stopMediaStreamTracks(stream);
-    throw error;
-  }
-
-  showTemporaryDraftStatus(`Grabando audio. Máximo ${audioRecordingLimitMinutes()} minutos; pulsa el botón cuadrado para enviar.`, 3200);
+      alert(error.message || 'No se pudo enviar el audio grabado.');
+    });
+  }, { once: true });
+  recorder.addEventListener('error', () => {
+    state.audioSending = false;
+    resetAudioRecorderState();
+    alert('No se pudo completar la grabación de audio.');
+  }, { once: true });
+  recorder.start();
+  showTemporaryDraftStatus('Grabando audio. Pulsa el botón cuadrado para enviar.', 2800);
   updateComposerControls();
 }
 
@@ -894,25 +767,10 @@ function avatarStableKey(profile = {}) {
   return safeStorageKeyPart(profile.userId || profile.email || profile.profileCode || initials(profile) || 'avatar');
 }
 
-function normalizeAvatarSize(size = 'normal') {
-  return String(size || '').trim() === 'small' ? 'small' : 'normal';
-}
-
-function avatarFallbackMarkup(profile = {}, size = 'normal', stableKey = '') {
-  const avatarSize = normalizeAvatarSize(size);
-  const fallbackInitials = initials(profile);
-  return `<span class="ce-avatar ce-avatar--${avatarSize}" aria-hidden="true" data-avatar-key="${escapeHtml(stableKey || avatarStableKey(profile))}">${escapeHtml(fallbackInitials)}</span>`;
-}
-
 function avatar(profile = {}, size = 'normal') {
-  const avatarSize = normalizeAvatarSize(size);
   const stableKey = avatarStableKey(profile);
-  const fallbackInitials = initials(profile);
-  const photoUrl = normalizeAvatarDisplayUrl(profile.photoUrl || '');
-  if (photoUrl) {
-    return `<img class="ce-avatar ce-avatar--${avatarSize}" src="${escapeHtml(photoUrl)}" alt="" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false" data-avatar-key="${escapeHtml(stableKey)}" data-avatar-initials="${escapeHtml(fallbackInitials)}" data-avatar-size="${escapeHtml(avatarSize)}">`;
-  }
-  return avatarFallbackMarkup(profile, avatarSize, stableKey);
+  if (profile.photoUrl) return `<img class="ce-avatar ce-avatar--${size}" src="${escapeHtml(profile.photoUrl)}" alt="" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false" data-avatar-key="${escapeHtml(stableKey)}">`;
+  return `<span class="ce-avatar ce-avatar--${size}" aria-hidden="true" data-avatar-key="${escapeHtml(stableKey)}">${escapeHtml(initials(profile))}</span>`;
 }
 
 function isSelfChat(chat = {}) {
@@ -990,9 +848,8 @@ function profileDisplayEmail(profile = {}) {
 
 function renderProfilePhotoForModal(profile = {}) {
   const label = profileDisplayName(profile);
-  const photoUrl = normalizeAvatarDisplayUrl(profile.photoUrl || '');
-  if (photoUrl) {
-    return `<span class="ce-profile-photo"><img src="${escapeHtml(photoUrl)}" alt="Foto de perfil de ${escapeHtml(label)}" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false"></span>`;
+  if (profile.photoUrl) {
+    return `<span class="ce-profile-photo"><img src="${escapeHtml(profile.photoUrl)}" alt="Foto de perfil de ${escapeHtml(label)}" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false"></span>`;
   }
   return `<span class="ce-profile-photo ce-profile-photo--fallback" aria-label="Foto de perfil de ${escapeHtml(label)}">${escapeHtml(initials(profile))}</span>`;
 }
@@ -1136,13 +993,13 @@ function scrollMessagesToBottom({ smooth = true, resetNew = true } = {}) {
 }
 
 function compactText(value = '', max = 220) {
-  const clean = stripUnsafeUnicodeControls(value).replace(/\s+/g, ' ').trim();
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
   const safeMax = Math.min(320, Math.max(60, Number(max || 220)));
   return clean.length > safeMax ? `${clean.slice(0, safeMax - 3)}...` : clean;
 }
 
 function normalizeClientSearchText(value = '') {
-  return stripUnsafeUnicodeControls(value)
+  return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
@@ -1150,7 +1007,7 @@ function normalizeClientSearchText(value = '') {
 
 function readPrivacyModePreference() {
   try {
-    return storageGetItem(privacyModeKey) === '1';
+    return localStorage.getItem(privacyModeKey) === '1';
   } catch {
     return false;
   }
@@ -1171,7 +1028,7 @@ function applyPrivacyModeClass() {
 function setPrivacyMode(enabled = false, { announce = false } = {}) {
   state.privacyMode = Boolean(enabled);
   try {
-    storageSetItem(privacyModeKey, state.privacyMode ? '1' : '0');
+    localStorage.setItem(privacyModeKey, state.privacyMode ? '1' : '0');
   } catch {}
   applyPrivacyModeClass();
   if (announce) {
@@ -1197,20 +1054,16 @@ function normalizePrivacyPin(value = '') {
 }
 
 function randomHex(bytes = 16) {
-  return secureRandomHex(Math.max(8, Math.min(64, Number(bytes || 16))));
+  const array = new Uint8Array(Math.max(8, Math.min(64, Number(bytes || 16))));
+  window.crypto?.getRandomValues?.(array);
+  return Array.from(array).map((item) => item.toString(16).padStart(2, '0')).join('');
 }
 
 function bytesToHex(buffer) {
   return Array.from(new Uint8Array(buffer)).map((item) => item.toString(16).padStart(2, '0')).join('');
 }
 
-function normalizePrivacyLockIterations(value = privacyLockKdfIterations) {
-  const number = Number(value || privacyLockKdfIterations);
-  if (!Number.isFinite(number)) return privacyLockKdfIterations;
-  return Math.min(privacyLockMaxKdfIterations, Math.max(privacyLockMinKdfIterations, Math.trunc(number)));
-}
-
-async function hashPrivacyPinLegacy(pin = '', salt = '') {
+async function hashPrivacyPin(pin = '', salt = '') {
   const normalizedPin = normalizePrivacyPin(pin);
   if (!normalizedPin || normalizedPin.length < 4) throw new Error('El PIN debe tener mínimo 4 números.');
   if (!window.crypto?.subtle || !window.TextEncoder) throw new Error('Este navegador no permite proteger el PIN localmente.');
@@ -1219,69 +1072,35 @@ async function hashPrivacyPinLegacy(pin = '', salt = '') {
   return bytesToHex(await window.crypto.subtle.digest('SHA-256', encoded));
 }
 
-async function hashPrivacyPin(pin = '', salt = '', options = {}) {
-  const normalizedPin = normalizePrivacyPin(pin);
-  if (!normalizedPin || normalizedPin.length < 4) throw new Error('El PIN debe tener mínimo 4 números.');
-  if (!window.crypto?.subtle || !window.TextEncoder) throw new Error('Este navegador no permite proteger el PIN localmente.');
-  const kdf = String(options.kdf || privacyLockKdfName).trim();
-  if (kdf === 'SHA-256' || options.legacy === true) return hashPrivacyPinLegacy(normalizedPin, salt);
-
-  // Punto débil corregido: un PIN local de 4-12 dígitos no debe guardarse con
-  // SHA-256 directo. PBKDF2 con sal por usuario y muchas iteraciones encarece
-  // la fuerza bruta si alguien obtiene el localStorage del dispositivo.
-  const iterations = normalizePrivacyLockIterations(options.iterations || privacyLockKdfIterations);
-  const encoder = new TextEncoder();
-  const keyMaterial = await window.crypto.subtle.importKey(
-    'raw',
-    encoder.encode(normalizedPin),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-  const derivedBits = await window.crypto.subtle.deriveBits({
-    name: 'PBKDF2',
-    salt: encoder.encode(`${salt}:${state.user?.userId || ''}:chatER-privacy-lock-v2`),
-    iterations,
-    hash: 'SHA-256'
-  }, keyMaterial, 256);
-  return bytesToHex(derivedBits);
-}
-
 function readPrivacyLockPreference() {
-  if (!state.user?.userId) return { enabled: false, salt: '', pinHash: '', kdf: privacyLockKdfName, iterations: privacyLockKdfIterations };
+  if (!state.user?.userId) return { enabled: false, salt: '', pinHash: '' };
   try {
-    const parsed = JSON.parse(storageGetItem(privacyLockPreferenceKey(), '{}'));
-    const enabled = Boolean(parsed.enabled && parsed.salt && parsed.pinHash);
-    const kdf = String(parsed.kdf || parsed.algorithm || '').trim();
+    const parsed = JSON.parse(localStorage.getItem(privacyLockPreferenceKey()) || '{}');
     return {
-      enabled,
+      enabled: Boolean(parsed.enabled && parsed.salt && parsed.pinHash),
       salt: String(parsed.salt || ''),
       pinHash: String(parsed.pinHash || ''),
-      kdf: enabled ? (kdf || 'SHA-256') : privacyLockKdfName,
-      iterations: enabled && kdf ? normalizePrivacyLockIterations(parsed.iterations || privacyLockKdfIterations) : privacyLockKdfIterations,
       updatedAt: String(parsed.updatedAt || '')
     };
   } catch {
-    return { enabled: false, salt: '', pinHash: '', kdf: privacyLockKdfName, iterations: privacyLockKdfIterations };
+    return { enabled: false, salt: '', pinHash: '' };
   }
 }
 
 function persistPrivacyLockPreference(config = {}) {
   if (!state.user?.userId) return;
   if (!config.enabled) {
-    storageRemoveItem(privacyLockPreferenceKey());
+    try { localStorage.removeItem(privacyLockPreferenceKey()); } catch {}
     return;
   }
   const payload = {
     enabled: true,
     salt: String(config.salt || ''),
     pinHash: String(config.pinHash || ''),
-    kdf: String(config.kdf || privacyLockKdfName),
-    iterations: normalizePrivacyLockIterations(config.iterations || privacyLockKdfIterations),
     updatedAt: new Date().toISOString(),
     autoLockMs: privacyLockAutoMs
   };
-  storageSetItem(privacyLockPreferenceKey(), JSON.stringify(payload));
+  localStorage.setItem(privacyLockPreferenceKey(), JSON.stringify(payload));
 }
 
 function loadPrivacyLockForCurrentUser({ lockOnRestore = false } = {}) {
@@ -1289,8 +1108,6 @@ function loadPrivacyLockForCurrentUser({ lockOnRestore = false } = {}) {
   state.privacyLock.enabled = Boolean(saved.enabled);
   state.privacyLock.salt = saved.salt || '';
   state.privacyLock.pinHash = saved.pinHash || '';
-  state.privacyLock.kdf = saved.kdf || privacyLockKdfName;
-  state.privacyLock.iterations = saved.iterations || privacyLockKdfIterations;
   state.privacyLock.error = '';
   state.privacyLock.status = '';
   state.privacyLock.locked = Boolean(lockOnRestore && saved.enabled);
@@ -1395,34 +1212,11 @@ function lockPrivacyScreen({ announce = false } = {}) {
   renderPrivacyLockOverlay();
 }
 
-async function verifyPrivacyPinAndMigrate(pin = '') {
-  const savedKdf = String(state.privacyLock.kdf || '').trim();
-  const legacyLock = !savedKdf || savedKdf === 'SHA-256';
-  const hash = legacyLock
-    ? await hashPrivacyPinLegacy(pin, state.privacyLock.salt || '')
-    : await hashPrivacyPin(pin, state.privacyLock.salt || '', {
-      kdf: savedKdf,
-      iterations: state.privacyLock.iterations || privacyLockKdfIterations
-    });
-  if (hash !== state.privacyLock.pinHash) return false;
-
-  if (legacyLock) {
-    const salt = randomHex(16);
-    const pinHash = await hashPrivacyPin(pin, salt, { kdf: privacyLockKdfName, iterations: privacyLockKdfIterations });
-    persistPrivacyLockPreference({ enabled: true, salt, pinHash, kdf: privacyLockKdfName, iterations: privacyLockKdfIterations });
-    state.privacyLock.salt = salt;
-    state.privacyLock.pinHash = pinHash;
-    state.privacyLock.kdf = privacyLockKdfName;
-    state.privacyLock.iterations = privacyLockKdfIterations;
-  }
-  return true;
-}
-
 async function unlockPrivacyScreen() {
   const pin = normalizePrivacyPin(els.privacyLockPinInput?.value || '');
   try {
-    const validPin = await verifyPrivacyPinAndMigrate(pin);
-    if (!validPin) throw new Error('PIN incorrecto. Inténtalo nuevamente.');
+    const hash = await hashPrivacyPin(pin, state.privacyLock.salt || '');
+    if (hash !== state.privacyLock.pinHash) throw new Error('PIN incorrecto. Inténtalo nuevamente.');
     state.privacyLock.locked = false;
     state.privacyLock.mode = 'closed';
     state.privacyLock.error = '';
@@ -1453,15 +1247,12 @@ async function savePrivacyLockFromOverlay() {
   try {
     state.privacyLock.saving = true;
     const salt = randomHex(16);
-    const iterations = privacyLockKdfIterations;
-    const pinHash = await hashPrivacyPin(pin, salt, { kdf: privacyLockKdfName, iterations });
-    persistPrivacyLockPreference({ enabled: true, salt, pinHash, kdf: privacyLockKdfName, iterations });
+    const pinHash = await hashPrivacyPin(pin, salt);
+    persistPrivacyLockPreference({ enabled: true, salt, pinHash });
     state.privacyLock.enabled = true;
     state.privacyLock.locked = false;
     state.privacyLock.salt = salt;
     state.privacyLock.pinHash = pinHash;
-    state.privacyLock.kdf = privacyLockKdfName;
-    state.privacyLock.iterations = iterations;
     state.privacyLock.mode = 'closed';
     state.privacyLock.error = '';
     state.privacyLock.status = '';
@@ -1487,8 +1278,6 @@ function disablePrivacyLock() {
   state.privacyLock.mode = 'closed';
   state.privacyLock.salt = '';
   state.privacyLock.pinHash = '';
-  state.privacyLock.kdf = privacyLockKdfName;
-  state.privacyLock.iterations = privacyLockKdfIterations;
   state.privacyLock.error = '';
   clearPrivacyLockInputs();
   if (state.privacyLock.autoLockTimer) window.clearTimeout(state.privacyLock.autoLockTimer);
@@ -1528,7 +1317,7 @@ function runPrivacyLockShortcut() {
 
 function readCompactModePreference() {
   try {
-    return storageGetItem(compactModeKey) === '1';
+    return localStorage.getItem(compactModeKey) === '1';
   } catch {
     return false;
   }
@@ -1549,7 +1338,7 @@ function applyCompactModeClass() {
 function setCompactMode(enabled = false, { announce = false } = {}) {
   state.compactMode = Boolean(enabled);
   try {
-    storageSetItem(compactModeKey, state.compactMode ? '1' : '0');
+    localStorage.setItem(compactModeKey, state.compactMode ? '1' : '0');
   } catch {}
   applyCompactModeClass();
   if (announce) {
@@ -1871,7 +1660,7 @@ function readOutboxMessages() {
   const key = outboxStorageKey();
   if (!key) return [];
   try {
-    const parsed = JSON.parse(storageGetItem(key, '[]'));
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
     return (Array.isArray(parsed) ? parsed : [])
       .map(normalizeQueuedMessage)
       .filter(Boolean)
@@ -1891,8 +1680,8 @@ function persistOutboxMessages(list = state.outboxMessages) {
     .slice(-100);
   state.outboxMessages = normalized;
   try {
-    if (normalized.length) storageSetItem(key, JSON.stringify(normalized));
-    else storageRemoveItem(key);
+    if (normalized.length) localStorage.setItem(key, JSON.stringify(normalized));
+    else localStorage.removeItem(key);
   } catch {}
 }
 
@@ -1997,11 +1786,11 @@ async function sendQueuedOutboxMessage(queued = {}) {
       replyToMessageId: normalized.replyToMessageId || '',
       silent: Boolean(normalized.silent),
       ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds),
-      attachment: normalizeAttachmentClient(normalized.attachment)
+      attachment: normalizeAttachmentClient(normalized.attachment),
+      draftOriginId: getDraftOriginId(),
+      clientId: getClientId()
     });
-    if (shouldWaitForStreamConfirmation(data)) {
-      scheduleStreamConfirmationFallback(data, normalized.clientMessageId);
-    } else {
+    if (!shouldWaitForStreamConfirmation(data)) {
       await applySentMessageHttpFallback(data, normalized.clientMessageId);
     }
     return true;
@@ -2066,7 +1855,7 @@ function readDraftPayload(chatId = state.activeChatId) {
   const key = chatDraftStorageKey(chatId);
   if (!key) return null;
   try {
-    const raw = storageGetItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return typeof parsed?.text === 'string' ? parsed : { text: String(raw || ''), savedAt: 0 };
@@ -2079,7 +1868,7 @@ function writeDraftPayload(chatId = state.activeChatId, text = '', savedAt = Dat
   const key = chatDraftStorageKey(chatId);
   if (!key) return false;
   try {
-    storageSetItem(key, JSON.stringify({ text: String(text || ''), savedAt: Number(savedAt || Date.now()) }));
+    localStorage.setItem(key, JSON.stringify({ text: String(text || ''), savedAt: Number(savedAt || Date.now()) }));
     return true;
   } catch {
     return false;
@@ -2089,7 +1878,7 @@ function writeDraftPayload(chatId = state.activeChatId, text = '', savedAt = Dat
 function removeLocalDraftPayload(chatId = state.activeChatId) {
   const key = chatDraftStorageKey(chatId);
   if (!key) return;
-  storageRemoveItem(key);
+  try { localStorage.removeItem(key); } catch {}
 }
 
 function remoteDraftSavedMs(draft = {}) {
@@ -2112,24 +1901,105 @@ function showTemporaryDraftStatus(message = '', ttl = 2200) {
   }, Math.max(800, Number(ttl || 2200)));
 }
 
+function getDraftInputMeta(chatId = state.activeChatId) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return null;
+  return state.draftInputMetaByChat.get(cleanChatId) || null;
+}
+
+function rememberDraftInputMeta(chatId = state.activeChatId, text = els.messageInput?.value || '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return null;
+  const meta = {
+    version: Number(state.draftInputVersion || 0),
+    editedAt: Date.now(),
+    text: String(text || '')
+  };
+  state.draftInputMetaByChat.set(cleanChatId, meta);
+  return meta;
+}
+
+function forgetDraftInputMeta(chatId = state.activeChatId) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  state.draftInputMetaByChat.delete(cleanChatId);
+}
+
+function markDraftCleared(chatId = state.activeChatId) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  state.draftLastClearedAtByChat.set(cleanChatId, Date.now());
+  forgetDraftInputMeta(cleanChatId);
+}
+
+function wasDraftClearedAfter(chatId = state.activeChatId, timestamp = 0) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return false;
+  return Number(state.draftLastClearedAtByChat.get(cleanChatId) || 0) > Number(timestamp || 0);
+}
+
+function isActiveDraftComposerProtected(chatId = state.activeChatId) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!els.messageInput || !cleanChatId || cleanChatId !== state.activeChatId || state.editingMessage?.messageId) return false;
+  const meta = getDraftInputMeta(cleanChatId);
+  const localDraftText = String(readDraftPayload(cleanChatId)?.text || '');
+  const inputText = String(els.messageInput.value || '');
+  const hasPendingDebounce = Boolean(state.draftSaveTimer);
+  const hasUnsavedInput = Boolean(meta && inputText !== localDraftText);
+  const recentlyTyped = Boolean(meta?.editedAt && Date.now() - Number(meta.editedAt || 0) <= draftSaveDelayMs + 1200);
+  const inputHasFocus = document.activeElement === els.messageInput;
+  return Boolean(hasPendingDebounce || hasUnsavedInput || recentlyTyped || (inputHasFocus && inputText.trim()));
+}
+
+function applyRemoteDraftToActiveInput(chatId = state.activeChatId, text = '', savedAtMs = Date.now(), status = 'Borrador sincronizado desde tu cuenta.') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!els.messageInput || !cleanChatId || cleanChatId !== state.activeChatId || state.editingMessage?.messageId) return false;
+  if (isActiveDraftComposerProtected(cleanChatId)) return false;
+  const remoteText = String(text || '');
+  if (!remoteText.trim() || remoteText === els.messageInput.value) return false;
+  writeDraftPayload(cleanChatId, remoteText, savedAtMs || Date.now());
+  els.messageInput.value = remoteText;
+  setDraftStatus(status);
+  updateComposerControls();
+  return true;
+}
+
 async function syncDraftToServer(chatId = state.activeChatId, text = '', { announce = false } = {}) {
   const cleanChatId = String(chatId || '').trim();
   if (!state.user || !cleanChatId) return;
+  const requestStartedAt = Date.now();
+  const payload = {
+    chatId: cleanChatId,
+    text: String(text || ''),
+    clientId: getClientId(),
+    draftOriginId: getDraftOriginId()
+  };
   try {
-    const data = await post('/api/chats/draft/save', { chatId: cleanChatId, text: String(text || '') });
+    const data = await post('/api/chats/draft/save', payload);
+    if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return;
     if (data.draft?.text) writeDraftPayload(cleanChatId, data.draft.text, remoteDraftSavedMs(data.draft) || Date.now());
     else removeLocalDraftPayload(cleanChatId);
-    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador sincronizado en tu cuenta.');
+    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador guardado y sincronizado.');
   } catch {
+    if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return;
     if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador guardado en este dispositivo. Se sincronizará cuando haya conexión.');
   }
 }
 
-function scheduleRemoteDraftSync(chatId = state.activeChatId, text = '', { delay = 900, announce = false } = {}) {
+function cancelRemoteDraftSync(chatId = state.activeChatId) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return false;
+  const current = state.draftSyncTimers.get(cleanChatId);
+  if (!current) return false;
+  window.clearTimeout(current);
+  state.draftSyncTimers.delete(cleanChatId);
+  return true;
+}
+
+function scheduleRemoteDraftSync(chatId = state.activeChatId, text = '', { delay = 0, announce = false } = {}) {
   const cleanChatId = String(chatId || '').trim();
   if (!state.user || !cleanChatId) return;
-  const current = state.draftSyncTimers.get(cleanChatId);
-  if (current) window.clearTimeout(current);
+  cancelRemoteDraftSync(cleanChatId);
   const timer = window.setTimeout(() => {
     state.draftSyncTimers.delete(cleanChatId);
     syncDraftToServer(cleanChatId, text, { announce }).catch(() => null);
@@ -2137,40 +2007,67 @@ function scheduleRemoteDraftSync(chatId = state.activeChatId, text = '', { delay
   state.draftSyncTimers.set(cleanChatId, timer);
 }
 
-function saveActiveDraft({ announce = false } = {}) {
-  if (!els.messageInput || !state.user || !state.activeChatId || state.editingMessage?.messageId) return;
-  const chatId = state.activeChatId;
-  const text = els.messageInput.value || '';
-  if (text.trim()) {
-    const saved = writeDraftPayload(chatId, text, Date.now());
-    scheduleRemoteDraftSync(chatId, text, { announce });
-    if (announce) setDraftStatus(saved ? 'Borrador guardado en este chat.' : 'No se pudo guardar el borrador en este dispositivo.');
+function cancelActiveDraftSaveTimer() {
+  if (!state.draftSaveTimer) return false;
+  window.clearTimeout(state.draftSaveTimer);
+  state.draftSaveTimer = 0;
+  return true;
+}
+
+function markActiveDraftInputChanged() {
+  state.draftInputVersion = Number(state.draftInputVersion || 0) + 1;
+  rememberDraftInputMeta(state.activeChatId, els.messageInput?.value || '');
+}
+
+function saveDraftSnapshot(chatId = state.activeChatId, text = '', { announce = false } = {}) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId || !state.user) return;
+  cancelRemoteDraftSync(cleanChatId);
+  const draftText = String(text || '');
+  if (draftText.trim()) {
+    const saved = writeDraftPayload(cleanChatId, draftText, Date.now());
+    syncDraftToServer(cleanChatId, draftText, { announce }).catch(() => null);
+    if (announce && !saved && cleanChatId === state.activeChatId) setDraftStatus('No se pudo guardar el borrador en este dispositivo.');
   } else {
-    removeLocalDraftPayload(chatId);
-    scheduleRemoteDraftSync(chatId, '', { delay: 0 });
-    setDraftStatus('');
+    removeLocalDraftPayload(cleanChatId);
+    scheduleRemoteDraftSync(cleanChatId, '', { delay: 0 });
+    if (cleanChatId === state.activeChatId) setDraftStatus('');
   }
 }
 
+function saveActiveDraft({ announce = false } = {}) {
+  cancelActiveDraftSaveTimer();
+  if (!els.messageInput || !state.user || !state.activeChatId || state.editingMessage?.messageId) return;
+  saveDraftSnapshot(state.activeChatId, els.messageInput.value || '', { announce });
+}
+
 function scheduleActiveDraftSave() {
-  if (state.draftSaveTimer) window.clearTimeout(state.draftSaveTimer);
+  markActiveDraftInputChanged();
+  cancelActiveDraftSaveTimer();
+  if (!els.messageInput || !state.user || !state.activeChatId || state.editingMessage?.messageId) return;
+  const chatId = state.activeChatId;
+  const textAtLastInput = els.messageInput.value || '';
   state.draftSaveTimer = window.setTimeout(() => {
     state.draftSaveTimer = 0;
-    saveActiveDraft({ announce: true });
-  }, 350);
+    saveDraftSnapshot(chatId, textAtLastInput, { announce: true });
+  }, draftSaveDelayMs);
 }
 
 async function loadDraftForChat(chatId = state.activeChatId) {
   if (!els.messageInput || state.editingMessage?.messageId) return;
+  const loadSeq = Number(state.draftLoadSeq || 0) + 1;
+  state.draftLoadSeq = loadSeq;
+  const inputVersionAtStart = Number(state.draftInputVersion || 0);
   const localDraft = readDraftPayload(chatId);
   const localText = typeof localDraft?.text === 'string' ? localDraft.text : '';
   els.messageInput.value = localText;
   setDraftStatus(localText.trim() ? 'Borrador recuperado en este chat.' : '');
   if (!state.user || !chatId) return;
   try {
-    const data = await post('/api/chats/draft/get', { chatId });
+    const data = await post('/api/chats/draft/get', { chatId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
     const remoteDraft = data.draft || null;
-    if (state.activeChatId !== chatId || state.editingMessage?.messageId) return;
+    if (state.activeChatId !== chatId || state.editingMessage?.messageId || state.draftLoadSeq !== loadSeq) return;
+    if (Number(state.draftInputVersion || 0) !== inputVersionAtStart) return;
     const remoteText = typeof remoteDraft?.text === 'string' ? remoteDraft.text : '';
     const remoteMs = remoteDraftSavedMs(remoteDraft);
     const localMs = Number(localDraft?.savedAt || 0);
@@ -2186,8 +2083,13 @@ async function loadDraftForChat(chatId = state.activeChatId) {
 }
 
 function clearDraftForChat(chatId = state.activeChatId) {
-  removeLocalDraftPayload(chatId);
-  scheduleRemoteDraftSync(chatId, '', { delay: 0 });
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  if (cleanChatId === state.activeChatId) cancelActiveDraftSaveTimer();
+  cancelRemoteDraftSync(cleanChatId);
+  markDraftCleared(cleanChatId);
+  removeLocalDraftPayload(cleanChatId);
+  scheduleRemoteDraftSync(cleanChatId, '', { delay: 0 });
   setDraftStatus('');
 }
 
@@ -2287,7 +2189,7 @@ async function openDraftFromList(chatId = '') {
 async function deleteDraftFromList(chatId = '') {
   const cleanChatId = String(chatId || '').trim();
   if (!cleanChatId) return;
-  await post('/api/chats/draft/delete', { chatId: cleanChatId });
+  await post('/api/chats/draft/delete', { chatId: cleanChatId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
   removeLocalDraftPayload(cleanChatId);
   state.drafts = state.drafts.filter((draft) => draft.chatId !== cleanChatId);
   if (state.activeChatId === cleanChatId && !state.editingMessage?.messageId) {
@@ -2380,7 +2282,7 @@ function reactionDisplayName(reaction = '') {
 function readRecentControlList(storageKey = '', allowedIds = []) {
   const allowed = new Set((allowedIds || []).filter(Boolean));
   try {
-    const parsed = JSON.parse(storageGetItem(storageKey, '[]'));
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!Array.isArray(parsed)) return [];
     return parsed.map((item) => String(item || '').trim()).filter((item, index, list) => item && allowed.has(item) && list.indexOf(item) === index).slice(0, recentMessageControlLimit);
   } catch {
@@ -2392,7 +2294,7 @@ function rememberRecentControl(storageKey = '', controlId = '', allowedIds = [])
   const cleanId = String(controlId || '').trim();
   if (!cleanId || !(allowedIds || []).includes(cleanId)) return;
   const next = [cleanId, ...readRecentControlList(storageKey, allowedIds).filter((item) => item !== cleanId)].slice(0, recentMessageControlLimit);
-  storageSetItem(storageKey, JSON.stringify(next));
+  try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
   try {
     window.queueMicrotask?.(() => {
       if (state.activeChatId) renderAll();
@@ -2433,7 +2335,8 @@ function renderReactionSummary(message = {}) {
     const active = reaction === activeReaction ? ' active' : '';
     const reactionName = reactionDisplayName(reaction);
     const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
-    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(reaction)}</span><strong>${count}</strong></button>`;
+    const countLabel = count > 2 ? `<strong>${count}</strong>` : '';
+    return `<button class="ce-reaction-chip${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" aria-label="${escapeHtml(label)}"><span class="ce-reaction-chip__emoji">${escapeHtml(reaction)}</span>${countLabel}</button>`;
   }).join('')}</div>`;
 }
 
@@ -2826,12 +2729,13 @@ async function createPollFromSlashArgs(args = '') {
   }
   ensureChatInteractionAllowed();
   const chatId = state.activeChatId;
-  const clientMessageId = createClientGeneratedId('poll');
+  const clientMessageId = `poll_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  cancelActiveDraftSaveTimer();
   state.pollCreating = true;
   renderPollModal();
   updateComposerControls();
   try {
-    const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId });
+    const data = await post('/api/chats/poll/create', { chatId, question: parsed.question, options: parsed.options, clientMessageId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
     clearDraftForChat(chatId);
     if (!shouldWaitForStreamConfirmation(data)) {
       upsertChat(data.chat);
@@ -3153,7 +3057,7 @@ function isKnownEmojiInsert(value = '') {
 function readRecentIconInserts() {
   const readList = (key) => {
     try {
-      const parsed = JSON.parse(storageGetItem(key, '[]'));
+      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
       return Array.isArray(parsed)
         ? parsed.map((emoji) => String(emoji || '').trim()).filter((emoji) => emoji && isKnownEmojiInsert(emoji)).slice(0, iconInsertMaxRecent)
         : [];
@@ -3168,7 +3072,7 @@ function writeRecentIconInserts(items = []) {
   const clean = [...new Set((Array.isArray(items) ? items : [])
     .map((emoji) => String(emoji || '').trim())
     .filter((emoji) => emoji && isKnownEmojiInsert(emoji)))].slice(0, iconInsertMaxRecent);
-  storageSetItem(iconInsertStorageKey, JSON.stringify(clean));
+  try { localStorage.setItem(iconInsertStorageKey, JSON.stringify(clean)); } catch {}
   return clean;
 }
 
@@ -3895,38 +3799,12 @@ function setStatus(message = '') {
   els.authStatus.textContent = message;
 }
 
-function updateRealtimeStatus(status = 'live', detail = '') {
-  const cleanStatus = String(status || 'live').trim() || 'live';
-  const titleByStatus = {
-    live: 'Sincronización activa',
-    connecting: 'Conectando chatER',
-    reconnecting: 'Reconectando chatER',
-    offline: 'Sin conexión a internet',
-    paused: 'Sincronización pausada'
-  };
-  const detailByStatus = {
-    live: 'Tus chats están actualizados en este dispositivo.',
-    connecting: 'Estamos abriendo el canal seguro en tiempo real.',
-    reconnecting: 'Puedes seguir escribiendo; los mensajes quedan en pendientes hasta recuperar conexión.',
-    offline: 'Puedes escribir mensajes. chatER los enviará automáticamente cuando vuelva la conexión.',
-    paused: 'Vuelve a iniciar sesión para reactivar mensajes, presencia y confirmaciones.'
-  };
-  state.realtimeStatus = cleanStatus;
-  state.realtimeStatusText = String(detail || detailByStatus[cleanStatus] || detailByStatus.live);
-  if (!els.realtimeStatusBanner) return;
-  const shouldHide = !state.user || cleanStatus === 'live';
-  els.realtimeStatusBanner.dataset.status = cleanStatus;
-  if (els.realtimeStatusTitle) els.realtimeStatusTitle.textContent = titleByStatus[cleanStatus] || titleByStatus.live;
-  if (els.realtimeStatusText) els.realtimeStatusText.textContent = state.realtimeStatusText;
-  els.realtimeStatusBanner.classList.toggle('hidden', shouldHide);
-}
-
 function rememberInstalledApp() {
-  storageSetItem(installedStorageKey, '1');
+  try { localStorage.setItem(installedStorageKey, '1'); } catch {}
 }
 
 function hasStoredInstalledApp() {
-  return storageGetItem(installedStorageKey) === '1';
+  try { return localStorage.getItem(installedStorageKey) === '1'; } catch { return false; }
 }
 
 function isStandaloneDisplayMode() {
@@ -3978,7 +3856,7 @@ function scheduleInstalledRelatedAppCheck() {
 
 function dismissInstallBanner() {
   state.installDismissed = true;
-  storageSetItem(installDismissedStorageKey, '1');
+  try { localStorage.setItem(installDismissedStorageKey, '1'); } catch {}
 }
 
 function updateInstallBanner() {
@@ -4022,65 +3900,14 @@ function urlBase64ToUint8Array(base64String = '') {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-function normalizePushPublicKey(value = '') {
-  return String(value || '').trim().replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function uint8ArrayToBase64Url(bytes = new Uint8Array()) {
-  const list = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
-  let binary = '';
-  for (const byte of list) binary += String.fromCharCode(byte);
-  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function subscriptionPublicKey(subscription = null) {
-  try {
-    const key = subscription?.options?.applicationServerKey;
-    if (!key) return '';
-    if (typeof key === 'string') return normalizePushPublicKey(key);
-    return uint8ArrayToBase64Url(key);
-  } catch {
-    return '';
-  }
-}
-
-function subscriptionMatchesPublicKey(subscription = null, publicKey = '') {
-  if (!subscription) return false;
-  const expected = normalizePushPublicKey(publicKey);
-  if (!expected) return true;
-  const current = subscriptionPublicKey(subscription);
-  // Navegadores legacy pueden no exponer applicationServerKey. En ese caso no
-  // se fuerza una baja automática para preservar una suscripción que sí funciona.
-  return !current || current === expected;
-}
-
-async function ensurePushSubscriptionForPublicKey(registration = null, publicKey = '') {
-  if (!registration?.pushManager) throw new Error('No se pudo preparar PushManager.');
-  const cleanPublicKey = normalizePushPublicKey(publicKey);
-  if (!cleanPublicKey) throw new Error('El backend todavía no tiene configurada la clave pública Web Push.');
-  let subscription = await registration.pushManager.getSubscription();
-  if (subscription && !subscriptionMatchesPublicKey(subscription, cleanPublicKey)) {
-    const endpoint = subscription.endpoint || '';
-    await post('/api/push/unsubscribe', { endpoint }).catch(() => null);
-    await subscription.unsubscribe().catch(() => null);
-    subscription = null;
-  }
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(cleanPublicKey)
-    });
-  }
-  return subscription;
-}
-
 function getAppMode() {
   return isInstalled() ? 'standalone' : 'browser';
 }
 
 
-function postMessageToReadyServiceWorker(message = {}) {
+function requestServiceWorkerDeliveryAckFlush() {
   if (!('serviceWorker' in navigator)) return;
+  const message = { type: 'CHAT_ER_FLUSH_DELIVERY_ACKS' };
   navigator.serviceWorker.ready.then((registration) => {
     const targets = [registration?.active, navigator.serviceWorker.controller].filter(Boolean);
     const sent = new Set();
@@ -4090,35 +3917,6 @@ function postMessageToReadyServiceWorker(message = {}) {
       target.postMessage(message);
     }
   }).catch(() => null);
-}
-
-function requestServiceWorkerDeliveryAckFlush() {
-  postMessageToReadyServiceWorker({ type: 'CHAT_ER_FLUSH_DELIVERY_ACKS' });
-}
-
-function isLocalDeliveryAckBackendHost(hostname = '') {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(String(hostname || '').trim().toLowerCase());
-}
-
-function trustedDeliveryAckBackendOrigin(value = '') {
-  try {
-    const url = new URL(String(value || getBackendUrl()).trim(), window.location.href);
-    if (!['http:', 'https:'].includes(url.protocol)) return '';
-    if (!url.hostname || url.username || url.password) return '';
-    // El ACK de entrega puede viajar aunque la app esté cerrada; por eso el
-    // origen informado al service worker debe ser HTTPS en dominios públicos.
-    // HTTP se conserva únicamente para backend local durante desarrollo.
-    if (url.protocol === 'http:' && !isLocalDeliveryAckBackendHost(url.hostname)) return '';
-    return url.origin;
-  } catch {
-    return '';
-  }
-}
-
-function registerServiceWorkerDeliveryAckOrigin(value = '') {
-  const backendPublicUrl = trustedDeliveryAckBackendOrigin(value || state.config?.backendPublicUrl || getBackendUrl());
-  if (!backendPublicUrl) return;
-  postMessageToReadyServiceWorker({ type: 'CHAT_ER_TRUST_DELIVERY_ACK_ORIGIN', backendPublicUrl });
 }
 
 async function getReadyServiceWorkerRegistration() {
@@ -4142,7 +3940,12 @@ async function enableWebPushNotifications() {
   state.pushState = 'saving';
   updatePushBanner();
   const registration = await getReadyServiceWorkerRegistration();
-  const subscription = await ensurePushSubscriptionForPublicKey(registration, keyData.publicKey);
+  if (!registration?.pushManager) throw new Error('No se pudo preparar PushManager.');
+  const existing = await registration.pushManager.getSubscription();
+  const subscription = existing || await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+  });
   await post('/api/push/subscribe', {
     subscription: subscription.toJSON(),
     meta: {
@@ -4163,9 +3966,15 @@ async function ensureExistingPushSubscriptionRegistered() {
   if (!state.user || !hasPushSupport() || Notification.permission !== 'granted') return false;
   try {
     const registration = await getReadyServiceWorkerRegistration();
-    const keyData = await apiGet('/api/push/public-key');
-    if (!keyData.enabled || !keyData.publicKey) return false;
-    const subscription = await ensurePushSubscriptionForPublicKey(registration, keyData.publicKey);
+    let subscription = await registration?.pushManager?.getSubscription?.();
+    if (!subscription) {
+      const keyData = await apiGet('/api/push/public-key');
+      if (!keyData.enabled || !keyData.publicKey || !registration?.pushManager) return false;
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+      });
+    }
     await post('/api/push/subscribe', {
       subscription: subscription.toJSON(),
       meta: { clientId: getClientId(), platform: navigator.platform || '', appMode: getAppMode(), language: navigator.language || 'es-CO' }
@@ -4224,115 +4033,8 @@ function showGuest() {
   updatePushBanner();
 }
 
-function resetAuthenticatedClientState({ statusMessage = 'Listo para iniciar sesión.', clearToken = true } = {}) {
-  saveActiveDraft({ announce: false });
-  if (state.voiceDictating) stopVoiceDictation({ announce: false });
-  stopPresenceRefresh();
-  clearSessionRestoreRetry();
-  state.sessionRestoreRetryInFlight = false;
-  closeRealtime();
-  if (clearToken) setSessionToken('');
-  state.user = null;
-  state.contacts = [];
-  state.chats = [];
-  state.labels = [];
-  state.chatLabelsByChatId = new Map();
-  state.activeLabelFilter = '';
-  state.labelsModalOpen = false;
-  state.slashCommandsOpen = false;
-  closeIconInsertPicker();
-  state.draftsOpen = false;
-  state.drafts = [];
-  state.draftsLoading = false;
-  state.globalStarredOpen = false;
-  state.globalStarredMessages = [];
-  state.globalStarredLoading = false;
-  state.globalStarredScannedChats = 0;
-  state.blockedContactsOpen = false;
-  state.blockedContacts = [];
-  state.labelsDraft = '';
-  state.archivedView = false;
-  state.chatListMode = 'active';
-  state.messagesByChat.clear();
-  clearAllStreamConfirmationFallbacks();
-  state.renderedMessageCountByChat.clear();
-  state.renderedActiveChatId = '';
-  state.scrollNewMessages = 0;
-  state.outboxMessages = [];
-  state.outboxSyncing = false;
-  state.notificationPreferences = normalizeNotificationPreferences({});
-  state.lastRealtimeEventId = '';
-  state.realtimeProcessedEventIds.clear();
-  state.realtimeProcessedEventOrder = [];
-  if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
-  state.outboxRetryTimer = 0;
-  if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
-  state.deliveryAckRetryTimer = 0;
-  state.activeChatId = '';
-  state.replyToMessage = null;
-  state.editingMessage = null;
-  state.forwardingMessage = null;
-  state.scheduleModalOpen = false;
-  state.scheduledMessages = [];
-  state.scheduledLoading = false;
-  state.schedulingMessage = false;
-  closePollModal();
-  state.pollCreating = false;
-  state.quickRepliesOpen = false;
-  state.quickRepliesLoaded = false;
-  state.quickReplies = [];
-  closeGlobalSearch();
-  resetGlobalSearchState();
-  closeGlobalStarred();
-  closeLinkLibrary();
-  closeChatBrief();
-  closePrivateNotesModal();
-  state.privateNotes = [];
-  closeReminderModal();
-  state.reminders = [];
-  closeLabelsModal();
-  closeCommandPalette();
-  state.privacyLock.locked = false;
-  state.privacyLock.mode = 'closed';
-  state.privacyLock.enabled = false;
-  state.privacyLock.salt = '';
-  state.privacyLock.pinHash = '';
-  state.privacyLock.kdf = privacyLockKdfName;
-  state.privacyLock.iterations = privacyLockKdfIterations;
-  renderPrivacyLockOverlay();
-  resetChatSearch();
-  showGuest();
-  setStatus(statusMessage || 'Listo para iniciar sesión.');
-}
-
-function handleSessionStorageChange(event = {}) {
-  if (String(event.key || '') !== SESSION_STORAGE_KEY) return;
-  const oldToken = String(event.oldValue || '').trim();
-  const newToken = String(event.newValue || '').trim();
-
-  if (!newToken) {
-    if (oldToken || state.user || getSessionToken()) {
-      resetAuthenticatedClientState({ statusMessage: 'La sesión se cerró en otra pestaña de este dispositivo.' });
-    }
-    return;
-  }
-
-  if (oldToken && oldToken !== newToken && state.user) {
-    // Otra pestaña reemplazó la sesión local. Conservamos el token nuevo y
-    // reconstruimos el estado desde /api/bootstrap para evitar mezclar chats
-    // del usuario anterior con la sesión recién autenticada.
-    resetAuthenticatedClientState({ statusMessage: 'Sesión actualizada en otra pestaña. Restaurando tus chats...', clearToken: false });
-  }
-
-  if (!state.user) {
-    attemptPendingSessionRestore().catch(() => scheduleSessionRestoreRetry(3000));
-  }
-}
-
-
 async function loadConfig() {
   state.config = await apiGet('/api/config');
-  registerServiceWorkerDeliveryAckOrigin(state.config.backendPublicUrl || getBackendUrl());
   const error = getFirebaseWebConfigError(state.config.firebaseWebConfig || {});
   setStatus(error || 'Listo para iniciar sesión.');
   els.btnGoogleLogin.disabled = Boolean(error);
@@ -4349,11 +4051,7 @@ async function loginWithGoogle() {
     applyBootstrap(data);
     showAuthenticated();
     await loadChatLabels({ force: true }).catch(() => null);
-    await openRealtime().catch((error) => {
-      if (handleRealtimeAuthFailure(error)) return;
-      updateRealtimeStatus(navigator.onLine === false ? 'offline' : 'reconnecting', 'La sesión inició, pero la sincronización en tiempo real se reintentará automáticamente.');
-      scheduleRealtimeReconnect();
-    });
+    await openRealtime();
     await ensureExistingPushSubscriptionRegistered();
     await consumeAddFromUrl();
     await consumeChatFromUrl();
@@ -4375,7 +4073,6 @@ function applyBootstrap(data = {}) {
   state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
   state.chats = Array.isArray(data.chats) ? data.chats : [];
   state.notificationPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
-  state.lastRealtimeEventId = readStoredRealtimeLastEventId();
   loadPrivacyLockForCurrentUser({ lockOnRestore: false });
   state.labels = [];
   state.chatLabelsByChatId = new Map();
@@ -4445,158 +4142,25 @@ async function loadChats({ includeArchived = state.archivedView, unreadOnly = fa
   renderAll();
 }
 
-function clearSessionRestoreRetry() {
-  if (state.sessionRestoreRetryTimer) window.clearTimeout(state.sessionRestoreRetryTimer);
-  state.sessionRestoreRetryTimer = 0;
-}
-
-function isSessionAuthFailure(error = {}) {
-  const status = Number(error?.status || 0);
-  return status === 401 || status === 403;
-}
-
-function handleRealtimeAuthFailure(error = {}) {
-  if (!isSessionAuthFailure(error)) return false;
-  resetAuthenticatedClientState({ statusMessage: 'Tu sesión ya no está activa. Inicia sesión nuevamente.' });
-  return true;
-}
-
-function sessionRestoreFailureMessage(error = {}) {
-  if (navigator.onLine === false) {
-    return 'Sin conexión. Conservamos tu sesión y la restauraremos automáticamente cuando vuelva internet.';
-  }
-  return error?.message
-    ? `${error.message} Conservamos tu sesión y reintentaremos la restauración.`
-    : 'No se pudo restaurar la sesión por un fallo temporal. Conservamos tu sesión y reintentaremos automáticamente.';
-}
-
-function scheduleSessionRestoreRetry(delayMs = 8000) {
-  if (!getSessionToken() || state.user || state.sessionRestoreRetryTimer) return false;
-  const safeDelay = Math.max(2500, Math.min(60000, Number(delayMs || 8000)));
-  state.sessionRestoreRetryTimer = window.setTimeout(() => {
-    state.sessionRestoreRetryTimer = 0;
-    attemptPendingSessionRestore().catch(() => null);
-  }, safeDelay);
-  return true;
-}
-
-async function attemptPendingSessionRestore() {
-  if (state.user || state.sessionRestoreRetryInFlight || !getSessionToken()) return false;
-  clearSessionRestoreRetry();
-  state.sessionRestoreRetryInFlight = true;
-  try {
-    return await bootstrapExistingSession({ retryOnTemporaryFailure: true });
-  } finally {
-    state.sessionRestoreRetryInFlight = false;
-  }
-}
-
-async function bootstrapExistingSession({ retryOnTemporaryFailure = true } = {}) {
+async function bootstrapExistingSession() {
   if (!getSessionToken()) return false;
   try {
     const data = await post('/api/bootstrap', {});
-    clearSessionRestoreRetry();
     applyBootstrap(data);
     showAuthenticated();
     if (state.privacyLock.enabled) lockPrivacyScreen();
     await loadChatLabels({ force: true }).catch(() => null);
-    await openRealtime().catch((error) => {
-      if (handleRealtimeAuthFailure(error)) return;
-      updateRealtimeStatus(navigator.onLine === false ? 'offline' : 'reconnecting', 'La sesión inició, pero la sincronización en tiempo real se reintentará automáticamente.');
-      scheduleRealtimeReconnect();
-    });
+    await openRealtime();
     await ensureExistingPushSubscriptionRegistered();
     await consumeAddFromUrl();
     await consumeChatFromUrl();
     scheduleOutboxRetry(1200);
     flushDeliveryAckQueue({ force: true }).catch(() => null);
     return true;
-  } catch (error) {
-    if (isSessionAuthFailure(error)) {
-      clearSessionRestoreRetry();
-      setSessionToken('');
-      return false;
-    }
-    setStatus(sessionRestoreFailureMessage(error));
-    if (retryOnTemporaryFailure) scheduleSessionRestoreRetry(navigator.onLine === false ? 12000 : 8000);
-    return false;
-  }
-}
-
-function realtimeLastEventStorageForCurrentUser() {
-  return state.user?.userId ? `${realtimeLastEventStorageKey}:${state.user.userId}` : realtimeLastEventStorageKey;
-}
-
-function normalizeRealtimeEventId(value = '') {
-  return String(value || '').replace(/[\x00-\x1F\x7F]+/g, '').trim().slice(0, 180);
-}
-
-function parseStoredRealtimeCursor(raw = '') {
-  const cleanRaw = String(raw || '').trim();
-  if (!cleanRaw) return '';
-  if (!cleanRaw.startsWith('{')) return normalizeRealtimeEventId(cleanRaw);
-  try {
-    const parsed = JSON.parse(cleanRaw);
-    const eventId = normalizeRealtimeEventId(parsed?.eventId || parsed?.id || '');
-    const savedAt = Number(parsed?.savedAt || parsed?.updatedAt || 0);
-    if (!eventId) return '';
-    if (savedAt && Date.now() - savedAt > realtimeReplayCursorTtlMs) return '';
-    return eventId;
   } catch {
-    return '';
-  }
-}
-
-function readStoredRealtimeLastEventId() {
-  const key = realtimeLastEventStorageForCurrentUser();
-  const eventId = parseStoredRealtimeCursor(storageGetItem(key, ''));
-  if (!eventId) storageRemoveItem(key);
-  return eventId;
-}
-
-function writeStoredRealtimeLastEventId(eventId = '') {
-  const cleanEventId = normalizeRealtimeEventId(eventId);
-  const key = realtimeLastEventStorageForCurrentUser();
-  if (!cleanEventId) {
-    storageRemoveItem(key);
+    setSessionToken('');
     return false;
   }
-  return storageSetItem(key, JSON.stringify({ eventId: cleanEventId, savedAt: Date.now() }));
-}
-
-function markRealtimeEventProcessed(eventId = '') {
-  const cleanEventId = normalizeRealtimeEventId(eventId);
-  if (!cleanEventId || state.realtimeProcessedEventIds.has(cleanEventId)) return Boolean(cleanEventId);
-  state.realtimeProcessedEventIds.add(cleanEventId);
-  state.realtimeProcessedEventOrder.push(cleanEventId);
-  while (state.realtimeProcessedEventOrder.length > realtimeProcessedEventLimit) {
-    const staleEventId = state.realtimeProcessedEventOrder.shift();
-    if (staleEventId) state.realtimeProcessedEventIds.delete(staleEventId);
-  }
-  return true;
-}
-
-function shouldProcessRealtimeEvent(payload = {}) {
-  const eventId = normalizeRealtimeEventId(payload?.eventId || '');
-  if (!eventId) return true;
-  return !state.realtimeProcessedEventIds.has(eventId);
-}
-
-function rememberRealtimeEvent(payload = {}) {
-  const eventId = normalizeRealtimeEventId(payload?.eventId || '');
-  if (eventId) markRealtimeEventProcessed(eventId);
-  if (transientRealtimeEventTypes.has(payload?.eventType)) return;
-  if (!eventId) return;
-  state.lastRealtimeEventId = eventId;
-  writeStoredRealtimeLastEventId(eventId);
-}
-
-function rememberFailedRealtimeEvent(payload = {}) {
-  const eventId = normalizeRealtimeEventId(payload?.eventId || '');
-  if (!eventId) return;
-  // Los eventos durables no se confirman como procesados si el reducer falló.
-  // Así el replay SSE puede reintentarlos en la reconexión y evita huecos silenciosos.
-  if (transientRealtimeEventTypes.has(payload?.eventType)) markRealtimeEventProcessed(eventId);
 }
 
 function closeRealtime() {
@@ -4606,19 +4170,10 @@ function closeRealtime() {
   state.realtimeReconnectTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
-  updateRealtimeStatus(state.user ? 'paused' : 'live');
 }
 
 function isRealtimeStreamUsable() {
   return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
-}
-
-function computeRealtimeReconnectDelayMs(attempt = 0) {
-  const cleanAttempt = Math.max(0, Number(attempt || 0));
-  const baseDelay = Math.min(realtimeReconnectMaxMs, realtimeReconnectBaseMs * (2 ** Math.min(cleanAttempt, 5)));
-  const jitterRange = Math.max(0, baseDelay * realtimeReconnectJitterRatio);
-  const jitter = jitterRange ? (Math.random() * jitterRange * 2) - jitterRange : 0;
-  return Math.max(1000, Math.min(realtimeReconnectMaxMs, Math.round(baseDelay + jitter)));
 }
 
 async function openRealtime() {
@@ -4630,36 +4185,21 @@ async function openRealtime() {
     if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
     state.realtimeReconnectTimer = 0;
     state.realtimeManualClose = false;
-    updateRealtimeStatus(navigator.onLine === false ? 'offline' : 'connecting');
     if (state.eventSource) state.eventSource.close();
     state.eventSource = null;
     const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
     if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) return null;
     const token = encodeURIComponent(tokenData.realtimeToken || '');
     if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
-    const replayAfter = encodeURIComponent(state.lastRealtimeEventId || readStoredRealtimeLastEventId());
-    const replayQuery = replayAfter ? `&replayAfter=${replayAfter}` : '';
-    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}${replayQuery}`);
+    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
     source.addEventListener('chater_ready', () => {
       if (state.eventSource !== source) return;
       state.realtimeRetryCount = 0;
-      updateRealtimeStatus('live');
     });
     source.addEventListener('chater_event', (event) => {
       if (state.eventSource !== source) return;
-      let payload = null;
-      try {
-        payload = JSON.parse(event.data || '{}');
-      } catch {
-        return;
-      }
-      if (!shouldProcessRealtimeEvent(payload)) return;
-      try {
-        handleRealtimeEvent(payload);
-      } catch (error) {
-        console.warn('[chatER][realtime][event]', error?.message || error);
-        rememberFailedRealtimeEvent(payload);
-      }
+      const payload = JSON.parse(event.data || '{}');
+      handleRealtimeEvent(payload);
     });
     source.onerror = () => {
       if (state.eventSource !== source) return;
@@ -4688,19 +4228,14 @@ function scheduleRealtimeReconnect() {
   if (state.realtimeReconnectTimer) return;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
-  // Backoff con jitter: evita que muchos clientes reconecten exactamente al mismo
-  // tiempo después de un reinicio, corte de red o 429 del backend realtime.
-  const delay = computeRealtimeReconnectDelayMs(state.realtimeRetryCount);
+  const delay = Math.min(30000, 1200 * (2 ** Math.min(state.realtimeRetryCount, 5)));
   state.realtimeRetryCount += 1;
-  const retrySeconds = Math.max(1, Math.ceil(delay / 1000));
-  updateRealtimeStatus(navigator.onLine === false ? 'offline' : 'reconnecting', `Reintentando sincronización en ${retrySeconds} s. Tus mensajes pendientes siguen protegidos.`);
   state.realtimeReconnectTimer = window.setTimeout(async () => {
     state.realtimeReconnectTimer = 0;
     if (!getSessionToken() || !state.user) return;
     try {
       await openRealtime();
-    } catch (error) {
-      if (handleRealtimeAuthFailure(error)) return;
+    } catch {
       scheduleRealtimeReconnect();
     }
   }, delay);
@@ -4829,7 +4364,6 @@ function getContactByUserId(userId = '') {
 
 function upsertMessage(message = {}) {
   if (!message.messageId || !message.chatId) return;
-  clearStreamConfirmationFallback(message.clientMessageId || message.messageId || '');
   const list = state.messagesByChat.get(message.chatId) || [];
   const index = list.findIndex((msg) => msg.messageId === message.messageId);
   if (index >= 0) list[index] = { ...list[index], ...message };
@@ -4852,35 +4386,22 @@ function deliveryAckQueueStorageForCurrentUser() {
   return state.user?.userId ? `${deliveryAckQueueStorageKey}:${state.user.userId}` : deliveryAckQueueStorageKey;
 }
 
-function isDeliveryAckQueueItemRetryable(item = {}, now = Date.now()) {
-  const firstQueuedAt = Number(item.firstQueuedAt || now);
-  const attempts = Math.max(0, Number(item.attempts || 0));
-  if (!item.chatId || !item.messageId) return false;
-  if (!Number.isFinite(firstQueuedAt)) return false;
-  if (now - firstQueuedAt > deliveryAckQueueMaxAgeMs) return false;
-  return attempts < deliveryAckQueueMaxAttempts;
-}
-
 function readDeliveryAckQueue() {
   try {
-    const now = Date.now();
-    const parsed = JSON.parse(storageGetItem(deliveryAckQueueStorageForCurrentUser(), '[]'));
-    const rawItems = Array.isArray(parsed) ? parsed : [];
-    const normalized = rawItems
+    const parsed = JSON.parse(localStorage.getItem(deliveryAckQueueStorageForCurrentUser()) || '[]');
+    return (Array.isArray(parsed) ? parsed : [])
       .map((item) => ({
         chatId: String(item.chatId || '').trim(),
         messageId: String(item.messageId || '').trim(),
         senderUserId: String(item.senderUserId || '').trim(),
         createdAt: String(item.createdAt || '').trim(),
-        firstQueuedAt: Number(item.firstQueuedAt || now),
+        firstQueuedAt: Number(item.firstQueuedAt || Date.now()),
         lastAttemptAt: Number(item.lastAttemptAt || 0),
         nextAttemptAt: Number(item.nextAttemptAt || 0),
         attempts: Math.max(0, Number(item.attempts || 0))
       }))
-      .filter((item) => isDeliveryAckQueueItemRetryable(item, now))
+      .filter((item) => item.chatId && item.messageId)
       .slice(-250);
-    if (normalized.length !== rawItems.length) writeDeliveryAckQueue(normalized);
-    return normalized;
   } catch {
     return [];
   }
@@ -4891,8 +4412,8 @@ function writeDeliveryAckQueue(items = []) {
     .filter((item) => item?.chatId && item?.messageId)
     .slice(-250);
   try {
-    if (normalized.length) storageSetItem(deliveryAckQueueStorageForCurrentUser(), JSON.stringify(normalized));
-    else storageRemoveItem(deliveryAckQueueStorageForCurrentUser());
+    if (normalized.length) localStorage.setItem(deliveryAckQueueStorageForCurrentUser(), JSON.stringify(normalized));
+    else localStorage.removeItem(deliveryAckQueueStorageForCurrentUser());
   } catch {}
 }
 
@@ -4913,29 +4434,14 @@ function queueDeliveryAck(message = {}, { attempted = false } = {}) {
   const queue = readDeliveryAckQueue();
   const index = queue.findIndex((item) => deliveryAckQueueKey(item.chatId, item.messageId) === key);
   const previous = index >= 0 ? queue[index] : null;
-  const previousAttempts = Math.max(0, Number(previous?.attempts || 0));
-  const attempts = attempted ? previousAttempts + 1 : previousAttempts;
-  const firstQueuedAt = Number(previous?.firstQueuedAt || now);
-
-  // Punto débil corregido: los ACK de entrega guardados en localStorage no deben
-  // reintentarse indefinidamente. Si el mensaje ya expiró, fue eliminado o el
-  // backend rechazó de forma permanente, la cola local se poda por edad/intentos
-  // para evitar consumo de almacenamiento y llamadas redundantes al endpoint de entrega del chat.
-  if (attempted && (attempts >= deliveryAckQueueMaxAttempts || now - firstQueuedAt > deliveryAckQueueMaxAgeMs)) {
-    if (index >= 0) {
-      queue.splice(index, 1);
-      writeDeliveryAckQueue(queue);
-    }
-    return;
-  }
-
+  const attempts = attempted ? Math.min(12, Number(previous?.attempts || 0) + 1) : Number(previous?.attempts || 0);
   const delay = attempted ? Math.min(5 * 60 * 1000, 1000 * (2 ** Math.min(8, attempts))) : 0;
   const next = {
     chatId: String(message.chatId || '').trim(),
     messageId: String(message.messageId || '').trim(),
     senderUserId: String(message.senderUserId || '').trim(),
     createdAt: String(message.createdAt || '').trim(),
-    firstQueuedAt,
+    firstQueuedAt: Number(previous?.firstQueuedAt || now),
     lastAttemptAt: attempted ? now : Number(previous?.lastAttemptAt || 0),
     nextAttemptAt: now + delay,
     attempts
@@ -5276,7 +4782,6 @@ function handleRealtimeEvent(payload = {}) {
   const data = payload.data || {};
   if (payload.eventType === 'stream.snapshot') {
     applyRealtimeSnapshot(data);
-    rememberRealtimeEvent(payload);
     return;
   }
   const currentUserId = state.user?.userId || '';
@@ -5319,22 +4824,20 @@ function handleRealtimeEvent(payload = {}) {
     }
     shouldRender = true;
   }
-  if (payload.eventType === 'chat.draft.updated' && state.draftsOpen) loadDrafts({ silent: true }).catch(() => null);
-  if (payload.eventType === 'chat.draft.updated' && data.draft?.chatId === state.activeChatId && !state.editingMessage?.messageId) {
+  const isOwnDraftRealtimeEvent = isCurrentDraftOrigin(data.sourceDraftOriginId || data.draftOriginId || '');
+  if (payload.eventType === 'chat.draft.updated' && state.draftsOpen && !isOwnDraftRealtimeEvent) loadDrafts({ silent: true }).catch(() => null);
+  if (payload.eventType === 'chat.draft.updated' && !isOwnDraftRealtimeEvent && data.draft?.chatId === state.activeChatId && !state.editingMessage?.messageId) {
     const remoteText = String(data.draft.text || '');
     const remoteMs = remoteDraftSavedMs(data.draft);
     const localMs = Number(readDraftPayload(state.activeChatId)?.savedAt || 0);
-    if (remoteText.trim() && remoteMs >= localMs && els.messageInput && remoteText !== els.messageInput.value) {
-      writeDraftPayload(state.activeChatId, remoteText, remoteMs || Date.now());
-      els.messageInput.value = remoteText;
-      setDraftStatus('Borrador sincronizado desde tu cuenta.');
-      updateComposerControls();
+    if (remoteText.trim() && remoteMs >= localMs && els.messageInput && remoteText !== els.messageInput.value && !isActiveDraftComposerProtected(state.activeChatId)) {
+      applyRemoteDraftToActiveInput(state.activeChatId, remoteText, remoteMs || Date.now(), 'Borrador sincronizado desde tu cuenta.');
     }
   }
-  if (payload.eventType === 'chat.draft.deleted' && state.draftsOpen) loadDrafts({ silent: true }).catch(() => null);
-  if (payload.eventType === 'chat.draft.deleted' && (data.chatId || payload.chatId) === state.activeChatId && !state.editingMessage?.messageId) {
+  if (payload.eventType === 'chat.draft.deleted' && state.draftsOpen && !isOwnDraftRealtimeEvent) loadDrafts({ silent: true }).catch(() => null);
+  if (payload.eventType === 'chat.draft.deleted' && !isOwnDraftRealtimeEvent && (data.chatId || payload.chatId) === state.activeChatId && !state.editingMessage?.messageId) {
     const localDraft = readDraftPayload(state.activeChatId);
-    if (localDraft?.text && localDraft.text === els.messageInput?.value) {
+    if (localDraft?.text && localDraft.text === els.messageInput?.value && !isActiveDraftComposerProtected(state.activeChatId)) {
       removeLocalDraftPayload(state.activeChatId);
       els.messageInput.value = '';
       setDraftStatus('');
@@ -5393,7 +4896,6 @@ function handleRealtimeEvent(payload = {}) {
     const mine = messageForThisUser.senderUserId === state.user?.userId;
     if (mine || isMessagesNearBottom()) markActiveRead();
   }
-  rememberRealtimeEvent(payload);
 }
 
 function stableRenderNodeKeys(node = null) {
@@ -6004,44 +5506,6 @@ async function openSelfNotesChat() {
   showTemporaryDraftStatus('Notas para mí abierto. Todo lo que guardes aquí queda en tu cuenta.');
 }
 
-function clearStreamConfirmationFallback(key = '') {
-  const cleanKey = String(key || '').trim();
-  if (!cleanKey) return false;
-  const timer = state.streamConfirmationFallbackTimers.get(cleanKey);
-  if (timer) window.clearTimeout(timer);
-  return state.streamConfirmationFallbackTimers.delete(cleanKey);
-}
-
-function hasSentMessageConfirmation(data = {}, clientMessageId = '') {
-  const chatId = String(data?.message?.chatId || data?.chat?.chatId || '').trim();
-  const messageId = String(data?.message?.messageId || '').trim();
-  const cleanClientMessageId = String(clientMessageId || data?.message?.clientMessageId || '').trim();
-  if (!chatId || (!messageId && !cleanClientMessageId)) return false;
-  const messages = state.messagesByChat.get(chatId) || [];
-  return messages.some((message) => (
-    (messageId && message.messageId === messageId)
-    || (cleanClientMessageId && message.clientMessageId === cleanClientMessageId)
-  ));
-}
-
-function scheduleStreamConfirmationFallback(data = {}, clientMessageId = '') {
-  const key = String(clientMessageId || data?.message?.clientMessageId || data?.message?.messageId || '').trim();
-  if (!key || !data?.message?.messageId) return false;
-  clearStreamConfirmationFallback(key);
-  const timer = window.setTimeout(() => {
-    state.streamConfirmationFallbackTimers.delete(key);
-    if (hasSentMessageConfirmation(data, clientMessageId)) return;
-    applySentMessageHttpFallback(data, clientMessageId).catch(() => null);
-  }, streamConfirmationFallbackDelayMs);
-  state.streamConfirmationFallbackTimers.set(key, timer);
-  return true;
-}
-
-function clearAllStreamConfirmationFallbacks() {
-  for (const timer of state.streamConfirmationFallbackTimers.values()) window.clearTimeout(timer);
-  state.streamConfirmationFallbackTimers.clear();
-}
-
 async function applySentMessageHttpFallback(data = {}, clientMessageId = '') {
   if (!data?.message?.messageId) return false;
   removeQueuedMessage(clientMessageId || data.message.clientMessageId || '', { render: false });
@@ -6070,11 +5534,12 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
     throw new Error(chatBlockNoticeText() || 'No puedes enviar mensajes en este chat.');
   }
   const chatId = state.activeChatId;
-  const clientMessageId = createClientGeneratedId('client');
+  const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
   const normalizedAttachment = normalizeAttachmentClient(attachment);
   const messageText = String(text || '').trim() || attachmentFallbackText(normalizedAttachment);
+  cancelActiveDraftSaveTimer();
   const streamOnly = shouldSendMessageStreamOnly();
   const queued = streamOnly ? null : upsertQueuedMessage({
     chatId,
@@ -6093,13 +5558,11 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
     lastError: ''
   }, { render: true });
   try {
-    const data = await post('/api/chats/send', { chatId, text: messageText, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), attachment: normalizedAttachment });
+    const data = await post('/api/chats/send', { chatId, text: messageText, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), attachment: normalizedAttachment, draftOriginId: getDraftOriginId(), clientId: getClientId() });
     clearDraftForChat(chatId);
     state.replyToMessage = null;
     if (normalizedAttachment && state.pendingAttachment?.attachmentId === normalizedAttachment.attachmentId) clearPendingAttachment();
-    if (shouldWaitForStreamConfirmation(data)) {
-      scheduleStreamConfirmationFallback(data, clientMessageId);
-    } else {
+    if (!shouldWaitForStreamConfirmation(data)) {
       await applySentMessageHttpFallback(data, clientMessageId);
     }
     if (silent || normalizeEphemeralSeconds(ephemeralSeconds)) {
@@ -6214,7 +5677,7 @@ function renderForwardModal() {
     els.forwardList.innerHTML = '';
     return;
   }
-  const preview = compactText(message.text || attachmentFallbackText(message.attachment) || 'Mensaje sin texto visible', 260);
+  const preview = compactText(message.text || '', 260);
   els.forwardPreview.innerHTML = `<strong>Mensaje seleccionado</strong><span>${escapeHtml(preview)}</span>`;
   const chats = availableForwardChats();
   if (!chats.length) {
@@ -6291,12 +5754,13 @@ async function createPollFromModal() {
   if (!question) throw new Error('Escribe la pregunta de la encuesta.');
   if (options.length < 2) throw new Error('Agrega al menos 2 opciones diferentes.');
   const chatId = state.activeChatId;
-  const clientMessageId = createClientGeneratedId('poll');
+  const clientMessageId = `poll_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  cancelActiveDraftSaveTimer();
   state.pollCreating = true;
   renderPollModal();
   updateComposerControls();
   try {
-    const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId });
+    const data = await post('/api/chats/poll/create', { chatId, question, options, clientMessageId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
     clearDraftForChat(chatId);
     if (!shouldWaitForStreamConfirmation(data)) {
       upsertChat(data.chat);
@@ -6413,15 +5877,16 @@ async function scheduleCurrentMessage() {
   if (!text) throw new Error('Escribe un mensaje antes de programarlo.');
   const scheduledFor = normalizeScheduleInputValue();
   if (!scheduledFor) throw new Error('Selecciona una fecha y hora válida.');
-  const clientMessageId = createClientGeneratedId('scheduled_client');
+  const clientMessageId = `scheduled_client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const silent = Boolean(els.scheduleSilent?.checked);
   const ephemeralSeconds = selectedEphemeralSeconds();
+  cancelActiveDraftSaveTimer();
   state.schedulingMessage = true;
   renderScheduleModal();
   updateComposerControls();
   try {
-    const data = await post('/api/chats/scheduled/create', { chatId: state.activeChatId, text, scheduledFor, clientMessageId, replyToMessageId, silent, ephemeralSeconds });
+    const data = await post('/api/chats/scheduled/create', { chatId: state.activeChatId, text, scheduledFor, clientMessageId, replyToMessageId, silent, ephemeralSeconds, draftOriginId: getDraftOriginId(), clientId: getClientId() });
     state.scheduledMessages = [data.scheduledMessage, ...state.scheduledMessages.filter((item) => item.scheduledId !== data.scheduledMessage?.scheduledId)].filter(Boolean);
     clearDraftForChat(state.activeChatId);
     state.replyToMessage = null;
@@ -6452,7 +5917,7 @@ async function forwardMessageToChat(targetChatId = '') {
     showTemporaryDraftStatus(chatBlockNoticeText(targetChat), 4200);
     throw new Error(chatBlockNoticeText(targetChat) || 'No puedes reenviar mensajes a un contacto bloqueado.');
   }
-  const clientMessageId = createClientGeneratedId('forward');
+  const clientMessageId = `forward_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const data = await post('/api/chats/forward', {
     sourceChatId: source.sourceChatId,
     messageId: source.messageId,
@@ -6850,18 +6315,12 @@ async function copyActiveChatLink() {
 
 
 function normalizeLinkCandidate(value = '') {
-  let url = stripUnsafeUnicodeControls(String(value || '')).trim();
+  let url = String(value || '').trim();
   if (!url) return '';
   url = url.replace(/[),.;:!?]+$/g, '');
-  if (!url || url.length > 2048) return '';
   try {
     const parsed = new URL(url.startsWith('www.') ? `https://${url}` : url);
     if (!/^https?:$/.test(parsed.protocol)) return '';
-    if (!parsed.hostname || parsed.username || parsed.password) return '';
-    // Punto débil corregido: la biblioteca de enlaces no debe convertir en
-    // botones clicables URLs con credenciales embebidas, controles Unicode o
-    // longitud excesiva. Se conservan enlaces web normales y se omiten los
-    // candidatos inseguros sin alterar el mensaje original.
     return parsed.toString();
   } catch {
     return '';
@@ -7997,58 +7456,7 @@ function isTypingInEditableField(event) {
   return target.isContentEditable || ['input', 'textarea', 'select'].includes(tagName);
 }
 
-
-function replaceBrokenAvatarImage(image = null) {
-  if (!image || image.dataset?.avatarBroken === '1') return false;
-  const fallback = document.createElement('span');
-  const avatarSize = normalizeAvatarSize(image.dataset?.avatarSize || (image.classList?.contains('ce-avatar--small') ? 'small' : 'normal'));
-  fallback.className = `ce-avatar ce-avatar--${avatarSize}`;
-  fallback.setAttribute('aria-hidden', 'true');
-  fallback.dataset.avatarKey = image.dataset?.avatarKey || '';
-  fallback.textContent = String(image.dataset?.avatarInitials || 'CE').slice(0, 4) || 'CE';
-  image.dataset.avatarBroken = '1';
-  image.replaceWith(fallback);
-  return true;
-}
-
-function replaceBrokenAttachmentImage(image = null) {
-  if (!image || image.dataset?.attachmentBroken === '1') return false;
-  const fileName = String(image.dataset?.attachmentFileName || image.getAttribute('alt') || 'imagen').trim() || 'imagen';
-  const width = Math.max(180, Math.min(360, Number(image.dataset?.attachmentWidth || image.naturalWidth || image.width || 0) || 260));
-  const height = Math.max(120, Math.min(320, Number(image.dataset?.attachmentHeight || image.naturalHeight || image.height || 0) || Math.round(width * 0.62)));
-  const fallback = document.createElement('span');
-  fallback.className = 'ce-attachment__image-fallback';
-  fallback.setAttribute('role', 'img');
-  fallback.setAttribute('aria-label', `Imagen no disponible: ${fileName}`);
-  fallback.style.setProperty('--ce-attachment-fallback-width', `${width}px`);
-  fallback.style.setProperty('--ce-attachment-fallback-height', `${height}px`);
-  const shape = document.createElement('span');
-  shape.className = 'ce-attachment__image-shape';
-  shape.setAttribute('aria-hidden', 'true');
-  const title = document.createElement('strong');
-  title.textContent = 'Imagen no disponible';
-  const detail = document.createElement('em');
-  detail.textContent = fileName;
-  fallback.append(shape, title, detail);
-  image.dataset.attachmentBroken = '1';
-  image.replaceWith(fallback);
-  return true;
-}
-
-function handleVisualMediaError(event) {
-  const target = event?.target;
-  if (!target || String(target.tagName || '').toUpperCase() !== 'IMG') return;
-  if (target.dataset?.avatarKey) {
-    replaceBrokenAvatarImage(target);
-    return;
-  }
-  if (target.dataset?.attachmentImage || target.closest?.('.ce-attachment--image')) {
-    replaceBrokenAttachmentImage(target);
-  }
-}
-
 function bindEvents() {
-  document.addEventListener('error', handleVisualMediaError, true);
   window.addEventListener('beforeunload', () => saveActiveDraft({ announce: false }));
   window.addEventListener('resize', () => updateResponsiveShellState(), { passive: true });
   ['pointerdown', 'touchstart', 'focusin'].forEach((eventName) => {
@@ -8254,26 +7662,16 @@ function bindEvents() {
   mobileChatViewportQuery?.addListener?.(handleMobileChatViewportChange);
   window.addEventListener('resize', handleMobileChatViewportChange, { passive: true });
   window.addEventListener('online', () => {
-    if (!state.user && getSessionToken()) {
-      setStatus('La conexión volvió. Restaurando tu sesión de chatER...');
-      attemptPendingSessionRestore().catch(() => scheduleSessionRestoreRetry(5000));
-      return;
-    }
     if (state.user) {
-      updateRealtimeStatus('connecting', 'La conexión volvió. Estamos reactivando mensajes, presencia y confirmaciones.');
-      if (!state.eventSource) openRealtime().catch((error) => { if (!handleRealtimeAuthFailure(error)) scheduleRealtimeReconnect(); });
+      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
     }
   });
-  window.addEventListener('offline', () => {
-    if (state.user) updateRealtimeStatus('offline');
-  });
-  window.addEventListener('storage', handleSessionStorageChange);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') saveActiveDraft({ announce: false });
     if (document.visibilityState === 'visible' && state.user) {
-      if (!state.eventSource) openRealtime().catch((error) => { if (!handleRealtimeAuthFailure(error)) scheduleRealtimeReconnect(); });
+      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
       scheduleOutboxRetry(1400);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
       requestServiceWorkerDeliveryAckFlush();
@@ -8293,7 +7691,70 @@ function bindEvents() {
     await unregisterCurrentPushSubscription().catch(() => null);
     await post('/api/auth/logout', {}).catch(() => null);
     await signOutFirebaseSession(state.config.firebaseWebConfig || {}).catch(() => null);
-    resetAuthenticatedClientState({ statusMessage: 'Sesión cerrada correctamente.' });
+    setSessionToken('');
+    state.user = null;
+    state.contacts = [];
+    state.chats = [];
+    state.labels = [];
+    state.chatLabelsByChatId = new Map();
+    state.activeLabelFilter = '';
+    state.labelsModalOpen = false;
+    state.slashCommandsOpen = false;
+    closeIconInsertPicker();
+    state.draftsOpen = false;
+    state.drafts = [];
+    state.draftsLoading = false;
+    state.globalStarredOpen = false;
+    state.globalStarredMessages = [];
+    state.globalStarredLoading = false;
+    state.globalStarredScannedChats = 0;
+    state.blockedContactsOpen = false;
+    state.blockedContacts = [];
+    state.labelsDraft = '';
+    state.archivedView = false;
+    state.messagesByChat.clear();
+    state.renderedMessageCountByChat.clear();
+    state.renderedActiveChatId = '';
+    state.scrollNewMessages = 0;
+    state.outboxMessages = [];
+    state.outboxSyncing = false;
+    state.notificationPreferences = normalizeNotificationPreferences({});
+    if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
+    state.outboxRetryTimer = 0;
+    if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
+    state.deliveryAckRetryTimer = 0;
+    state.activeChatId = '';
+    state.replyToMessage = null;
+    state.editingMessage = null;
+    state.forwardingMessage = null;
+    state.scheduleModalOpen = false;
+    state.scheduledMessages = [];
+    state.scheduledLoading = false;
+    state.schedulingMessage = false;
+    closePollModal();
+    state.pollCreating = false;
+    state.quickRepliesOpen = false;
+    state.quickRepliesLoaded = false;
+    state.quickReplies = [];
+    closeGlobalSearch();
+    resetGlobalSearchState();
+    closeGlobalStarred();
+    closeLinkLibrary();
+    closeChatBrief();
+    closePrivateNotesModal();
+    state.privateNotes = [];
+    closeReminderModal();
+    state.reminders = [];
+    closeLabelsModal();
+    closeCommandPalette();
+    state.privacyLock.locked = false;
+    state.privacyLock.mode = 'closed';
+    state.privacyLock.enabled = false;
+    state.privacyLock.salt = '';
+    state.privacyLock.pinHash = '';
+    renderPrivacyLockOverlay();
+    resetChatSearch();
+    showGuest();
   });
   els.btnInstall.addEventListener('click', async () => {
     if (state.installPrompt) {
@@ -9323,7 +8784,6 @@ async function registerServiceWorker() {
       const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       state.serviceWorkerRegistration = registration;
       await registration.update().catch(() => null);
-      registerServiceWorkerDeliveryAckOrigin(getBackendUrl());
       requestServiceWorkerDeliveryAckFlush();
     } catch {}
   }

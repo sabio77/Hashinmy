@@ -609,50 +609,6 @@ svg {
   background: linear-gradient(135deg, rgba(231, 244, 239, 0.95), rgba(255, 255, 255, 0.80));
 }
 
-.ce-realtime-banner {
-  margin: 14px 14px 0;
-  padding: 12px 13px;
-  border: 1px solid rgba(10, 168, 132, 0.22);
-  border-radius: 18px;
-  display: grid;
-  gap: 4px;
-  background: linear-gradient(135deg, rgba(217, 253, 211, 0.78), rgba(255, 255, 255, 0.72));
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-}
-
-.ce-realtime-banner[data-status='reconnecting'],
-.ce-realtime-banner[data-status='connecting'] {
-  border-color: rgba(245, 158, 11, 0.38);
-  background: linear-gradient(135deg, rgba(254, 243, 199, 0.90), rgba(255, 255, 255, 0.76));
-}
-
-.ce-realtime-banner[data-status='offline'],
-.ce-realtime-banner[data-status='paused'] {
-  border-color: rgba(180, 35, 24, 0.24);
-  background: linear-gradient(135deg, rgba(254, 226, 226, 0.86), rgba(255, 255, 255, 0.76));
-}
-
-.ce-realtime-banner strong {
-  color: var(--ce-accent-dark);
-  font-size: 0.92rem;
-}
-
-.ce-realtime-banner[data-status='reconnecting'] strong,
-.ce-realtime-banner[data-status='connecting'] strong {
-  color: #92400e;
-}
-
-.ce-realtime-banner[data-status='offline'] strong,
-.ce-realtime-banner[data-status='paused'] strong {
-  color: var(--ce-danger);
-}
-
-.ce-realtime-banner span {
-  color: var(--ce-muted-strong);
-  font-size: 0.86rem;
-  line-height: 1.4;
-}
-
 .ce-install strong {
   color: var(--ce-accent-dark);
 }
@@ -1179,6 +1135,22 @@ svg {
   line-height: 1.45;
 }
 
+.ce-msg-emoji {
+  display: inline-block;
+  font-size: 1.5em;
+  line-height: 1;
+  vertical-align: -0.1em;
+}
+
+.ce-msg__text--solo-emoji {
+  line-height: 1.05;
+}
+
+.ce-msg__text--solo-emoji .ce-msg-emoji {
+  font-size: 3em;
+  vertical-align: -0.04em;
+}
+
 .ce-forwarded-label {
   display: inline-flex;
   align-items: center;
@@ -1635,6 +1607,13 @@ svg {
   font-weight: 900;
 }
 
+.ce-reaction-chip__emoji {
+  display: inline-block;
+  font-size: 1.5em;
+  line-height: 1;
+  vertical-align: -0.08em;
+}
+
 .ce-reaction-chip strong {
   font-size: 0.72rem;
 }
@@ -1646,7 +1625,8 @@ svg {
   display: grid;
   place-items: center;
   padding: 0;
-  font-size: 1rem;
+  font-size: 1.5rem;
+  line-height: 1;
   transition: transform 0.14s ease, opacity 0.14s ease, border-color 0.14s ease;
 }
 
@@ -2923,8 +2903,7 @@ svg {
     margin-inline: 10px;
   }
 
-  .ce-install,
-  .ce-realtime-banner {
+  .ce-install {
     margin-inline: 10px;
   }
 
@@ -3770,8 +3749,7 @@ body.ce-compact-mode .ce-chat__header span {
   font-size: 0.76rem;
 }
 
-body.ce-compact-mode .ce-install,
-body.ce-compact-mode .ce-realtime-banner {
+body.ce-compact-mode .ce-install {
   margin: 9px 10px 0;
   padding: 9px 10px;
   gap: 5px;
@@ -7580,53 +7558,13 @@ body {
   text-decoration: none;
 }
 
-.ce-attachment--image img,
-.ce-attachment__image-fallback {
-  display: grid;
+.ce-attachment--image img {
+  display: block;
   max-width: min(360px, 100%);
   max-height: 320px;
   border-radius: 10px;
   object-fit: cover;
   background: rgba(17, 27, 33, 0.08);
-}
-
-.ce-attachment--image img {
-  display: block;
-}
-
-.ce-attachment__image-fallback {
-  width: min(var(--ce-attachment-fallback-width, 260px), 100%);
-  min-height: var(--ce-attachment-fallback-height, 160px);
-  place-items: center;
-  align-content: center;
-  gap: 6px;
-  padding: 18px;
-  color: var(--ce-muted);
-  text-align: center;
-  border: 1px dashed rgba(17, 27, 33, 0.18);
-}
-
-.ce-attachment__image-shape {
-  width: 58px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(10, 168, 132, 0.22), rgba(59, 130, 246, 0.18));
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.46);
-}
-
-.ce-attachment__image-fallback strong {
-  color: var(--ce-text);
-  font-size: 0.92rem;
-}
-
-.ce-attachment__image-fallback em {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--ce-muted);
-  font-size: 0.78rem;
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ce-attachment--file {
@@ -8080,8 +8018,7 @@ body.ce-dark-mode .ce-msg__meta {
   backdrop-filter: none;
 }
 
-.ce-attachment--image img,
-.ce-attachment__image-fallback {
+.ce-attachment--image img {
   border-radius: 8px;
 }
 
@@ -8290,7 +8227,6 @@ body.ce-dark-mode .ce-row.is-active {
 :root[data-theme='dark'] .ce-search-area,
 :root[data-theme='dark'] .ce-chat-search-area,
 :root[data-theme='dark'] .ce-install,
-:root[data-theme='dark'] .ce-realtime-banner,
 :root[data-theme='dark'] .ce-unread-separator button {
   background: var(--ce-bg-soft);
   color: var(--ce-text);
@@ -10319,19 +10255,4 @@ body.ce-dark-mode .ce-compose {
     height: 34px !important;
     min-height: 34px !important;
   }
-}
-
-/* Iteración actual · controles del composer conectados al DOM
-   Punto débil corregido: el JavaScript ya gestionaba programar, dictado por voz y envío silencioso,
-   pero el HTML no exponía esos botones y una capa CSS anterior mantenía ocultos schedule/voice.
-   Se habilita su presencia visual sin cambiar lógica de envío ni reducers. */
-#messageForm .ce-compose__toolstrip #btnScheduleMessage,
-#messageForm .ce-compose__toolstrip #btnVoiceDictation,
-#messageForm .ce-compose__toolstrip #btnSilentSend {
-  display: grid !important;
-}
-
-#messageForm .ce-compose__toolstrip #btnVoiceDictation[aria-pressed="true"] {
-  background: var(--ce-accent) !important;
-  color: #ffffff !important;
 }
