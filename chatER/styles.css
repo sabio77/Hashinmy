@@ -9450,3 +9450,507 @@ body.ce-dark-mode .ce-control-toggle {
     left: 0 !important;
   }
 }
+
+/* Iteración messageForm responsive · márgenes seguros y compositor compacto en todo ancho.
+   Refuerza el punto débil detectado: las columnas y alturas rígidas podían apretar o desbordar
+   el compositor en pantallas intermedias, ventanas divididas y móviles angostos. */
+:root {
+  --ce-compose-edge-margin: clamp(8px, 1.8vw, 18px);
+  --ce-compose-pad-x: clamp(8px, 1.45vw, 14px);
+  --ce-compose-pad-y: clamp(6px, 1vw, 8px);
+  --ce-compose-gap: clamp(6px, 1vw, 10px);
+  --ce-compose-input-height: 48px;
+  --ce-compose-action-size: 48px;
+  --ce-compose-top-height: 52px;
+  --ce-compose-compact-height: calc(68px + max(0px, env(safe-area-inset-bottom)));
+}
+
+.ce-shell {
+  container: ce-shell-pane / inline-size;
+}
+
+.ce-chat {
+  grid-template-rows: var(--ce-header) minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  overflow: hidden !important;
+}
+
+#messageForm.ce-compose,
+.ce-compose {
+  box-sizing: border-box !important;
+  justify-self: center !important;
+  width: min(100%, calc(100% - (var(--ce-compose-edge-margin) * 2))) !important;
+  max-width: 1160px !important;
+  min-height: var(--ce-compose-compact-height) !important;
+  height: var(--ce-compose-compact-height) !important;
+  max-height: var(--ce-compose-compact-height) !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 0.74fr) minmax(280px, 1.26fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-areas: "composerTools composerInput" !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  grid-auto-rows: minmax(0, auto) !important;
+  grid-auto-flow: row !important;
+  gap: var(--ce-compose-gap) !important;
+  align-items: center !important;
+  padding: var(--ce-compose-pad-y) calc(var(--ce-compose-pad-x) + env(safe-area-inset-right)) calc(var(--ce-compose-pad-y) + env(safe-area-inset-bottom)) calc(var(--ce-compose-pad-x) + env(safe-area-inset-left)) !important;
+  margin: 0 auto !important;
+  border: 1px solid var(--ce-line) !important;
+  border-radius: 20px 20px 0 0 !important;
+  background: color-mix(in srgb, var(--ce-bg-soft) 92%, #ffffff 8%) !important;
+  overflow: visible !important;
+}
+
+.ce-compose *,
+.ce-compose *::before,
+.ce-compose *::after {
+  box-sizing: border-box;
+}
+
+.ce-compose__top,
+.ce-compose__bottom {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: center !important;
+}
+
+.ce-compose__top {
+  grid-area: composerTools !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: clamp(5px, 0.9vw, 8px) !important;
+}
+
+.ce-compose__bottom {
+  grid-area: composerInput !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) var(--ce-compose-action-size) !important;
+  align-items: center !important;
+  gap: clamp(6px, 1vw, 8px) !important;
+}
+
+.ce-compose__status-stack {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+.ce-compose__toolstrip {
+  min-width: 0 !important;
+  max-width: min(42vw, 245px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: clamp(4px, 0.75vw, 6px) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ce-compose__toolstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.ce-compose__toolstrip .ce-icon-btn,
+.ce-compose__toolstrip button {
+  width: clamp(31px, 3.7vw, 34px) !important;
+  height: clamp(31px, 3.7vw, 34px) !important;
+  min-width: clamp(31px, 3.7vw, 34px) !important;
+  min-height: clamp(31px, 3.7vw, 34px) !important;
+  flex: 0 0 auto !important;
+}
+
+.ce-input-shell {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--ce-compose-input-height) !important;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(42px, max-content) !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 0 4px 4px !important;
+  overflow: hidden !important;
+}
+
+.ce-input-shell #messageInput,
+.ce-compose #messageInput,
+:root[data-theme='dark'] .ce-input-shell #messageInput,
+:root[data-theme='dark'] .ce-compose #messageInput,
+body.ce-dark-mode .ce-input-shell #messageInput,
+body.ce-dark-mode .ce-compose #messageInput {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: calc(var(--ce-compose-input-height) - 8px) !important;
+  min-height: calc(var(--ce-compose-input-height) - 8px) !important;
+  padding-inline: clamp(7px, 1.2vw, 10px) !important;
+  text-overflow: ellipsis !important;
+}
+
+.ce-input-prefix,
+.ce-input-suffix {
+  height: calc(var(--ce-compose-input-height) - 8px) !important;
+  min-width: calc(var(--ce-compose-input-height) - 10px) !important;
+}
+
+.ce-input-suffix {
+  max-width: clamp(44px, 10vw, 70px) !important;
+  padding-inline: clamp(7px, 1.15vw, 10px) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.ce-compose #btnSend,
+.ce-compose .ce-send-circle {
+  width: var(--ce-compose-action-size) !important;
+  height: var(--ce-compose-action-size) !important;
+  min-width: var(--ce-compose-action-size) !important;
+  min-height: var(--ce-compose-action-size) !important;
+}
+
+.ce-scroll-bottom {
+  bottom: calc(var(--ce-compose-compact-height) + max(12px, var(--ce-compose-edge-margin))) !important;
+}
+
+.ce-compose .ce-quick-replies,
+.ce-compose .ce-slash-panel,
+.ce-compose .ce-icon-insert-panel,
+.ce-compose .ce-send-mode-menu {
+  max-width: min(calc(100dvw - (var(--ce-compose-edge-margin) * 2)), 520px) !important;
+}
+
+:root[data-theme='dark'] #messageForm.ce-compose,
+:root[data-theme='dark'] .ce-compose,
+body.ce-dark-mode #messageForm.ce-compose,
+body.ce-dark-mode .ce-compose {
+  background: color-mix(in srgb, var(--ce-bg-soft) 88%, #000000 12%) !important;
+  border-color: var(--ce-line) !important;
+}
+
+@media (max-width: 980px) {
+  :root {
+    --ce-compose-edge-margin: clamp(8px, 2.4vw, 14px);
+    --ce-compose-input-height: 46px;
+    --ce-compose-action-size: 46px;
+    --ce-compose-compact-height: calc(98px + max(0px, env(safe-area-inset-bottom)));
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    max-width: none !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 34px var(--ce-compose-input-height) !important;
+    grid-template-areas:
+      "composerTools"
+      "composerInput" !important;
+    gap: 6px !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  .ce-compose__top {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: min(48vw, 230px) !important;
+  }
+
+  .ce-compose__bottom {
+    grid-template-columns: minmax(0, 1fr) var(--ce-compose-action-size) !important;
+  }
+}
+
+@container ce-shell-pane (max-width: 1120px) {
+  .ce-chat {
+    --ce-compose-input-height: 46px;
+    --ce-compose-action-size: 46px;
+    --ce-compose-compact-height: calc(98px + max(0px, env(safe-area-inset-bottom)));
+    grid-template-rows: var(--ce-header) minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    max-width: none !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 34px var(--ce-compose-input-height) !important;
+    grid-template-areas:
+      "composerTools"
+      "composerInput" !important;
+    gap: 6px !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: min(48vw, 230px) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  :root,
+  .ce-chat {
+    --ce-compose-edge-margin: max(6px, env(safe-area-inset-left));
+    --ce-compose-pad-x: 7px;
+    --ce-compose-pad-y: 5px;
+    --ce-compose-input-height: 44px;
+    --ce-compose-action-size: 44px;
+    --ce-compose-compact-height: calc(92px + max(0px, env(safe-area-inset-bottom)));
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    grid-template-rows: 31px var(--ce-compose-input-height) !important;
+    gap: 5px !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: 46vw !important;
+    gap: 4px !important;
+  }
+
+  .ce-compose__toolstrip .ce-icon-btn,
+  .ce-compose__toolstrip button {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .ce-input-shell {
+    grid-template-columns: 34px minmax(0, 1fr) 40px !important;
+    padding-left: 3px !important;
+  }
+
+  .ce-input-prefix,
+  .ce-input-suffix {
+    min-width: 34px !important;
+  }
+
+  .ce-input-suffix {
+    max-width: 40px !important;
+    padding-inline: 6px !important;
+  }
+}
+
+@media (max-width: 340px) {
+  :root,
+  .ce-chat {
+    --ce-compose-edge-margin: 4px;
+    --ce-compose-pad-x: 5px;
+    --ce-compose-pad-y: 4px;
+    --ce-compose-gap: 4px;
+    --ce-compose-input-height: 42px;
+    --ce-compose-action-size: 42px;
+    --ce-compose-compact-height: calc(88px + max(0px, env(safe-area-inset-bottom)));
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    grid-template-rows: 29px var(--ce-compose-input-height) !important;
+    gap: var(--ce-compose-gap) !important;
+  }
+
+  .ce-compose__status-stack .ce-typing,
+  .ce-compose__status-stack .ce-draft-status,
+  .ce-compose__status-stack .ce-reply-draft,
+  .ce-compose__status-stack .ce-attachment-preview {
+    padding-inline: 7px !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: 44vw !important;
+  }
+
+  .ce-compose__toolstrip .ce-icon-btn,
+  .ce-compose__toolstrip button {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  .ce-input-prefix {
+    display: none !important;
+  }
+
+  .ce-input-shell {
+    grid-template-columns: minmax(0, 1fr) 38px !important;
+  }
+}
+
+/* Iteración messageForm responsive · cierre para pantallas de baja altura.
+   Punto débil identificado: la última capa compactaba por ancho, pero en móviles/tablets horizontales
+   o ventanas divididas con poca altura el messageForm seguía ocupando 92-98px y reducía demasiado
+   el historial. Esta capa reduce el compositor sin eliminar controles ni tocar la lógica JS. */
+@media (max-height: 560px) {
+  :root,
+  .ce-chat {
+    --ce-compose-edge-margin: clamp(4px, 1.5vw, 14px);
+    --ce-compose-pad-x: clamp(6px, 1.2vw, 10px);
+    --ce-compose-pad-y: 5px;
+    --ce-compose-gap: 6px;
+    --ce-compose-input-height: 42px;
+    --ce-compose-action-size: 42px;
+    --ce-compose-compact-height: calc(64px + max(0px, env(safe-area-inset-bottom)));
+  }
+
+  .ce-chat {
+    grid-template-rows: var(--ce-header) minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    width: min(100%, calc(100% - (var(--ce-compose-edge-margin) * 2))) !important;
+    min-height: var(--ce-compose-compact-height) !important;
+    height: var(--ce-compose-compact-height) !important;
+    max-height: var(--ce-compose-compact-height) !important;
+    grid-template-columns: minmax(150px, 0.38fr) minmax(260px, 0.62fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    grid-template-areas: "composerTools composerInput" !important;
+    gap: var(--ce-compose-gap) !important;
+    padding: var(--ce-compose-pad-y) calc(var(--ce-compose-pad-x) + env(safe-area-inset-right)) calc(var(--ce-compose-pad-y) + env(safe-area-inset-bottom)) calc(var(--ce-compose-pad-x) + env(safe-area-inset-left)) !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+
+  .ce-compose__top,
+  .ce-compose__bottom {
+    height: auto !important;
+    min-height: 0 !important;
+    align-self: center !important;
+  }
+
+  .ce-compose__top {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 5px !important;
+  }
+
+  .ce-compose__bottom {
+    grid-template-columns: minmax(0, 1fr) var(--ce-compose-action-size) !important;
+    gap: 6px !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: min(28vw, 180px) !important;
+    gap: 4px !important;
+  }
+
+  .ce-compose__toolstrip .ce-icon-btn,
+  .ce-compose__toolstrip button {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  .ce-compose__status-stack .ce-typing,
+  .ce-compose__status-stack .ce-draft-status,
+  .ce-compose__status-stack .ce-reply-draft,
+  .ce-compose__status-stack .ce-attachment-preview {
+    padding-block: 5px !important;
+    padding-inline: 8px !important;
+  }
+
+  .ce-input-shell {
+    height: var(--ce-compose-input-height) !important;
+    grid-template-columns: 34px minmax(0, 1fr) 38px !important;
+    padding: 3px 0 3px 3px !important;
+  }
+
+  .ce-input-shell #messageInput,
+  .ce-compose #messageInput,
+  :root[data-theme='dark'] .ce-input-shell #messageInput,
+  :root[data-theme='dark'] .ce-compose #messageInput,
+  body.ce-dark-mode .ce-input-shell #messageInput,
+  body.ce-dark-mode .ce-compose #messageInput {
+    height: calc(var(--ce-compose-input-height) - 6px) !important;
+    min-height: calc(var(--ce-compose-input-height) - 6px) !important;
+    padding-inline: 8px !important;
+  }
+
+  .ce-input-prefix,
+  .ce-input-suffix {
+    height: calc(var(--ce-compose-input-height) - 6px) !important;
+    min-width: 34px !important;
+  }
+
+  .ce-input-suffix {
+    max-width: 38px !important;
+    padding-inline: 6px !important;
+  }
+
+  .ce-compose #btnSend,
+  .ce-compose .ce-send-circle {
+    width: var(--ce-compose-action-size) !important;
+    height: var(--ce-compose-action-size) !important;
+    min-width: var(--ce-compose-action-size) !important;
+    min-height: var(--ce-compose-action-size) !important;
+  }
+
+  .ce-scroll-bottom {
+    bottom: calc(var(--ce-compose-compact-height) + 10px) !important;
+  }
+
+  .ce-chat-search-area {
+    max-height: calc(100% - var(--ce-header) - var(--ce-compose-compact-height) - 18px) !important;
+  }
+}
+
+@media (max-height: 560px) and (max-width: 559px) {
+  :root,
+  .ce-chat {
+    --ce-compose-pad-y: 4px;
+    --ce-compose-input-height: 40px;
+    --ce-compose-action-size: 40px;
+    --ce-compose-compact-height: calc(82px + max(0px, env(safe-area-inset-bottom)));
+  }
+
+  #messageForm.ce-compose,
+  .ce-compose {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 28px var(--ce-compose-input-height) !important;
+    grid-template-areas:
+      "composerTools"
+      "composerInput" !important;
+    gap: 4px !important;
+    padding-block: var(--ce-compose-pad-y) calc(var(--ce-compose-pad-y) + env(safe-area-inset-bottom)) !important;
+    padding-inline: calc(5px + env(safe-area-inset-left)) calc(5px + env(safe-area-inset-right)) !important;
+  }
+
+  .ce-compose__toolstrip {
+    max-width: 44vw !important;
+  }
+
+  .ce-compose__toolstrip .ce-icon-btn,
+  .ce-compose__toolstrip button {
+    width: 27px !important;
+    height: 27px !important;
+    min-width: 27px !important;
+    min-height: 27px !important;
+  }
+
+  .ce-input-shell {
+    grid-template-columns: 32px minmax(0, 1fr) 36px !important;
+  }
+
+  .ce-input-prefix,
+  .ce-input-suffix {
+    min-width: 32px !important;
+  }
+}
+
+@media (max-height: 560px) and (max-width: 340px) {
+  .ce-input-shell {
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+  }
+
+  .ce-input-shell #messageInput,
+  .ce-compose #messageInput {
+    grid-column: 1 !important;
+  }
+
+  .ce-input-suffix {
+    grid-column: 2 !important;
+    max-width: 36px !important;
+  }
+}
