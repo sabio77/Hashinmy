@@ -399,6 +399,21 @@ function renderMessageAttachment(attachment = null) {
   return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
 
+function shouldRenderMessageTextBody(text = '', attachment = null) {
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return false;
+  const normalized = normalizeAttachmentClient(attachment);
+  if (normalized?.kind === 'image' && cleanText === attachmentFallbackText(normalized)) return false;
+  return true;
+}
+
+function renderMessageTextBody(text = '', attachment = null) {
+  const cleanText = String(text || '').trim();
+  return shouldRenderMessageTextBody(cleanText, attachment)
+    ? `<p class="ce-msg__text">${escapeHtml(cleanText)}</p>`
+    : '';
+}
+
 function updateAttachmentPreview() {
   if (!els.attachmentPreview) return;
   const attachment = normalizeAttachmentClient(state.pendingAttachment);
@@ -1672,7 +1687,7 @@ function renderQueuedMessage(queued = {}) {
   const failed = queued.status === 'failed';
   const sending = queued.status === 'sending';
   const queuedAttachment = normalizeAttachmentClient(queued.attachment || null);
-  const queuedText = queued.text && queuedAttachment?.kind !== 'image' ? `<p class="ce-msg__text">${escapeHtml(queued.text)}</p>` : '';
+  const queuedText = renderMessageTextBody(queued.text, queuedAttachment);
   const statusText = sending
     ? 'Enviando pendiente...'
     : (failed ? `Pendiente sin enviar${queued.lastError ? ` · ${queued.lastError}` : ''}` : 'Pendiente · se enviará al recuperar conexión');
@@ -2304,7 +2319,7 @@ function renderMessageBody(message = {}, mine = false) {
     : '';
   const normalizedAttachment = normalizeAttachmentClient(message.attachment || null);
   const attachment = renderMessageAttachment(normalizedAttachment);
-  const textBody = message.text && normalizedAttachment?.kind !== 'image' ? `<p class="ce-msg__text">${escapeHtml(message.text)}</p>` : '';
+  const textBody = renderMessageTextBody(message.text, normalizedAttachment);
   const body = message.type === 'poll' || message.poll
     ? renderPollMessage(message)
     : `${attachment}${textBody}`;
@@ -8339,7 +8354,11 @@ function bindEvents() {
   });
   els.messages.addEventListener('click', (event) => {
     const messageEl = event.target.closest('.ce-msg');
-    if (messageEl && els.messages.contains(messageEl)) openMessageControlsForElement(messageEl);
+    if (messageEl && els.messages.contains(messageEl)) {
+      openMessageControlsForElement(messageEl);
+    } else {
+      closeOpenMessageControls();
+    }
     const controlsToggle = event.target.closest('[data-message-controls-toggle]');
     if (controlsToggle && els.messages.contains(controlsToggle)) {
       event.preventDefault();

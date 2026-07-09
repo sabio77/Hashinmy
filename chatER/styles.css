@@ -9232,9 +9232,13 @@ body:has(#chatScreen:not(.hidden)) .ce-app {
   overscroll-behavior: contain;
 }
 
-.ce-attachment--image figcaption,
-.ce-attachment--image + .ce-msg__text {
+.ce-attachment--image figcaption {
   display: none !important;
+}
+
+.ce-attachment--image + .ce-msg__text {
+  display: block !important;
+  margin-top: 7px !important;
 }
 
 .ce-msg-actions.ce-control-list,
