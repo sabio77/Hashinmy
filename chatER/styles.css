@@ -609,6 +609,50 @@ svg {
   background: linear-gradient(135deg, rgba(231, 244, 239, 0.95), rgba(255, 255, 255, 0.80));
 }
 
+.ce-realtime-banner {
+  margin: 14px 14px 0;
+  padding: 12px 13px;
+  border: 1px solid rgba(10, 168, 132, 0.22);
+  border-radius: 18px;
+  display: grid;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(217, 253, 211, 0.78), rgba(255, 255, 255, 0.72));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.ce-realtime-banner[data-status='reconnecting'],
+.ce-realtime-banner[data-status='connecting'] {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.90), rgba(255, 255, 255, 0.76));
+}
+
+.ce-realtime-banner[data-status='offline'],
+.ce-realtime-banner[data-status='paused'] {
+  border-color: rgba(180, 35, 24, 0.24);
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.86), rgba(255, 255, 255, 0.76));
+}
+
+.ce-realtime-banner strong {
+  color: var(--ce-accent-dark);
+  font-size: 0.92rem;
+}
+
+.ce-realtime-banner[data-status='reconnecting'] strong,
+.ce-realtime-banner[data-status='connecting'] strong {
+  color: #92400e;
+}
+
+.ce-realtime-banner[data-status='offline'] strong,
+.ce-realtime-banner[data-status='paused'] strong {
+  color: var(--ce-danger);
+}
+
+.ce-realtime-banner span {
+  color: var(--ce-muted-strong);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
 .ce-install strong {
   color: var(--ce-accent-dark);
 }
@@ -2879,7 +2923,8 @@ svg {
     margin-inline: 10px;
   }
 
-  .ce-install {
+  .ce-install,
+  .ce-realtime-banner {
     margin-inline: 10px;
   }
 
@@ -3725,7 +3770,8 @@ body.ce-compact-mode .ce-chat__header span {
   font-size: 0.76rem;
 }
 
-body.ce-compact-mode .ce-install {
+body.ce-compact-mode .ce-install,
+body.ce-compact-mode .ce-realtime-banner {
   margin: 9px 10px 0;
   padding: 9px 10px;
   gap: 5px;
@@ -7534,13 +7580,53 @@ body {
   text-decoration: none;
 }
 
-.ce-attachment--image img {
-  display: block;
+.ce-attachment--image img,
+.ce-attachment__image-fallback {
+  display: grid;
   max-width: min(360px, 100%);
   max-height: 320px;
   border-radius: 10px;
   object-fit: cover;
   background: rgba(17, 27, 33, 0.08);
+}
+
+.ce-attachment--image img {
+  display: block;
+}
+
+.ce-attachment__image-fallback {
+  width: min(var(--ce-attachment-fallback-width, 260px), 100%);
+  min-height: var(--ce-attachment-fallback-height, 160px);
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 18px;
+  color: var(--ce-muted);
+  text-align: center;
+  border: 1px dashed rgba(17, 27, 33, 0.18);
+}
+
+.ce-attachment__image-shape {
+  width: 58px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(10, 168, 132, 0.22), rgba(59, 130, 246, 0.18));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.46);
+}
+
+.ce-attachment__image-fallback strong {
+  color: var(--ce-text);
+  font-size: 0.92rem;
+}
+
+.ce-attachment__image-fallback em {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ce-muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ce-attachment--file {
@@ -7994,7 +8080,8 @@ body.ce-dark-mode .ce-msg__meta {
   backdrop-filter: none;
 }
 
-.ce-attachment--image img {
+.ce-attachment--image img,
+.ce-attachment__image-fallback {
   border-radius: 8px;
 }
 
@@ -8203,6 +8290,7 @@ body.ce-dark-mode .ce-row.is-active {
 :root[data-theme='dark'] .ce-search-area,
 :root[data-theme='dark'] .ce-chat-search-area,
 :root[data-theme='dark'] .ce-install,
+:root[data-theme='dark'] .ce-realtime-banner,
 :root[data-theme='dark'] .ce-unread-separator button {
   background: var(--ce-bg-soft);
   color: var(--ce-text);
@@ -9953,4 +10041,297 @@ body.ce-dark-mode .ce-compose {
     grid-column: 2 !important;
     max-width: 36px !important;
   }
+}
+
+/* Iteración actual · messageForm responsive compacto en todos los anchos
+   Punto débil corregido: la última capa del composer conservaba una columna interna sobrante en .ce-input-shell
+   y en anchos mínimos podía reubicar controles por auto-placement. Esta capa final fija áreas explícitas,
+   conserva todos los controles, respeta safe-area y mantiene márgenes compactos sin tocar lógica JS. */
+#messageForm.ce-compose,
+#messageForm.ce-compose * {
+  box-sizing: border-box;
+}
+
+#messageForm.ce-compose {
+  width: min(100%, calc(100% - (var(--ce-compose-edge-margin, clamp(8px, 1.8vw, 18px)) * 2))) !important;
+  max-width: 1160px !important;
+  margin-inline: auto !important;
+  padding-top: clamp(6px, 0.95vw, 8px) !important;
+  padding-right: calc(clamp(8px, 1.55vw, 16px) + env(safe-area-inset-right, 0px)) !important;
+  padding-bottom: calc(clamp(7px, 1.05vw, 10px) + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: calc(clamp(8px, 1.55vw, 16px) + env(safe-area-inset-left, 0px)) !important;
+  overflow: visible !important;
+}
+
+#messageForm .ce-compose__top,
+#messageForm .ce-compose__bottom,
+#messageForm .ce-compose__status-stack,
+#messageForm .ce-input-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#messageForm .ce-compose__bottom {
+  grid-template-columns: minmax(0, 1fr) var(--ce-compose-action-size, 48px) !important;
+  gap: clamp(6px, 1.1vw, 8px) !important;
+}
+
+#messageForm .ce-input-shell {
+  --ce-compose-prefix-size: 38px;
+  --ce-compose-suffix-size: 42px;
+  grid-template-columns: var(--ce-compose-prefix-size) minmax(0, 1fr) minmax(var(--ce-compose-suffix-size), auto) !important;
+  grid-auto-flow: column;
+  grid-auto-columns: 0;
+  overflow: visible !important;
+}
+
+#messageForm .ce-input-prefix {
+  grid-column: 1 !important;
+  display: inline-grid !important;
+}
+
+#messageForm #messageInput {
+  grid-column: 2 !important;
+}
+
+#messageForm .ce-input-suffix {
+  grid-column: 3 !important;
+  max-width: min(74px, 18vw) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#messageForm .ce-input-suffix span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#messageForm .ce-compose__toolstrip {
+  max-width: min(210px, 52vw);
+  padding-inline: 1px;
+}
+
+#messageForm .ce-compose__status-stack .ce-typing,
+#messageForm .ce-compose__status-stack .ce-draft-status,
+#messageForm .ce-compose__status-stack .ce-reply-draft,
+#messageForm .ce-compose__status-stack .ce-attachment-preview {
+  max-width: 100%;
+}
+
+@media (max-width: 520px) {
+  :root,
+  .ce-chat {
+    --ce-compose-compact-height: calc(94px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #messageForm.ce-compose {
+    --ce-compose-row-top: 32px;
+    --ce-compose-row-bottom: 44px;
+    --ce-compose-action-size: 44px;
+    gap: 6px !important;
+    padding-top: 6px !important;
+    padding-right: calc(7px + env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: calc(7px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: calc(7px + env(safe-area-inset-left, 0px)) !important;
+  }
+
+  #messageForm .ce-compose__top {
+    gap: 6px;
+  }
+
+  #messageForm .ce-compose__bottom {
+    grid-template-columns: minmax(0, 1fr) var(--ce-compose-action-size) !important;
+    gap: 7px !important;
+  }
+
+  #messageForm .ce-compose__toolstrip {
+    max-width: 48vw !important;
+    gap: 4px;
+  }
+
+  #messageForm .ce-compose__toolstrip .ce-icon-btn,
+  #messageForm .ce-compose__toolstrip button {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+  }
+
+  #messageForm .ce-input-shell {
+    --ce-compose-prefix-size: 34px;
+    --ce-compose-suffix-size: 38px;
+    height: 44px !important;
+    min-height: 44px !important;
+    grid-template-columns: var(--ce-compose-prefix-size) minmax(0, 1fr) minmax(var(--ce-compose-suffix-size), auto) !important;
+    gap: 3px !important;
+    padding: 3px !important;
+  }
+
+  #messageForm .ce-input-prefix,
+  #messageForm .ce-input-suffix {
+    width: auto !important;
+    height: 36px !important;
+    min-width: 34px !important;
+    min-height: 36px !important;
+  }
+
+  #messageForm .ce-input-suffix {
+    min-width: 38px !important;
+    max-width: 58px !important;
+    padding-inline: 6px !important;
+  }
+
+  #messageForm .ce-input-shell #messageInput,
+  #messageForm.ce-compose #messageInput {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding-inline: 7px !important;
+    font-size: 0.94rem !important;
+  }
+
+  #messageForm #btnSend,
+  #messageForm .ce-send-circle {
+    width: var(--ce-compose-action-size) !important;
+    height: var(--ce-compose-action-size) !important;
+    min-width: var(--ce-compose-action-size) !important;
+    min-height: var(--ce-compose-action-size) !important;
+  }
+}
+
+@media (max-width: 360px) {
+  :root,
+  .ce-chat {
+    --ce-compose-compact-height: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #messageForm.ce-compose {
+    --ce-compose-row-top: 30px;
+    --ce-compose-row-bottom: 42px;
+    --ce-compose-action-size: 42px;
+    gap: 5px !important;
+    padding-top: 5px !important;
+    padding-right: calc(6px + env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: calc(6px + env(safe-area-inset-left, 0px)) !important;
+  }
+
+  #messageForm .ce-compose__bottom {
+    gap: 6px !important;
+  }
+
+  #messageForm .ce-compose__toolstrip {
+    max-width: 44vw !important;
+    gap: 3px;
+  }
+
+  #messageForm .ce-compose__toolstrip .ce-icon-btn,
+  #messageForm .ce-compose__toolstrip button {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  #messageForm .ce-input-shell {
+    --ce-compose-prefix-size: 32px;
+    --ce-compose-suffix-size: 36px;
+    height: 42px !important;
+    min-height: 42px !important;
+    grid-template-columns: var(--ce-compose-prefix-size) minmax(0, 1fr) var(--ce-compose-suffix-size) !important;
+  }
+
+  #messageForm .ce-input-prefix,
+  #messageForm .ce-input-suffix {
+    height: 34px !important;
+    min-height: 34px !important;
+    min-width: 32px !important;
+  }
+
+  #messageForm .ce-input-suffix {
+    min-width: 36px !important;
+    max-width: 36px !important;
+    padding-inline: 5px !important;
+  }
+
+  #messageForm .ce-input-suffix span {
+    display: none !important;
+  }
+
+  #messageForm .ce-input-shell #messageInput,
+  #messageForm.ce-compose #messageInput {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding-inline: 6px !important;
+    font-size: 0.9rem !important;
+  }
+}
+
+@media (max-width: 320px) {
+  #messageForm.ce-compose {
+    --ce-compose-action-size: 40px;
+  }
+
+  #messageForm .ce-compose__toolstrip {
+    max-width: 41vw !important;
+  }
+
+  #messageForm .ce-input-shell {
+    --ce-compose-prefix-size: 30px;
+    --ce-compose-suffix-size: 34px;
+    grid-template-columns: var(--ce-compose-prefix-size) minmax(0, 1fr) var(--ce-compose-suffix-size) !important;
+  }
+
+  #messageForm .ce-input-prefix,
+  #messageForm .ce-input-suffix {
+    min-width: 30px !important;
+  }
+
+  #messageForm .ce-input-suffix {
+    min-width: 34px !important;
+    max-width: 34px !important;
+  }
+}
+
+@media (max-height: 560px) and (max-width: 559px) {
+  :root,
+  .ce-chat {
+    --ce-compose-compact-height: calc(82px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #messageForm.ce-compose {
+    --ce-compose-row-top: 28px;
+    --ce-compose-row-bottom: 40px;
+    --ce-compose-action-size: 40px;
+    padding-top: 4px !important;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  #messageForm .ce-input-shell {
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+
+  #messageForm .ce-input-shell #messageInput,
+  #messageForm.ce-compose #messageInput {
+    height: 34px !important;
+    min-height: 34px !important;
+  }
+}
+
+/* Iteración actual · controles del composer conectados al DOM
+   Punto débil corregido: el JavaScript ya gestionaba programar, dictado por voz y envío silencioso,
+   pero el HTML no exponía esos botones y una capa CSS anterior mantenía ocultos schedule/voice.
+   Se habilita su presencia visual sin cambiar lógica de envío ni reducers. */
+#messageForm .ce-compose__toolstrip #btnScheduleMessage,
+#messageForm .ce-compose__toolstrip #btnVoiceDictation,
+#messageForm .ce-compose__toolstrip #btnSilentSend {
+  display: grid !important;
+}
+
+#messageForm .ce-compose__toolstrip #btnVoiceDictation[aria-pressed="true"] {
+  background: var(--ce-accent) !important;
+  color: #ffffff !important;
 }
