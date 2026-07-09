@@ -14,6 +14,9 @@ const installedStorageKey = 'chater_installed_v1';
 const installDismissedStorageKey = 'chater_install_dismissed_v1';
 const scrollBottomThresholdPx = 160;
 const quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
+const reactionRecentStorageKey = 'chater_recent_reactions_v1';
+const messageActionRecentStorageKey = 'chater_recent_message_actions_v1';
+const recentMessageControlLimit = 3;
 const iconInsertStorageKey = 'chater_recent_emojis_v1';
 const iconInsertLegacyStorageKey = 'chater_recent_icon_inserts_v1';
 const iconInsertMaxRecent = 24;
@@ -391,7 +394,7 @@ function renderMessageAttachment(attachment = null) {
   if (!normalized) return '';
   const size = normalized.sizeBytes ? ` · ${formatFileSize(normalized.sizeBytes)}` : '';
   if (normalized.kind === 'image') {
-    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a><figcaption>${escapeHtml(normalized.fileName)}${escapeHtml(size)}</figcaption></figure>`;
+    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a></figure>`;
   }
   return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
@@ -894,7 +897,7 @@ function updateScrollBottomButton() {
   const label = state.scrollNewMessages > 0
     ? `${state.scrollNewMessages} ${state.scrollNewMessages === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}`
     : 'Ir al final';
-  els.btnScrollBottom.innerHTML = `<span>${uiIcon('arrowDown')}${escapeHtml(label)}</span>`;
+  els.btnScrollBottom.innerHTML = uiIcon('arrowDown');
   els.btnScrollBottom.setAttribute('aria-label', label === 'Ir al final' ? 'Ir al final de la conversación' : `${label}. Ir al final de la conversación`);
 }
 
@@ -1668,6 +1671,8 @@ function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', re
 function renderQueuedMessage(queued = {}) {
   const failed = queued.status === 'failed';
   const sending = queued.status === 'sending';
+  const queuedAttachment = normalizeAttachmentClient(queued.attachment || null);
+  const queuedText = queued.text && queuedAttachment?.kind !== 'image' ? `<p class="ce-msg__text">${escapeHtml(queued.text)}</p>` : '';
   const statusText = sending
     ? 'Enviando pendiente...'
     : (failed ? `Pendiente sin enviar${queued.lastError ? ` · ${queued.lastError}` : ''}` : 'Pendiente · se enviará al recuperar conexión');
@@ -1682,8 +1687,8 @@ function renderQueuedMessage(queued = {}) {
     ${replyPreview}
     ${queued.silent ? `<div class="ce-silent-label" aria-label="Mensaje pendiente silencioso">${uiIcon('bellOff')}<span>Sin notificación</span></div>` : ''}
     ${queued.ephemeralSeconds ? `<div class="ce-ephemeral-label" aria-label="Mensaje pendiente temporal">${escapeHtml(formatEphemeralOption(queued.ephemeralSeconds))} · temporal</div>` : ''}
-    ${renderMessageAttachment(queued.attachment)}
-    <p class="ce-msg__text">${escapeHtml(queued.text)}</p>
+    ${renderMessageAttachment(queuedAttachment)}
+    ${queuedText}
     <span class="ce-msg__meta ce-msg__meta--outbox"><time>${formatMessageTime(queued.createdAt)}</time><span class="ce-msg__receipt" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${sending ? '<span class="ce-send-dots" aria-hidden="true"><i></i><i></i><i></i></span>' : uiIcon('hourglass')}</span></span>
   </article>`;
 }
@@ -2078,6 +2083,52 @@ function reactionDisplayName(reaction = '') {
   return normalizeReactionKey(reaction) || 'reacción';
 }
 
+function readRecentControlList(storageKey = '', allowedIds = []) {
+  const allowed = new Set((allowedIds || []).filter(Boolean));
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => String(item || '').trim()).filter((item, index, list) => item && allowed.has(item) && list.indexOf(item) === index).slice(0, recentMessageControlLimit);
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecentControl(storageKey = '', controlId = '', allowedIds = []) {
+  const cleanId = String(controlId || '').trim();
+  if (!cleanId || !(allowedIds || []).includes(cleanId)) return;
+  const next = [cleanId, ...readRecentControlList(storageKey, allowedIds).filter((item) => item !== cleanId)].slice(0, recentMessageControlLimit);
+  try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+  try {
+    window.queueMicrotask?.(() => {
+      if (state.activeChatId) renderAll();
+    });
+  } catch {}
+}
+
+function orderControlItemsForCollapsedView(items = [], recentIds = []) {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const visibleIds = [];
+  for (const id of recentIds) {
+    if (byId.has(id) && !visibleIds.includes(id)) visibleIds.push(id);
+    if (visibleIds.length >= recentMessageControlLimit) break;
+  }
+  for (const item of items) {
+    if (!visibleIds.includes(item.id)) visibleIds.push(item.id);
+    if (visibleIds.length >= recentMessageControlLimit) break;
+  }
+  return [
+    ...visibleIds.map((id) => ({ ...byId.get(id), priority: 'recent' })).filter((item) => item && item.id),
+    ...items.filter((item) => !visibleIds.includes(item.id)).map((item) => ({ ...item, priority: 'more' }))
+  ];
+}
+
+function renderMessageControlsToggle(kind = '', hasMore = false) {
+  if (!hasMore) return '';
+  const label = kind === 'reactions' ? 'Mostrar más reacciones' : 'Mostrar más acciones';
+  return `<button class="ce-control-toggle" type="button" data-message-controls-toggle="${escapeHtml(kind)}" aria-label="${escapeHtml(label)}" aria-expanded="false">${uiIcon('arrowDown')}</button>`;
+}
+
 function renderReactionSummary(message = {}) {
   const reactions = getMessageReactions(message);
   const entries = Object.entries(reactions);
@@ -2094,12 +2145,19 @@ function renderReactionSummary(message = {}) {
 
 function renderReactionPicker(message = {}) {
   const activeReaction = userReactionForMessage(message);
-  return `<div class="ce-reaction-picker" aria-label="Reaccionar al mensaje">${quickReactions.map((reaction) => {
+  const recentReactions = readRecentControlList(reactionRecentStorageKey, quickReactions);
+  const reactionItems = orderControlItemsForCollapsedView(quickReactions.map((reaction) => ({
+    id: reaction,
+    reaction
+  })), recentReactions);
+  const buttons = reactionItems.map(({ reaction, priority }) => {
     const active = reaction === activeReaction ? ' active' : '';
     const reactionName = reactionDisplayName(reaction);
     const label = reaction === activeReaction ? `Quitar reacción ${reactionName}` : `Reaccionar con ${reactionName}`;
-    return `<button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(reaction)}</button>`;
-  }).join('')}</div>`;
+    return `<span class="ce-control-item" data-control-priority="${escapeHtml(priority)}"><button class="ce-reaction-btn${active}" type="button" data-message-id="${escapeHtml(message.messageId || '')}" data-reaction="${escapeHtml(reaction)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(reaction)}</button></span>`;
+  }).join('');
+  const hasMore = reactionItems.some((item) => item.priority === 'more');
+  return `<div class="ce-reaction-picker ce-control-list" data-control-list="reactions" aria-label="Reaccionar al mensaje">${buttons}${renderMessageControlsToggle('reactions', hasMore)}</div>`;
 }
 
 function normalizePollClient(message = {}) {
@@ -2154,49 +2212,49 @@ function renderStarButton(message = {}) {
   const active = message.isStarred ? ' active' : '';
   const icon = message.isStarred ? uiIcon('star') : uiIcon('starOutline');
   const label = message.isStarred ? 'Quitar de mensajes destacados' : 'Destacar mensaje';
-  return `<button class="ce-star-btn${active}" type="button" data-star-message-id="${escapeHtml(message.messageId || '')}" data-starred="${message.isStarred ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
+  return `<button class="ce-star-btn${active}" type="button" data-message-action-id="star" data-star-message-id="${escapeHtml(message.messageId || '')}" data-starred="${message.isStarred ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
 }
 
 function renderPinMessageButton(message = {}) {
   const active = message.isPinned ? ' active' : '';
   const icon = message.isPinned ? uiIcon('pin') : uiIcon('pinOutline');
   const label = message.isPinned ? 'Desfijar mensaje de este chat' : 'Fijar mensaje en este chat';
-  return `<button class="ce-pin-msg-btn${active}" type="button" data-pin-message-id="${escapeHtml(message.messageId || '')}" data-pinned="${message.isPinned ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
+  return `<button class="ce-pin-msg-btn${active}" type="button" data-message-action-id="pin" data-pin-message-id="${escapeHtml(message.messageId || '')}" data-pinned="${message.isPinned ? '1' : '0'}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
 }
 
 function renderReplyButton(message = {}) {
   const label = 'Responder este mensaje';
-  return `<button class="ce-reply-btn" type="button" data-reply-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reply')}</button>`;
+  return `<button class="ce-reply-btn" type="button" data-message-action-id="reply" data-reply-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reply')}</button>`;
 }
 
 function renderForwardButton(message = {}) {
   const label = 'Reenviar mensaje';
-  return `<button class="ce-forward-btn" type="button" data-forward-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('forward')}</button>`;
+  return `<button class="ce-forward-btn" type="button" data-message-action-id="forward" data-forward-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('forward')}</button>`;
 }
 
 function renderMessageLinkButton(message = {}) {
   const label = 'Copiar enlace interno del mensaje';
-  return `<button class="ce-link-msg-btn" type="button" data-copy-message-link-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('link')}</button>`;
+  return `<button class="ce-link-msg-btn" type="button" data-message-action-id="link" data-copy-message-link-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('link')}</button>`;
 }
 
 function renderCopyButton(message = {}) {
   const label = 'Copiar texto del mensaje';
-  return `<button class="ce-copy-btn" type="button" data-copy-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('copy')}</button>`;
+  return `<button class="ce-copy-btn" type="button" data-message-action-id="copy" data-copy-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('copy')}</button>`;
 }
 
 function renderReminderButton(message = {}) {
   const label = 'Crear recordatorio privado de este mensaje';
-  return `<button class="ce-reminder-btn" type="button" data-remind-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reminder')}</button>`;
+  return `<button class="ce-reminder-btn" type="button" data-message-action-id="reminder" data-remind-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('reminder')}</button>`;
 }
 
 function renderEditButton(message = {}) {
   const label = 'Editar mensaje';
-  return `<button class="ce-edit-btn" type="button" data-edit-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('edit')}</button>`;
+  return `<button class="ce-edit-btn" type="button" data-message-action-id="edit" data-edit-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('edit')}</button>`;
 }
 
 function renderDeleteButton(message = {}) {
   const label = 'Eliminar mensaje para todos';
-  return `<button class="ce-delete-btn" type="button" data-delete-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('trash')}</button>`;
+  return `<button class="ce-delete-btn" type="button" data-message-action-id="delete" data-delete-message-id="${escapeHtml(message.messageId || '')}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${uiIcon('trash')}</button>`;
 }
 
 
@@ -2211,9 +2269,23 @@ function bellIconSvg(muted = false) {
 function renderMessageActions(message = {}, mine = false) {
   if (isDeletedMessage(message)) return '';
   const isPoll = message.type === 'poll' || Boolean(message.poll);
-  const ownerActions = mine ? `${isPoll ? '' : renderEditButton(message)}${renderDeleteButton(message)}` : '';
-  const actions = `${renderStarButton(message)}${renderPinMessageButton(message)}${renderReplyButton(message)}${renderForwardButton(message)}${renderReminderButton(message)}${renderMessageLinkButton(message)}${renderCopyButton(message)}${ownerActions}`;
-  return `<span class="ce-msg-actions" aria-label="Acciones del mensaje">${actions}</span>`;
+  const actionItems = [
+    { id: 'star', html: renderStarButton(message) },
+    { id: 'pin', html: renderPinMessageButton(message) },
+    { id: 'reply', html: renderReplyButton(message) },
+    { id: 'forward', html: renderForwardButton(message) },
+    { id: 'reminder', html: renderReminderButton(message) },
+    { id: 'link', html: renderMessageLinkButton(message) },
+    { id: 'copy', html: renderCopyButton(message) },
+    ...(mine && !isPoll ? [{ id: 'edit', html: renderEditButton(message) }] : []),
+    ...(mine ? [{ id: 'delete', html: renderDeleteButton(message) }] : [])
+  ].filter((item) => item.html);
+  const actionIds = actionItems.map((item) => item.id);
+  const recentActions = readRecentControlList(messageActionRecentStorageKey, actionIds);
+  const orderedActions = orderControlItemsForCollapsedView(actionItems, recentActions);
+  const actions = orderedActions.map((item) => `<span class="ce-control-item" data-control-priority="${escapeHtml(item.priority)}" data-control-action-id="${escapeHtml(item.id)}">${item.html}</span>`).join('');
+  const hasMore = orderedActions.some((item) => item.priority === 'more');
+  return `<span class="ce-msg-actions ce-control-list" data-control-list="actions" aria-label="Acciones del mensaje">${actions}${renderMessageControlsToggle('actions', hasMore)}</span>`;
 }
 
 function renderMessageBody(message = {}, mine = false) {
@@ -2230,8 +2302,9 @@ function renderMessageBody(message = {}, mine = false) {
   const ephemeral = message.ephemeralSeconds || message.expireAt
     ? `<div class="ce-ephemeral-label" aria-label="Mensaje temporal">${escapeHtml(formatEphemeralMessageLabel(message))}</div>`
     : '';
-  const attachment = renderMessageAttachment(message.attachment || null);
-  const textBody = message.text ? `<p class="ce-msg__text">${escapeHtml(message.text)}</p>` : '';
+  const normalizedAttachment = normalizeAttachmentClient(message.attachment || null);
+  const attachment = renderMessageAttachment(normalizedAttachment);
+  const textBody = message.text && normalizedAttachment?.kind !== 'image' ? `<p class="ce-msg__text">${escapeHtml(message.text)}</p>` : '';
   const body = message.type === 'poll' || message.poll
     ? renderPollMessage(message)
     : `${attachment}${textBody}`;
@@ -2335,6 +2408,41 @@ function renderMessageReceipt(message = {}, mine = false) {
 function renderMessageTime(message = {}, mine = false) {
   const edited = message.editedAt && !isDeletedMessage(message) ? ' · editado' : '';
   return `<span class="ce-msg__meta"><time>${formatMessageTime(message.createdAt)}${edited}</time>${renderMessageReceipt(message, mine)}</span>`;
+}
+
+function closeOpenMessageControls(exceptMessage = null) {
+  if (!els.messages) return;
+  els.messages.querySelectorAll('.ce-msg.is-controls-open').forEach((messageEl) => {
+    if (exceptMessage && messageEl === exceptMessage) return;
+    messageEl.classList.remove('is-controls-open');
+    messageEl.querySelectorAll('.ce-control-list.is-expanded').forEach((list) => {
+      list.classList.remove('is-expanded');
+      list.querySelectorAll('[data-message-controls-toggle]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+    });
+  });
+}
+
+function openMessageControlsForElement(messageEl = null) {
+  if (!messageEl || !els.messages?.contains(messageEl) || !messageEl.classList.contains('ce-msg')) return false;
+  closeOpenMessageControls(messageEl);
+  messageEl.classList.add('is-controls-open');
+  return true;
+}
+
+function toggleMessageControlList(toggleButton = null) {
+  if (!toggleButton || !els.messages?.contains(toggleButton)) return false;
+  const messageEl = toggleButton.closest('.ce-msg');
+  const list = toggleButton.closest('.ce-control-list');
+  if (!messageEl || !list) return false;
+  openMessageControlsForElement(messageEl);
+  const expanded = !list.classList.contains('is-expanded');
+  list.classList.toggle('is-expanded', expanded);
+  toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  const kind = toggleButton.dataset.messageControlsToggle || '';
+  toggleButton.setAttribute('aria-label', expanded
+    ? (kind === 'reactions' ? 'Plegar reacciones' : 'Plegar acciones')
+    : (kind === 'reactions' ? 'Mostrar más reacciones' : 'Mostrar más acciones'));
+  return true;
 }
 
 function messageSenderLabel(senderUserId = '') {
@@ -3700,6 +3808,7 @@ async function unregisterCurrentPushSubscription() {
 }
 
 function showAuthenticated() {
+  document.body.classList.add('ce-chat-screen-active');
   els.authScreen.classList.add('hidden');
   els.chatScreen.classList.remove('hidden');
   els.userSummary.innerHTML = `${avatar(state.user)}<div><strong>${escapeHtml(state.user.displayName || 'Usuario chatER')}</strong><span>${escapeHtml(state.user.email || '')}</span></div>`;
@@ -3708,6 +3817,7 @@ function showAuthenticated() {
 }
 
 function showGuest() {
+  document.body.classList.remove('ce-chat-screen-active');
   els.chatScreen.classList.add('hidden');
   els.authScreen.classList.remove('hidden');
   closeGlobalSearch();
@@ -8228,6 +8338,15 @@ function bindEvents() {
     if (jump) jumpToMessage(jump.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
   });
   els.messages.addEventListener('click', (event) => {
+    const messageEl = event.target.closest('.ce-msg');
+    if (messageEl && els.messages.contains(messageEl)) openMessageControlsForElement(messageEl);
+    const controlsToggle = event.target.closest('[data-message-controls-toggle]');
+    if (controlsToggle && els.messages.contains(controlsToggle)) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleMessageControlList(controlsToggle);
+      return;
+    }
     const blockButton = event.target.closest('[data-block-active-contact]');
     if (blockButton && els.messages.contains(blockButton)) {
       event.preventDefault();
@@ -8249,24 +8368,28 @@ function bindEvents() {
     const replyButton = event.target.closest('[data-reply-message-id]');
     if (replyButton && els.messages.contains(replyButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'reply', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       startReplyToMessage(replyButton.dataset.replyMessageId || '');
       return;
     }
     const forwardButton = event.target.closest('[data-forward-message-id]');
     if (forwardButton && els.messages.contains(forwardButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'forward', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       openForwardMessage(forwardButton.dataset.forwardMessageId || '');
       return;
     }
     const editButton = event.target.closest('[data-edit-message-id]');
     if (editButton && els.messages.contains(editButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'edit', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       startEditMessage(editButton.dataset.editMessageId || '');
       return;
     }
     const deleteButton = event.target.closest('[data-delete-message-id]');
     if (deleteButton && els.messages.contains(deleteButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'delete', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       deleteMessageForEveryone(deleteButton.dataset.deleteMessageId || '').catch((error) => alert(error.message || 'No se pudo eliminar el mensaje.'));
       return;
     }
@@ -8280,6 +8403,7 @@ function bindEvents() {
     if (pinButton && els.messages.contains(pinButton)) {
       event.preventDefault();
       const nextState = pinButton.dataset.pinned !== '1';
+      rememberRecentControl(messageActionRecentStorageKey, 'pin', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       setMessagePinned(pinButton.dataset.pinMessageId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el mensaje fijado.'));
       return;
     }
@@ -8287,24 +8411,28 @@ function bindEvents() {
     if (starButton && els.messages.contains(starButton)) {
       event.preventDefault();
       const nextState = starButton.dataset.starred !== '1';
+      rememberRecentControl(messageActionRecentStorageKey, 'star', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       setMessageStar(starButton.dataset.starMessageId || '', nextState).catch((error) => alert(error.message || 'No se pudo actualizar el destacado.'));
       return;
     }
     const remindButton = event.target.closest('[data-remind-message-id]');
     if (remindButton && els.messages.contains(remindButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'reminder', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       openReminderModal(remindButton.dataset.remindMessageId || '').catch((error) => alert(error.message || 'No se pudo crear el recordatorio.'));
       return;
     }
     const messageLinkButton = event.target.closest('[data-copy-message-link-id]');
     if (messageLinkButton && els.messages.contains(messageLinkButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'link', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       copyMessageLink(messageLinkButton.dataset.copyMessageLinkId || '').catch((error) => alert(error.message || 'No se pudo copiar el enlace del mensaje.'));
       return;
     }
     const copyButton = event.target.closest('[data-copy-message-id]');
     if (copyButton && els.messages.contains(copyButton)) {
       event.preventDefault();
+      rememberRecentControl(messageActionRecentStorageKey, 'copy', ['star', 'pin', 'reply', 'forward', 'reminder', 'link', 'copy', 'edit', 'delete']);
       copyMessageText(copyButton.dataset.copyMessageId || '').catch((error) => alert(error.message || 'No se pudo copiar el mensaje.'));
       return;
     }
@@ -8334,7 +8462,12 @@ function bindEvents() {
     const reactionButton = event.target.closest('[data-reaction][data-message-id]');
     if (!reactionButton || !els.messages.contains(reactionButton)) return;
     event.preventDefault();
+    rememberRecentControl(reactionRecentStorageKey, normalizeReactionKey(reactionButton.dataset.reaction || ''), quickReactions);
     setMessageReaction(reactionButton.dataset.messageId || '', reactionButton.dataset.reaction || '').catch((error) => alert(error.message || 'No se pudo guardar la reacción.'));
+  });
+  document.addEventListener('click', (event) => {
+    if (!els.messages || els.messages.contains(event.target)) return;
+    closeOpenMessageControls();
   });
   els.tabChats.addEventListener('click', () => {
     showChatListMode('active');

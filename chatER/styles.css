@@ -9185,3 +9185,264 @@ body.ce-dark-mode .ce-compose #messageInput {
   }
 }
 
+
+
+/* Iteración actual · chatScreen a ventana completa y controles de mensaje por click. */
+body.ce-chat-screen-active,
+body:has(#chatScreen:not(.hidden)) {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  place-items: stretch;
+}
+
+body.ce-chat-screen-active .ce-app,
+body:has(#chatScreen:not(.hidden)) .ce-app {
+  width: 100vw !important;
+  max-width: none !important;
+  height: 100vh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+#chatScreen.ce-shell {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100dvh !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+#chatScreen .ce-sidebar,
+#chatScreen .ce-chat {
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+#chatScreen .ce-messages {
+  min-height: 0 !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+}
+
+.ce-attachment--image figcaption,
+.ce-attachment--image + .ce-msg__text {
+  display: none !important;
+}
+
+.ce-msg-actions.ce-control-list,
+.ce-reaction-picker.ce-control-list {
+  position: absolute !important;
+  z-index: 9;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  max-width: min(76vw, 360px);
+  padding: 5px !important;
+  border: 1px solid var(--ce-line) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--ce-text);
+  box-shadow: var(--ce-shadow-soft) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(4px) scale(0.98) !important;
+  transition: opacity 0.14s ease, transform 0.14s ease !important;
+  backdrop-filter: blur(12px);
+}
+
+.ce-msg-actions.ce-control-list {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+}
+
+.ce-reaction-picker.ce-control-list {
+  top: calc(100% + 7px) !important;
+  bottom: auto !important;
+}
+
+.ce-msg.mine .ce-msg-actions.ce-control-list,
+.ce-msg.mine .ce-reaction-picker.ce-control-list {
+  right: 0 !important;
+  left: auto !important;
+}
+
+.ce-msg.theirs .ce-msg-actions.ce-control-list,
+.ce-msg.theirs .ce-reaction-picker.ce-control-list {
+  left: 0 !important;
+  right: auto !important;
+}
+
+.ce-msg.is-controls-open .ce-msg-actions.ce-control-list,
+.ce-msg.is-controls-open .ce-reaction-picker.ce-control-list {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.ce-control-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ce-control-list:not(.is-expanded) .ce-control-item[data-control-priority="more"] {
+  display: none !important;
+}
+
+.ce-msg-actions.ce-control-list button,
+.ce-msg-actions.ce-control-list .ce-star-btn,
+.ce-msg-actions.ce-control-list .ce-pin-msg-btn,
+.ce-msg-actions.ce-control-list .ce-reply-btn,
+.ce-msg-actions.ce-control-list .ce-forward-btn,
+.ce-msg-actions.ce-control-list .ce-reminder-btn,
+.ce-msg-actions.ce-control-list .ce-link-msg-btn,
+.ce-msg-actions.ce-control-list .ce-copy-btn,
+.ce-msg-actions.ce-control-list .ce-edit-btn,
+.ce-msg-actions.ce-control-list .ce-delete-btn,
+.ce-reaction-picker.ce-control-list .ce-reaction-btn,
+.ce-control-toggle {
+  position: static !important;
+  inset: auto !important;
+  width: 31px !important;
+  height: 31px !important;
+  min-width: 31px !important;
+  min-height: 31px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 1px solid rgba(15, 118, 110, 0.16) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: var(--ce-muted-strong) !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  line-height: 1 !important;
+}
+
+.ce-msg-actions.ce-control-list .ce-star-btn.active,
+.ce-msg-actions.ce-control-list .ce-pin-msg-btn.active,
+.ce-reaction-picker.ce-control-list .ce-reaction-btn.active {
+  background: var(--ce-accent-soft) !important;
+  color: var(--ce-accent-dark) !important;
+}
+
+.ce-msg-actions.ce-control-list .ce-delete-btn {
+  color: var(--ce-danger) !important;
+}
+
+.ce-control-toggle {
+  color: var(--ce-accent-dark) !important;
+}
+
+.ce-control-list.is-expanded .ce-control-toggle .ce-ui-icon {
+  transform: rotate(180deg);
+}
+
+.ce-control-toggle .ce-ui-icon,
+.ce-msg-actions.ce-control-list .ce-ui-icon,
+.ce-reaction-picker.ce-control-list .ce-ui-icon {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.ce-reaction-picker.ce-control-list .ce-reaction-btn {
+  font-size: 1rem !important;
+}
+
+.ce-scroll-bottom {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+.ce-scroll-bottom span {
+  display: contents !important;
+}
+
+.ce-scroll-bottom .ce-ui-icon {
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.ce-icon-btn,
+.ce-chat-action,
+.ce-msg-actions button,
+.ce-reaction-btn,
+.ce-reaction-chip,
+.ce-control-toggle,
+.ce-icon-insert-item,
+.ce-input-prefix,
+.ce-input-suffix,
+.ce-send-circle,
+.ce-scroll-bottom,
+.ce-btn,
+.ce-link,
+.ce-tab,
+.ce-tabs button {
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+.ce-ui-icon,
+button svg,
+.ce-reaction-btn,
+.ce-reaction-chip span,
+.ce-icon-insert-item {
+  vertical-align: middle;
+  line-height: 1 !important;
+}
+
+:root[data-theme='dark'] .ce-msg-actions.ce-control-list,
+:root[data-theme='dark'] .ce-reaction-picker.ce-control-list,
+body.ce-dark-mode .ce-msg-actions.ce-control-list,
+body.ce-dark-mode .ce-reaction-picker.ce-control-list {
+  background: rgba(32, 44, 51, 0.94) !important;
+}
+
+:root[data-theme='dark'] .ce-msg-actions.ce-control-list button,
+:root[data-theme='dark'] .ce-reaction-picker.ce-control-list .ce-reaction-btn,
+:root[data-theme='dark'] .ce-control-toggle,
+body.ce-dark-mode .ce-msg-actions.ce-control-list button,
+body.ce-dark-mode .ce-reaction-picker.ce-control-list .ce-reaction-btn,
+body.ce-dark-mode .ce-control-toggle {
+  background: rgba(17, 27, 33, 0.86) !important;
+  color: var(--ce-text) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+@media (max-width: 620px) {
+  .ce-msg-actions.ce-control-list,
+  .ce-reaction-picker.ce-control-list {
+    max-width: calc(100vw - 24px);
+  }
+
+  .ce-msg.mine .ce-msg-actions.ce-control-list,
+  .ce-msg.mine .ce-reaction-picker.ce-control-list {
+    right: 0 !important;
+  }
+
+  .ce-msg.theirs .ce-msg-actions.ce-control-list,
+  .ce-msg.theirs .ce-reaction-picker.ce-control-list {
+    left: 0 !important;
+  }
+}
