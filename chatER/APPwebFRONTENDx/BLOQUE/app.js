@@ -1,4 +1,4 @@
-import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken } from './api.js';
+import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl } from './api.js';
 import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigError } from './firebase.auth.js';
 
 const clientIdKey = 'chater_client_id';
@@ -166,7 +166,9 @@ const state = {
   commandPaletteActiveIndex: 0,
   scrollBottomVisible: false,
   scrollNewMessages: 0,
-  notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' }
+  notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' },
+  pendingAttachment: null,
+  attachmentUploading: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -177,7 +179,7 @@ const els = {
   addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
-  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'),
+  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), emojiPickerPanel: $('emojiPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnEmojiPicker: $('btnEmojiPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
   scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnCloseSchedule: $('btnCloseSchedule'), btnConfirmSchedule: $('btnConfirmSchedule'),
@@ -213,6 +215,168 @@ function getClientId() {
 
 function escapeHtml(value = '') {
   return String(value || '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+
+const R2_IMAGE_MAX_BYTES = 200 * 1024;
+const R2_GENERIC_FILE_MAX_BYTES = 15 * 1024 * 1024;
+
+function formatFileSize(bytes = 0) {
+  const value = Math.max(0, Number(bytes || 0));
+  if (value < 1024) return `${Math.round(value)} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function normalizeAttachmentClient(attachment = null) {
+  if (!attachment || typeof attachment !== 'object') return null;
+  const attachmentId = String(attachment.attachmentId || attachment.id || '').trim();
+  const url = String(attachment.url || attachment.publicUrl || attachment.readUrl || '').trim();
+  if (!attachmentId || !url) return null;
+  const kind = String(attachment.kind || attachment.mediaKind || '').trim().toLowerCase() === 'image' ? 'image' : 'file';
+  return {
+    attachmentId,
+    kind,
+    fileName: String(attachment.fileName || attachment.filename || (kind === 'image' ? 'imagen.webp' : 'archivo')).trim() || (kind === 'image' ? 'imagen.webp' : 'archivo'),
+    mimeType: String(attachment.mimeType || attachment.type || 'application/octet-stream').trim() || 'application/octet-stream',
+    sizeBytes: Math.max(0, Number(attachment.sizeBytes || attachment.size || 0) || 0),
+    width: Math.max(0, Number(attachment.width || 0) || 0),
+    height: Math.max(0, Number(attachment.height || 0) || 0),
+    url,
+    publicUrl: String(attachment.publicUrl || '').trim(),
+    readUrl: String(attachment.readUrl || '').trim()
+  };
+}
+
+function attachmentFallbackText(attachment = null) {
+  const normalized = normalizeAttachmentClient(attachment);
+  if (!normalized) return '';
+  return normalized.kind === 'image' ? 'Imagen adjunta' : `Archivo adjunto: ${normalized.fileName}`;
+}
+
+function renderMessageAttachment(attachment = null) {
+  const normalized = normalizeAttachmentClient(attachment);
+  if (!normalized) return '';
+  const size = normalized.sizeBytes ? ` · ${formatFileSize(normalized.sizeBytes)}` : '';
+  if (normalized.kind === 'image') {
+    return `<figure class="ce-attachment ce-attachment--image"><a href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></a><figcaption>${escapeHtml(normalized.fileName)}${escapeHtml(size)}</figcaption></figure>`;
+  }
+  return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">📎</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
+}
+
+function updateAttachmentPreview() {
+  if (!els.attachmentPreview) return;
+  const attachment = normalizeAttachmentClient(state.pendingAttachment);
+  els.attachmentPreview.classList.toggle('hidden', !attachment && !state.attachmentUploading);
+  if (state.attachmentUploading) {
+    els.attachmentPreview.innerHTML = '<span class="ce-attachment-preview__spinner" aria-hidden="true"></span><strong>Preparando adjunto...</strong><em>Comprimiendo si es imagen y subiendo directo a Cloudflare R2.</em>';
+    return;
+  }
+  if (!attachment) {
+    els.attachmentPreview.innerHTML = '';
+    return;
+  }
+  const preview = attachment.kind === 'image'
+    ? `<img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" />`
+    : '<span class="ce-attachment-preview__file" aria-hidden="true">📎</span>';
+  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo en Cloudflare R2')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">×</button>`;
+}
+
+function clearPendingAttachment() {
+  state.pendingAttachment = null;
+  state.attachmentUploading = false;
+  if (els.fileInput) els.fileInput.value = '';
+  updateAttachmentPreview();
+  updateComposerControls();
+}
+
+function isImageAttachmentFile(file = null) {
+  const mime = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  return Boolean(file && mime.startsWith('image/') && mime !== 'image/gif' && mime !== 'image/svg+xml' && !name.endsWith('.svg'));
+}
+
+async function prepareFileForR2(file, onProgress = () => {}) {
+  if (!file) throw new Error('Selecciona un archivo para adjuntar.');
+  if (isImageAttachmentFile(file)) {
+    const compressor = window.ChatERImageWebpCompressorLego;
+    if (!compressor?.compress) {
+      throw new Error('El bloque IMAGENwebpCOMPRESIONx no está disponible; la imagen no se enviará sin compresión WebP garantizada.');
+    }
+    const result = await compressor.compress(file, {
+      maxBytes: R2_IMAGE_MAX_BYTES,
+      maxDimension: 1600,
+      onProgress(progress, stage) {
+        onProgress(`Comprimiendo imagen WebP ${Math.max(1, Math.min(100, Number(progress || 0)))}%`);
+      }
+    });
+    const compressedFile = result?.file;
+    if (!compressedFile || compressedFile.size > R2_IMAGE_MAX_BYTES || compressedFile.type !== 'image/webp') {
+      throw new Error('La imagen no quedó en WebP menor o igual a 200 KB.');
+    }
+    if (compressor.assertReadyForUpload) await compressor.assertReadyForUpload(compressedFile, R2_IMAGE_MAX_BYTES);
+    return {
+      file: compressedFile,
+      kind: 'image',
+      fileName: compressedFile.name || 'imagen.webp',
+      mimeType: 'image/webp',
+      sizeBytes: compressedFile.size,
+      width: result.width || 0,
+      height: result.height || 0,
+      sha256: result.sha256 || '',
+      originalFileName: file.name || '',
+      originalMimeType: file.type || ''
+    };
+  }
+  if (file.size > R2_GENERIC_FILE_MAX_BYTES) {
+    throw new Error(`El archivo supera ${formatFileSize(R2_GENERIC_FILE_MAX_BYTES)}.`);
+  }
+  return {
+    file,
+    kind: 'file',
+    fileName: file.name || 'archivo',
+    mimeType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+    width: 0,
+    height: 0,
+    sha256: '',
+    originalFileName: file.name || '',
+    originalMimeType: file.type || ''
+  };
+}
+
+async function uploadAttachmentForActiveChat(file) {
+  if (!state.activeChatId) throw new Error('Selecciona un chat antes de adjuntar archivos.');
+  if (isChatInteractionBlocked()) throw new Error(chatBlockNoticeText() || 'No puedes adjuntar archivos en este chat.');
+  state.attachmentUploading = true;
+  state.pendingAttachment = null;
+  updateAttachmentPreview();
+  updateComposerControls();
+  try {
+    const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400));
+    showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
+    const intent = await post('/api/chats/attachments/intent', {
+      chatId: state.activeChatId,
+      kind: prepared.kind,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
+      sizeBytes: prepared.sizeBytes,
+      width: prepared.width,
+      height: prepared.height,
+      sha256: prepared.sha256,
+      originalFileName: prepared.originalFileName,
+      originalMimeType: prepared.originalMimeType
+    });
+    const upload = intent.upload || {};
+    await uploadToSignedUrl(upload.url, prepared.file, upload.headers || { 'Content-Type': prepared.mimeType });
+    const confirmed = await post('/api/chats/attachments/confirm', { attachmentId: intent.attachment?.attachmentId || '' });
+    state.pendingAttachment = normalizeAttachmentClient(confirmed.attachment || intent.attachment);
+    showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
+  } finally {
+    state.attachmentUploading = false;
+    updateAttachmentPreview();
+    updateComposerControls();
+  }
 }
 
 function initials(profile = {}) {
@@ -1081,14 +1245,16 @@ function normalizeQueuedMessage(item = {}) {
   const chatId = String(item.chatId || '').trim().slice(0, 140);
   const text = String(item.text || '').trim();
   const clientMessageId = String(item.clientMessageId || item.localId || '').trim().slice(0, 160);
-  if (!chatId || !text || !clientMessageId) return null;
+  const attachment = normalizeAttachmentClient(item.attachment || null);
+  if (!chatId || (!text && !attachment) || !clientMessageId) return null;
   const status = ['queued', 'sending', 'failed'].includes(item.status) ? item.status : 'queued';
   const createdAt = item.createdAt && !Number.isNaN(Date.parse(item.createdAt)) ? item.createdAt : new Date().toISOString();
   return {
     localId: clientMessageId,
     clientMessageId,
     chatId,
-    text: text.slice(0, 12000),
+    text: (text || attachmentFallbackText(attachment)).slice(0, 12000),
+    attachment,
     replyToMessageId: String(item.replyToMessageId || '').trim().slice(0, 160),
     replyTo: item.replyTo && typeof item.replyTo === 'object' ? item.replyTo : null,
     silent: Boolean(item.silent),
@@ -1169,15 +1335,17 @@ function isRecoverableSendError(error = {}) {
   return !status || /fetch|network|conexi[oó]n|internet|offline|load failed|networkerror/.test(message);
 }
 
-function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', replyToMessageId = '', replyTo = null, silent = false, ephemeralSeconds = 0, error = null } = {}) {
+function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', replyToMessageId = '', replyTo = null, silent = false, ephemeralSeconds = 0, attachment = null, error = null } = {}) {
   const now = new Date().toISOString();
+  const normalizedAttachment = normalizeAttachmentClient(attachment);
   const queued = upsertQueuedMessage({
     chatId,
-    text,
+    text: String(text || '').trim() || attachmentFallbackText(normalizedAttachment),
     clientMessageId,
     localId: clientMessageId,
     replyToMessageId,
     replyTo,
+    attachment: normalizeAttachmentClient(attachment),
     silent: Boolean(silent),
     ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
     createdAt: now,
@@ -1209,6 +1377,7 @@ function renderQueuedMessage(queued = {}) {
     ${replyPreview}
     ${queued.silent ? '<div class="ce-silent-label" aria-label="Mensaje pendiente silencioso">🔕 Sin notificación</div>' : ''}
     ${queued.ephemeralSeconds ? `<div class="ce-ephemeral-label" aria-label="Mensaje pendiente temporal">${escapeHtml(formatEphemeralOption(queued.ephemeralSeconds))} · temporal</div>` : ''}
+    ${renderMessageAttachment(queued.attachment)}
     <p class="ce-msg__text">${escapeHtml(queued.text)}</p>
     <span class="ce-msg__meta ce-msg__meta--outbox"><time>${formatMessageTime(queued.createdAt)}</time><span class="ce-msg__receipt" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${sending ? '…' : '⏳'}</span></span>
   </article>`;
@@ -1225,7 +1394,8 @@ async function sendQueuedOutboxMessage(queued = {}) {
       clientMessageId: normalized.clientMessageId,
       replyToMessageId: normalized.replyToMessageId || '',
       silent: Boolean(normalized.silent),
-      ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds)
+      ephemeralSeconds: normalizeEphemeralSeconds(normalized.ephemeralSeconds),
+      attachment: normalizeAttachmentClient(normalized.attachment)
     });
     if (!shouldWaitForStreamConfirmation(data)) {
       await applySentMessageHttpFallback(data, normalized.clientMessageId);
@@ -1737,9 +1907,11 @@ function renderMessageBody(message = {}, mine = false) {
   const ephemeral = message.ephemeralSeconds || message.expireAt
     ? `<div class="ce-ephemeral-label" aria-label="Mensaje temporal">${escapeHtml(formatEphemeralMessageLabel(message))}</div>`
     : '';
+  const attachment = renderMessageAttachment(message.attachment || null);
+  const textBody = message.text ? `<p class="ce-msg__text">${escapeHtml(message.text)}</p>` : '';
   const body = message.type === 'poll' || message.poll
     ? renderPollMessage(message)
-    : `<p class="ce-msg__text">${escapeHtml(message.text)}</p>`;
+    : `${attachment}${textBody}`;
   return `${forwarded}${silent}${ephemeral}${body}`;
 }
 
@@ -2143,8 +2315,11 @@ function updateComposerControls() {
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
   els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje, /ayuda o 😊');
+  const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
+  const hasText = Boolean(String(els.messageInput?.value || '').trim());
   els.btnSend.textContent = state.editingMessage?.messageId ? 'Guardar' : 'Enviar';
-  els.btnSend.disabled = !hasChat || blocked;
+  els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || (!state.editingMessage?.messageId && !hasText && !hasAttachment);
+  if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading;
   if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked;
   if (els.btnEmojiPicker) {
     const emojiDisabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
@@ -2159,7 +2334,6 @@ function updateComposerControls() {
     els.btnSmartReplySuggestions.setAttribute('title', label);
     els.btnSmartReplySuggestions.setAttribute('aria-label', label);
   }
-  const hasText = Boolean(String(els.messageInput?.value || '').trim());
   if (els.btnScheduleMessage) {
     els.btnScheduleMessage.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId) || state.schedulingMessage;
   }
@@ -2168,7 +2342,7 @@ function updateComposerControls() {
   }
   renderVoiceDictationControl();
   if (els.btnSilentSend) {
-    els.btnSilentSend.disabled = !hasChat || blocked || !hasText || Boolean(state.editingMessage?.messageId);
+    els.btnSilentSend.disabled = !hasChat || blocked || (!hasText && !hasAttachment) || Boolean(state.editingMessage?.messageId) || state.attachmentUploading;
   }
   if (els.messageTtlSelect) {
     els.messageTtlSelect.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId);
@@ -4594,7 +4768,7 @@ function shouldSendMessageStreamOnly() {
   return Boolean(isRealtimeStreamUsable() && navigator.onLine !== false);
 }
 
-async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
+async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds(), attachment = state.pendingAttachment } = {}) {
   if (!state.activeChatId) return;
   if (isChatInteractionBlocked()) {
     showTemporaryDraftStatus(chatBlockNoticeText(), 4800);
@@ -4604,14 +4778,17 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   const clientMessageId = `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const replyToMessageId = state.replyToMessage?.messageId || '';
   const replyTo = state.replyToMessage ? { ...state.replyToMessage } : null;
+  const normalizedAttachment = normalizeAttachmentClient(attachment);
+  const messageText = String(text || '').trim() || attachmentFallbackText(normalizedAttachment);
   const streamOnly = shouldSendMessageStreamOnly();
   const queued = streamOnly ? null : upsertQueuedMessage({
     chatId,
-    text,
+    text: messageText,
     clientMessageId,
     localId: clientMessageId,
     replyToMessageId,
     replyTo,
+    attachment: normalizeAttachmentClient(attachment),
     silent: Boolean(silent),
     ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds),
     createdAt: new Date().toISOString(),
@@ -4621,9 +4798,10 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
     lastError: ''
   }, { render: true });
   try {
-    const data = await post('/api/chats/send', { chatId, text, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds) });
+    const data = await post('/api/chats/send', { chatId, text: messageText, clientMessageId, replyToMessageId, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), attachment: normalizedAttachment });
     clearDraftForChat(chatId);
     state.replyToMessage = null;
+    if (normalizedAttachment && state.pendingAttachment?.attachmentId === normalizedAttachment.attachmentId) clearPendingAttachment();
     if (!shouldWaitForStreamConfirmation(data)) {
       await applySentMessageHttpFallback(data, clientMessageId);
     }
@@ -4641,7 +4819,7 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
     clearDraftForChat(chatId);
     state.replyToMessage = null;
     upsertQueuedMessage({
-      ...(queued || { chatId, text, clientMessageId, replyToMessageId, replyTo, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
+      ...(queued || { chatId, text: messageText, clientMessageId, replyToMessageId, replyTo, attachment: normalizedAttachment, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
       status: 'failed',
       attempts: Math.max(1, Number(queued?.attempts || 1)),
       updatedAt: new Date().toISOString(),
@@ -4656,7 +4834,7 @@ async function sendSilentCurrentMessage() {
   if (!state.activeChatId || state.editingMessage?.messageId) return;
   const text = String(els.messageInput?.value || '').trim();
   if (state.voiceDictating) stopVoiceDictation({ announce: false });
-  if (!text) {
+  if (!text && !normalizeAttachmentClient(state.pendingAttachment)) {
     els.messageInput?.focus();
     return;
   }
@@ -4664,6 +4842,7 @@ async function sendSilentCurrentMessage() {
   try {
     await sendMessage(text, { silent: true, ephemeralSeconds: selectedEphemeralSeconds() });
     if (els.messageInput) els.messageInput.value = '';
+    clearPendingAttachment();
     await sendTyping(false);
   } finally {
     updateComposerControls();
@@ -7381,6 +7560,26 @@ function bindEvents() {
   els.btnSilentSend?.addEventListener('click', () => {
     sendSilentCurrentMessage().catch((error) => alert(error.message || 'No se pudo enviar sin notificación.'));
   });
+  els.btnAttachFile?.addEventListener('click', () => {
+    if (state.attachmentUploading) return;
+    els.fileInput?.click();
+  });
+  els.fileInput?.addEventListener('change', () => {
+    const file = els.fileInput?.files?.[0] || null;
+    if (!file) return;
+    uploadAttachmentForActiveChat(file).catch((error) => {
+      clearPendingAttachment();
+      alert(error.message || 'No se pudo adjuntar el archivo.');
+    });
+  });
+  els.attachmentPreview?.addEventListener('click', (event) => {
+    const clearButton = event.target.closest('[data-clear-attachment]');
+    if (!clearButton || !els.attachmentPreview.contains(clearButton)) return;
+    event.preventDefault();
+    clearPendingAttachment();
+    updateComposerControls();
+    els.messageInput?.focus();
+  });
   els.btnCreatePoll?.addEventListener('click', () => openPollModal());
   els.btnVoiceDictation?.addEventListener('click', () => toggleVoiceDictation());
   els.btnClosePoll?.addEventListener('click', closePollModal);
@@ -7661,11 +7860,12 @@ function bindEvents() {
   els.messageForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const text = els.messageInput.value.trim();
+    const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
-    if (!text) return;
+    if (!text && !hasAttachment) return;
     els.btnSend.disabled = true;
     try {
-      const slashResult = await handleSlashCommandSubmit(text);
+      const slashResult = text ? await handleSlashCommandSubmit(text) : null;
       if (slashResult) {
         if (slashResult.clearComposer) {
           els.messageInput.value = '';
@@ -7679,6 +7879,7 @@ function bindEvents() {
       else {
         await sendMessage(text);
         els.messageInput.value = '';
+        clearPendingAttachment();
       }
       await sendTyping(false);
     } catch (error) {

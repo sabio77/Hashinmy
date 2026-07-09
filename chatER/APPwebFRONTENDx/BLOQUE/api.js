@@ -42,3 +42,18 @@ export async function post(path, body = {}) {
   }
   return data;
 }
+
+
+export async function uploadToSignedUrl(url, file, headers = {}) {
+  const cleanUrl = String(url || '').trim();
+  if (!cleanUrl) throw new Error('No se recibió URL firmada para subir el adjunto.');
+  const response = await fetch(cleanUrl, {
+    method: 'PUT',
+    headers: headers || {},
+    body: file
+  });
+  if (!response.ok) {
+    throw new Error('Cloudflare R2 no aceptó la subida del adjunto.');
+  }
+  return { ok: true, status: response.status };
+}

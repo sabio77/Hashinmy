@@ -135,6 +135,9 @@
           <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
           <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
           <div class="ce-emoji-panel hidden" id="emojiPickerPanel" aria-live="polite"></div>
+          <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite"></div>
+          <input id="fileInput" class="ce-file-input" type="file" hidden />
+          <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled>📎</button>
           <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled>⚡</button>
           <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled>✨</button>
           <button class="ce-icon-btn ce-icon-btn--emoji" id="btnEmojiPicker" type="button" title="Insertar emoji" aria-label="Insertar emoji" aria-expanded="false" disabled>😊</button>
@@ -431,6 +434,8 @@
     </div>
   </div>
 
+  <script src="./IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js" defer></script>
+  <script src="./IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js" defer></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
