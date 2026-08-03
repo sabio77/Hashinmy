@@ -1,0 +1,8 @@
+{
+  "target_image": "assets/icons/logo.png",
+  "type": "app_logo",
+  "size": "512x512 recomendado, visible en UI a 96x96",
+  "format": "png",
+  "purpose": "logo_visual_runtime",
+  "prompt": "Crear un logo visual para una semilla de app web instalable. Debe ser simple, geométrico, sin texto, con símbolo de semilla digital o módulo de aplicación, fondo transparente o muy limpio, buen contraste en modo claro y oscuro, forma reconocible en 96x96, estilo profesional de producto listo para producción."
+}

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Control administrativo local-first para proyectos compartidos entre dispositivos mediante sincronización P2P." />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Control P2P" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="application-name" content="Control P2P" />
+  <title>Control de proyectos P2P</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="stylesheet" href="./src/css/app.css" />
+</head>
+<body>
+  <noscript>Esta aplicación necesita JavaScript para funcionar correctamente.</noscript>
+
+  <main class="app-shell" aria-live="polite">
+    <section id="auth-card" class="auth-card" aria-labelledby="auth-title">
+      <div class="app-logo" data-skeleton-slot data-image-src="./assets/icons/logo.png" data-image-width="88" data-image-height="88" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
+      <p class="eyebrow" data-i18n="auth.eyebrow">Acceso seguro</p>
+      <h1 id="auth-title" data-i18n="auth.title">Administra proyectos en equipo</h1>
+      <p class="auth-description" data-i18n="auth.description">Inicia sesión con Google. La información compartida se replica en los dispositivos autorizados.</p>
+      <button id="google-login-button" class="button button-primary" type="button" data-i18n="auth.googleButton">Continuar con Google</button>
+      <p id="auth-status" class="inline-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="app-workspace" class="workspace hidden" aria-labelledby="workspace-title">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div id="app-logo" class="app-logo app-logo-small" data-image-src="./assets/icons/logo.png" data-image-width="48" data-image-height="48" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
+          <div>
+            <p id="user-identity" class="user-identity"></p>
+            <h1 id="workspace-title" data-i18n="dashboard.title">Control de proyectos</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="p2p-connection-status" class="status-pill" data-state="connecting" role="status" data-i18n="p2p.connecting">Conectando…</span>
+          <button id="invitations-button" class="icon-button" type="button" aria-label="Ver invitaciones" data-i18n-attr="aria-label:dashboard.invitations">
+            <span aria-hidden="true">✉</span><span id="invitation-count" class="notification-badge" hidden>0</span>
+          </button>
+          <button id="devices-button" class="icon-button" type="button" aria-label="Administrar dispositivos" data-i18n-attr="aria-label:devices.open">
+            <span aria-hidden="true">▣</span>
+          </button>
+          <button id="local-network-button" class="button button-secondary button-compact" type="button" data-i18n="localNetwork.open" hidden>Red local</button>
+          <button id="enable-push-button" class="button button-secondary button-compact" type="button" data-i18n="p2p.enableNotifications">Notificaciones</button>
+          <button id="logout-button" class="button button-ghost button-compact" type="button" data-i18n="auth.logoutButton">Salir</button>
+        </div>
+      </header>
+
+      <aside id="storage-durability-banner" class="storage-durability-banner hidden" data-state="warning" role="status" aria-live="polite">
+        <span class="storage-durability-icon" aria-hidden="true">◆</span>
+        <p id="storage-durability-message"></p>
+        <button id="protect-storage-button" class="button button-secondary button-compact" type="button" data-i18n="storage.protect">Proteger datos</button>
+      </aside>
+
+      <section id="dashboard-view" class="view-stack">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
+            <h2 data-i18n="dashboard.projects">Proyectos</h2>
+            <p class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
+          </div>
+          <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
+
+        <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
+        <p id="dashboard-status" class="inline-status" role="status" aria-live="polite"></p>
+        <section id="project-list" class="project-grid" aria-live="polite"></section>
+      </section>
+
+      <section id="project-view" class="view-stack hidden">
+        <div class="project-navigation">
+          <button id="back-to-dashboard-button" class="button button-ghost button-compact" type="button" data-i18n="project.back">← Proyectos</button>
+          <div class="project-actions">
+            <button id="invite-collaborator-button" class="button button-secondary button-compact" type="button" data-i18n="project.invite">Invitar</button>
+            <button id="manage-access-button" class="button button-secondary button-compact" type="button" data-i18n="access.manage">Participantes</button>
+            <button id="edit-project-button" class="button button-ghost button-compact" type="button" data-i18n="project.edit">Editar</button>
+          </div>
+        </div>
+
+        <header class="project-hero">
+          <div>
+            <p id="project-address" class="eyebrow"></p>
+            <h2 id="project-name">Proyecto</h2>
+            <p id="project-description" class="section-description"></p>
+          </div>
+          <div class="project-collaboration-summary">
+            <span id="project-replica-health" class="replica-health-badge" data-state="unknown">Cobertura por confirmar</span>
+            <div id="project-member-summary" class="member-summary"></div>
+          </div>
+        </header>
+
+        <section id="project-metrics" class="metrics-grid" aria-label="Métricas del proyecto"></section>
+        <div class="budget-progress" aria-label="Uso del capital">
+          <div class="budget-progress-track"><span id="budget-progress-value"></span></div>
+          <p id="budget-progress-label"></p>
+        </div>
+
+        <nav class="action-grid" aria-label="Acciones del proyecto">
+          <button id="add-purchase-button" class="action-card" type="button"><span aria-hidden="true">−</span><strong data-i18n="project.addPurchase">Agregar compra</strong></button>
+          <button id="add-income-button" class="action-card" type="button"><span aria-hidden="true">+</span><strong data-i18n="project.addIncome">Agregar ingreso</strong></button>
+          <button id="add-projection-button" class="action-card" type="button"><span aria-hidden="true">↗</span><strong data-i18n="project.addProjection">Agregar proyección</strong></button>
+        </nav>
+
+        <div class="records-layout">
+          <section class="records-panel">
+            <div class="panel-heading-row"><h3 data-i18n="project.purchases">Compras</h3><span id="purchase-count" class="count-badge">0</span></div>
+            <div id="purchase-list" class="record-list"></div>
+          </section>
+          <section class="records-panel">
+            <div class="panel-heading-row"><h3 data-i18n="project.projections">Proyecciones</h3><span id="projection-count" class="count-badge">0</span></div>
+            <div id="projection-list" class="record-list"></div>
+          </section>
+          <section class="records-panel">
+            <div class="panel-heading-row"><h3 data-i18n="project.incomes">Ingresos</h3><span id="income-count" class="count-badge">0</span></div>
+            <div id="income-list" class="record-list"></div>
+          </section>
+        </div>
+        <p id="project-status" class="inline-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+
+    <label class="language-control" for="language-selector">
+      <span data-i18n="language.selectorLabel">Idioma</span>
+      <select id="language-selector" data-language-selector aria-label="Idioma"></select>
+    </label>
+  </main>
+
+  <dialog id="project-dialog" class="modal-card">
+    <form id="project-form" class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="project.formEyebrow">Información base</p><h2 id="project-dialog-title" data-i18n="project.createTitle">Crear proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="project-dialog" aria-label="Cerrar">×</button></div>
+      <input id="project-form-mode" type="hidden" value="create" />
+      <label><span data-i18n="project.name">Nombre</span><input id="project-name-input" name="name" maxlength="120" required autocomplete="off" /></label>
+      <label><span data-i18n="project.description">Descripción</span><textarea id="project-description-input" name="description" maxlength="900" rows="3"></textarea></label>
+      <label><span data-i18n="project.address">Dirección</span><input id="project-address-input" name="address" maxlength="240" autocomplete="street-address" /></label>
+      <label><span data-i18n="project.initialBudget">Presupuesto inicial</span><input id="project-budget-input" name="initialBudget" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" required /></label>
+      <p id="project-form-status" class="inline-status" role="status"></p>
+      <div class="modal-actions"><button class="button button-ghost" type="button" data-close-dialog="project-dialog" data-i18n="common.cancel">Cancelar</button><button id="project-submit-button" class="button button-primary" type="submit" data-i18n="common.save">Guardar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="record-dialog" class="modal-card">
+    <form id="record-form" class="modal-form">
+      <div class="modal-heading"><div><p id="record-dialog-eyebrow" class="eyebrow"></p><h2 id="record-dialog-title">Nuevo registro</h2></div><button class="icon-button" type="button" data-close-dialog="record-dialog" aria-label="Cerrar">×</button></div>
+      <input id="record-type-input" type="hidden" />
+      <label><span data-i18n="record.description">Descripción</span><input id="record-description-input" maxlength="360" required autocomplete="off" /></label>
+      <label id="invoice-field"><span data-i18n="record.invoice">Número de factura</span><input id="record-invoice-input" maxlength="120" autocomplete="off" /></label>
+      <label><span id="record-amount-label" data-i18n="record.amount">Valor</span><input id="record-amount-input" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" required /></label>
+      <label id="record-date-field"><span id="record-date-label" data-i18n="record.date">Fecha</span><input id="record-date-input" type="date" /></label>
+      <label id="projection-link-field"><span data-i18n="record.linkProjection">Vincular con proyección</span><select id="record-projection-input"></select></label>
+      <p id="record-form-status" class="inline-status" role="status"></p>
+      <div class="modal-actions"><button class="button button-ghost" type="button" data-close-dialog="record-dialog" data-i18n="common.cancel">Cancelar</button><button id="record-submit-button" class="button button-primary" type="submit" data-i18n="common.save">Guardar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="invite-dialog" class="modal-card">
+    <form id="invite-form" class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.eyebrow">Colaboración segura</p><h2 data-i18n="invite.title">Invitar participante</h2></div><button class="icon-button" type="button" data-close-dialog="invite-dialog" aria-label="Cerrar">×</button></div>
+      <label><span data-i18n="invite.email">Correo de Google</span><input id="invite-email-input" type="email" maxlength="254" autocomplete="email" required /></label>
+      <fieldset class="permission-grid"><legend data-i18n="invite.permissions">Permisos</legend>
+        <label><input type="checkbox" name="permission" value="read" checked disabled /><span data-i18n="invite.read">Lectura</span></label>
+        <label><input type="checkbox" name="permission" value="add" checked /><span data-i18n="invite.add">Agregar y editar</span></label>
+        <label><input type="checkbox" name="permission" value="delete" /><span data-i18n="invite.delete">Eliminar</span></label>
+        <label><input type="checkbox" name="permission" value="projection" checked /><span data-i18n="invite.projection">Proyecciones</span></label>
+      </fieldset>
+      <p id="invite-status" class="inline-status" role="status"></p>
+      <div class="modal-actions"><button class="button button-ghost" type="button" data-close-dialog="invite-dialog" data-i18n="common.cancel">Cancelar</button><button id="invite-submit-button" class="button button-primary" type="submit" data-i18n="invite.send">Enviar invitación</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="invitations-dialog" class="modal-card modal-wide">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.receivedEyebrow">Solicitudes recibidas</p><h2 data-i18n="invite.pending">Invitaciones pendientes</h2></div><button class="icon-button" type="button" data-close-dialog="invitations-dialog" aria-label="Cerrar">×</button></div>
+      <div id="invitation-list" class="invitation-list"></div>
+    </div>
+  </dialog>
+
+
+
+  <dialog id="local-network-dialog" class="modal-card modal-wide">
+    <div class="modal-form local-network-panel">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="localNetwork.eyebrow">Sincronización directa</p><h2 data-i18n="localNetwork.title">Conectar por la misma red Wi‑Fi</h2></div><button class="icon-button" type="button" data-close-dialog="local-network-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="localNetwork.description">Úsalo cuando memoriaBACKEND no esté disponible. Ambos dispositivos deben tener la aplicación abierta y estar conectados a la misma red Wi‑Fi.</p>
+      <div id="local-network-state" class="local-network-state" data-state="idle" role="status" aria-live="polite"></div>
+      <ol class="local-network-steps">
+        <li data-i18n="localNetwork.stepCreate">En el primer dispositivo, crea una invitación local y comparte el código.</li>
+        <li data-i18n="localNetwork.stepAccept">En el segundo, pega el código, acepta y devuelve la respuesta generada.</li>
+        <li data-i18n="localNetwork.stepComplete">En el primero, pega la respuesta y completa la conexión.</li>
+      </ol>
+      <div class="local-network-actions">
+        <button id="local-network-create-offer" class="button button-primary" type="button" data-i18n="localNetwork.createOffer">Crear invitación local</button>
+      </div>
+      <label><span data-i18n="localNetwork.receivedCode">Código recibido</span><textarea id="local-network-input" rows="5" spellcheck="false" autocomplete="off" placeholder="P2PSIN1..."></textarea></label>
+      <div class="modal-actions local-network-action-row">
+        <button id="local-network-accept-offer" class="button button-secondary" type="button" data-i18n="localNetwork.acceptOffer">Aceptar invitación</button>
+        <button id="local-network-complete-answer" class="button button-secondary" type="button" data-i18n="localNetwork.completeAnswer">Completar respuesta</button>
+      </div>
+      <label><span data-i18n="localNetwork.generatedCode">Código para compartir</span><textarea id="local-network-output" rows="5" spellcheck="false" readonly></textarea></label>
+      <div class="modal-actions">
+        <button id="local-network-copy" class="button button-ghost" type="button" data-i18n="localNetwork.copy">Copiar código</button>
+      </div>
+      <div>
+        <strong data-i18n="localNetwork.connectedPeers">Dispositivos conectados</strong>
+        <div id="local-network-peers" class="local-network-peer-list"></div>
+      </div>
+      <p class="device-safety-hint" data-i18n="localNetwork.securityHint">Conecta únicamente códigos que hayas recibido directamente del colaborador esperado. Las operaciones siguen cifradas por proyecto.</p>
+      <p id="local-network-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <dialog id="devices-dialog" class="modal-card modal-wide">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="devices.eyebrow">Seguridad de la cuenta</p><h2 data-i18n="devices.title">Dispositivos autorizados</h2></div><button class="icon-button" type="button" data-close-dialog="devices-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="devices.description">Consulta las instalaciones vinculadas a tu cuenta y retira únicamente las que ya no utilizas.</p>
+      <div id="device-list" class="device-list"></div>
+      <p class="device-safety-hint" data-i18n="devices.safetyHint">Antes de retirar una instalación, memoriaBACKEND comprueba que otra copia autorizada esté al día en todos tus proyectos.</p>
+      <section id="device-confirm-panel" class="access-confirm-panel hidden" aria-live="polite">
+        <strong data-i18n="devices.retireConfirmTitle">Confirma el retiro</strong>
+        <p id="device-confirm-message"></p>
+        <div class="modal-actions">
+          <button id="device-confirm-cancel" class="button button-ghost button-compact" type="button" data-i18n="common.cancel">Cancelar</button>
+          <button id="device-confirm-button" class="button button-danger button-compact" type="button" data-i18n="devices.retire">Retirar</button>
+        </div>
+      </section>
+      <p id="device-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <dialog id="access-dialog" class="modal-card modal-wide">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
+      <div id="access-member-list" class="access-member-list"></div>
+      <section id="access-owner-actions" class="access-owner-actions hidden">
+        <div>
+          <strong data-i18n="access.deleteProject">Eliminar proyecto</strong>
+          <p data-i18n="access.deleteProjectHint">Elimina el proyecto, revoca el acceso y ordena retirar las copias sincronizadas de cada participante.</p>
+        </div>
+        <button id="delete-project-button" class="button button-danger button-compact" type="button" data-i18n="access.deleteProjectButton">Eliminar definitivamente</button>
+      </section>
+      <section id="access-confirm-panel" class="access-confirm-panel hidden" aria-live="polite">
+        <strong data-i18n="access.confirmTitle">Confirma esta acción</strong>
+        <p id="access-confirm-message"></p>
+        <div class="modal-actions">
+          <button id="access-confirm-cancel" class="button button-ghost button-compact" type="button" data-i18n="common.cancel">Cancelar</button>
+          <button id="access-confirm-button" class="button button-danger button-compact" type="button" data-i18n="access.confirm">Confirmar</button>
+        </div>
+      </section>
+      <p id="access-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <div id="update-status" class="update-status" role="status" aria-live="polite" hidden></div>
+  <script src="./src/js/app-metadata.js" defer></script>
+  <script src="./src/js/runtime-config.js" defer></script>
+  <script src="./src/js/config.js" defer></script>
+  <script src="./src/js/skeleton-screen.js" defer></script>
+  <script src="./src/js/i18n.js" defer></script>
+  <script src="./src/js/asset-loader.js" defer></script>
+  <script src="./src/js/pwa-update-manager.js" defer></script>
+  <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>

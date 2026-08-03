@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: semilla-appweb-pwa
+    runtime: static
+    buildCommand: python tools/generate-release.py
+    staticPublishPath: .
+    previews:
+      generation: automatic
+    envVars:
+      - key: APP_BACKEND_URL
+        sync: false
+      # Interruptor público de compilación para habilitar el bloque opcional P2P_sin_.
+      # Al cambiarlo en Render se debe ejecutar un nuevo deploy para regenerar runtime-config.js.
+      - key: sinBACKEND
+        value: "false"
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /version.json
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /index.html
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /manifest.webmanifest
+        name: Cache-Control
+        value: no-cache, max-age=0, must-revalidate
+      - path: /textX/*
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /src/js/app-metadata.js
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /assets/*
+        name: Cache-Control
+        value: no-cache, max-age=0, must-revalidate
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin-allow-popups
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:10000; frame-src https://*.firebaseapp.com https://accounts.google.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

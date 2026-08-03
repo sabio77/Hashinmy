@@ -1,0 +1,35 @@
+# Copia este archivo como .htaccess si publicas en Apache.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+</IfModule>
+
+<FilesMatch "^(index\.html|sw\.js|version\.json|health\.json)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-store, max-age=0, must-revalidate"
+  </IfModule>
+</FilesMatch>
+
+<FilesMatch "\.(css|js|webmanifest|png|svg|ico|json|txt)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </IfModule>
+</FilesMatch>
+
+<Files "sw.js">
+  <IfModule mod_headers.c>
+    Header set Service-Worker-Allowed "/"
+  </IfModule>
+</Files>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>

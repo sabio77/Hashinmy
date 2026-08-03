@@ -1,0 +1,3 @@
+# Netlify: soporte para rutas internas de SPA.
+# Los archivos reales se sirven antes de esta regla.
+/* /index.html 200

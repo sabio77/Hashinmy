@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "languageCode": "es",
+    "languageName": "Spanish",
+    "nativeName": "Español",
+    "dir": "ltr"
+  },
+  "seo": {
+    "title": "Semilla App Web",
+    "description": "Semilla robusta de app web instalable, responsive, multilenguaje y autoactualizable con autenticación segura mediante Google.",
+    "applicationName": "Semilla App",
+    "appleMobileWebAppTitle": "Semilla App",
+    "manifestName": "Semilla App Web Autoactualizable",
+    "manifestShortName": "Semilla App",
+    "manifestDescription": "Base reutilizable para crear una app web instalable, offline y autoactualizable con autenticación Google."
+  }
+}

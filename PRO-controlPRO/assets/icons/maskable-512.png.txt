@@ -1,0 +1,8 @@
+{
+  "target_image": "assets/icons/maskable-512.png",
+  "type": "pwa_icon",
+  "size": "512x512",
+  "format": "png",
+  "purpose": "maskable",
+  "prompt": "Crear un ícono maskable para PWA con zona segura central. Fondo completo hasta los bordes, gradiente sutil verde/azul, símbolo geométrico simple de semilla digital o ventana de app dentro del 60% central, sin texto, sin detalles finos, contraste fuerte, preparado para recortes circulares o redondeados del sistema operativo."
+}

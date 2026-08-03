@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-01T19:43:00-05:00",
+  "fallbackLanguage": "es",
+  "namespaces": [
+    "app",
+    "seo"
+  ],
+  "discovery": {
+    "mode": "render-static-build-scan",
+    "appPattern": "textX/app/*.json",
+    "seoPattern": "textX/seo/*.json",
+    "codeSource": "filename-stem",
+    "keyReference": "es"
+  },
+  "languages": [
+    {
+      "code": "es",
+      "htmlLang": "es",
+      "name": "Spanish",
+      "nativeName": "Español",
+      "dir": "ltr",
+      "app": "./textX/app/es.json",
+      "seo": "./textX/seo/es.json"
+    },
+    {
+      "code": "ar",
+      "htmlLang": "ar",
+      "name": "Arabic",
+      "nativeName": "العربية",
+      "dir": "rtl",
+      "app": "./textX/app/ar.json",
+      "seo": "./textX/seo/ar.json"
+    },
+    {
+      "code": "en",
+      "htmlLang": "en",
+      "name": "English",
+      "nativeName": "English",
+      "dir": "ltr",
+      "app": "./textX/app/en.json",
+      "seo": "./textX/seo/en.json"
+    }
+  ]
+}

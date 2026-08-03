@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const currentFile = fileURLToPath(import.meta.url);
+const root = path.resolve(path.dirname(currentFile), '..');
+const source = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
+
+const methodStart = source.indexOf('  async handleEvent(event = {}');
+const methodEnd = source.indexOf('\n  ackRetryDelay()', methodStart);
+assert.ok(methodStart >= 0 && methodEnd > methodStart, 'No se encontró el procesamiento realtime para validar el ACK de membresía.');
+const methodSource = source.slice(methodStart, methodEnd);
+
+const harness = `
+const CURSOR_META_PREFIX = 'cursor:';
+const dispatched = [];
+const metaWrites = [];
+function dispatch(name, detail = {}) { dispatched.push({ name, detail }); }
+function assertRealtimeEventEnvelope(event) { return event; }
+function assertRealtimeSequenceContinuity() { return true; }
+function eventCursorSequence(event = {}) { return Number(event.deviceSequence || 0); }
+function isEntityOperationType() { return false; }
+function realtimeProtocolError(message, code, detail = {}) { const error = new Error(message); error.code = code; Object.assign(error, detail); return error; }
+async function setMeta(key, value) { metaWrites.push({ key, value }); }
+class TestClient {
+  constructor(refreshBootstrap) {
+    this.refreshBootstrap = refreshBootstrap;
+    this.lastAcceptedStreamSequence = 0;
+    this.lastProcessedSequence = 0;
+    this.pendingAckReplicaSpaceIds = new Set();
+    this.acks = [];
+  }
+  captureSessionContext() { return { deviceId: 'device_membership_0001' }; }
+  assertSessionContext() { return true; }
+  async fenceBootstrapResponses() { return true; }
+  scheduleAck(sequence) { this.acks.push(sequence); }
+${methodSource}
+}
+export { TestClient, dispatched, metaWrites };
+`;
+
+const module = await import(`data:text/javascript;base64,${Buffer.from(harness).toString('base64')}`);
+const event = {
+  eventId: 'event_membership_1',
+  eventType: 'p2p.membership.changed',
+  deviceSequence: 41,
+  spaceId: 'space_membership_1',
+  data: {
+    space: {
+      spaceId: 'space_membership_1',
+      ownerUserId: 'user_owner_old',
+      members: []
+    }
+  }
+};
+
+const transientError = new Error('bootstrap temporalmente no disponible');
+const failingClient = new module.TestClient(async () => { throw transientError; });
+await assert.rejects(
+  failingClient.handleEvent(event),
+  (error) => error === transientError,
+  'Una falla al confirmar la membresía autoritativa volvió a absorberse silenciosamente.'
+);
+assert.equal(failingClient.lastProcessedSequence, 0, 'El cursor durable avanzó aunque la membresía no se aplicó.');
+assert.deepEqual(failingClient.acks, [], 'El cliente confirmó al backend un cambio de acceso todavía no aplicado.');
+assert.deepEqual(module.metaWrites, [], 'La secuencia fallida quedó persistida y ya no podría reproducirse.');
+
+const incompleteClient = new module.TestClient(async () => ({ spaces: [] }));
+await assert.rejects(
+  incompleteClient.handleEvent(event),
+  (error) => error?.code === 'P2P_REALTIME_MEMBERSHIP_STATE_MISSING'
+    && error?.spaceId === event.spaceId,
+  'Un bootstrap exitoso pero incompleto permitió confirmar un cambio de membresía sin estado autoritativo.'
+);
+assert.equal(incompleteClient.lastProcessedSequence, 0, 'El cursor avanzó aunque el bootstrap omitió el proyecto afectado.');
+assert.deepEqual(incompleteClient.acks, [], 'Se envió ACK aunque el bootstrap no confirmó el proyecto afectado.');
+assert.deepEqual(module.metaWrites, [], 'La secuencia incompleta quedó persistida y ya no podría reproducirse.');
+
+const canonicalSpace = {
+  spaceId: 'space_membership_1',
+  ownerUserId: 'user_owner_new',
+  members: [{ userId: 'user_owner_new', role: 'owner', permissions: ['read'] }]
+};
+const healthyClient = new module.TestClient(async () => ({ spaces: [canonicalSpace] }));
+await healthyClient.handleEvent(event);
+assert.equal(healthyClient.lastProcessedSequence, 41, 'El cursor no avanzó después de aplicar la membresía autoritativa.');
+assert.deepEqual(healthyClient.acks, [41], 'El ACK no se programó después de una aplicación válida.');
+assert.equal(module.dispatched.at(-1)?.name, 'p2p:membership');
+assert.equal(
+  module.dispatched.at(-1)?.detail?.space?.ownerUserId,
+  'user_owner_new',
+  'La interfaz recibió el grafo transportado y no el estado autoritativo leído antes del ACK.'
+);
+
+console.log('OK: los cambios de membresía solo avanzan cursor y ACK después de confirmar el proyecto en el bootstrap autoritativo; fallas u omisiones conservan el evento para replay.');

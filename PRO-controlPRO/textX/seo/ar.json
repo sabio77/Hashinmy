@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "languageCode": "ar",
+    "languageName": "Arabic",
+    "nativeName": "العربية",
+    "dir": "rtl"
+  },
+  "seo": {
+    "title": "بذرة تطبيق ويب",
+    "description": "بذرة قوية لتطبيق ويب قابل للتثبيت، متجاوبة، متعددة اللغات وذاتية التحديث مع مصادقة آمنة عبر Google.",
+    "applicationName": "تطبيق بذرة",
+    "appleMobileWebAppTitle": "تطبيق بذرة",
+    "manifestName": "بذرة تطبيق ويب ذاتية التحديث",
+    "manifestShortName": "تطبيق بذرة",
+    "manifestDescription": "قاعدة قابلة لإعادة الاستخدام لإنشاء تطبيق ويب قابل للتثبيت ويعمل دون اتصال ويتحدث تلقائيًا مع مصادقة Google."
+  }
+}

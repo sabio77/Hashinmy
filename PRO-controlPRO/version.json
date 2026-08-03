@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 3,
+  "releaseId": "semilla-appweb-pwa@1.9.79+2026-08-01-140",
+  "version": "1.9.79",
+  "build": "2026-08-01-140",
+  "releasedAt": "2026-08-01T19:43:00-05:00",
+  "channel": "stable",
+  "minimumSupportedBuild": "2026-07-02-002",
+  "forceReload": true,
+  "message": "Semilla PWA local-first con almacenamiento persistente supervisado, invitaciones por correo, sincronización SSE/POST, replay temporal, Web Push y autenticación Google.",
+  "updateStrategy": {
+    "mode": "auto-reload",
+    "primarySignal": "version.json",
+    "assetFingerprintSignal": "criticalAssets",
+    "clientPolling": "disabled",
+    "clientChecks": [
+      "startup",
+      "focus",
+      "visibilitychange",
+      "online",
+      "pageshow",
+      "service-worker-updatefound",
+      "controllerchange"
+    ],
+    "multiTabCoordination": true
+  },
+  "criticalAssets": [
+    {
+      "url": "./index.html",
+      "sha256": "091c3bbe587ef47bf3872f5d35f198ce8bddf67cd85e7d2dcc57b2a16b7383d4",
+      "bytes": 21015
+    },
+    {
+      "url": "./offline.html",
+      "sha256": "70051db5d76dbca682bb653cd7e4ea4310d458afc502e4bbaff996a3c9f37c2e",
+      "bytes": 1109
+    },
+    {
+      "url": "./manifest.webmanifest",
+      "sha256": "c45eedf43b9f6746cacd378e11ab4643c435ba2dc1fdd87b4b1c75cc416c8e79",
+      "bytes": 7987
+    },
+    {
+      "url": "./sw.js",
+      "sha256": "c09eced243ab9d671a2ec2113d8eca1f3ed84bc5d8dd803faa24007c156fe277",
+      "bytes": 32393
+    },
+    {
+      "url": "./src/css/app.css",
+      "sha256": "2a0b86fe43daa45bad90b1870c787db639540571abd6ed81e252013bd239dcab",
+      "bytes": 26175
+    },
+    {
+      "url": "./src/js/app-metadata.js",
+      "sha256": "837685798a537c2196e9e48f7e12891a57155dd8ab93d7f130214349493dc078",
+      "bytes": 4592
+    },
+    {
+      "url": "./src/js/runtime-config.js",
+      "sha256": "1edffc4f57781102fef08ecfeb6456bc9fce3f3e958947e1c2f3538e48bde98e",
+      "bytes": 323
+    },
+    {
+      "url": "./src/js/config.js",
+      "sha256": "06b71e5e5a7eafaf311d712ebef3a62ac09007f3c377aa5513ed2093a54b34f2",
+      "bytes": 5383
+    },
+    {
+      "url": "./src/js/application-scope.js",
+      "sha256": "3be7c332f4468d27e507c9c3aa7ef4ac495896e97a62dbec06d679ec47dc59fc",
+      "bytes": 2019
+    },
+    {
+      "url": "./src/js/api.js",
+      "sha256": "148780941b31a853a873ad9a3ceb98f91dca531410574c9721bcf7d33567ddc7",
+      "bytes": 6041
+    },
+    {
+      "url": "./src/js/firebase-auth.js",
+      "sha256": "9f06349cdae270f836f64dbb5052ad2489501e48acaee74400f4c5458550bcc0",
+      "bytes": 4406
+    },
+    {
+      "url": "./src/js/p2p-storage.js",
+      "sha256": "1131a783ad0bafed8336ee1eba0da3d56bd894a664fb30ffac639c81f8f59633",
+      "bytes": 83956
+    },
+    {
+      "url": "./src/js/p2p-durability.js",
+      "sha256": "34eff32e73d440d92e69e20c7ac4e3c5153cb1d9a27ee6ec765930c242171eb5",
+      "bytes": 4481
+    },
+    {
+      "url": "./src/js/p2p-crypto.js",
+      "sha256": "52c6724c05f16e92c4d20839de9c8f484d072b0b5d62f7752fbdd03b1c40b0a5",
+      "bytes": 46200
+    },
+    {
+      "url": "./src/js/p2p-tab-coordinator.js",
+      "sha256": "7ae3717bed7568e88588f4e863de2e4889a99f37bb4ff7dfbbed9c69cbb49782",
+      "bytes": 28115
+    },
+    {
+      "url": "./src/js/p2p-client.js",
+      "sha256": "977ab9e0553b69fcdd2dd1a6884b335294a1ddbdadf40d48534a4a4ba75a47ac",
+      "bytes": 318125
+    },
+    {
+      "url": "./src/js/p2p-permissions.js",
+      "sha256": "f063165ddcf1bb1057aec1126edf3ead3b731808d89dc68584a0df7a5ad0394a",
+      "bytes": 2044
+    },
+    {
+      "url": "./src/js/p2p-space-creation-intent.js",
+      "sha256": "9ad019a731250ad7324c1a3a4b60b2ecd30c60d5c2f6909450624a62a89881e6",
+      "bytes": 4570
+    },
+    {
+      "url": "./src/js/p2p-invitation-intent.js",
+      "sha256": "c91cf4fbad6a66e073236dd67565461997ddd2ed6c285d58a6185424afaa4602",
+      "bytes": 2512
+    },
+    {
+      "url": "./src/js/project-domain.js",
+      "sha256": "9807f7d5041b5c200d530f525f8001ea5406fb89867f001b53e9eaad3a4bc0dd",
+      "bytes": 15129
+    },
+    {
+      "url": "./src/js/device-management.js",
+      "sha256": "80fe49b122f115bcde012be929a51fd1900cc02ce6df7e55169ff5b1716a32fc",
+      "bytes": 2303
+    },
+    {
+      "url": "./src/js/skeleton-screen.js",
+      "sha256": "2e49cb78294fed5135cef2b0a80baab058278737914a09895020e1bf5b72225f",
+      "bytes": 2418
+    },
+    {
+      "url": "./src/js/i18n.js",
+      "sha256": "25d778f3d1cf7385d5f3bcc11d4c32c0f5ea2d2d28629395e2b9092af4ae98ea",
+      "bytes": 11830
+    },
+    {
+      "url": "./src/js/asset-loader.js",
+      "sha256": "e00071c4fffcfc25b2bac768c6bd8d20bd6f1b39b7aab06a0051555cc53a5ce8",
+      "bytes": 2767
+    },
+    {
+      "url": "./src/js/pwa-update-manager.js",
+      "sha256": "49b6e44c70091d7276e8cb7991502049fa4e5639a1454c3cd2f038ce4c59fdc3",
+      "bytes": 20118
+    },
+    {
+      "url": "./src/js/app.js",
+      "sha256": "bf077d7ee3da2d28e281a832f970cbf89a7ce1f20285f724fd318f74af7d98c6",
+      "bytes": 104043
+    },
+    {
+      "url": "./textX/languages.json",
+      "sha256": "8b7f3b2ca685eaaaa453101e85d3902fd866bfca1b5d8df40c79c158564a0a7f",
+      "bytes": 981
+    },
+    {
+      "url": "./textX/app/es.json",
+      "sha256": "0cc329fe2c1e9753072be666f9a40c1face2cdbfa3cd3e3bf79282a71e50dabb",
+      "bytes": 19689
+    },
+    {
+      "url": "./textX/seo/es.json",
+      "sha256": "596b82018859cfca1767ce6e572e335ca461a87df9d0bdf6504eeafef27f4b0c",
+      "bytes": 636
+    },
+    {
+      "url": "./textX/app/ar.json",
+      "sha256": "2ceab9fcca1d2aee1cf1e5a8dd6549ffa8e79ab30d9935b4a26a51ade7569068",
+      "bytes": 23394
+    },
+    {
+      "url": "./textX/seo/ar.json",
+      "sha256": "47c806cf11fb20a0cf14922af0325f4a4b62b010fa24529d56c68013482bfde8",
+      "bytes": 833
+    },
+    {
+      "url": "./textX/app/en.json",
+      "sha256": "9ef3eecd22c919f3bde59459b9619e810bdf8c776da0ea66290c9dceace8f7a2",
+      "bytes": 18572
+    },
+    {
+      "url": "./textX/seo/en.json",
+      "sha256": "ff306fce4a347c7c3b2ceda3c3b3a85b6f32bcd2d035eb54e5e290c92cb07a22",
+      "bytes": 590
+    },
+    {
+      "url": "./P2P_sin_RED_LOCALx/P2P_sin_transport.js",
+      "sha256": "e68cef92d63af261033fcfb22dd3495c90bb13afffeb121fe130da7fe0a83480",
+      "bytes": 25179
+    },
+    {
+      "url": "./assets/icons/logo.png.txt",
+      "sha256": "5303a9e299dc72ae4424b108ce59a5f580dd38c1b8fc4522b9ccaa0fa01da879",
+      "bytes": 509
+    },
+    {
+      "url": "./assets/icons/icon-192.png.txt",
+      "sha256": "dfc9b0383f8164e9dc10f3544cde68e272db5ef4b5b2dc097f81e615246787fc",
+      "bytes": 476
+    },
+    {
+      "url": "./assets/icons/icon-512.png.txt",
+      "sha256": "defbc3bd510091cec8d5274fc4db0a5b8cfa4f9bd8608faffbe9ca49e68c5c28",
+      "bytes": 476
+    },
+    {
+      "url": "./assets/icons/maskable-192.png.txt",
+      "sha256": "7920a25b7668e7dd4f93f3b139f7f1120bc2e2fbcc07d083e5b97d77ad57a93e",
+      "bytes": 485
+    },
+    {
+      "url": "./assets/icons/maskable-512.png.txt",
+      "sha256": "cd8fe9ac30252bda9afb2eaca4bbd4b6da051eaa4db4b64d42c44299243f111e",
+      "bytes": 485
+    }
+  ],
+  "i18n": {
+    "manifest": "./textX/languages.json",
+    "fallbackLanguage": "es",
+    "autoDiscovery": "build-time scan of textX/app/*.json and textX/seo/*.json",
+    "codeSource": "filename-stem",
+    "requiresPair": [
+      "textX/app/<code>.json",
+      "textX/seo/<code>.json"
+    ],
+    "languages": [
+      "es",
+      "ar",
+      "en"
+    ]
+  },
+  "assetPrompts": {
+    "autoDiscovery": "build-time scan of assets/**/*.png.txt",
+    "count": 5,
+    "files": [
+      "./assets/icons/logo.png.txt",
+      "./assets/icons/icon-192.png.txt",
+      "./assets/icons/icon-512.png.txt",
+      "./assets/icons/maskable-192.png.txt",
+      "./assets/icons/maskable-512.png.txt"
+    ]
+  }
+}

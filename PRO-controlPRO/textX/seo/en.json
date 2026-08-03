@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "languageCode": "en",
+    "languageName": "English",
+    "nativeName": "English",
+    "dir": "ltr"
+  },
+  "seo": {
+    "title": "Web App Seed",
+    "description": "Robust installable, responsive, multilingual and self-updating web app seed with secure Google authentication.",
+    "applicationName": "Seed App",
+    "appleMobileWebAppTitle": "Seed App",
+    "manifestName": "Self-Updating Web App Seed",
+    "manifestShortName": "Seed App",
+    "manifestDescription": "Reusable base for an installable, offline and self-updating web app with Google authentication."
+  }
+}
