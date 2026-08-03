@@ -3830,17 +3830,54 @@ export class SemillaP2PClient {
     }
     const recipients = (data.devices || []).filter((device) => device?.deviceId && device.deviceId !== this.deviceId);
     const envelopes = await createSpaceKeyEnvelopes(spaceId, recipients, { keyId });
-    let delivered = 0;
-    for (const envelope of envelopes) {
+    const deliveryResults = await Promise.allSettled(envelopes.map(async (envelope) => {
       const result = await apiPost('/api/p2p/crypto/key-envelope', {
         deviceId: this.deviceId,
         spaceId,
         targetDeviceId: envelope.recipientDeviceId,
         envelope
       });
-      delivered += Number(result.deliveredToDevices || 0);
-    }
-    return { recipients: recipients.length, envelopes: envelopes.length, delivered };
+      const delivered = Math.max(0, Number(result.deliveredToDevices || 0));
+      if (delivered < 1) {
+        const error = new Error('El backend no confirmó la entrega de la clave al dispositivo autorizado.');
+        error.code = 'P2P_KEY_ENVELOPE_NOT_DELIVERED';
+        error.status = 503;
+        throw error;
+      }
+      return {
+        recipientDeviceId: String(envelope.recipientDeviceId || '').trim(),
+        delivered
+      };
+    }));
+    const deliveredDeviceIds = new Set();
+    let delivered = 0;
+    const failures = [];
+    deliveryResults.forEach((result, index) => {
+      const recipientDeviceId = String(envelopes[index]?.recipientDeviceId || '').trim();
+      if (result.status === 'fulfilled') {
+        delivered += Math.max(0, Number(result.value?.delivered || 0));
+        if (recipientDeviceId) deliveredDeviceIds.add(recipientDeviceId);
+        return;
+      }
+      failures.push({
+        recipientDeviceId,
+        code: String(result.reason?.code || 'P2P_KEY_ENVELOPE_DELIVERY_FAILED').trim(),
+        status: Math.max(0, Number(result.reason?.status || result.reason?.statusCode || 0))
+      });
+    });
+    const failedDeviceIds = recipients
+      .map((device) => String(device?.deviceId || '').trim())
+      .filter((deviceId) => deviceId && !deliveredDeviceIds.has(deviceId));
+    const complete = failedDeviceIds.length === 0 && envelopes.length === recipients.length;
+    return {
+      recipients: recipients.length,
+      envelopes: envelopes.length,
+      delivered,
+      failed: failedDeviceIds.length,
+      failedDeviceIds,
+      failures,
+      complete
+    };
   }
 
   async replayDeferredEncryptedEvents(spaceId = '', sessionContext = this.captureSessionContext()) {
@@ -5647,6 +5684,36 @@ export class SemillaP2PClient {
           data.space.activeEncryptionKeyId || ''
         );
         data.space = activation.space || data.space;
+        this.assertSessionContext(sessionContext);
+        try {
+          data.keyDistribution = await this.distributeSpaceKey(data.space.spaceId, key.keyId);
+        } catch (error) {
+          dispatch('p2p:key-distribution-pending', {
+            spaceId: data.space.spaceId,
+            keyId: key.keyId,
+            stage: 'space-create',
+            error
+          });
+          throw error;
+        }
+        this.assertSessionContext(sessionContext);
+        if (data.keyDistribution?.complete !== true) {
+          const error = new Error('El proyecto quedó creado, pero su clave todavía no llegó a todos los dispositivos autorizados. La creación se reintentará antes de publicar información compartida.');
+          error.code = 'P2P_INITIAL_KEY_DISTRIBUTION_PENDING';
+          error.status = 503;
+          error.retryable = true;
+          error.spaceId = data.space.spaceId;
+          error.keyId = key.keyId;
+          error.distribution = data.keyDistribution;
+          dispatch('p2p:key-distribution-pending', {
+            spaceId: data.space.spaceId,
+            keyId: key.keyId,
+            stage: 'space-create',
+            distribution: data.keyDistribution,
+            error
+          });
+          throw error;
+        }
       }
     }
     this.assertSessionContext(sessionContext);
