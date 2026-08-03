@@ -1155,7 +1155,12 @@ async function loginWithGoogle() {
     showWorkspace(data.user || {});
     await startP2P();
   } catch (error) {
-    showAuth(error?.message || t('auth.loginError', 'No se pudo iniciar sesión con Google.'));
+    if (error?.code === 'BACKEND_NOT_CONFIGURED') {
+      console.error('[semilla-auth] Falta APP_BACKEND_URL en src/js/runtime-config.js. Ejecuta el generador de release durante el build del Static Site.');
+      showAuth(t('auth.backendNotConfigured', 'El servicio de acceso no está configurado para esta instalación. Contacta al administrador.'));
+    } else {
+      showAuth(error?.message || t('auth.loginError', 'No se pudo iniciar sesión con Google.'));
+    }
   } finally {
     setBusy(false);
   }

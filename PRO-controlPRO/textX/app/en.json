@@ -36,6 +36,7 @@
     "openingGoogle": "Opening Google...",
     "validatingAccess": "Validating your access...",
     "serviceUnavailable": "The sign-in service is unavailable. Please try again later.",
+    "backendNotConfigured": "The sign-in service is not configured for this installation. Contact the administrator.",
     "loginError": "Could not sign in with Google.",
     "signedOut": "You have signed out successfully."
   },

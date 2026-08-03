@@ -36,6 +36,7 @@
     "openingGoogle": "Abriendo Google...",
     "validatingAccess": "Validando tu acceso...",
     "serviceUnavailable": "El servicio de acceso no está disponible. Inténtalo más tarde.",
+    "backendNotConfigured": "El servicio de acceso no está configurado para esta instalación. Contacta al administrador.",
     "loginError": "No se pudo iniciar sesión con Google.",
     "signedOut": "Sesión cerrada correctamente."
   },

@@ -37,7 +37,9 @@ export function getBackendUrl() {
   const host = String(window.location.hostname || '').toLowerCase();
   if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:10000';
 
-  throw new Error('BACKEND_NOT_CONFIGURED');
+  const error = new Error('BACKEND_NOT_CONFIGURED');
+  error.code = 'BACKEND_NOT_CONFIGURED';
+  throw error;
 }
 
 export function getSessionToken() {

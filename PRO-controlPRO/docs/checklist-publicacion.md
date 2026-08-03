@@ -25,6 +25,18 @@ Antes de publicar una app real basada en esta semilla:
 - [ ] Revisar `fingerprintCheckFiles`.
 - [ ] Probar cambio de CSS/JS con app instalada.
 
+
+## Conexión con memoriaBACKEND
+
+- [ ] Definir `APP_BACKEND_URL` en el Static Site, sin comillas exteriores.
+- [ ] Al guardar variables en Render, elegir **Save, rebuild, and deploy**.
+- [ ] Ejecutar `python tools/generate-release.py --require-backend` durante el build.
+- [ ] Si la app está en una subcarpeta, ejecutar el generador de esa carpeta desde el build del sitio principal.
+- [ ] Abrir públicamente `src/js/runtime-config.js` y confirmar que `backendUrl` no está vacío.
+- [ ] Registrar el origen en `P2P_DOMINIOS_APROBADOS`.
+- [ ] Registrar la ruta exacta y sensible a mayúsculas/minúsculas en `P2P_APLICACIONES_APROBADAS`.
+- [ ] Autorizar el dominio público en Firebase Authentication.
+
 ## Seguridad
 
 - [ ] Ajustar CSP si conectas APIs externas.

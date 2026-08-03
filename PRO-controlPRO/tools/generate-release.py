@@ -22,6 +22,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Set
+from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "version.json"
@@ -367,13 +368,49 @@ def fingerprint_check_files(language_manifest: Dict[str, Any], prompt_assets: It
     ])
 
 
-def update_runtime_config_file() -> None:
-    """Inyecta únicamente configuración pública durante el build de Render."""
-    backend_url = str(os.environ.get("APP_BACKEND_URL") or os.environ.get("SEMILLA_BACKEND_URL") or "").strip().rstrip("/")
-    sin_backend_raw = str(os.environ.get("sinBACKEND") or os.environ.get("APP_SIN_BACKEND") or "false").strip().lower()
-    sin_backend = sin_backend_raw in {"1", "true", "yes", "on"}
-    if not backend_url and not sin_backend:
-        return
+def clean_env_scalar(value: Any = "") -> str:
+    """Normaliza valores copiados desde paneles que pueden incluir comillas exteriores."""
+    text = str(value or "").strip()
+    while len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+        text = text[1:-1].strip()
+    return text
+
+
+def bool_env(value: Any = "") -> bool:
+    return clean_env_scalar(value).lower() in {"1", "true", "yes", "on"}
+
+
+def normalize_backend_url(value: Any = "") -> str:
+    raw = clean_env_scalar(value).rstrip("/")
+    if not raw:
+        return ""
+    try:
+        parsed = urlsplit(raw)
+    except ValueError as error:
+        raise ValueError("APP_BACKEND_URL no contiene una URL válida.") from error
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("APP_BACKEND_URL debe ser una URL HTTP(S) absoluta, por ejemplo https://mapsx.app.")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("APP_BACKEND_URL no puede incluir credenciales, parámetros ni fragmentos.")
+    normalized_path = parsed.path.rstrip("/")
+    return urlunsplit((parsed.scheme.lower(), parsed.netloc, normalized_path, "", ""))
+
+
+def render_environment() -> bool:
+    return bool_env(os.environ.get("RENDER")) or bool(clean_env_scalar(os.environ.get("RENDER_SERVICE_ID")))
+
+
+def update_runtime_config_file(*, require_backend: bool = False) -> str:
+    """Inyecta configuración pública y evita publicar una PWA sin su backend obligatorio."""
+    raw_backend_url = os.environ.get("APP_BACKEND_URL") or os.environ.get("SEMILLA_BACKEND_URL") or ""
+    backend_url = normalize_backend_url(raw_backend_url)
+    sin_backend = bool_env(os.environ.get("sinBACKEND") or os.environ.get("APP_SIN_BACKEND") or "false")
+
+    if require_backend and not backend_url:
+        raise RuntimeError(
+            "Falta APP_BACKEND_URL. Esta PWA necesita memoriaBACKEND incluso cuando sinBACKEND=true, "
+            "porque Google, invitaciones y capacidades P2P se validan en el servidor."
+        )
 
     payload = (
         "(function exposeRuntimeConfig(root) {\n"
@@ -386,6 +423,7 @@ def update_runtime_config_file() -> None:
     )
     RUNTIME_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     RUNTIME_CONFIG_FILE.write_text(payload, encoding="utf-8")
+    return backend_url
 
 
 def update_metadata_file(version: str, build: str, released_at: str, language_manifest: Dict[str, Any]) -> None:
@@ -441,6 +479,11 @@ def main() -> None:
     parser.add_argument("--build", help="Build público. Ejemplo: 2026-07-02-005")
     parser.add_argument("--released-at", help="Fecha ISO del release")
     parser.add_argument("--no-metadata", action="store_true", help="No actualizar src/js/app-metadata.js")
+    parser.add_argument(
+        "--require-backend",
+        action="store_true",
+        help="Fallar si APP_BACKEND_URL no está definida; obligatorio para despliegues de producción.",
+    )
     args = parser.parse_args()
 
     current = read_json(VERSION_FILE)
@@ -448,7 +491,7 @@ def main() -> None:
     build = args.build or current.get("build") or datetime.now().strftime("%Y%m%d%H%M%S")
     released_at = args.released_at or current.get("releasedAt") or iso_now()
 
-    update_runtime_config_file()
+    backend_url = update_runtime_config_file(require_backend=args.require_backend or render_environment())
     language_manifest = discover_languages(released_at)
     prompt_assets = discover_prompt_assets()
     write_json(LANGUAGE_MANIFEST_FILE, language_manifest)
@@ -497,6 +540,7 @@ def main() -> None:
     write_json(VERSION_FILE, next_payload)
 
     print(f"Release generado: {next_payload['releaseId']}")
+    print(f"Backend público: {backend_url or 'no configurado (solo válido para desarrollo/CI)'}")
     print(f"Idiomas detectados: {', '.join(next_payload['i18n']['languages'])}")
     print(f"Archivos críticos con huella: {len(assets)}")
 

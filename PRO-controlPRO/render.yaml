@@ -2,7 +2,7 @@ services:
   - type: web
     name: semilla-appweb-pwa
     runtime: static
-    buildCommand: python tools/generate-release.py
+    buildCommand: python tools/generate-release.py --require-backend
     staticPublishPath: .
     previews:
       generation: automatic
@@ -49,7 +49,7 @@ services:
         value: camera=(), microphone=(), geolocation=()
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:10000; frame-src https://*.firebaseapp.com https://accounts.google.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        value: "default-src 'self'; script-src 'self' 'sha256-lRCdaGVhvfFFcJSwJg4kkkgh4L2jLFOwnrADoTSirvY=' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:10000; frame-src https://*.firebaseapp.com https://accounts.google.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin

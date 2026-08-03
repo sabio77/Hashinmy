@@ -26,7 +26,7 @@ La semilla deriva automáticamente su identificador de aplicación desde la carp
 
 No declares una variable de entorno en cada `appWEB` para indicar la carpeta. Solo configura `APP_BACKEND_URL` en el build y registra la combinación en `P2P_APLICACIONES_APROBADAS` de `memoriaBACKEND`. El alcance se aplica a sesión, usuario cacheado, dispositivo, IndexedDB funcional, IndexedDB criptográfica, coordinación entre pestañas, idioma, actualización PWA, Cache Storage y Firebase. La limpieza del Service Worker reconoce únicamente las familias `static` y `runtime` del namespace exacto de esa aplicación, por lo que la raíz y las carpetas hermanas no eliminan sus cachés entre sí.
 
-Cuando copies la semilla dentro de un sitio principal, el hosting padre debe servir esa carpeta y devolver su `index.html` para navegaciones internas. Las rutas de los archivos, manifiesto y Service Worker ya son relativas y conservan el scope de la carpeta.
+Cuando copies la semilla dentro de un sitio principal, el hosting padre debe servir esa carpeta y devolver su `index.html` para navegaciones internas. Las rutas de los archivos, manifiesto y Service Worker ya son relativas y conservan el scope de la carpeta. El punto de entrada normaliza además una visita como `/PRO-control` hacia `/PRO-control/` antes de cargar recursos, evitando que el navegador solicite por error `/src/...` desde la raíz del dominio.
 
 > **Límite de seguridad del navegador:** las carpetas del mismo dominio quedan aisladas por namespace y por tenant del backend, pero siguen perteneciendo al mismo origen web. Esto evita mezclas accidentales y cruces del protocolo; no convierte cada carpeta en una frontera contra código malicioso o una vulnerabilidad XSS de otra app del mismo dominio. Para aplicaciones administradas por equipos no confiables entre sí, publícalas en subdominios diferentes y aprueba cada origen por separado.
 
@@ -398,9 +398,21 @@ Documentación relacionada:
 
 El primer acceso requiere que memoriaBACKEND valide Google mediante Firebase Admin. Después, mientras exista una sesión local previa, la PWA puede abrir sin conexión la copia IndexedDB de esa misma cuenta; la sincronización se reanuda al volver internet.
 
-Para Render Static Site configura `APP_BACKEND_URL` con la URL pública del Web Service de `memoriaBACKEND`. El comando de build existente (`python tools/generate-release.py`) genera `src/js/runtime-config.js` sin exponer secretos.
+Para Render Static Site configura `APP_BACKEND_URL` con la URL pública del Web Service de `memoriaBACKEND`. Al guardar la variable elige **Save, rebuild, and deploy**; reutilizar un build anterior no puede inyectar el valor en los archivos estáticos. El build de producción debe ejecutar `python tools/generate-release.py --require-backend`; ese comando genera `src/js/runtime-config.js` sin exponer secretos y detiene el despliegue si la URL no fue recibida. El generador también normaliza valores copiados accidentalmente con comillas exteriores, aunque en el panel de Render se recomienda guardar `https://mapsx.app` sin comillas.
 
-En Firebase Authentication habilita Google y autoriza el dominio público del Static Site. Las credenciales privadas de Service Account pertenecen únicamente a memoriaBACKEND; nunca deben copiarse a `appWEB`.
+Cuando la app vive en una subcarpeta de un Static Site mayor, la variable por sí sola no modifica archivos del navegador: el comando de build del sitio principal debe ejecutar el generador de esa copia. Para `/PRO-controlPRO/`, usa por ejemplo `python PRO-controlPRO/tools/generate-release.py --require-backend`. Si hay varias apps, ejecuta una vez el generador de cada carpeta. Después del deploy, `https://hashinmy.com/PRO-controlPRO/src/js/runtime-config.js` debe contener `backendUrl: "https://mapsx.app"`.
+
+En `memoriaBACKEND`, autoriza el origen y la aplicación exacta —incluidas mayúsculas y minúsculas—:
+
+```text
+P2P_DOMINIOS_APROBADOS=https://hashinmy.com
+P2P_APLICACIONES_APROBADAS={"https://hashinmy.com":["PRO-controlPRO"]}
+APP_BACKEND_PUBLIC_URL=https://mapsx.app
+```
+
+`APP_REDIS_URL`, `APP_FIREBASE_SERVICE` y `APP_FIREBASE_CREDENTIALS` también son obligatorias para que memoriaBACKEND inicie. `APP_WEB_PUSH_PUBLIC_KEY` y `APP_WEB_PUSH_PRIVATE_KEY` son opcionales, pero deben configurarse juntas para notificaciones con la PWA cerrada.
+
+En Firebase Authentication habilita Google y autoriza `hashinmy.com`. Las credenciales privadas de Service Account pertenecen únicamente a memoriaBACKEND; nunca deben copiarse a `appWEB`.
 
 ## Fundación P2P local-first
 

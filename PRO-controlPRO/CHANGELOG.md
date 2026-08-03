@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.81 - 2026-08-03
+
+- Corregido el despliegue que podía publicar `runtime-config.js` con `backendUrl` vacío aunque `APP_BACKEND_URL` estuviera definida en Render pero el generador de la app no se ejecutara desde el build del Static Site.
+- El generador normaliza valores copiados con comillas, limpia configuraciones antiguas, valida URL HTTP(S) y el build de producción falla explícitamente cuando falta memoriaBACKEND, incluso si `sinBACKEND=true`.
+- La interfaz ya no muestra el código técnico `BACKEND_NOT_CONFIGURED`; presenta un mensaje traducido de producción y conserva el código estructurado para diagnóstico. Se añadieron regresiones y documentación para apps instaladas en raíz o subcarpetas.
+
 ## 1.9.79 - 2026-08-01
 
 - Corregido el punto débil de despliegue del modo `sinBACKEND`: el generador aceptaba la variable, pero el Blueprint del Static Site no la declaraba y una semilla creada desde `render.yaml` dejaba el bloque P2P local oculto y desactivado salvo configuración manual adicional.

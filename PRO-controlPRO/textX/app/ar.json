@@ -36,6 +36,7 @@
     "openingGoogle": "جارٍ فتح Google...",
     "validatingAccess": "جارٍ التحقق من صلاحية الوصول...",
     "serviceUnavailable": "خدمة تسجيل الدخول غير متاحة. حاول مرة أخرى لاحقًا.",
+    "backendNotConfigured": "خدمة تسجيل الدخول غير مهيأة لهذا التثبيت. تواصل مع المسؤول.",
     "loginError": "تعذر تسجيل الدخول باستخدام Google.",
     "signedOut": "تم تسجيل الخروج بنجاح."
   },
