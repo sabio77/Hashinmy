@@ -239,7 +239,7 @@ function jsonByteLength(value) {
 }
 
 function isEntityOperationType(type = '') {
-  return ['entity.put', 'entity.patch', 'entity.delete', 'custom'].includes(String(type || ''));
+  return ['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'].includes(String(type || ''));
 }
 
 export function normalizePublishDeliveryIntent(type = '', options = {}) {
@@ -322,7 +322,7 @@ function realtimeProtocolError(message = '', code = 'P2P_REALTIME_EVENT_INVALID_
   return error;
 }
 
-const CANONICAL_STATE_OPERATION_TYPES = new Set(['entity.put', 'entity.patch', 'entity.delete', 'custom']);
+const CANONICAL_STATE_OPERATION_TYPES = new Set(['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom']);
 const CANONICAL_SNAPSHOT_OPERATION_TYPES = new Set(['snapshot.chunk', 'snapshot.complete']);
 const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.key.request',
@@ -3614,8 +3614,8 @@ export class SemillaP2PClient {
     const hasEncryptionMetadata = operation.encrypted === true
       && Number(operation.encryptionVersion || 0) === 1
       && Boolean(String(operation.keyId || '').trim());
-    const statePayloadProtected = type === 'entity.delete'
-      || !['entity.put', 'entity.patch', 'custom'].includes(type)
+    const statePayloadProtected = ['entity.delete', 'entity.purge'].includes(type)
+      || !['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'custom'].includes(type)
       || Boolean(operation.payload?.__p2pEncrypted);
     if (!hasEncryptionMetadata || !statePayloadProtected) {
       const reason = !hasEncryptionMetadata
@@ -6262,14 +6262,42 @@ export class SemillaP2PClient {
     }, publishOptions);
   }
 
+  lifecycleOperation(type, spaceId, entityType, entityId, options = {}) {
+    const { operationId, expected, at, actorUserId, ...publishOptions } = options || {};
+    const hasExpected = expected && typeof expected === 'object' && !Array.isArray(expected);
+    return this.publish(spaceId, {
+      operationId: String(operationId || '').trim() || undefined,
+      type,
+      entityType,
+      entityId,
+      payload: {
+        ...(hasExpected ? { expected } : {}),
+        at: String(at || '').trim() || new Date().toISOString(),
+        actorUserId: String(actorUserId || this.user?.userId || '').trim()
+      }
+    }, publishOptions);
+  }
+
+  trash(spaceId, entityType, entityId, options = {}) {
+    return this.lifecycleOperation('entity.trash', spaceId, entityType, entityId, options);
+  }
+
+  restore(spaceId, entityType, entityId, options = {}) {
+    return this.lifecycleOperation('entity.restore', spaceId, entityType, entityId, options);
+  }
+
+  purge(spaceId, entityType, entityId, options = {}) {
+    return this.delete(spaceId, entityType, entityId, { ...options, operationType: 'entity.purge' });
+  }
+
   delete(spaceId, entityType, entityId, options = {}) {
-    const { operationId, expected, conflictPolicy, referenceGuards, dependentDeletes, ...publishOptions } = options || {};
+    const { operationId, operationType = 'entity.delete', expected, conflictPolicy, referenceGuards, dependentDeletes, ...publishOptions } = options || {};
     const hasExpected = expected && typeof expected === 'object' && !Array.isArray(expected);
     const normalizedReferenceGuards = normalizeDeleteReferenceGuards(referenceGuards);
     const normalizedDependentDeletes = normalizeDependentDeletes(dependentDeletes, { entityType, entityId });
     return this.publish(spaceId, {
       operationId: String(operationId || '').trim() || undefined,
-      type: 'entity.delete',
+      type: operationType === 'entity.purge' ? 'entity.purge' : 'entity.delete',
       entityType,
       entityId,
       ...(normalizedDependentDeletes.length ? { dependentDeletes: normalizedDependentDeletes } : {}),

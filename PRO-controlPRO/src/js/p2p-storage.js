@@ -706,7 +706,19 @@ function operationIdOf(operation = {}) {
 }
 
 function isEntityOperation(operation = {}) {
-  return ['entity.put', 'entity.patch', 'entity.delete', 'custom'].includes(String(operation?.type || ''));
+  return ['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'].includes(String(operation?.type || ''));
+}
+
+function operationWithAuthoritativeLifecycleActor(operation = {}, actorUserId = '') {
+  if (!['entity.trash', 'entity.restore'].includes(String(operation?.type || ''))) return operation;
+  const authoritativeActorUserId = String(actorUserId || '').trim().slice(0, 140);
+  return {
+    ...operation,
+    payload: {
+      ...(operation.payload && typeof operation.payload === 'object' ? operation.payload : {}),
+      actorUserId: authoritativeActorUserId
+    }
+  };
 }
 
 function comparableValuesEqual(left, right) {
@@ -759,7 +771,7 @@ function normalizeDependentDeletes(input = [], sourceOperation = {}) {
     const entityType = String(candidate?.entityType || '').trim().toLowerCase().slice(0, 80);
     const entityId = String(candidate?.entityId || '').trim().slice(0, 180);
     const relation = String(candidate?.relation || '').trim().toLowerCase().slice(0, 80);
-    const supported = String(sourceOperation?.type || '') === 'entity.delete'
+    const supported = ['entity.delete', 'entity.purge'].includes(String(sourceOperation?.type || ''))
       && sourceType === 'admin.purchase'
       && entityType === 'admin.projection-link'
       && entityId === sourceId
@@ -805,7 +817,7 @@ function referenceCandidateState(record = {}, optimistic = false) {
 
 function findReferenceGuardConflictsFromRecords(records = [], event = {}) {
   const operation = event.operation || {};
-  if (operation.type !== 'entity.delete') return [];
+  if (!['entity.delete', 'entity.purge'].includes(operation.type)) return [];
   const guards = normalizeReferenceGuards(operation.payload?.referenceGuards);
   if (!guards.length) return [];
   const targetKey = entityKey(event.spaceId, operation.entityType, operation.entityId);
@@ -903,7 +915,43 @@ function applyOperationToState(input = {}, operation = {}) {
     state.deleted = false;
     return { supported: true, conflicts, partial: conflicts.length > 0, ...state };
   }
-  if (operation.type === 'entity.delete') {
+  if (operation.type === 'entity.trash' || operation.type === 'entity.restore') {
+    const payload = operation.payload && typeof operation.payload === 'object' ? operation.payload : {};
+    const expected = payload.expected && typeof payload.expected === 'object' && !Array.isArray(payload.expected)
+      ? payload.expected
+      : null;
+    const current = state.exists && !state.deleted && state.value && typeof state.value === 'object' && !Array.isArray(state.value)
+      ? state.value
+      : null;
+    if (!current || (expected && !comparableValuesEqual(current, expected))) {
+      return {
+        supported: true,
+        conflicts: [{ field: '__entity__', expected, actual: current }],
+        partial: true,
+        skipped: true,
+        ...state
+      };
+    }
+    const at = String(payload.at || '').trim().slice(0, 60) || new Date().toISOString();
+    const actorUserId = String(payload.actorUserId || '').trim().slice(0, 140);
+    const next = { ...current, updatedAt: at };
+    if (operation.type === 'entity.trash') {
+      next.trashedAt = at;
+      next.trashedBy = actorUserId;
+      delete next.restoredAt;
+      delete next.restoredBy;
+    } else {
+      next.trashedAt = '';
+      next.trashedBy = '';
+      next.restoredAt = at;
+      next.restoredBy = actorUserId;
+    }
+    state.exists = true;
+    state.value = next;
+    state.deleted = false;
+    return { supported: true, conflicts: [], partial: false, skipped: false, ...state };
+  }
+  if (operation.type === 'entity.delete' || operation.type === 'entity.purge') {
     const expected = operation.payload?.expected && typeof operation.payload.expected === 'object'
       && !Array.isArray(operation.payload.expected)
       ? operation.payload.expected
@@ -1029,7 +1077,8 @@ function materializeEntityState(state = {}) {
         deleted: Boolean(state.confirmedDeleted)
       };
   for (const entry of state.pendingOperations || []) {
-    const next = applyOperationToState(visible, entry.operation || {});
+    const pendingOperation = operationWithAuthoritativeLifecycleActor(entry.operation || {}, entry.actorUserId || '');
+    const next = applyOperationToState(visible, pendingOperation);
     if (next.supported) visible = next;
   }
 
@@ -1134,7 +1183,8 @@ function reduceEntityRecord(existing = null, event = {}) {
     : state.unresolvedOptimistic
       ? { exists: true, value: state.unresolvedValue, deleted: state.unresolvedDeleted }
       : { exists: false, value: null, deleted: false };
-  const canonical = applyOperationToState(canonicalBase, operation);
+  const canonicalOperation = operationWithAuthoritativeLifecycleActor(operation, event.actorUserId || '');
+  const canonical = applyOperationToState(canonicalBase, canonicalOperation);
   if (!canonical.supported) {
     return { applied: false, entity: existing || null, reason: 'unsupported', maxStateRevision: state.confirmedStateRevision };
   }
@@ -1149,7 +1199,7 @@ function reduceEntityRecord(existing = null, event = {}) {
   state.confirmedSpaceSequence = incomingSequence;
   state.confirmedStateRevision = incomingStateRevision || incomingSequence;
   state.confirmedUpdatedAt = event.createdAt || new Date().toISOString();
-  if (operation.type === 'entity.put' || operation.type === 'entity.delete' || operation.type === 'custom' || state.unresolvedOperationId === operationId) {
+  if (operation.type === 'entity.put' || ['entity.delete', 'entity.purge'].includes(operation.type) || operation.type === 'custom' || state.unresolvedOperationId === operationId) {
     state.unresolvedOptimistic = false;
     state.unresolvedValue = null;
     state.unresolvedDeleted = false;
@@ -1231,7 +1281,7 @@ async function applyEntityOperation(store, event = {}) {
   const existing = await requestToPromise(store.get(key));
   const sourceWasActive = referenceCandidateState(existing, Boolean(event.optimistic)).active;
   let guardedEvent = event;
-  const hasDeleteGuards = operation.type === 'entity.delete'
+  const hasDeleteGuards = ['entity.delete', 'entity.purge'].includes(operation.type)
     && normalizeReferenceGuards(operation.payload?.referenceGuards).length > 0;
   const hasReferenceRequirements = normalizeReferenceRequirements(operation.payload?.referenceRequirements).length > 0;
   if (hasDeleteGuards || hasReferenceRequirements) {

@@ -1,3 +1,13 @@
+# Semilla App Web PWA P2P para control de proyectos
+
+## Papelera distribuida y menús contextuales
+
+Los proyectos y registros administrativos exponen un único menú vertical de tres puntos. Las opciones se derivan de la membresía y del perfil `admin-project-v1`: editar requiere `add` o `projection`, mientras enviar a papelera, restaurar y purgar requieren `delete`; una proyección exige además `projection`, y la raíz `admin.project` continúa reservada al propietario.
+
+`entity.trash` y `entity.restore` son operaciones durables cifradas. Guardan una precondición `expected`, por lo que una réplica antigua no puede ocultar o reactivar silenciosamente un registro que otro participante modificó. La papelera se representa mediante `trashedAt` y `trashedBy` dentro del valor replicado; los selectores del dominio excluyen esos elementos de capital, gastos, proyecciones y listas activas sin perder el contenido necesario para restaurarlos.
+
+La eliminación permanente solo se ejecuta desde la papelera mediante `entity.purge` para registros o mediante la eliminación autoritativa del espacio para un proyecto completo. Las guardas de proyecciones y los vínculos compra-proyección se mantienen, y el mismo contrato se valida tanto por memoriaBACKEND como por el bloque opcional `P2P_sin_`.
+
 ## Permisos idénticos con backend y por red local
 
 El modo `sinBACKEND` no aplica una política paralela. Cada capacidad firmada incluye el `resourceType` y el `permissionProfile` del espacio, y `src/js/p2p-permissions.js` reproduce en la PWA la misma decisión autoritativa que memoriaBACKEND. En el perfil `admin-project-v1`, la raíz presupuestal queda reservada al propietario, crear o modificar proyecciones requiere `projection`, borrar una proyección exige simultáneamente `delete` y `projection`, y crear o retirar vínculos de proyección depende de `projection`.

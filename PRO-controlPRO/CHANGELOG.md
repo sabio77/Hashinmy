@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.83 - 2026-08-03
+
+- Cada card de proyecto y cada compra, ingreso o proyección usa ahora un menú vertical de tres puntos con opciones permitidas por rol, presentado en una ventana modal centrada y accesible.
+- Las eliminaciones normales pasan a una papelera P2P sincronizada: el elemento deja de afectar métricas y vistas activas, conserva su contenido completo y puede restaurarse desde cualquier réplica autorizada. La eliminación permanente solo se ofrece dentro de la papelera y exige una segunda confirmación explicativa.
+- Se incorporaron las operaciones cifradas `entity.trash`, `entity.restore` y `entity.purge` en IndexedDB, memoriaBACKEND y `P2P_sin_`, con control de versión esperada, permisos estrictos para proyecciones, guardas de referencias y compatibilidad con `entity.delete`.
+- La papelera distingue proyectos completos de registros individuales, mantiene aislamiento por dominio/aplicación y dispone de textos ES/EN/AR, estilos compactos y regresiones ejecutables.
+
 ## 1.9.81 - 2026-08-03
 
 - Corregido el despliegue que podía publicar `runtime-config.js` con `backendUrl` vacío aunque `APP_BACKEND_URL` estuviera definida en Render pero el generador de la app no se ejecutara desde el build del Static Site.

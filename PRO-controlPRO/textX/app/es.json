@@ -205,7 +205,11 @@
     "purchaseEditTitle": "Editar compra",
     "incomeEditTitle": "Editar ingreso",
     "projectionEditTitle": "Editar proyección",
-    "purchaseSavedLinkError": "La compra se guardó, pero no pudo actualizarse su vínculo con la proyección."
+    "purchaseSavedLinkError": "La compra se guardó, pero no pudo actualizarse su vínculo con la proyección.",
+    "purchaseLabel": "Compra",
+    "incomeLabel": "Ingreso",
+    "projectionLabel": "Proyección",
+    "genericLabel": "Registro"
   },
   "projection": {
     "completed": "Compra realizada",
@@ -247,7 +251,8 @@
   "permissions": {
     "denied": "Tus permisos no permiten realizar esta acción.",
     "deleteDenied": "No tienes permiso para eliminar registros.",
-    "projectionDeleteDenied": "Necesitas permisos de proyección y eliminación para borrar una proyección."
+    "projectionDeleteDenied": "Necesitas permisos de proyección y eliminación para borrar una proyección.",
+    "ownerRequired": "Solo el propietario puede realizar esta acción."
   },
   "devices": {
     "open": "Administrar dispositivos",
@@ -275,7 +280,8 @@
     "saving": "Guardando…",
     "delete": "Eliminar",
     "edit": "Editar",
-    "noChanges": "No hay cambios por guardar."
+    "noChanges": "No hay cambios por guardar.",
+    "confirm": "Confirmar"
   },
   "access": {
     "manage": "Participantes",
@@ -314,12 +320,12 @@
     "permissionsUpdated": "Los permisos se actualizaron en todos los dispositivos.",
     "permissionsUnchanged": "Los permisos ya estaban configurados de esa forma.",
     "permissionsError": "No se pudieron actualizar los permisos.",
-    "deleteProject": "Eliminar proyecto",
-    "deleteProjectHint": "Elimina el proyecto, revoca el acceso y ordena retirar las copias sincronizadas de cada participante.",
-    "deleteProjectButton": "Eliminar definitivamente",
-    "deleteConfirm": "Esta acción eliminará {name}, revocará el acceso y retirará las copias sincronizadas cuando cada dispositivo se conecte. No se puede deshacer.",
-    "deleteConfirmButton": "Eliminar definitivamente",
-    "deletedSuccess": "El proyecto fue eliminado y se inició la retirada de sus copias sincronizadas.",
+    "deleteProject": "Mover proyecto a la papelera",
+    "deleteProjectHint": "Oculta el proyecto y sus registros de las vistas activas. Podrás restaurarlo desde la papelera.",
+    "deleteProjectButton": "Mover a papelera",
+    "deleteConfirm": "{name} y todos sus registros dejarán de aparecer en las vistas activas. Podrás restaurarlo desde la papelera.",
+    "deleteConfirmButton": "Mover a papelera",
+    "deletedSuccess": "El proyecto fue enviado a la papelera y dejó de afectar el resumen administrativo.",
     "deletedRemote": "El propietario eliminó un proyecto compartido. Su copia local fue retirada de este dispositivo.",
     "transferReplicaRequired": "El nuevo propietario debe abrir y sincronizar completamente el proyecto en al menos uno de sus dispositivos antes de recibir la propiedad."
   },
@@ -357,5 +363,43 @@
     "copied": "Código copiado.",
     "selectCopy": "Selecciona y copia manualmente el código.",
     "changeShared": "Cambio guardado y enviado por la red local."
+  },
+  "actions": {
+    "eyebrow": "Opciones disponibles",
+    "confirmTitle": "Confirma esta acción",
+    "openMenu": "Abrir opciones",
+    "projectMenu": "Opciones del proyecto",
+    "recordMenu": "Opciones del registro",
+    "trashMenu": "Opciones del elemento en papelera",
+    "projectContext": "Acciones generales del proyecto",
+    "openProject": "Abrir proyecto",
+    "noneAvailable": "No hay acciones disponibles para tus permisos."
+  },
+  "trash": {
+    "open": "Abrir papelera",
+    "eyebrow": "Recuperación de información",
+    "title": "Papelera de reciclaje",
+    "description": "Restaura elementos o elimínalos permanentemente. Los proyectos eliminados incluyen toda su información y participantes.",
+    "moveProject": "Mover a papelera",
+    "moveRecord": "Mover a papelera",
+    "moveToTrash": "Mover a papelera",
+    "restore": "Restaurar",
+    "deletePermanently": "Eliminar permanentemente",
+    "projectContext": "Proyecto completo en la papelera",
+    "inTrash": "En la papelera",
+    "confirmProject": "El proyecto “{name}” y todos sus registros dejarán de aparecer en las vistas activas y en las métricas. Podrás restaurarlo desde la papelera.",
+    "confirmRecord": "“{name}” dejará de aparecer en el proyecto y dejará de afectar sus métricas. Podrás restaurarlo desde la papelera.",
+    "confirmPermanentProject": "Se eliminarán permanentemente “{name}”, todos sus registros, el acceso de los participantes y las copias sincronizadas. Esta acción no se puede deshacer.",
+    "confirmPermanentRecord": "Se eliminará permanentemente “{name}”. Ya no podrá restaurarse ni recuperarse desde otros dispositivos.",
+    "projectUnavailable": "No se encontró la versión actual del proyecto.",
+    "recordUnavailable": "No se encontró la versión actual del registro.",
+    "processing": "Aplicando cambio…",
+    "movedSuccess": "El elemento fue enviado a la papelera y dejó de afectar las vistas activas.",
+    "restoredSuccess": "El elemento fue restaurado correctamente.",
+    "purgedSuccess": "El elemento fue eliminado permanentemente.",
+    "actionError": "No se pudo completar la acción.",
+    "projectsSection": "Proyectos eliminados",
+    "completeProject": "Proyecto completo",
+    "empty": "La papelera está vacía."
   }
 }

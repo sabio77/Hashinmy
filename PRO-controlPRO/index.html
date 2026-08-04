@@ -46,6 +46,9 @@
           <button id="invitations-button" class="icon-button" type="button" aria-label="Ver invitaciones" data-i18n-attr="aria-label:dashboard.invitations">
             <span aria-hidden="true">✉</span><span id="invitation-count" class="notification-badge" hidden>0</span>
           </button>
+          <button id="trash-button" class="icon-button" type="button" aria-label="Abrir papelera" data-i18n-attr="aria-label:trash.open">
+            <span aria-hidden="true">♲</span><span id="trash-count" class="notification-badge" hidden>0</span>
+          </button>
           <button id="devices-button" class="icon-button" type="button" aria-label="Administrar dispositivos" data-i18n-attr="aria-label:devices.open">
             <span aria-hidden="true">▣</span>
           </button>
@@ -187,6 +190,31 @@
 
 
 
+  <dialog id="action-menu-dialog" class="modal-card action-menu-dialog">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p id="action-menu-eyebrow" class="eyebrow" data-i18n="actions.eyebrow">Opciones disponibles</p><h2 id="action-menu-title">Acciones</h2><p id="action-menu-context" class="section-description"></p></div><button class="icon-button" type="button" data-close-dialog="action-menu-dialog" aria-label="Cerrar">×</button></div>
+      <div id="action-menu-list" class="action-menu-list"></div>
+      <section id="action-menu-confirm-panel" class="access-confirm-panel hidden" aria-live="polite">
+        <strong id="action-menu-confirm-title" data-i18n="actions.confirmTitle">Confirma esta acción</strong>
+        <p id="action-menu-confirm-message"></p>
+        <div class="modal-actions">
+          <button id="action-menu-confirm-cancel" class="button button-ghost button-compact" type="button" data-i18n="common.cancel">Cancelar</button>
+          <button id="action-menu-confirm-button" class="button button-danger button-compact" type="button" data-i18n="common.confirm">Confirmar</button>
+        </div>
+      </section>
+      <p id="action-menu-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <dialog id="trash-dialog" class="modal-card modal-wide">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="trash.eyebrow">Recuperación de información</p><h2 data-i18n="trash.title">Papelera de reciclaje</h2></div><button class="icon-button" type="button" data-close-dialog="trash-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="trash.description">Restaura elementos o elimínalos permanentemente. Los proyectos eliminados incluyen toda su información y participantes.</p>
+      <div id="trash-list" class="trash-list"></div>
+      <p id="trash-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <dialog id="local-network-dialog" class="modal-card modal-wide">
     <div class="modal-form local-network-panel">
       <div class="modal-heading"><div><p class="eyebrow" data-i18n="localNetwork.eyebrow">Sincronización directa</p><h2 data-i18n="localNetwork.title">Conectar por la misma red Wi‑Fi</h2></div><button class="icon-button" type="button" data-close-dialog="local-network-dialog" aria-label="Cerrar">×</button></div>
@@ -243,10 +271,10 @@
       <div id="access-member-list" class="access-member-list"></div>
       <section id="access-owner-actions" class="access-owner-actions hidden">
         <div>
-          <strong data-i18n="access.deleteProject">Eliminar proyecto</strong>
-          <p data-i18n="access.deleteProjectHint">Elimina el proyecto, revoca el acceso y ordena retirar las copias sincronizadas de cada participante.</p>
+          <strong data-i18n="access.deleteProject">Mover proyecto a la papelera</strong>
+          <p data-i18n="access.deleteProjectHint">Oculta el proyecto y sus registros de las vistas activas. Podrás restaurarlo desde la papelera.</p>
         </div>
-        <button id="delete-project-button" class="button button-danger button-compact" type="button" data-i18n="access.deleteProjectButton">Eliminar definitivamente</button>
+        <button id="delete-project-button" class="button button-danger button-compact" type="button" data-i18n="access.deleteProjectButton">Mover a papelera</button>
       </section>
       <section id="access-confirm-panel" class="access-confirm-panel hidden" aria-live="polite">
         <strong data-i18n="access.confirmTitle">Confirma esta acción</strong>

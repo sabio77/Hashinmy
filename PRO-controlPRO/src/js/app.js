@@ -75,6 +75,8 @@ const state = {
   editingRecord: null,
   pendingAccessAction: null,
   pendingDeviceRetirement: null,
+  actionMenuContext: null,
+  pendingActionMenuAction: null,
   storageDurability: null,
   storageRequestPromise: null,
   concurrentConflictOperations: new Map(),
@@ -102,7 +104,9 @@ const elements = {
   projectDialog: byId('project-dialog'), projectForm: byId('project-form'), projectFormMode: byId('project-form-mode'), projectDialogTitle: byId('project-dialog-title'), projectNameInput: byId('project-name-input'), projectDescriptionInput: byId('project-description-input'), projectAddressInput: byId('project-address-input'), projectBudgetInput: byId('project-budget-input'), projectFormStatus: byId('project-form-status'), projectSubmitButton: byId('project-submit-button'),
   recordDialog: byId('record-dialog'), recordForm: byId('record-form'), recordTypeInput: byId('record-type-input'), recordDialogEyebrow: byId('record-dialog-eyebrow'), recordDialogTitle: byId('record-dialog-title'), recordDescriptionInput: byId('record-description-input'), recordInvoiceInput: byId('record-invoice-input'), recordAmountInput: byId('record-amount-input'), recordDateInput: byId('record-date-input'), recordProjectionInput: byId('record-projection-input'), invoiceField: byId('invoice-field'), projectionLinkField: byId('projection-link-field'), recordDateLabel: byId('record-date-label'), recordAmountLabel: byId('record-amount-label'), recordFormStatus: byId('record-form-status'), recordSubmitButton: byId('record-submit-button'),
   inviteDialog: byId('invite-dialog'), inviteForm: byId('invite-form'), inviteEmailInput: byId('invite-email-input'), inviteStatus: byId('invite-status'), inviteSubmitButton: byId('invite-submit-button'), invitationsDialog: byId('invitations-dialog'),
-  accessDialog: byId('access-dialog'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel')
+  accessDialog: byId('access-dialog'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel'),
+  trashButton: byId('trash-button'), trashCount: byId('trash-count'), trashDialog: byId('trash-dialog'), trashList: byId('trash-list'), trashStatus: byId('trash-status'),
+  actionMenuDialog: byId('action-menu-dialog'), actionMenuTitle: byId('action-menu-title'), actionMenuContext: byId('action-menu-context'), actionMenuList: byId('action-menu-list'), actionMenuStatus: byId('action-menu-status'), actionMenuConfirmPanel: byId('action-menu-confirm-panel'), actionMenuConfirmTitle: byId('action-menu-confirm-title'), actionMenuConfirmMessage: byId('action-menu-confirm-message'), actionMenuConfirmButton: byId('action-menu-confirm-button'), actionMenuConfirmCancel: byId('action-menu-confirm-cancel')
 };
 
 function t(key, fallback) { return window.AppI18n?.t?.(key, fallback) || fallback; }
@@ -122,7 +126,9 @@ function isSelectedProjectOwner() {
   const space = selectedSpace();
   return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user?.userId && space.ownerUserId === state.user.userId);
 }
-function userCan(permission) { const space = selectedSpace(); return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user && hasPermission(space, state.user.userId, permission)); }
+function spaceUserCan(space = null, permission = '') { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user && hasPermission(space, state.user.userId, permission)); }
+function userCan(permission) { return spaceUserCan(selectedSpace(), permission); }
+function isSpaceOwner(space = null) { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user?.userId && space.ownerUserId === state.user.userId); }
 function replicaHealthForSpace(spaceId = '') {
   const cleanSpaceId = String(spaceId || '').trim();
   const health = state.p2pState.replicaHealth?.[cleanSpaceId];
@@ -185,7 +191,7 @@ function setOperationSavedStatus(result = {}, message = '') {
 function setBusy(value) { state.busy = Boolean(value); if (elements.loginButton) elements.loginButton.disabled = state.busy; if (elements.logoutButton) elements.logoutButton.disabled = state.busy; }
 function setP2PBusy(value) {
   state.p2pBusy = Boolean(value);
-  [elements.projectSubmitButton, elements.recordSubmitButton, elements.inviteSubmitButton, elements.deleteProjectButton, elements.accessConfirmButton, elements.deviceConfirmButton].forEach((button) => { if (button) button.disabled = state.p2pBusy; });
+  [elements.projectSubmitButton, elements.recordSubmitButton, elements.inviteSubmitButton, elements.deleteProjectButton, elements.accessConfirmButton, elements.deviceConfirmButton, elements.actionMenuConfirmButton].forEach((button) => { if (button) button.disabled = state.p2pBusy; });
   elements.accessMemberList?.querySelectorAll('button, input').forEach((control) => {
     control.disabled = state.p2pBusy || control.dataset.permissionLocked === 'true';
   });
@@ -427,12 +433,14 @@ function resetUserScopedInterface() {
   state.editingRecord = null;
   state.pendingAccessAction = null;
   state.pendingDeviceRetirement = null;
+  state.actionMenuContext = null;
+  state.pendingActionMenuAction = null;
   state.concurrentConflictOperations.clear();
   state.invitationRefreshSequence += 1;
   state.storageDurability = null;
   state.storageRequestPromise = null;
   setP2PBusy(false);
-  [elements.projectDialog, elements.recordDialog, elements.inviteDialog, elements.invitationsDialog, elements.devicesDialog, elements.accessDialog]
+  [elements.projectDialog, elements.recordDialog, elements.inviteDialog, elements.invitationsDialog, elements.devicesDialog, elements.accessDialog, elements.actionMenuDialog, elements.trashDialog]
     .forEach((dialog) => closeDialog(dialog));
   elements.projectView?.classList.add('hidden');
   elements.dashboardView?.classList.remove('hidden');
@@ -480,6 +488,9 @@ function resolvedProjectData(space, entities) {
   const strictProjectionLinks = space?.permissionProfile === ADMIN_PROJECT_PERMISSION_PROFILE;
   const purchases = resolvePurchaseProjectionLinks(rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
   const projections = resolveProjectionActuals(rawProjections, rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
+  const trashedPurchases = entitiesByType(entities, PURCHASE_ENTITY_TYPE, { onlyTrashed: true });
+  const trashedIncomes = entitiesByType(entities, INCOME_ENTITY_TYPE, { onlyTrashed: true });
+  const trashedProjections = entitiesByType(entities, PROJECTION_ENTITY_TYPE, { onlyTrashed: true });
   return {
     space,
     project,
@@ -487,6 +498,11 @@ function resolvedProjectData(space, entities) {
     incomes,
     projections,
     projectionLinks,
+    trash: {
+      purchases: trashedPurchases,
+      incomes: trashedIncomes,
+      projections: trashedProjections
+    },
     strictProjectionLinks,
     metrics: calculateProjectMetrics(project, purchases, incomes, projections)
   };
@@ -501,14 +517,16 @@ async function refreshProjects() {
   }));
   if (renderSequence !== state.renderSequence) return;
   state.projects = new Map(entries);
-  if (state.selectedSpaceId && !state.projects.has(state.selectedSpaceId)) showDashboard();
+  const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
+  if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
   renderDashboard();
+  renderTrash();
   if (state.selectedSpaceId) renderProject();
 }
 
 function renderPortfolioMetrics() {
   elements.portfolioMetrics.replaceChildren();
-  const projects = [...state.projects.values()];
+  const projects = [...state.projects.values()].filter((item) => !item.project.isTrashed);
   const totalCapital = sumMoneyValues(projects, (item) => item.metrics.totalCapital);
   const totalPurchases = sumMoneyValues(projects, (item) => item.metrics.totalPurchases);
   const available = sumMoneyValues(projects, (item) => item.metrics.availableCapital);
@@ -520,17 +538,34 @@ function renderPortfolioMetrics() {
   );
 }
 
+function contextMenuButton(context = {}, label = '') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'context-menu-button';
+  button.dataset.actionMenuScope = context.scope || '';
+  button.dataset.spaceId = context.spaceId || '';
+  if (context.type) button.dataset.recordType = context.type;
+  if (context.entityId) button.dataset.entityId = context.entityId;
+  button.setAttribute('aria-label', label || t('actions.openMenu', 'Abrir opciones'));
+  button.title = label || t('actions.openMenu', 'Abrir opciones');
+  button.innerHTML = '<span aria-hidden="true">⋮</span>';
+  return button;
+}
+
 function renderDashboard() {
   renderPortfolioMetrics();
   elements.projectList.replaceChildren();
-  const projects = [...state.projects.values()].sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
+  const projects = [...state.projects.values()]
+    .filter((item) => !item.project.isTrashed)
+    .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
   if (!projects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
     empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`;
     elements.projectList.append(empty); return;
   }
   for (const data of projects) {
-    const card = document.createElement('button'); card.type = 'button'; card.className = 'project-card'; card.dataset.spaceId = data.space.spaceId;
+    const card = document.createElement('article'); card.className = 'project-card';
+    const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'project-card-main'; openButton.dataset.openProject = data.space.spaceId;
     const authorizationUnconfirmed = isAuthorizationUnconfirmed(data.space);
     const replicaRecoveryPending = isReplicaRecoveryPending(data.space);
     if (authorizationUnconfirmed) card.dataset.authorization = 'unconfirmed';
@@ -543,7 +578,9 @@ function renderDashboard() {
     const description = document.createElement('p'); description.textContent = data.project.description || t('project.noDescription', 'Sin descripción');
     const metrics = document.createElement('div'); metrics.className = 'project-card-metrics';
     metrics.innerHTML = `<div><span>${t('project.available', 'Disponible')}</span><strong>${money(data.metrics.availableCapital)}</strong></div><div><span>${t('project.expenses', 'Gastos')}</span><strong>${money(data.metrics.totalPurchases)}</strong></div>`;
-    card.append(header, description, metrics); elements.projectList.append(card);
+    openButton.append(header, description, metrics);
+    card.append(openButton, contextMenuButton({ scope: 'project', spaceId: data.space.spaceId }, t('actions.projectMenu', 'Opciones del proyecto')));
+    elements.projectList.append(card);
   }
 }
 
@@ -789,7 +826,7 @@ function prepareAccessAction(action = '', userId = '') {
     revoke: t('access.revokeConfirm', '{name} perderá el acceso y las claves futuras del proyecto.').replace('{name}', label),
     transfer: t('access.transferConfirm', '{name} será el nuevo propietario. Debe haber abierto y sincronizado completamente este proyecto en al menos uno de sus dispositivos. Tú conservarás acceso como participante.').replace('{name}', label),
     leave: t('access.leaveConfirm', 'Perderás acceso y la copia local de este proyecto se eliminará de este dispositivo.'),
-    'delete-project': t('access.deleteConfirm', 'Esta acción eliminará {name}, revocará el acceso y retirará las copias sincronizadas cuando cada dispositivo se conecte. No se puede deshacer.').replace('{name}', label)
+    'delete-project': t('access.deleteConfirm', '{name} y todos sus registros dejarán de aparecer en las vistas activas. Podrás restaurarlo desde la papelera.').replace('{name}', label)
   };
   if (!messages[action]) return;
   state.pendingAccessAction = { action, userId, spaceId: data.space.spaceId, label };
@@ -799,7 +836,7 @@ function prepareAccessAction(action = '', userId = '') {
     : action === 'leave'
       ? t('access.leaveConfirmButton', 'Abandonar')
       : action === 'delete-project'
-        ? t('access.deleteConfirmButton', 'Eliminar definitivamente')
+        ? t('access.deleteConfirmButton', 'Mover a papelera')
         : t('access.revokeConfirmButton', 'Revocar');
   elements.accessConfirmButton.classList.toggle('button-danger', action !== 'transfer');
   elements.accessConfirmButton.classList.toggle('button-primary', action === 'transfer');
@@ -815,15 +852,20 @@ async function executeAccessAction() {
     if (pending.action === 'revoke') result = await semillaP2P.revoke(pending.spaceId, pending.userId);
     if (pending.action === 'transfer') result = await semillaP2P.transfer(pending.spaceId, pending.userId);
     if (pending.action === 'leave') result = await semillaP2P.leave(pending.spaceId);
-    if (pending.action === 'delete-project') result = await semillaP2P.deleteSpace(pending.spaceId);
+    if (pending.action === 'delete-project') {
+      const data = state.projects.get(pending.spaceId);
+      if (!data?.project?._entity?.value) throw new Error(t('trash.projectUnavailable', 'No se encontró la versión actual del proyecto.'));
+      result = await semillaP2P.trash(pending.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity.value });
+    }
     applyP2PState(semillaP2P.bootstrapState);
     clearAccessConfirmation();
     if (pending.action === 'leave' || pending.action === 'delete-project') {
+      await refreshProjects();
       closeDialog(elements.accessDialog); showDashboard();
       setStatus(
         elements.dashboardStatus,
         pending.action === 'delete-project'
-          ? t('access.deletedSuccess', 'El proyecto fue eliminado y se inició la retirada de sus copias sincronizadas.')
+          ? t('access.deletedSuccess', 'El proyecto fue enviado a la papelera y dejó de afectar el resumen administrativo.')
           : t('access.leftSuccess', 'Abandonaste el proyecto y su copia local fue retirada.'),
         'success'
       );
@@ -846,7 +888,6 @@ async function executeAccessAction() {
   } finally { setP2PBusy(false); renderAccessManagement(); }
 }
 function emptyRecord(text) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = text; return empty; }
-function actionButton(action, type, id, label) { const button = document.createElement('button'); button.type = 'button'; button.className = 'mini-button'; button.dataset.recordAction = action; button.dataset.recordType = type; button.dataset.entityId = id; button.textContent = label; return button; }
 function projectionVarianceLabel(record = {}) {
   if (record.varianceStatus === 'over') return `${t('projection.overBudget', 'Sobre presupuesto')}: ${money(absoluteMoneyValue(record.varianceAmount || 0))}`;
   if (record.varianceStatus === 'under') return `${t('projection.underBudget', 'Por debajo')}: ${money(absoluteMoneyValue(record.varianceAmount || 0))}`;
@@ -862,21 +903,6 @@ function renderRecordList(container, records, type) {
     if (type === 'income') detail.textContent = shortDate(record.receivedAt);
     if (type === 'projection') detail.textContent = record.status === 'completed' ? t('projection.completed', 'Compra realizada') : [t('projection.pending', 'Pendiente'), shortDate(record.expectedAt)].filter(Boolean).join(' · ');
     content.append(title, detail);
-    const canEdit = userCan(type === 'projection' ? 'projection' : 'add');
-    const canDelete = userCan('delete') && (type !== 'projection' || userCan('projection'));
-    if (canEdit || canDelete) {
-      const actions = document.createElement('div'); actions.className = 'record-actions';
-      if (canEdit) actions.append(actionButton('edit', type, record.id, t('common.edit', 'Editar')));
-      if (canDelete) {
-        const deleteButton = actionButton('delete', type, record.id, t('common.delete', 'Eliminar'));
-        if (type === 'projection' && (record.actualPurchaseIds || []).length) {
-          deleteButton.disabled = true;
-          deleteButton.title = t('projection.deleteLinkedHint', 'Esta proyección conserva compras reales vinculadas.');
-        }
-        actions.append(deleteButton);
-      }
-      content.append(actions);
-    }
     const amount = document.createElement('div'); amount.className = 'record-amount';
     if (type === 'projection') {
       amount.textContent = money(record.projectedAmount);
@@ -890,14 +916,21 @@ function renderRecordList(container, records, type) {
         variance.textContent = varianceLabel;
         amount.append(variance);
       }
-    }
-    else amount.textContent = money(record.amount);
-    item.append(content, amount); container.append(item);
+    } else amount.textContent = money(record.amount);
+    const canEdit = userCan(type === 'projection' ? 'projection' : 'add');
+    const canDelete = userCan('delete') && (type !== 'projection' || userCan('projection'));
+    const menu = contextMenuButton(
+      { scope: 'record', spaceId: state.selectedSpaceId, type, entityId: record.id },
+      t('actions.recordMenu', 'Opciones del registro')
+    );
+    menu.disabled = !canEdit && !canDelete;
+    if (type === 'projection' && (record.actualPurchaseIds || []).length) menu.dataset.linkedPurchases = 'true';
+    item.append(content, amount, menu); container.append(item);
   }
 }
 
 function renderProject() {
-  const data = selectedProjectData(); if (!data) return;
+  const data = selectedProjectData(); if (!data || data.project.isTrashed) { showDashboard(); return; }
   elements.projectName.textContent = data.project.name; elements.projectDescription.textContent = data.project.description || t('project.noDescription', 'Sin descripción'); elements.projectAddress.textContent = data.project.address || t('project.noAddress', 'Sin dirección');
   renderMembers(data);
   if (elements.projectReplicaHealth) {
@@ -930,7 +963,8 @@ function renderProject() {
 
 function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); }
 function openProject(spaceId) {
-  if (!state.projects.has(spaceId)) return;
+  const data = state.projects.get(spaceId);
+  if (!data || data.project.isTrashed) return;
   state.selectedSpaceId = spaceId;
   elements.dashboardView.classList.add('hidden');
   elements.projectView.classList.remove('hidden');
@@ -1255,9 +1289,11 @@ async function submitProject(event) {
   finally { setP2PBusy(false); }
 }
 
-function recordByType(type = '', entityId = '') {
-  const data = selectedProjectData();
-  const collections = { purchase: data?.purchases, income: data?.incomes, projection: data?.projections };
+function recordByType(type = '', entityId = '', options = {}) {
+  const data = options.spaceId ? state.projects.get(options.spaceId) : selectedProjectData();
+  const collections = options.trashed === true
+    ? { purchase: data?.trash?.purchases, income: data?.trash?.incomes, projection: data?.trash?.projections }
+    : { purchase: data?.purchases, income: data?.incomes, projection: data?.projections };
   return (collections[type] || []).find((record) => record.id === entityId) || null;
 }
 
@@ -1489,72 +1525,332 @@ async function submitRecord(event) {
   }
 }
 
-async function handleRecordAction(event) {
-  const button = event.target.closest('[data-record-action][data-record-type][data-entity-id]'); if (!button || state.p2pBusy) return;
-  const type = button.dataset.recordType; const record = recordByType(type, button.dataset.entityId); const projectData = selectedProjectData();
-  if (button.dataset.recordAction === 'edit') { if (record) openRecordForm(type, record); return; }
-  if (button.dataset.recordAction !== 'delete') return;
-  if (!userCan('delete') || (type === 'projection' && !userCan('projection'))) {
-    setStatus(elements.projectStatus, type === 'projection'
-      ? t('permissions.projectionDeleteDenied', 'Necesitas permisos de proyección y eliminación para borrar una proyección.')
-      : t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'), 'error');
-    return;
+const RECORD_ENTITY_TYPES = Object.freeze({ purchase: PURCHASE_ENTITY_TYPE, income: INCOME_ENTITY_TYPE, projection: PROJECTION_ENTITY_TYPE });
+
+function recordTypeLabel(type = '') {
+  return {
+    purchase: t('record.purchaseLabel', 'Compra'),
+    income: t('record.incomeLabel', 'Ingreso'),
+    projection: t('record.projectionLabel', 'Proyección')
+  }[type] || t('record.genericLabel', 'Registro');
+}
+
+function recordCanEdit(space = null, type = '') {
+  return spaceUserCan(space, type === 'projection' ? 'projection' : 'add');
+}
+
+function recordCanDelete(space = null, type = '') {
+  return spaceUserCan(space, 'delete') && (type !== 'projection' || spaceUserCan(space, 'projection'));
+}
+
+function menuActionButton(action = '', icon = '', label = '', options = {}) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'action-menu-option';
+  if (options.danger) button.classList.add('is-danger');
+  button.dataset.menuAction = action;
+  const iconNode = document.createElement('span'); iconNode.className = 'action-menu-icon'; iconNode.setAttribute('aria-hidden', 'true'); iconNode.textContent = icon;
+  const labelNode = document.createElement('span'); labelNode.textContent = label;
+  button.append(iconNode, labelNode);
+  return button;
+}
+
+function clearActionMenuConfirmation() {
+  state.pendingActionMenuAction = null;
+  elements.actionMenuConfirmPanel?.classList.add('hidden');
+  if (elements.actionMenuConfirmMessage) elements.actionMenuConfirmMessage.textContent = '';
+  if (elements.actionMenuConfirmButton) elements.actionMenuConfirmButton.textContent = t('common.confirm', 'Confirmar');
+}
+
+function actionMenuContextFromButton(button = null) {
+  if (!button) return null;
+  const scope = String(button.dataset.actionMenuScope || '').trim();
+  const spaceId = String(button.dataset.spaceId || '').trim();
+  if (!scope || !spaceId) return null;
+  return {
+    scope,
+    spaceId,
+    type: String(button.dataset.recordType || '').trim(),
+    entityId: String(button.dataset.entityId || '').trim()
+  };
+}
+
+function actionMenuRecord(context = null) {
+  if (!context?.type || !context?.entityId) return null;
+  return recordByType(context.type, context.entityId, {
+    spaceId: context.spaceId,
+    trashed: context.scope === 'trash-record'
+  });
+}
+
+function renderActionMenu() {
+  const context = state.actionMenuContext;
+  if (!context || !elements.actionMenuList) return;
+  clearActionMenuConfirmation();
+  setStatus(elements.actionMenuStatus, '');
+  elements.actionMenuList.replaceChildren();
+  const data = state.projects.get(context.spaceId);
+  if (!data) return;
+  const space = data.space;
+  const actions = [];
+
+  if (context.scope === 'project') {
+    elements.actionMenuTitle.textContent = data.project.name;
+    elements.actionMenuContext.textContent = t('actions.projectContext', 'Acciones generales del proyecto');
+    actions.push(menuActionButton('open-project', '↗', t('actions.openProject', 'Abrir proyecto')));
+    if (isSpaceOwner(space)) actions.push(menuActionButton('edit-project', '✎', t('common.edit', 'Editar')));
+    if (!isAuthorizationUnconfirmed(space) && (isSpaceOwner(space) || spaceUserCan(space, 'invite'))) actions.push(menuActionButton('invite-project', '＋', t('project.invite', 'Invitar')));
+    if (!isAuthorizationUnconfirmed(space) && (space.members || []).some((member) => member.userId === state.user?.userId)) actions.push(menuActionButton('manage-access', '♙', t('access.manage', 'Participantes')));
+    if (isSpaceOwner(space)) actions.push(menuActionButton('trash-project', '♲', t('trash.moveProject', 'Mover a papelera'), { danger: true }));
   }
-  const entityTypes = { purchase: PURCHASE_ENTITY_TYPE, income: INCOME_ENTITY_TYPE, projection: PROJECTION_ENTITY_TYPE }; const entityType = entityTypes[type]; if (!entityType) return;
-  if (!record?._entity?.value) return;
-  if (type === 'projection' && (record.actualPurchaseIds || []).length) {
-    setStatus(elements.projectStatus, t('projection.deleteLinkedError', 'No se puede eliminar una proyección con compras reales vinculadas. Desvincula o elimina esas compras primero.'), 'warning');
-    return;
+
+  if (context.scope === 'record') {
+    const record = actionMenuRecord(context);
+    elements.actionMenuTitle.textContent = record?.description || recordTypeLabel(context.type);
+    elements.actionMenuContext.textContent = recordTypeLabel(context.type);
+    if (record && recordCanEdit(space, context.type)) actions.push(menuActionButton('edit-record', '✎', t('common.edit', 'Editar')));
+    if (record && recordCanDelete(space, context.type)) actions.push(menuActionButton('trash-record', '♲', t('trash.moveRecord', 'Mover a papelera'), { danger: true }));
   }
-  setP2PBusy(true);
-  try {
-    let queued = false;
-    if (type === 'projection' && projectData?.strictProjectionLinks) {
-      const activePurchaseIds = new Set((projectData.purchases || []).map((purchase) => String(purchase.id || '')).filter(Boolean));
-      const orphanLinks = (projectData.projectionLinks || []).filter((link) => (
-        link?.active !== false
-        && String(link?.projectionId || '') === String(button.dataset.entityId || '')
-        && !activePurchaseIds.has(String(link?.purchaseId || link?.id || ''))
-      ));
-      for (const link of orphanLinks) {
-        try {
-          await semillaP2P.delete(state.selectedSpaceId, PROJECTION_LINK_ENTITY_TYPE, link.id, {
-            expected: link._entity?.value || link
-          });
-        } catch (error) {
-          if (!error?.p2pQueued) throw error;
-          queued = true;
-        }
+
+  if (context.scope === 'trash-project') {
+    elements.actionMenuTitle.textContent = data.project.name;
+    elements.actionMenuContext.textContent = t('trash.projectContext', 'Proyecto completo en la papelera');
+    if (isSpaceOwner(space)) {
+      actions.push(menuActionButton('restore-project', '↶', t('trash.restore', 'Restaurar')));
+      actions.push(menuActionButton('purge-project', '×', t('trash.deletePermanently', 'Eliminar permanentemente'), { danger: true }));
+    }
+  }
+
+  if (context.scope === 'trash-record') {
+    const record = actionMenuRecord(context);
+    elements.actionMenuTitle.textContent = record?.description || recordTypeLabel(context.type);
+    elements.actionMenuContext.textContent = `${recordTypeLabel(context.type)} · ${t('trash.inTrash', 'En la papelera')}`;
+    if (record && recordCanDelete(space, context.type)) {
+      actions.push(menuActionButton('restore-record', '↶', t('trash.restore', 'Restaurar')));
+      actions.push(menuActionButton('purge-record', '×', t('trash.deletePermanently', 'Eliminar permanentemente'), { danger: true }));
+    }
+  }
+
+  if (!actions.length) elements.actionMenuList.append(emptyRecord(t('actions.noneAvailable', 'No hay acciones disponibles para tus permisos.')));
+  else elements.actionMenuList.append(...actions);
+}
+
+function openActionMenu(context = null) {
+  if (!context || state.p2pBusy) return;
+  state.actionMenuContext = context;
+  renderActionMenu();
+  openDialog(elements.actionMenuDialog);
+  elements.actionMenuList?.querySelector('button')?.focus();
+}
+
+function prepareActionMenuConfirmation(action = '') {
+  const context = state.actionMenuContext;
+  const data = context ? state.projects.get(context.spaceId) : null;
+  const record = context ? actionMenuRecord(context) : null;
+  if (!context || !data) return;
+  const projectName = data.project.name || t('project.defaultName', 'Proyecto compartido');
+  const recordName = record?.description || recordTypeLabel(context.type);
+  const messages = {
+    'trash-project': t('trash.confirmProject', 'El proyecto “{name}” y todos sus registros dejarán de aparecer en las vistas activas y en las métricas. Podrás restaurarlo desde la papelera.').replace('{name}', projectName),
+    'trash-record': t('trash.confirmRecord', '“{name}” dejará de aparecer en el proyecto y dejará de afectar sus métricas. Podrás restaurarlo desde la papelera.').replace('{name}', recordName),
+    'purge-project': t('trash.confirmPermanentProject', 'Se eliminarán permanentemente “{name}”, todos sus registros, el acceso de los participantes y las copias sincronizadas. Esta acción no se puede deshacer.').replace('{name}', projectName),
+    'purge-record': t('trash.confirmPermanentRecord', 'Se eliminará permanentemente “{name}”. Ya no podrá restaurarse ni recuperarse desde otros dispositivos.').replace('{name}', recordName)
+  };
+  if (!messages[action]) return;
+  state.pendingActionMenuAction = { action, context: { ...context } };
+  elements.actionMenuConfirmMessage.textContent = messages[action];
+  elements.actionMenuConfirmButton.textContent = action.startsWith('purge-')
+    ? t('trash.deletePermanently', 'Eliminar permanentemente')
+    : t('trash.moveToTrash', 'Mover a papelera');
+  elements.actionMenuConfirmPanel.classList.remove('hidden');
+  elements.actionMenuConfirmButton.focus();
+}
+
+async function purgeRecord(context = {}, record = null, data = null) {
+  const entityType = RECORD_ENTITY_TYPES[context.type];
+  if (!entityType || !record?._entity?.value || !data) throw new Error(t('trash.recordUnavailable', 'No se encontró la versión actual del registro.'));
+  let queued = false;
+  if (context.type === 'projection' && (record.actualPurchaseIds || []).length) {
+    const error = new Error(t('projection.deleteLinkedError', 'No se puede eliminar una proyección con compras reales vinculadas. Desvincula o elimina esas compras primero.'));
+    error.code = 'P2P_PROJECTION_LINKED';
+    throw error;
+  }
+  if (context.type === 'projection' && data.strictProjectionLinks) {
+    const activePurchaseIds = new Set((data.purchases || []).map((purchase) => String(purchase.id || '')).filter(Boolean));
+    const orphanLinks = (data.projectionLinks || []).filter((link) => (
+      link?.active !== false
+      && String(link?.projectionId || '') === String(context.entityId || '')
+      && !activePurchaseIds.has(String(link?.purchaseId || link?.id || ''))
+    ));
+    for (const link of orphanLinks) {
+      try {
+        await semillaP2P.purge(context.spaceId, PROJECTION_LINK_ENTITY_TYPE, link.id, { expected: link._entity?.value || link });
+      } catch (error) {
+        if (!error?.p2pQueued) throw error;
+        queued = true;
       }
     }
-    const result = await semillaP2P.delete(state.selectedSpaceId, entityType, button.dataset.entityId, {
-      expected: record._entity.value,
-      ...(type === 'purchase' && projectData?.strictProjectionLinks && record.projectionLink ? {
-        dependentDeletes: [{
-          entityType: PROJECTION_LINK_ENTITY_TYPE,
-          entityId: button.dataset.entityId,
-          relation: 'admin.purchase-projection-link-v1'
-        }]
-      } : {}),
-      ...(type === 'projection' ? {
-        referenceGuards: projectData?.strictProjectionLinks
-          ? [{ entityType: PROJECTION_LINK_ENTITY_TYPE, field: 'projectionId', equals: button.dataset.entityId }]
-          : [{ entityType: PURCHASE_ENTITY_TYPE, field: 'projectionId', equals: button.dataset.entityId }]
-      } : {})
-    });
+  }
+  const result = await semillaP2P.purge(context.spaceId, entityType, context.entityId, {
+    expected: record._entity.value,
+    ...(context.type === 'purchase' && data.strictProjectionLinks && record.projectionLink ? {
+      dependentDeletes: [{ entityType: PROJECTION_LINK_ENTITY_TYPE, entityId: context.entityId, relation: 'admin.purchase-projection-link-v1' }]
+    } : {}),
+    ...(context.type === 'projection' ? {
+      referenceGuards: data.strictProjectionLinks
+        ? [{ entityType: PROJECTION_LINK_ENTITY_TYPE, field: 'projectionId', equals: context.entityId }]
+        : [{ entityType: PURCHASE_ENTITY_TYPE, field: 'projectionId', equals: context.entityId }]
+    } : {})
+  });
+  return { result, queued };
+}
+
+async function executeLifecycleAction(action = '', context = null) {
+  const data = context ? state.projects.get(context.spaceId) : null;
+  if (!context || !data || state.p2pBusy) return;
+  const isProjectAction = action.endsWith('-project');
+  const record = isProjectAction ? null : actionMenuRecord(context);
+  setP2PBusy(true);
+  setStatus(elements.actionMenuStatus, t('trash.processing', 'Aplicando cambio…'));
+  try {
+    let result = null;
+    let queued = false;
+    if (isProjectAction) {
+      if (!isSpaceOwner(data.space)) throw new Error(t('permissions.ownerRequired', 'Solo el propietario puede realizar esta acción.'));
+      if (action === 'trash-project') result = await semillaP2P.trash(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
+      if (action === 'restore-project') result = await semillaP2P.restore(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
+      if (action === 'purge-project') result = await semillaP2P.deleteSpace(context.spaceId);
+    } else {
+      if (!recordCanDelete(data.space, context.type)) throw new Error(t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'));
+      const entityType = RECORD_ENTITY_TYPES[context.type];
+      if (!entityType || !record?._entity?.value) throw new Error(t('trash.recordUnavailable', 'No se encontró la versión actual del registro.'));
+      if (context.type === 'projection' && (record.actualPurchaseIds || []).length && action !== 'restore-record') {
+        throw new Error(t('projection.deleteLinkedError', 'No se puede eliminar una proyección con compras reales vinculadas. Desvincula o elimina esas compras primero.'));
+      }
+      if (action === 'trash-record') result = await semillaP2P.trash(context.spaceId, entityType, context.entityId, { expected: record._entity.value });
+      if (action === 'restore-record') result = await semillaP2P.restore(context.spaceId, entityType, context.entityId, { expected: record._entity.value });
+      if (action === 'purge-record') {
+        const purge = await purgeRecord(context, record, data);
+        result = purge.result;
+        queued = purge.queued;
+      }
+    }
+    applyP2PState(semillaP2P.bootstrapState);
     await refreshProjects();
-    renderProject();
-    if (queued) setStatus(elements.projectStatus, t('p2p.queuedOffline', 'El registro quedó en la cola local.'), 'success');
-    else setOperationSavedStatus(result, t('record.deleted', 'Registro eliminado y sincronizado.'));
+    clearActionMenuConfirmation();
+    closeDialog(elements.actionMenuDialog);
+    if (isProjectAction && action !== 'restore-project') showDashboard();
+    if (elements.trashDialog?.open) renderTrash();
+    const message = action.startsWith('trash-')
+      ? t('trash.movedSuccess', 'El elemento fue enviado a la papelera y dejó de afectar las vistas activas.')
+      : action.startsWith('restore-')
+        ? t('trash.restoredSuccess', 'El elemento fue restaurado correctamente.')
+        : t('trash.purgedSuccess', 'El elemento fue eliminado permanentemente.');
+    const target = elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus;
+    setStatus(target, queued || result?.queued ? t('p2p.queuedOffline', 'El cambio quedó guardado localmente y se enviará al recuperar conexión.') : message, 'success');
   } catch (error) {
     if (error?.p2pQueued) {
       await refreshProjects();
-      renderProject();
-      setStatus(elements.projectStatus, t('p2p.queuedOffline', 'El registro quedó en la cola local.'), 'success');
+      closeDialog(elements.actionMenuDialog);
+      setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, t('p2p.queuedOffline', 'El cambio quedó guardado localmente y se enviará al recuperar conexión.'), 'success');
     } else {
-      setStatus(elements.projectStatus, error?.message || t('record.deleteError', 'No se pudo eliminar el registro.'), 'error');
+      setStatus(elements.actionMenuStatus, error?.message || t('trash.actionError', 'No se pudo completar la acción.'), 'error');
     }
-  } finally { setP2PBusy(false); }
+  } finally {
+    setP2PBusy(false);
+  }
+}
+
+async function executeActionMenuConfirmation() {
+  const pending = state.pendingActionMenuAction;
+  if (!pending) return;
+  await executeLifecycleAction(pending.action, pending.context);
+}
+
+async function handleActionMenuSelection(event) {
+  const button = event.target.closest('button[data-menu-action]');
+  if (!button || state.p2pBusy) return;
+  const action = button.dataset.menuAction;
+  const context = state.actionMenuContext;
+  if (!context) return;
+  if (['trash-project', 'trash-record', 'purge-project', 'purge-record'].includes(action)) {
+    prepareActionMenuConfirmation(action);
+    return;
+  }
+  if (action === 'restore-project' || action === 'restore-record') {
+    await executeLifecycleAction(action, context);
+    return;
+  }
+  closeDialog(elements.actionMenuDialog);
+  if (action === 'open-project') openProject(context.spaceId);
+  if (action === 'edit-project') { openProject(context.spaceId); openProjectForm('edit'); }
+  if (action === 'invite-project') { openProject(context.spaceId); openInviteForm(); }
+  if (action === 'manage-access') { openProject(context.spaceId); openAccessManagement(); }
+  if (action === 'edit-record') {
+    openProject(context.spaceId);
+    const record = recordByType(context.type, context.entityId);
+    if (record) openRecordForm(context.type, record);
+  }
+}
+
+function trashRecordDetail(type = '', record = {}) {
+  if (type === 'purchase') return [record.invoiceNumber ? `${t('record.invoiceShort', 'Factura')}: ${record.invoiceNumber}` : '', money(record.amount)].filter(Boolean).join(' · ');
+  if (type === 'income') return money(record.amount);
+  return money(record.projectedAmount);
+}
+
+function renderTrashItem(data = null, context = null, titleText = '', detailText = '') {
+  const item = document.createElement('article'); item.className = 'trash-item';
+  const content = document.createElement('div');
+  const title = document.createElement('h3'); title.textContent = titleText;
+  const detail = document.createElement('p'); detail.textContent = [detailText, context.scope === 'trash-project' ? shortDateTime(data.project.trashedAt) : shortDateTime(actionMenuRecord(context)?.trashedAt)].filter(Boolean).join(' · ');
+  content.append(title, detail);
+  const menu = contextMenuButton(context, t('actions.trashMenu', 'Opciones del elemento en papelera'));
+  const canAct = context.scope === 'trash-project' ? isSpaceOwner(data.space) : recordCanDelete(data.space, context.type);
+  menu.disabled = !canAct;
+  item.append(content, menu);
+  return item;
+}
+
+function renderTrash() {
+  if (!elements.trashList || !elements.trashCount) return;
+  elements.trashList.replaceChildren();
+  let count = 0;
+  const ordered = [...state.projects.values()].sort((left, right) => String(right.project.trashedAt || right.project.updatedAt || '').localeCompare(String(left.project.trashedAt || left.project.updatedAt || '')));
+  for (const data of ordered) {
+    if (data.project.isTrashed) {
+      count += 1;
+      const section = document.createElement('section'); section.className = 'trash-section';
+      const heading = document.createElement('h3'); heading.textContent = t('trash.projectsSection', 'Proyectos eliminados');
+      section.append(heading, renderTrashItem(data, { scope: 'trash-project', spaceId: data.space.spaceId }, data.project.name, t('trash.completeProject', 'Proyecto completo')));
+      elements.trashList.append(section);
+      continue;
+    }
+    const records = [
+      ...(data.trash?.purchases || []).map((record) => ({ type: 'purchase', record })),
+      ...(data.trash?.projections || []).map((record) => ({ type: 'projection', record })),
+      ...(data.trash?.incomes || []).map((record) => ({ type: 'income', record }))
+    ].sort((left, right) => String(right.record.trashedAt || '').localeCompare(String(left.record.trashedAt || '')));
+    if (!records.length) continue;
+    count += records.length;
+    const section = document.createElement('section'); section.className = 'trash-section';
+    const heading = document.createElement('h3'); heading.textContent = data.project.name;
+    section.append(heading);
+    for (const entry of records) {
+      const context = { scope: 'trash-record', spaceId: data.space.spaceId, type: entry.type, entityId: entry.record.id };
+      section.append(renderTrashItem(data, context, entry.record.description || recordTypeLabel(entry.type), `${recordTypeLabel(entry.type)} · ${trashRecordDetail(entry.type, entry.record)}`));
+    }
+    elements.trashList.append(section);
+  }
+  elements.trashCount.textContent = String(count);
+  elements.trashCount.hidden = count === 0;
+  if (!count) elements.trashList.append(emptyRecord(t('trash.empty', 'La papelera está vacía.')));
+}
+
+function openTrashDialog() {
+  renderTrash();
+  setStatus(elements.trashStatus, '');
+  openDialog(elements.trashDialog);
 }
 
 function openInviteForm() { if (!selectedProjectData()) return; elements.inviteForm.reset(); const read = elements.inviteForm.querySelector('input[value="read"]'); if (read) read.checked = true; const add = elements.inviteForm.querySelector('input[value="add"]'); if (add) add.checked = true; const projection = elements.inviteForm.querySelector('input[value="projection"]'); if (projection) projection.checked = true; setStatus(elements.inviteStatus, ''); openDialog(elements.inviteDialog); elements.inviteEmailInput.focus(); }
@@ -1766,9 +2062,26 @@ elements.deviceList?.addEventListener('click', (event) => { const button = event
 elements.deviceConfirmButton?.addEventListener('click', executeDeviceRetirement); elements.deviceConfirmCancel?.addEventListener('click', clearDeviceConfirmation);
 elements.protectStorageButton?.addEventListener('click', () => requestStorageProtection({ announce: true }));
 elements.newProjectButton?.addEventListener('click', () => { requestStorageProtection(); openProjectForm('create'); }); elements.projectForm?.addEventListener('submit', submitProject); elements.editProjectButton?.addEventListener('click', () => openProjectForm('edit'));
-elements.projectList?.addEventListener('click', (event) => { const card = event.target.closest('[data-space-id]'); if (card) openProject(card.dataset.spaceId); }); elements.backButton?.addEventListener('click', showDashboard);
+elements.projectList?.addEventListener('click', (event) => {
+  const menu = event.target.closest('button[data-action-menu-scope]');
+  if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
+  const open = event.target.closest('button[data-open-project]');
+  if (open) openProject(open.dataset.openProject);
+});
+elements.backButton?.addEventListener('click', showDashboard);
 elements.addPurchaseButton?.addEventListener('click', () => openRecordForm('purchase')); elements.addIncomeButton?.addEventListener('click', () => openRecordForm('income')); elements.addProjectionButton?.addEventListener('click', () => openRecordForm('projection')); elements.recordForm?.addEventListener('submit', submitRecord);
-[elements.purchaseList, elements.projectionList, elements.incomeList].forEach((list) => list?.addEventListener('click', handleRecordAction));
+[elements.purchaseList, elements.projectionList, elements.incomeList].forEach((list) => list?.addEventListener('click', (event) => {
+  const menu = event.target.closest('button[data-action-menu-scope]');
+  if (menu) openActionMenu(actionMenuContextFromButton(menu));
+}));
+elements.trashButton?.addEventListener('click', openTrashDialog);
+elements.trashList?.addEventListener('click', (event) => {
+  const menu = event.target.closest('button[data-action-menu-scope]');
+  if (menu) openActionMenu(actionMenuContextFromButton(menu));
+});
+elements.actionMenuList?.addEventListener('click', handleActionMenuSelection);
+elements.actionMenuConfirmButton?.addEventListener('click', executeActionMenuConfirmation);
+elements.actionMenuConfirmCancel?.addEventListener('click', clearActionMenuConfirmation);
 elements.inviteCollaboratorButton?.addEventListener('click', openInviteForm); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
 elements.manageAccessButton?.addEventListener('click', openAccessManagement);
 elements.accessMemberList?.addEventListener('click', (event) => {
@@ -1783,7 +2096,8 @@ elements.accessMemberList?.addEventListener('submit', submitPermissionUpdate);
 elements.deleteProjectButton?.addEventListener('click', () => prepareAccessAction('delete-project'));
 elements.accessConfirmButton?.addEventListener('click', executeAccessAction); elements.accessConfirmCancel?.addEventListener('click', clearAccessConfirmation);
 document.addEventListener('click', (event) => { const button = event.target.closest('[data-close-dialog]'); if (button) closeDialog(byId(button.dataset.closeDialog)); });
-document.addEventListener('app-language-ready', () => { renderInvitations(); renderDevices(); renderDashboard(); renderStorageDurability(); if (state.selectedSpaceId) { renderProject(); if (elements.accessDialog?.open) renderAccessManagement(); } setConnectionState(elements.connectionStatus?.dataset.state || 'connecting'); window.AppAssetLoader?.hydrate(document); });
+elements.actionMenuDialog?.addEventListener('close', () => { state.actionMenuContext = null; clearActionMenuConfirmation(); setStatus(elements.actionMenuStatus, ''); });
+document.addEventListener('app-language-ready', () => { renderInvitations(); renderDevices(); renderDashboard(); renderTrash(); renderStorageDurability(); if (state.selectedSpaceId) { renderProject(); if (elements.accessDialog?.open) renderAccessManagement(); } if (elements.actionMenuDialog?.open) renderActionMenu(); setConnectionState(elements.connectionStatus?.dataset.state || 'connecting'); window.AppAssetLoader?.hydrate(document); });
 
 subscribeSessionTokenChanges(({ token }) => {
   queueExternalSessionSynchronization(token);

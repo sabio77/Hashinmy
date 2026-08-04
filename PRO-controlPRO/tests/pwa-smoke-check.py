@@ -65,6 +65,7 @@ REQUIRED_FILES = [
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
     "tests/project-domain-smoke.mjs",
+    "tests/p2p-trash-lifecycle-smoke.mjs",
     "_headers",
 ]
 
@@ -252,6 +253,21 @@ def assert_local_state_reconciliation() -> None:
     )
     if result.returncode != 0:
         fail(f"Falló la reconciliación local P2P: {result.stderr.strip() or result.stdout.strip()}")
+
+
+def assert_trash_lifecycle() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba de papelera P2P.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "p2p-trash-lifecycle-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló el ciclo de vida de papelera P2P: {result.stderr.strip() or result.stdout.strip()}")
 
 
 def assert_storage_durability() -> None:
@@ -1262,6 +1278,7 @@ def main() -> None:
     assert_multitab_coordination()
     assert_session_isolation()
     assert_project_domain()
+    assert_trash_lifecycle()
     assert_invitation_notification_intent()
     assert_control_mutation_atomicity()
     assert_retry_after_recovery()
@@ -1274,11 +1291,11 @@ def main() -> None:
     assert_generator_syncs_prompts_and_fingerprints()
 
     index = (ROOT / "index.html").read_text(encoding="utf-8")
-    for marker in ['Control de proyectos', 'new-project-button', 'project-list', 'add-purchase-button', 'add-income-button', 'add-projection-button', 'manage-access-button', 'access-dialog', 'access-member-list', 'storage-durability-banner', 'protect-storage-button']:
+    for marker in ['Control de proyectos', 'new-project-button', 'project-list', 'add-purchase-button', 'add-income-button', 'add-projection-button', 'manage-access-button', 'access-dialog', 'access-member-list', 'storage-durability-banner', 'protect-storage-button', 'trash-button', 'trash-dialog', 'action-menu-dialog', 'action-menu-confirm-panel']:
         if marker not in index:
             fail(f"index.html no contiene la interfaz administrativa requerida: {marker}.")
     app_source = (ROOT / "src/js/app.js").read_text(encoding="utf-8")
-    for marker in ["pendingProjectCreation", "recordByType", "data-record-action", "admin.project", "admin.purchase", "admin.income", "admin.projection", "requestStorageProtection", "inspectStorageDurability", "semillaP2P.revoke", "semillaP2P.transfer", "semillaP2P.leave", "semillaP2P.updatePermissions", "accessPermissionEditor", "permissionsUpdated", "revokedRotationPending", "referenceGuards", "referenceRequirements", "projectionVarianceLabel", "varianceStatus", "deleteLinkedError"]:
+    for marker in ["pendingProjectCreation", "recordByType", "data-action-menu-scope", "admin.project", "admin.purchase", "admin.income", "admin.projection", "requestStorageProtection", "inspectStorageDurability", "semillaP2P.revoke", "semillaP2P.transfer", "semillaP2P.leave", "semillaP2P.updatePermissions", "accessPermissionEditor", "permissionsUpdated", "revokedRotationPending", "referenceGuards", "referenceRequirements", "projectionVarianceLabel", "varianceStatus", "deleteLinkedError"]:
         if marker not in app_source and marker not in (ROOT / "src/js/project-domain.js").read_text(encoding="utf-8"):
             fail(f"La interfaz administrativa perdió una capacidad funcional requerida: {marker}.")
 
@@ -1321,14 +1338,14 @@ def main() -> None:
 
     for code in sorted(textx_language_pairs()):
         payload = read_json(f"textX/app/{code}.json")
-        for namespace, key in [("projection", "overBudget"), ("projection", "underBudget"), ("projection", "onBudget"), ("projection", "deleteLinkedError"), ("p2p", "referenceDeletePreserved"), ("access", "deleteProject"), ("access", "deleteConfirm"), ("access", "deletedRemote")]:
+        for namespace, key in [("projection", "overBudget"), ("projection", "underBudget"), ("projection", "onBudget"), ("projection", "deleteLinkedError"), ("p2p", "referenceDeletePreserved"), ("access", "deleteProject"), ("access", "deleteConfirm"), ("access", "deletedRemote"), ("trash", "title"), ("trash", "restore"), ("trash", "deletePermanently"), ("trash", "confirmPermanentProject"), ("actions", "projectMenu")]:
             if not str(payload.get(namespace, {}).get(key, "")).strip():
                 fail(f"textX/app/{code}.json no contiene el texto funcional {namespace}.{key}.")
 
     config = (ROOT / "src/js/config.js").read_text(encoding="utf-8")
     manager = (ROOT / "src/js/pwa-update-manager.js").read_text(encoding="utf-8")
     p2p_client = (ROOT / "src/js/p2p-client.js").read_text(encoding="utf-8")
-    for required in ["enqueueEvent(payload)", "this.eventPipeline", "this.eventPipelineBlocked", "Math.max(this.lastProcessedSequence, sequence)", "stateRevisions", "snapshotChunksByBytes", "replaceBootstrapControlState", "saveControlStateAtomically", "snapshotRecoveryRequired", "reconcileSnapshotRecovery", "p2p:snapshot-source-error", "p2p:snapshot-source-deferred", "pendingForSpace", "hasOptimisticEntities", "queueWhenOffline: false", "request.expiresAt", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "publishBatch", "publish-batch", "revertRejectedOutboxBatch", "abortBatchOnFailure", "P2P_BATCH_CANCELLED", "rejectOutboxOperation", "p2p:operation-reverted", "isPermanentOutboxRejection", "orderedSourceConfirmation", "normalizePublishDeliveryIntent", "P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN", "includeSourceDevice: deliveryIntent.includeSourceDevice", "'entity.put', 'entity.patch', 'entity.delete', 'custom'", "operationType: entity.operationType", "purgeLocalSpace", "p2p.membership.revoked", "p2p.space.deleted", "async deleteSpace(", "'/api/p2p/access/delete'", "async leave(", "async revoke(", "async updatePermissions(", "async transfer(", "requestId: String(options.requestId || options.clientRequestId || '').trim()", "async createSpace(options = {})", "error.p2pQueued = true", "normalizeDeleteReferenceGuards", "referenceGuards: normalizedReferenceGuards", "pendingAtomicEventBatches", "collectAtomicTransportBatch", "handleEventBatch", "applyDecryptedOperationEventBatch", "event-batch-assembly"]:
+    for required in ["enqueueEvent(payload)", "this.eventPipeline", "this.eventPipelineBlocked", "Math.max(this.lastProcessedSequence, sequence)", "stateRevisions", "snapshotChunksByBytes", "replaceBootstrapControlState", "saveControlStateAtomically", "snapshotRecoveryRequired", "reconcileSnapshotRecovery", "p2p:snapshot-source-error", "p2p:snapshot-source-deferred", "pendingForSpace", "hasOptimisticEntities", "queueWhenOffline: false", "request.expiresAt", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "publishBatch", "publish-batch", "revertRejectedOutboxBatch", "abortBatchOnFailure", "P2P_BATCH_CANCELLED", "rejectOutboxOperation", "p2p:operation-reverted", "isPermanentOutboxRejection", "orderedSourceConfirmation", "normalizePublishDeliveryIntent", "P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN", "includeSourceDevice: deliveryIntent.includeSourceDevice", "'entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'", "operationType: entity.operationType", "purgeLocalSpace", "p2p.membership.revoked", "p2p.space.deleted", "async deleteSpace(", "'/api/p2p/access/delete'", "async leave(", "async revoke(", "async updatePermissions(", "async transfer(", "requestId: String(options.requestId || options.clientRequestId || '').trim()", "async createSpace(options = {})", "error.p2pQueued = true", "normalizeDeleteReferenceGuards", "referenceGuards: normalizedReferenceGuards", "pendingAtomicEventBatches", "collectAtomicTransportBatch", "handleEventBatch", "applyDecryptedOperationEventBatch", "event-batch-assembly"]:
         if required not in p2p_client:
             fail(f"src/js/p2p-client.js perdió la tubería secuencial o el cursor monótono: {required}")
     if "this.handleEvent(payload)" in p2p_client:
@@ -1379,7 +1396,7 @@ def main() -> None:
             fail(f"src/js/app.js perdió la apertura automática desde Web Push: {required}")
 
     p2p_storage = (ROOT / "src/js/p2p-storage.js").read_text(encoding="utf-8")
-    for required in ["STATE_REVISION_META_PREFIX", "listStateRevisions", "incomingStateRevision", "confirmedStateRevision", "pendingOperations", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "rejectOutboxOperation", "rejectOutboxOperationBatch", "discardPendingOperationRecord", "confirmOutboxOperation", "outboxConfirmed", "'entity.put', 'entity.patch', 'entity.delete', 'custom'", "source.operationType === 'custom'", "confirmedOperationType", "findRemovedSpaceIds", "snapshotRecordSpaceId", "RECOVERY_REQUIREMENTS_META_KEY", "findReferenceGuardConflictsFromRecords", "__reference__", "referenceConflicts", "applyP2PEventBatch", "atomicBatchDescriptor", "transaction.abort()"]:
+    for required in ["STATE_REVISION_META_PREFIX", "listStateRevisions", "incomingStateRevision", "confirmedStateRevision", "pendingOperations", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "rejectOutboxOperation", "rejectOutboxOperationBatch", "discardPendingOperationRecord", "confirmOutboxOperation", "outboxConfirmed", "'entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'", "source.operationType === 'custom'", "confirmedOperationType", "findRemovedSpaceIds", "snapshotRecordSpaceId", "RECOVERY_REQUIREMENTS_META_KEY", "findReferenceGuardConflictsFromRecords", "__reference__", "referenceConflicts", "applyP2PEventBatch", "atomicBatchDescriptor", "transaction.abort()"]:
         if required not in p2p_storage:
             fail(f"src/js/p2p-storage.js perdió anti-entropía o preservación de versión optimista: {required}")
     p2p_durability = (ROOT / "src/js/p2p-durability.js").read_text(encoding="utf-8")

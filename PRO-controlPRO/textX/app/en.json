@@ -205,7 +205,11 @@
     "purchaseEditTitle": "Edit purchase",
     "incomeEditTitle": "Edit income",
     "projectionEditTitle": "Edit forecast",
-    "purchaseSavedLinkError": "The purchase was saved, but its forecast link could not be updated."
+    "purchaseSavedLinkError": "The purchase was saved, but its forecast link could not be updated.",
+    "purchaseLabel": "Purchase",
+    "incomeLabel": "Income",
+    "projectionLabel": "Projection",
+    "genericLabel": "Record"
   },
   "projection": {
     "completed": "Purchase completed",
@@ -247,7 +251,8 @@
   "permissions": {
     "denied": "Your permissions do not allow this action.",
     "deleteDenied": "You do not have permission to delete records.",
-    "projectionDeleteDenied": "You need both projection and delete permissions to delete a projection."
+    "projectionDeleteDenied": "You need both projection and delete permissions to delete a projection.",
+    "ownerRequired": "Only the owner can perform this action."
   },
   "devices": {
     "open": "Manage devices",
@@ -275,7 +280,8 @@
     "saving": "Saving…",
     "delete": "Delete",
     "edit": "Edit",
-    "noChanges": "There are no changes to save."
+    "noChanges": "There are no changes to save.",
+    "confirm": "Confirm"
   },
   "access": {
     "manage": "Participants",
@@ -314,12 +320,12 @@
     "permissionsUpdated": "Permissions were updated across all devices.",
     "permissionsUnchanged": "Permissions were already configured this way.",
     "permissionsError": "Permissions could not be updated.",
-    "deleteProject": "Delete project",
-    "deleteProjectHint": "Deletes the project, revokes access, and schedules removal of each participant’s synchronized copies.",
-    "deleteProjectButton": "Delete permanently",
-    "deleteConfirm": "This action will delete {name}, revoke access, and remove synchronized copies as each device reconnects. It cannot be undone.",
-    "deleteConfirmButton": "Delete permanently",
-    "deletedSuccess": "The project was deleted, and removal of its synchronized copies has started.",
+    "deleteProject": "Move project to recycle bin",
+    "deleteProjectHint": "Hides the project and its records from active views. You can restore it from the recycle bin.",
+    "deleteProjectButton": "Move to recycle bin",
+    "deleteConfirm": "{name} and all its records will disappear from active views. You can restore it from the recycle bin.",
+    "deleteConfirmButton": "Move to recycle bin",
+    "deletedSuccess": "The project was moved to the recycle bin and no longer affects the administrative summary.",
     "deletedRemote": "The owner deleted a shared project. Its local copy was removed from this device.",
     "transferReplicaRequired": "The new owner must open and fully synchronize the project on at least one of their devices before receiving ownership."
   },
@@ -357,5 +363,43 @@
     "copied": "Code copied.",
     "selectCopy": "Select and copy the code manually.",
     "changeShared": "Change saved and sent over the local network."
+  },
+  "actions": {
+    "eyebrow": "Available options",
+    "confirmTitle": "Confirm this action",
+    "openMenu": "Open options",
+    "projectMenu": "Project options",
+    "recordMenu": "Record options",
+    "trashMenu": "Trash item options",
+    "projectContext": "General project actions",
+    "openProject": "Open project",
+    "noneAvailable": "No actions are available for your permissions."
+  },
+  "trash": {
+    "open": "Open recycle bin",
+    "eyebrow": "Information recovery",
+    "title": "Recycle bin",
+    "description": "Restore items or delete them permanently. Deleted projects include all their information and participants.",
+    "moveProject": "Move to recycle bin",
+    "moveRecord": "Move to recycle bin",
+    "moveToTrash": "Move to recycle bin",
+    "restore": "Restore",
+    "deletePermanently": "Delete permanently",
+    "projectContext": "Complete project in the recycle bin",
+    "inTrash": "In the recycle bin",
+    "confirmProject": "The project “{name}” and all its records will disappear from active views and metrics. You can restore it from the recycle bin.",
+    "confirmRecord": "“{name}” will disappear from the project and will no longer affect its metrics. You can restore it from the recycle bin.",
+    "confirmPermanentProject": "“{name}”, all its records, participant access, and synchronized copies will be permanently deleted. This action cannot be undone.",
+    "confirmPermanentRecord": "“{name}” will be permanently deleted. It can no longer be restored or recovered from other devices.",
+    "projectUnavailable": "The current project version could not be found.",
+    "recordUnavailable": "The current record version could not be found.",
+    "processing": "Applying change…",
+    "movedSuccess": "The item was moved to the recycle bin and no longer affects active views.",
+    "restoredSuccess": "The item was restored successfully.",
+    "purgedSuccess": "The item was permanently deleted.",
+    "actionError": "The action could not be completed.",
+    "projectsSection": "Deleted projects",
+    "completeProject": "Complete project",
+    "empty": "The recycle bin is empty."
   }
 }

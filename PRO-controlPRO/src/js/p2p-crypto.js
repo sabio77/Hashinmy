@@ -960,17 +960,17 @@ async function decryptJson(spaceId = '', encryptedPayload = {}, aadFactory = (ke
 }
 
 export function isEncryptedOperation(operation = {}) {
-  if (operation.type === 'entity.delete') return Number(operation.encryptionVersion || 0) === ENCRYPTION_VERSION;
+  if (['entity.delete', 'entity.purge'].includes(operation.type)) return Number(operation.encryptionVersion || 0) === ENCRYPTION_VERSION;
   return Boolean(encryptedPayloadShape(operation.payload || {}));
 }
 
 export async function encryptOperationForTransport(spaceId = '', operation = {}) {
   const type = String(operation.type || '');
-  if (!['entity.put', 'entity.patch', 'entity.delete', 'custom'].includes(type)) return { ...operation };
+  if (!['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'].includes(type)) return { ...operation };
   const keyRecord = await getActiveSpaceKey(spaceId);
   if (!keyRecord) throw createMissingKeyError(spaceId, '');
   const hasDependentDeletes = Array.isArray(operation.dependentDeletes) && operation.dependentDeletes.length > 0;
-  if (type === 'entity.delete' && !Object.keys(operation.payload || {}).length && !hasDependentDeletes) {
+  if (['entity.delete', 'entity.purge'].includes(type) && !Object.keys(operation.payload || {}).length && !hasDependentDeletes) {
     return { ...operation, payload: {}, encrypted: true, encryptionVersion: ENCRYPTION_VERSION, keyId: keyRecord.keyId };
   }
   const payload = await encryptJson(
@@ -1023,8 +1023,8 @@ export async function decryptOperationEvent(event = {}) {
       }
     };
   }
-  if (!['entity.put', 'entity.patch', 'entity.delete', 'custom'].includes(String(operation.type || ''))) return event;
-  if (operation.type === 'entity.delete' && !encryptedPayloadShape(operation.payload || {})) {
+  if (!['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'].includes(String(operation.type || ''))) return event;
+  if (['entity.delete', 'entity.purge'].includes(operation.type) && !encryptedPayloadShape(operation.payload || {})) {
     if (Number(operation.encryptionVersion || 0) !== ENCRYPTION_VERSION) return event;
     if (!(await hasSpaceKey(event.spaceId, operation.keyId || ''))) throw createMissingKeyError(event.spaceId, operation.keyId || '');
     return event;
@@ -1039,7 +1039,7 @@ export async function decryptOperationEvent(event = {}) {
       (keyId) => operationAad(event.spaceId, operation, keyId)
     );
   } catch (error) {
-    const recoverableDependentDelete = operation.type === 'entity.delete'
+    const recoverableDependentDelete = ['entity.delete', 'entity.purge'].includes(operation.type)
       && String(operation.entityType || '').trim().toLowerCase() === 'admin.purchase'
       && (!Array.isArray(operation.dependentDeletes) || operation.dependentDeletes.length === 0);
     if (!recoverableDependentDelete) throw error;

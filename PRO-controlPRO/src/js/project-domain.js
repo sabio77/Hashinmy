@@ -229,11 +229,29 @@ export function activeEntityValue(entity = null) {
   return entity.value && typeof entity.value === 'object' ? entity.value : null;
 }
 
-export function entitiesByType(entities = [], entityType = '') {
+export function isTrashedValue(value = null) {
+  return Boolean(cleanText(value && typeof value === 'object' ? value.trashedAt : '', 60));
+}
+
+export function entitiesByType(entities = [], entityType = '', options = {}) {
+  const includeTrashed = options.includeTrashed === true;
+  const onlyTrashed = options.onlyTrashed === true;
   return (Array.isArray(entities) ? entities : [])
-    .filter((entity) => entity?.entityType === entityType && !entity.deleted && activeEntityValue(entity))
-    .map((entity) => ({ id: entity.entityId, ...activeEntityValue(entity), _entity: entity }))
-    .sort((left, right) => String(right.createdAt || right.updatedAt || '').localeCompare(String(left.createdAt || left.updatedAt || '')));
+    .filter((entity) => {
+      if (entity?.entityType !== entityType || entity.deleted) return false;
+      const value = activeEntityValue(entity);
+      if (!value) return false;
+      const trashed = isTrashedValue(value);
+      if (onlyTrashed) return trashed;
+      return includeTrashed || !trashed;
+    })
+    .map((entity) => ({
+      id: entity.entityId,
+      ...activeEntityValue(entity),
+      isTrashed: isTrashedValue(activeEntityValue(entity)),
+      _entity: entity
+    }))
+    .sort((left, right) => String(right.trashedAt || right.createdAt || right.updatedAt || '').localeCompare(String(left.trashedAt || left.createdAt || left.updatedAt || '')));
 }
 
 export function projectRecord(space = {}, entities = []) {
@@ -253,7 +271,12 @@ export function projectRecord(space = {}, entities = []) {
     initialBudget: moneyValue(value.initialBudget),
     createdAt: value.createdAt || space.createdAt || '',
     updatedAt: value.updatedAt || space.updatedAt || '',
-    loaded: Boolean(entity)
+    trashedAt: cleanText(value.trashedAt || '', 60),
+    trashedBy: cleanText(value.trashedBy || '', 180),
+    restoredAt: cleanText(value.restoredAt || '', 60),
+    isTrashed: isTrashedValue(value),
+    loaded: Boolean(entity),
+    _entity: entity || null
   };
 }
 

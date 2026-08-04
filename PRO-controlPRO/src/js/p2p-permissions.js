@@ -24,11 +24,11 @@ export function requiredPermissionForDurableOperation(scope = {}, operation = {}
   if (usesAdminProjectPermissionProfile(scope)) {
     if (entityType === 'admin.project') return 'owner';
     if (entityType === 'admin.projection-link') return 'projection';
-    if (operationType === 'entity.delete' && entityType === 'admin.projection') return 'delete_projection';
+    if (['entity.delete', 'entity.trash', 'entity.restore', 'entity.purge'].includes(operationType) && entityType === 'admin.projection') return 'delete_projection';
     if (entityType === 'admin.projection') return 'projection';
   }
 
-  if (operationType === 'entity.delete') return 'delete';
+  if (['entity.delete', 'entity.trash', 'entity.restore', 'entity.purge'].includes(operationType)) return 'delete';
   return 'add';
 }
 
