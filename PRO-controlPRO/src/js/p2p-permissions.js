@@ -46,3 +46,15 @@ export function memberAllowsDurableOperation(scope = {}, membership = {}, operat
   if (permissions.includes(required)) return true;
   return permissions.includes('write') && ['add', 'delete', 'projection'].includes(required);
 }
+
+export function lifecycleReplicationPairAuthorized(sourceMembership = {}, targetMembership = {}, action = '') {
+  const cleanAction = normalize(action, 24);
+  if (!['trash', 'purge'].includes(cleanAction)) return false;
+  const sourcePermissions = normalizedPermissions(sourceMembership);
+  const targetPermissions = normalizedPermissions(targetMembership);
+  return sourceMembership?.role === 'owner'
+    && sourcePermissions.includes('read')
+    && targetPermissions.includes('read')
+    && usesAdminProjectPermissionProfile(sourceMembership)
+    && usesAdminProjectPermissionProfile(targetMembership);
+}

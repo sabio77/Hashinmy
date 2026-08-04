@@ -54,6 +54,7 @@ class TestClient {
   get device() { return { deviceId: 'device_bootstrap_0001' }; }
   captureSessionContext() { return { deviceId: 'device_bootstrap_0001' }; }
   assertSessionContext() { return true; }
+  async completedLifecycleReceipts() { return []; }
   async applyBootstrapData(data) {
     if (this.onApplyStart) this.onApplyStart();
     if (this.applyWaiter) await this.applyWaiter;

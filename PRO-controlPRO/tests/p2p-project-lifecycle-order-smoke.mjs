@@ -38,7 +38,13 @@ for (const marker of [
   'localLifecycleCompleted: true',
   'LOCAL_LIFECYCLE_TOMBSTONE_META_KEY',
   'rememberLocalLifecycleTombstone',
-  'matchingLocalLifecycleTombstone'
+  'matchingLocalLifecycleTombstone',
+  'LIFECYCLE_RECEIPT_META_KEY',
+  'rememberLifecycleReceipt',
+  'rememberTrashLifecycleReceipt',
+  'lifecycleReceipts',
+  'completedLifecycleReceipts',
+  'lifecycleReconciliationDeferred'
 ]) {
   assert.ok(clientSource.includes(marker), `El cliente perdió la coordinación remota/local requerida: ${marker}`);
 }
@@ -47,6 +53,33 @@ const finalizeIndex = clientSource.indexOf("event.eventType === 'p2p.lifecycle.f
 const localApplyIndex = clientSource.indexOf('await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);', finalizeIndex);
 const completeIndex = clientSource.indexOf("apiPost('/api/p2p/lifecycle/complete'", finalizeIndex);
 assert.ok(finalizeIndex >= 0 && localApplyIndex > finalizeIndex && completeIndex > localApplyIndex, 'El iniciador confirma antes de aplicar localmente o aplica fuera del evento final autoritativo.');
+
+const lifecycleStartIndex = clientSource.indexOf("async startProjectLifecycle(action = '', spaceId = '', options = {})");
+const lifecycleStartEnd = clientSource.indexOf("trashProjectAfterReplicas(spaceId = '', options = {})", lifecycleStartIndex);
+const lifecycleStartSource = clientSource.slice(lifecycleStartIndex, lifecycleStartEnd);
+const durableIntentIndex = lifecycleStartSource.indexOf('await enqueueOutbox(outboxItem);');
+const backendStartIndex = lifecycleStartSource.indexOf('const data = await apiPost(outboxItem.endpoint, outboxItem.request);');
+assert.ok(durableIntentIndex >= 0 && backendStartIndex > durableIntentIndex, 'La intención crítica no se conserva antes de contactar al backend.');
+assert.ok(!lifecycleStartSource.includes('await removeOutbox(outboxItem.operationId).catch(() => null);\n      const transaction'), 'La intención crítica vuelve a retirarse apenas el backend acepta iniciar la coordinación.');
+
+const remotePurgeIndex = clientSource.indexOf("event.eventType === 'p2p.lifecycle.remote-purge'");
+const remoteReceiptIndex = clientSource.indexOf('await this.rememberLifecycleReceipt({', remotePurgeIndex);
+const remotePurgeApplyIndex = clientSource.indexOf('const purge = await purgeLocalSpace(cleanSpaceId);', remotePurgeIndex);
+const remoteReceiptCompletedIndex = clientSource.indexOf('await this.rememberLifecycleReceipt({', remotePurgeApplyIndex);
+assert.ok(
+  remoteReceiptIndex > remotePurgeIndex
+  && remotePurgeApplyIndex > remoteReceiptIndex
+  && clientSource.slice(remoteReceiptIndex, remotePurgeApplyIndex).includes("status: 'prepared'")
+  && remoteReceiptCompletedIndex > remotePurgeApplyIndex
+  && clientSource.slice(remoteReceiptCompletedIndex, remoteReceiptCompletedIndex + 600).includes("status: 'completed'"),
+  'La purga remota no conserva un comprobante preparado antes de borrar ni lo completa después de persistir la eliminación.'
+);
+assert.ok(clientSource.includes("record.status !== 'prepared' || record.action !== 'purge' || localSpaces.has(record.spaceId)"), 'El arranque no recupera una purga aplicada cuyo proceso cayó antes de completar el comprobante.');
+
+const bootstrapIndex = clientSource.indexOf("apiPost('/api/p2p/bootstrap'");
+const ackIndex = clientSource.indexOf("apiPost('/api/p2p/events/ack'");
+assert.ok(clientSource.lastIndexOf('lifecycleReceipts', bootstrapIndex) > 0, 'El bootstrap no entrega comprobantes para reconciliar eliminaciones ya aplicadas.');
+assert.ok(clientSource.lastIndexOf('lifecycleReceipts', ackIndex) > 0, 'El ACK no adjunta comprobantes durables para cerrar una confirmación partida.');
 
 for (const marker of [
   'activeProjectLifecycle',

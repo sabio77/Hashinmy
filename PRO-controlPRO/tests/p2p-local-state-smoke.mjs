@@ -751,6 +751,12 @@ const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1000;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
 const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
+const LIFECYCLE_RECEIPT_META_KEY = 'p2pLifecycleReceipts';
+const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LIFECYCLE_RECEIPT_MAX = 256;
+const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pLocalLifecycleTombstones';
+const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 256;
 const readySourceLifecycleTransactions = (transactions = []) => {
   const ready = new Map();
   for (const transaction of Array.isArray(transactions) ? transactions : []) {
@@ -789,10 +795,18 @@ let activeSessionToken = 'test-session-token';
 const getSessionToken = () => activeSessionToken;
 const setActiveSessionToken = (token = '') => { activeSessionToken = String(token || ''); };
 const isSessionChangedError = () => false;
-const getMeta = async () => 0;
+const metaRecords = new Map();
+const getMeta = async (key, fallback = null) => metaRecords.has(key) ? structuredClone(metaRecords.get(key)) : structuredClone(fallback);
+const setMeta = async (key, value) => { metaRecords.set(key, structuredClone(value)); return value; };
 const listSpaces = async () => [];
 const saveSpaces = async () => {};
 const listStateRevisions = async () => ({});
+const enqueueOutbox = async (item) => {
+  const index = outboxItems.findIndex((candidate) => candidate.operationId === item.operationId);
+  if (index >= 0) outboxItems[index] = structuredClone(item);
+  else outboxItems.push(structuredClone(item));
+  return item;
+};
 const listOutbox = async () => outboxItems.map((item) => ({ ...item, request: { ...(item.request || {}) } }));
 const removeOutbox = async (operationId) => {
   removedOutboxIds.push(operationId);
@@ -979,6 +993,118 @@ const {
   purgedSpaceIds,
   dispatchedEvents
 } = await import(clientModuleUrl);
+
+const lifecycleReceiptClient = new SemillaP2PClient();
+lifecycleReceiptClient.user = { userId: 'usr_lifecycle_receipt' };
+lifecycleReceiptClient.deviceId = 'dev_lifecycle_receipt';
+lifecycleReceiptClient.started = true;
+lifecycleReceiptClient.sessionGeneration = 1;
+await lifecycleReceiptClient.rememberLifecycleReceipt({
+  transactionId: 'tx_purge_receipt',
+  action: 'purge',
+  spaceId: 'space_purge_receipt',
+  operationId: 'op_purge_receipt',
+  sourceDeviceId: 'dev_source_receipt',
+  remoteEventId: 'evt_purge_receipt',
+  appliedStateRevision: 0,
+  status: 'prepared'
+});
+if ((await lifecycleReceiptClient.completedLifecycleReceipts(['space_purge_receipt'])).length !== 0) {
+  throw new Error('Una purga preparada se confirmó aunque el proyecto todavía existe localmente.');
+}
+const recoveredPurgeReceipts = await lifecycleReceiptClient.completedLifecycleReceipts([]);
+if (recoveredPurgeReceipts.length !== 1
+  || recoveredPurgeReceipts[0]?.transactionId !== 'tx_purge_receipt'
+  || recoveredPurgeReceipts[0]?.status !== 'completed') {
+  throw new Error('El arranque no recuperó el comprobante de una purga ya persistida antes del cierre.');
+}
+
+const localLifecycleClient = new SemillaP2PClient();
+localLifecycleClient.user = { userId: 'usr_local_lifecycle' };
+localLifecycleClient.deviceId = 'dev_local_lifecycle';
+localLifecycleClient.started = true;
+localLifecycleClient.sessionGeneration = 1;
+const preparedLocalTombstone = await localLifecycleClient.rememberLocalLifecycleTombstone({
+  transactionId: 'tx_local_purge',
+  action: 'purge',
+  spaceId: 'space_local_purge',
+  operationId: 'op_local_purge',
+  sourceUserId: 'usr_owner_source',
+  sourceDeviceId: 'dev_owner_source',
+  status: 'prepared'
+});
+if (preparedLocalTombstone.status !== 'prepared' || preparedLocalTombstone.completedAt) {
+  throw new Error('El comprobante LAN se marcó como completado antes de persistir la purga local.');
+}
+const matchedPreparedTombstone = await localLifecycleClient.matchingLocalLifecycleTombstone({
+  transactionId: 'tx_local_purge',
+  action: 'purge',
+  spaceId: 'space_local_purge',
+  operationId: 'op_local_purge',
+  sourceDeviceId: 'dev_owner_source'
+}, { userId: 'usr_owner_source', deviceId: 'dev_owner_source' });
+if (matchedPreparedTombstone?.status !== 'prepared') {
+  throw new Error('El reintento LAN no recuperó el comprobante preparado de la purga interrumpida.');
+}
+const completedLocalTombstone = await localLifecycleClient.rememberLocalLifecycleTombstone({
+  transactionId: 'tx_local_purge',
+  action: 'purge',
+  spaceId: 'space_local_purge',
+  operationId: 'op_local_purge',
+  sourceUserId: 'usr_owner_source',
+  sourceDeviceId: 'dev_owner_source',
+  status: 'completed'
+});
+if (completedLocalTombstone.status !== 'completed'
+  || !completedLocalTombstone.completedAt
+  || completedLocalTombstone.preparedAt !== preparedLocalTombstone.preparedAt) {
+  throw new Error('El comprobante LAN no conservó la transición durable prepared → completed.');
+}
+const legacyLocalTombstone = localLifecycleClient.normalizeLocalLifecycleTombstones([{
+  transactionId: 'tx_legacy_trash',
+  action: 'trash',
+  spaceId: 'space_legacy_trash',
+  operationId: 'op_legacy_trash',
+  sourceUserId: 'usr_legacy_owner',
+  sourceDeviceId: 'dev_legacy_owner',
+  targetUserId: 'usr_local_lifecycle',
+  expiresAtMs: Date.now() + 60000
+}]);
+if (legacyLocalTombstone[0]?.status !== 'completed'
+  || !legacyLocalTombstone[0]?.preparedAt
+  || !legacyLocalTombstone[0]?.completedAt) {
+  throw new Error('La migración de comprobantes LAN anteriores perdió compatibilidad.');
+}
+const monotonicLocalTombstone = await localLifecycleClient.rememberLocalLifecycleTombstone({
+  transactionId: 'tx_local_purge',
+  action: 'purge',
+  spaceId: 'space_local_purge',
+  operationId: 'op_local_purge',
+  sourceUserId: 'usr_owner_source',
+  sourceDeviceId: 'dev_owner_source',
+  status: 'prepared'
+});
+if (monotonicLocalTombstone.status !== 'completed' || !monotonicLocalTombstone.completedAt) {
+  throw new Error('Un reintento tardío degradó un comprobante LAN ya completado.');
+}
+
+const purgeProof = await localLifecycleClient.completedPurgeProofForSpace('space_local_purge');
+if (purgeProof?.source !== 'local-network' || purgeProof.record?.status !== 'completed') {
+  throw new Error('Una señal atrasada de papelera no pudo detectar la purga local que la reemplaza.');
+}
+await localLifecycleClient.rememberLifecycleReceipt({
+  transactionId: 'tx_backend_purge_proof',
+  action: 'purge',
+  spaceId: 'space_backend_purge_proof',
+  operationId: 'op_backend_purge_proof',
+  sourceDeviceId: 'dev_backend_source',
+  remoteEventId: 'evt_backend_purge_proof',
+  status: 'completed'
+});
+const backendPurgeProof = await localLifecycleClient.completedPurgeProofForSpace('space_backend_purge_proof');
+if (backendPurgeProof?.source !== 'memoriaBACKEND') {
+  throw new Error('Una señal atrasada de papelera no detectó la purga ya confirmada por memoriaBACKEND.');
+}
 
 const identityRecoveryClient = new SemillaP2PClient();
 identityRecoveryClient.user = { userId: 'usr_identity_recovery', email: 'identity@example.com' };

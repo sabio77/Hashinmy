@@ -1,5 +1,5 @@
 import { P2P_APPLICATION_ID, scopedStorageKey } from './application-scope.js';
-import { memberAllowsDurableOperation } from './p2p-permissions.js';
+import { lifecycleReplicationPairAuthorized, memberAllowsDurableOperation } from './p2p-permissions.js';
 import { apiGet, apiPost, getBackendUrl, getSessionToken, isSessionChangedError } from './api.js';
 import { P2PTabCoordinator, classifyTabStateRelay } from './p2p-tab-coordinator.js';
 import {
@@ -101,6 +101,9 @@ const LOCAL_CAPABILITY_REFRESH_RETRY_MAX_MS = 30 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pSinLifecycleTombstones';
 const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 128;
+const LIFECYCLE_RECEIPT_META_KEY = 'p2pLifecycleReceipts';
+const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LIFECYCLE_RECEIPT_MAX = 256;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
 const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
 
@@ -1853,24 +1856,38 @@ export class SemillaP2PClient {
 
   normalizeLocalLifecycleTombstones(records = [], nowMs = Date.now()) {
     return (Array.isArray(records) ? records : [])
-      .map((record) => ({
-        transactionId: String(record?.transactionId || '').trim(),
-        action: String(record?.action || '').trim(),
-        spaceId: String(record?.spaceId || '').trim(),
-        operationId: String(record?.operationId || '').trim(),
-        sourceUserId: String(record?.sourceUserId || '').trim(),
-        sourceDeviceId: String(record?.sourceDeviceId || '').trim(),
-        targetUserId: String(record?.targetUserId || '').trim(),
-        expiresAtMs: Math.max(0, Number(record?.expiresAtMs || 0))
-      }))
+      .map((record) => {
+        const status = String(record?.status || '').trim().toLowerCase() === 'prepared' ? 'prepared' : 'completed';
+        const expiresAtMs = Math.max(0, Number(record?.expiresAtMs || 0));
+        const legacyCompletedAt = new Date(Math.max(0, Math.min(nowMs, expiresAtMs || nowMs))).toISOString();
+        const preparedAt = String(record?.preparedAt || record?.completedAt || legacyCompletedAt).trim().slice(0, 80);
+        const completedAt = status === 'completed'
+          ? String(record?.completedAt || record?.preparedAt || legacyCompletedAt).trim().slice(0, 80)
+          : '';
+        return {
+          transactionId: String(record?.transactionId || '').trim(),
+          action: String(record?.action || '').trim().toLowerCase(),
+          spaceId: String(record?.spaceId || '').trim(),
+          operationId: String(record?.operationId || '').trim(),
+          sourceUserId: String(record?.sourceUserId || '').trim(),
+          sourceDeviceId: String(record?.sourceDeviceId || '').trim(),
+          targetUserId: String(record?.targetUserId || '').trim(),
+          status,
+          preparedAt,
+          completedAt,
+          expiresAtMs
+        };
+      })
       .filter((record) => (
         record.transactionId
-        && record.action === 'purge'
+        && ['trash', 'purge'].includes(record.action)
         && record.spaceId
         && record.operationId
         && record.sourceUserId
         && record.sourceDeviceId
         && record.targetUserId
+        && record.preparedAt
+        && (record.status !== 'completed' || record.completedAt)
         && record.expiresAtMs > nowMs
       ))
       .slice(0, LOCAL_LIFECYCLE_TOMBSTONE_MAX);
@@ -1887,19 +1904,29 @@ export class SemillaP2PClient {
 
   async rememberLocalLifecycleTombstone(input = {}, sessionContext = this.captureSessionContext()) {
     this.assertSessionContext(sessionContext);
+    const records = await this.localLifecycleTombstones();
+    this.assertSessionContext(sessionContext);
+    const transactionId = String(input.transactionId || '').trim();
+    const existing = records.find((candidate) => candidate.transactionId === transactionId) || null;
+    const requestedStatus = String(input.status || '').trim().toLowerCase() === 'prepared' ? 'prepared' : 'completed';
+    const status = existing?.status === 'completed' ? 'completed' : requestedStatus;
+    const timestamp = new Date().toISOString();
     const record = this.normalizeLocalLifecycleTombstones([{
-      transactionId: input.transactionId,
+      transactionId,
       action: input.action,
       spaceId: input.spaceId,
       operationId: input.operationId,
       sourceUserId: input.sourceUserId,
       sourceDeviceId: input.sourceDeviceId,
       targetUserId: sessionContext.userId,
+      status,
+      preparedAt: String(input.preparedAt || existing?.preparedAt || '').trim() || timestamp,
+      completedAt: status === 'completed'
+        ? (String(input.completedAt || existing?.completedAt || '').trim() || timestamp)
+        : '',
       expiresAtMs: Date.now() + LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS
     }])[0] || null;
     if (!record) throw new Error('No se pudo conservar el comprobante local de la eliminación remota.');
-    const records = await this.localLifecycleTombstones();
-    this.assertSessionContext(sessionContext);
     const next = [record, ...records.filter((candidate) => candidate.transactionId !== record.transactionId)]
       .slice(0, LOCAL_LIFECYCLE_TOMBSTONE_MAX);
     await setMeta(LOCAL_LIFECYCLE_TOMBSTONE_META_KEY, next);
@@ -1921,6 +1948,153 @@ export class SemillaP2PClient {
       && record.targetUserId === sessionContext.userId
       && String(payload.sourceDeviceId || '').trim() === record.sourceDeviceId
     )) || null;
+  }
+
+  async completedPurgeProofForSpace(spaceId = '', sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId) return null;
+    const localTombstones = await this.localLifecycleTombstones();
+    this.assertSessionContext(sessionContext);
+    const localProof = localTombstones.find((record) => (
+      record.spaceId === cleanSpaceId
+      && record.action === 'purge'
+      && record.status === 'completed'
+    )) || null;
+    if (localProof) return { source: 'local-network', record: localProof };
+    const receipts = await this.lifecycleReceipts();
+    this.assertSessionContext(sessionContext);
+    const backendProof = receipts.find((record) => (
+      record.spaceId === cleanSpaceId
+      && record.action === 'purge'
+      && record.status === 'completed'
+    )) || null;
+    return backendProof ? { source: 'memoriaBACKEND', record: backendProof } : null;
+  }
+
+  async localLifecycleCapabilityAuthorization(spaceId = '', sourceCapabilityPayload = {}, action = '', sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId || !this.localCapability || !this.localCapabilityAuthority) return { authorized: false, sourceMembership: null, targetMembership: null };
+    const targetCapabilityPayload = await verifyP2PLocalCapability(this.localCapabilityAuthority, this.localCapability, {
+      origin: window.location.origin,
+      applicationId: P2P_APPLICATION_ID,
+      userId: sessionContext.userId,
+      deviceId: sessionContext.deviceId
+    });
+    this.assertSessionContext(sessionContext);
+    const sourceMembership = (Array.isArray(sourceCapabilityPayload?.memberships) ? sourceCapabilityPayload.memberships : [])
+      .find((candidate) => String(candidate?.spaceId || '').trim() === cleanSpaceId) || null;
+    const targetMembership = (Array.isArray(targetCapabilityPayload?.memberships) ? targetCapabilityPayload.memberships : [])
+      .find((candidate) => String(candidate?.spaceId || '').trim() === cleanSpaceId) || null;
+    return {
+      authorized: lifecycleReplicationPairAuthorized(sourceMembership || {}, targetMembership || {}, action),
+      sourceMembership,
+      targetMembership
+    };
+  }
+
+  normalizeLifecycleReceipts(records = [], nowMs = Date.now()) {
+    return (Array.isArray(records) ? records : [])
+      .map((record) => ({
+        transactionId: String(record?.transactionId || '').trim().slice(0, 180),
+        action: String(record?.action || '').trim().toLowerCase(),
+        spaceId: String(record?.spaceId || '').trim().slice(0, 140),
+        operationId: String(record?.operationId || '').trim().slice(0, 180),
+        sourceDeviceId: String(record?.sourceDeviceId || '').trim().slice(0, 180),
+        remoteEventId: String(record?.remoteEventId || record?.eventId || '').trim().slice(0, 180),
+        appliedStateRevision: Math.max(0, Number(record?.appliedStateRevision || 0)),
+        status: String(record?.status || '').trim().toLowerCase() === 'prepared' ? 'prepared' : 'completed',
+        preparedAt: String(record?.preparedAt || record?.completedAt || '').trim().slice(0, 80),
+        completedAt: String(record?.completedAt || '').trim().slice(0, 80),
+        expiresAtMs: Math.max(0, Number(record?.expiresAtMs || 0))
+      }))
+      .filter((record) => (
+        record.transactionId
+        && ['trash', 'purge'].includes(record.action)
+        && record.spaceId
+        && record.operationId
+        && record.sourceDeviceId
+        && record.remoteEventId
+        && record.preparedAt
+        && (record.status !== 'completed' || record.completedAt)
+        && record.expiresAtMs > nowMs
+        && (record.action !== 'trash' || Number.isSafeInteger(record.appliedStateRevision))
+      ))
+      .slice(0, LIFECYCLE_RECEIPT_MAX);
+  }
+
+  async lifecycleReceipts() {
+    const stored = await getMeta(LIFECYCLE_RECEIPT_META_KEY, []);
+    const normalized = this.normalizeLifecycleReceipts(stored);
+    if (!Array.isArray(stored) || normalized.length !== stored.length) {
+      await setMeta(LIFECYCLE_RECEIPT_META_KEY, normalized);
+    }
+    return normalized;
+  }
+
+  async completedLifecycleReceipts(localSpaceIds = null, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const records = await this.lifecycleReceipts();
+    this.assertSessionContext(sessionContext);
+    if (!Array.isArray(localSpaceIds)) return records.filter((record) => record.status === 'completed');
+
+    const localSpaces = new Set(localSpaceIds.map((spaceId) => String(spaceId || '').trim()).filter(Boolean));
+    const completedAt = new Date().toISOString();
+    let promoted = false;
+    const reconciled = records.map((record) => {
+      if (record.status !== 'prepared' || record.action !== 'purge' || localSpaces.has(record.spaceId)) return record;
+      promoted = true;
+      return { ...record, status: 'completed', completedAt };
+    });
+    if (promoted) {
+      await setMeta(LIFECYCLE_RECEIPT_META_KEY, reconciled);
+      this.assertSessionContext(sessionContext);
+    }
+    return reconciled.filter((record) => record.status === 'completed');
+  }
+
+  async rememberLifecycleReceipt(input = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const status = String(input.status || '').trim().toLowerCase() === 'prepared' ? 'prepared' : 'completed';
+    const timestamp = new Date().toISOString();
+    const receipt = this.normalizeLifecycleReceipts([{
+      ...input,
+      status,
+      preparedAt: String(input.preparedAt || '').trim() || timestamp,
+      completedAt: status === 'completed' ? (String(input.completedAt || '').trim() || timestamp) : '',
+      expiresAtMs: Date.now() + LIFECYCLE_RECEIPT_TTL_MS
+    }])[0] || null;
+    if (!receipt) throw new Error('No se pudo conservar la confirmación durable de la acción crítica.');
+    const records = await this.lifecycleReceipts();
+    this.assertSessionContext(sessionContext);
+    const next = [receipt, ...records.filter((candidate) => candidate.transactionId !== receipt.transactionId)]
+      .slice(0, LIFECYCLE_RECEIPT_MAX);
+    await setMeta(LIFECYCLE_RECEIPT_META_KEY, next);
+    this.assertSessionContext(sessionContext);
+    return receipt;
+  }
+
+  async rememberTrashLifecycleReceipt(event = {}, sessionContext = this.captureSessionContext()) {
+    const operation = event?.operation || {};
+    const operationId = String(operation.operationId || '').trim();
+    if (
+      String(operation.type || '').trim() !== 'entity.trash'
+      || String(operation.entityType || '').trim() !== 'admin.project'
+      || String(operation.entityId || '').trim() !== 'project'
+      || !operationId
+      || String(event.sourceDeviceId || '').trim() === sessionContext.deviceId
+    ) return null;
+    return this.rememberLifecycleReceipt({
+      transactionId: `lifecycle_${operationId}`,
+      action: 'trash',
+      spaceId: event.spaceId,
+      operationId,
+      sourceDeviceId: event.sourceDeviceId,
+      remoteEventId: event.eventId,
+      appliedStateRevision: Math.max(0, Number(event.stateRevision || event.spaceSequence || 0)),
+      status: 'completed'
+    }, sessionContext);
   }
 
   localLifecyclePublicState(entry = {}, status = '') {
@@ -2307,37 +2481,60 @@ export class SemillaP2PClient {
       const tombstone = await this.matchingLocalLifecycleTombstone({
         transactionId, action: 'purge', spaceId, operationId, sourceDeviceId
       }, capabilityPayload, sessionContext);
-      if (tombstone) {
+      if (tombstone?.status === 'completed') {
         await acknowledgePurge();
         return true;
       }
       const { space, member, permissions } = this.memberPermissionsForUser(spaceId, sessionContext.userId);
       const sourceMember = (space?.members || []).find((candidate) => candidate?.userId === capabilityPayload.userId) || null;
+      const localStateAuthorized = Boolean(
+        space
+        && space.authorizationState !== 'unconfirmed'
+        && space.ownerUserId === capabilityPayload.userId
+        && sourceMember?.role === 'owner'
+        && member
+        && permissions.includes('read')
+      );
+      const capabilityAuthorization = tombstone
+        ? { authorized: true }
+        : await this.localLifecycleCapabilityAuthorization(spaceId, capabilityPayload, 'purge', sessionContext)
+          .catch(() => ({ authorized: false }));
       if (
         !transactionId || !spaceId || !operationId || !sessionId
         || sourceDeviceId !== capabilityPayload.deviceId
-        || !space || space.authorizationState === 'unconfirmed'
-        || space.ownerUserId !== capabilityPayload.userId || sourceMember?.role !== 'owner'
-        || !member || !permissions.includes('read')
+        || (!localStateAuthorized && capabilityAuthorization.authorized !== true)
       ) {
         const error = new Error('Se rechazó una eliminación local sin autoridad confirmada del propietario.');
         error.code = 'P2P_SIN_LIFECYCLE_UNAUTHORIZED';
         dispatch('p2p:local-network', { state: 'rejected', error, peer: message.peer || null, spaceId });
         return false;
       }
+      if (!tombstone) {
+        await this.rememberLocalLifecycleTombstone({
+          transactionId,
+          action: 'purge',
+          spaceId,
+          operationId,
+          sourceUserId: capabilityPayload.userId,
+          sourceDeviceId,
+          status: 'prepared'
+        }, sessionContext);
+      }
+      await this.fenceBootstrapResponses(sessionContext);
+      const purge = await purgeLocalSpace(spaceId);
+      await purgeSpaceCrypto(spaceId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      this.removeSpaceFromBootstrapState(spaceId);
       await this.rememberLocalLifecycleTombstone({
         transactionId,
         action: 'purge',
         spaceId,
         operationId,
         sourceUserId: capabilityPayload.userId,
-        sourceDeviceId
+        sourceDeviceId,
+        status: 'completed'
       }, sessionContext);
-      await this.fenceBootstrapResponses(sessionContext);
-      const purge = await purgeLocalSpace(spaceId);
-      await purgeSpaceCrypto(spaceId).catch(() => null);
       this.assertSessionContext(sessionContext);
-      this.removeSpaceFromBootstrapState(spaceId);
       dispatch('p2p:space-deleted', { spaceId, source: 'lifecycle-local-network-remote', purge, pendingAuthoritativeDeletion: true });
       await acknowledgePurge();
       return true;
@@ -2694,19 +2891,70 @@ export class SemillaP2PClient {
       && (!request.deviceId || String(request.deviceId || '').trim() === String(capabilityPayload.deviceId || '').trim());
     const certifiedPeer = { userId: capabilityPayload.userId, deviceId: capabilityPayload.deviceId };
     const localLifecycle = request.localLifecycle && typeof request.localLifecycle === 'object' ? request.localLifecycle : null;
-    const lifecycleSpace = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
-    const lifecycleAuthorized = !localLifecycle || (
-      String(localLifecycle.action || '').trim() === 'trash'
+    const lifecycleAction = String(localLifecycle?.action || '').trim().toLowerCase();
+    const lifecycleIdentityValid = !localLifecycle || (
+      lifecycleAction === 'trash'
       && String(localLifecycle.spaceId || '').trim() === spaceId
       && String(localLifecycle.operationId || '').trim() === String(transportOperation.operationId || '').trim()
       && String(localLifecycle.sourceDeviceId || '').trim() === String(capabilityPayload.deviceId || '').trim()
+      && String(transportOperation.type || '').trim() === 'entity.trash'
+      && String(transportOperation.entityType || '').trim() === 'admin.project'
+      && String(transportOperation.entityId || '').trim() === 'project'
+    );
+    const lifecycleTombstone = localLifecycle && lifecycleIdentityValid
+      ? await this.matchingLocalLifecycleTombstone({
+          transactionId: localLifecycle.transactionId,
+          action: lifecycleAction,
+          spaceId,
+          operationId: transportOperation.operationId,
+          sourceDeviceId: localLifecycle.sourceDeviceId
+        }, capabilityPayload, sessionContext)
+      : null;
+    const acknowledgeTrash = async () => {
+      const ack = await this.createSignedLocalControlBody('lifecycle.ack', {
+        transactionId: String(localLifecycle?.transactionId || '').trim(),
+        action: 'trash',
+        spaceId,
+        operationId: String(transportOperation.operationId || '').trim(),
+        sourceDeviceId: String(localLifecycle?.sourceDeviceId || '').trim()
+      }, sessionContext);
+      await this.localTransport?.sendTo?.(String(message.sessionId || '').trim(), ack);
+    };
+    const supersedingPurgeProof = localLifecycle && lifecycleIdentityValid
+      ? await this.completedPurgeProofForSpace(spaceId, sessionContext)
+      : null;
+    const supersededTrashAuthorized = Boolean(
+      supersedingPurgeProof
+      && this.capabilityOperationAuthorized(capabilityPayload, spaceId, transportOperation)
+    );
+    if (operationIdentityValid && lifecycleIdentityValid
+      && (lifecycleTombstone?.status === 'completed' || supersededTrashAuthorized)) {
+      await acknowledgeTrash();
+      return true;
+    }
+    const lifecycleSpace = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
+    const localStateLifecycleAuthorized = Boolean(
+      localLifecycle
+      && lifecycleIdentityValid
       && lifecycleSpace?.ownerUserId === String(capabilityPayload.userId || '').trim()
     );
+    const lifecycleCapabilityAuthorization = localLifecycle && lifecycleIdentityValid
+      ? await this.localLifecycleCapabilityAuthorization(spaceId, capabilityPayload, lifecycleAction, sessionContext)
+        .catch(() => ({ authorized: false }))
+      : { authorized: false };
+    const lifecycleAuthorized = !localLifecycle
+      || localStateLifecycleAuthorized
+      || lifecycleCapabilityAuthorization.authorized === true
+      || Boolean(lifecycleTombstone);
+    const localOperationAuthorized = this.localOperationAuthorized(spaceId, transportOperation, certifiedPeer)
+      || (Boolean(localLifecycle) && lifecycleCapabilityAuthorization.authorized === true)
+      || Boolean(lifecycleTombstone);
     if (
       !operationIdentityValid
+      || !lifecycleIdentityValid
       || !lifecycleAuthorized
       || !this.capabilityOperationAuthorized(capabilityPayload, spaceId, transportOperation)
-      || !this.localOperationAuthorized(spaceId, transportOperation, certifiedPeer)
+      || !localOperationAuthorized
     ) {
       const error = new Error('Se rechazó un cambio de red local porque el emisor no tiene permisos certificados y confirmados para ese proyecto.');
       error.code = 'P2P_SIN_UNAUTHORIZED_OPERATION';
@@ -2761,6 +3009,18 @@ export class SemillaP2PClient {
       }
     };
     const optimisticEvent = { ...decryptedEvent, optimistic: true, localTransport: true };
+    if (localLifecycle && !lifecycleTombstone) {
+      await this.rememberLocalLifecycleTombstone({
+        transactionId: String(localLifecycle.transactionId || '').trim(),
+        action: 'trash',
+        spaceId,
+        operationId: relayedOperation.operationId,
+        sourceUserId: capabilityPayload.userId,
+        sourceDeviceId: String(localLifecycle.sourceDeviceId || '').trim(),
+        status: 'prepared'
+      }, sessionContext);
+      this.assertSessionContext(sessionContext);
+    }
     const result = localLifecycle
       ? await applyP2PEvent(optimisticEvent)
       : await enqueueOptimisticOperation(relayedOutboxItem, optimisticEvent);
@@ -2768,14 +3028,28 @@ export class SemillaP2PClient {
     dispatch('p2p:operation', { event: optimisticEvent, result, localTransport: true, optimistic: true, lifecycleRemote: Boolean(localLifecycle) });
     dispatch('p2p:local-operation', { event: decryptedEvent, result, peer: message.peer || null, lifecycleRemote: Boolean(localLifecycle) });
     if (localLifecycle) {
-      const ack = await this.createSignedLocalControlBody('lifecycle.ack', {
+      const rootAfter = await getEntity(spaceId, 'admin.project', 'project');
+      this.assertSessionContext(sessionContext);
+      const trashAppliedOrAlreadyAbsent = !rootAfter
+        || rootAfter.deleted
+        || Boolean(String(rootAfter.value?.trashedAt || '').trim());
+      if (!trashAppliedOrAlreadyAbsent) {
+        const error = new Error('La réplica local no pudo ubicar el proyecto en la papelera de forma segura.');
+        error.code = 'P2P_SIN_LIFECYCLE_STATE_CONFLICT';
+        dispatch('p2p:local-network', { state: 'rejected', error, peer: message.peer || null, spaceId });
+        return false;
+      }
+      await this.rememberLocalLifecycleTombstone({
         transactionId: String(localLifecycle.transactionId || '').trim(),
         action: 'trash',
         spaceId,
         operationId: relayedOperation.operationId,
-        sourceDeviceId: String(localLifecycle.sourceDeviceId || '').trim()
+        sourceUserId: capabilityPayload.userId,
+        sourceDeviceId: String(localLifecycle.sourceDeviceId || '').trim(),
+        status: 'completed'
       }, sessionContext);
-      await this.localTransport?.sendTo?.(String(message.sessionId || '').trim(), ack);
+      this.assertSessionContext(sessionContext);
+      await acknowledgeTrash();
     } else {
       dispatch('p2p:outbox', { queued: true, operationId: relayedOperation.operationId, localNetworkRelay: true });
     }
@@ -5070,11 +5344,17 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const stateRevisions = await listStateRevisions(localSpaces.map((space) => space.spaceId));
     this.assertSessionContext(sessionContext);
+    const lifecycleReceipts = await this.completedLifecycleReceipts(
+      localSpaces.map((space) => space.spaceId),
+      sessionContext
+    );
+    this.assertSessionContext(sessionContext);
     const data = await apiPost('/api/p2p/bootstrap', {
       device: this.device,
       requestSnapshots,
       snapshotSpaceIds,
       stateRevisions,
+      lifecycleReceipts,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
         ? {}
         : this.snapshotSourceExclusionsBySpace()
@@ -5690,6 +5970,8 @@ export class SemillaP2PClient {
     assertCanonicalOperationEnvelope(event);
     const applyResult = await applyP2PEvent(event);
     this.assertSessionContext(sessionContext);
+    await this.rememberTrashLifecycleReceipt(event, sessionContext);
+    this.assertSessionContext(sessionContext);
     if (event.operation?.type === 'snapshot.complete') {
       if (applyResult?.snapshotIncomplete) {
         const deterministicRejection = ['invalid_snapshot_complete', 'snapshot_integrity_mismatch']
@@ -6074,8 +6356,30 @@ export class SemillaP2PClient {
       const transaction = this.lifecycleTransactionFromControl(event);
       const cleanSpaceId = String(transaction.spaceId || '').trim();
       if (cleanSpaceId) {
+        await this.rememberLifecycleReceipt({
+          transactionId: transaction.transactionId,
+          action: 'purge',
+          spaceId: cleanSpaceId,
+          operationId: transaction.operationId,
+          sourceDeviceId: transaction.sourceDeviceId,
+          remoteEventId: event.eventId,
+          appliedStateRevision: 0,
+          status: 'prepared'
+        }, sessionContext);
+        this.assertSessionContext(sessionContext);
         const purge = await purgeLocalSpace(cleanSpaceId);
         await purgeSpaceCrypto(cleanSpaceId).catch(() => null);
+        this.assertSessionContext(sessionContext);
+        await this.rememberLifecycleReceipt({
+          transactionId: transaction.transactionId,
+          action: 'purge',
+          spaceId: cleanSpaceId,
+          operationId: transaction.operationId,
+          sourceDeviceId: transaction.sourceDeviceId,
+          remoteEventId: event.eventId,
+          appliedStateRevision: 0,
+          status: 'completed'
+        }, sessionContext);
         this.assertSessionContext(sessionContext);
         this.removeSpaceFromBootstrapState(cleanSpaceId);
         dispatch('p2p:space-deleted', {
@@ -6307,11 +6611,14 @@ export class SemillaP2PClient {
               });
             }
           }
+          const lifecycleReceipts = await this.completedLifecycleReceipts(null, sessionContext);
+          this.assertSessionContext(sessionContext);
           const ackResult = await apiPost('/api/p2p/events/ack', {
             deviceId: sessionContext.deviceId,
             deviceSequence: deliverySequence,
             deliverySequence,
-            appliedStateRevisions
+            appliedStateRevisions,
+            lifecycleReceipts
           });
           this.assertSessionContext(sessionContext);
           if (ackGeneration !== this.ackGeneration) return;
@@ -6324,6 +6631,13 @@ export class SemillaP2PClient {
             for (const spaceId of refreshSpaceIds) this.pendingReplicaHealthSpaceIds.add(spaceId);
           }
           this.scheduleReplicaHealthRefresh(refreshSpaceIds);
+          if (ackResult.lifecycleReconciliationDeferred === true && this.realtimeLeader) {
+            this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+              if (!this.isSessionContextChangedError(error)) {
+                dispatch('p2p:lifecycle-reconciliation-deferred', { error, source: 'ack' });
+              }
+            });
+          }
           if (this.isSessionContextCurrent(sessionContext) && this.realtimeLeader) {
             this.ackRetryCount = 0;
           }
@@ -6623,11 +6937,18 @@ export class SemillaP2PClient {
       };
     }
 
+    await enqueueOutbox(outboxItem);
+    this.assertSessionContext(sessionContext);
     try {
       const data = await apiPost(outboxItem.endpoint, outboxItem.request);
       this.assertSessionContext(sessionContext);
-      await removeOutbox(outboxItem.operationId).catch(() => null);
       const transaction = data.lifecycle || null;
+      await enqueueOutbox({
+        ...outboxItem,
+        backendLifecycle: transaction ? { ...transaction } : outboxItem.backendLifecycle || null,
+        backendAcceptedAt: new Date().toISOString()
+      });
+      this.assertSessionContext(sessionContext);
       if (transaction) {
         this.rememberLifecycleTransaction(transaction);
         dispatch('p2p:lifecycle-progress', { transaction, source: 'local-start' });
@@ -6636,13 +6957,13 @@ export class SemillaP2PClient {
     } catch (error) {
       if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) throw this.createSessionContextChangedError();
       if (this.isRetryableTransportError(error) && options.queueWhenOffline !== false) {
-        await enqueueOutbox(outboxItem);
-        this.assertSessionContext(sessionContext);
         error.p2pQueued = true;
         const localDelivery = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
         this.assertSessionContext(sessionContext);
         if (Number(localDelivery?.delivered || 0) > 0) error.p2pLocalDelivered = Number(localDelivery.delivered || 0);
         dispatch('p2p:outbox', { queued: true, operationId: outboxItem.operationId, lifecycleAction: cleanAction, localDelivered: Number(localDelivery?.delivered || 0) });
+      } else {
+        await removeOutbox(outboxItem.operationId).catch(() => null);
       }
       throw error;
     }
@@ -7500,7 +7821,12 @@ export class SemillaP2PClient {
           const data = await apiPost(endpoint, item.request);
           this.assertSessionContext(sessionContext);
           if (item?.lifecycleAction) {
-            await removeOutbox(item.operationId);
+            await enqueueOutbox({
+              ...item,
+              backendLifecycle: data?.lifecycle ? { ...data.lifecycle } : item.backendLifecycle || null,
+              backendAcceptedAt: new Date().toISOString(),
+              attempts: Math.max(0, Number(item.attempts || 0)) + 1
+            });
             this.assertSessionContext(sessionContext);
             if (data?.lifecycle) {
               this.rememberLifecycleTransaction(data.lifecycle);

@@ -121,6 +121,7 @@ class TestClient {
   get device() { return { deviceId: 'device_atomic_2' }; }
   captureSessionContext() { return { deviceId: 'device_atomic_2' }; }
   assertSessionContext() { return true; }
+  async completedLifecycleReceipts() { return []; }
   async applyBootstrapData(data) {
     this.bootstrapState = data;
     if (data.failAfterCommit) {

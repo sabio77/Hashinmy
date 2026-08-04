@@ -111,6 +111,52 @@ if (record.deleted || record.value.trashedAt !== '' || record.value.trashedBy !=
   throw new Error('Restaurar no devolvió el registro a las vistas activas con auditoría.');
 }
 
+const missingProjectValue = {
+  name: 'Proyecto recuperable',
+  description: 'Copia raíz reconstruida desde el valor esperado cifrado.',
+  address: 'Bogotá',
+  initialBudget: 500000,
+  createdAt: '2026-08-03T18:00:00.000Z',
+  updatedAt: '2026-08-03T18:00:00.000Z'
+};
+const recoveredMissingProject = reduceEntityRecord(null, {
+  ...event({
+    operationId: 'op_trash_missing_project',
+    type: 'entity.trash',
+    entityType: 'admin.project',
+    entityId: 'project',
+    payload: { expected: missingProjectValue, at: trashAt, actorUserId: 'usr_owner' }
+  }, 12),
+  spaceId: 'space_missing_project'
+});
+if (recoveredMissingProject.skipped || recoveredMissingProject.entity?.value?.trashedAt !== trashAt || recoveredMissingProject.entity?.value?.name !== missingProjectValue.name) {
+  throw new Error('Una réplica sin raíz local no reconstruyó el proyecto directamente en la papelera.');
+}
+const missingProjectRestore = reduceEntityRecord(null, {
+  ...event({
+    operationId: 'op_restore_missing_project',
+    type: 'entity.restore',
+    entityType: 'admin.project',
+    entityId: 'project',
+    payload: { expected: missingProjectValue, at: restoreAt, actorUserId: 'usr_owner' }
+  }, 13),
+  spaceId: 'space_missing_project_restore'
+});
+if (!missingProjectRestore.skipped || missingProjectRestore.entity) {
+  throw new Error('Una restauración atrasada reconstruyó una raíz ausente que pudo haber sido purgada.');
+}
+
+const missingGenericRecord = reduceEntityRecord(null, event({
+  operationId: 'op_trash_missing_generic',
+  type: 'entity.trash',
+  entityType: 'admin.purchase',
+  entityId: 'purchase_missing',
+  payload: { expected: baseValue, at: trashAt, actorUserId: 'usr_owner' }
+}, 14));
+if (!missingGenericRecord.skipped || missingGenericRecord.entity) {
+  throw new Error('La recuperación especial de la raíz se extendió indebidamente a registros genéricos.');
+}
+
 const purgeExpected = structuredClone(record.value);
 record = reduceEntityRecord(record, event({
   operationId: 'op_purge',
@@ -151,6 +197,18 @@ for (const marker of ['trash-button', 'trash-dialog', 'action-menu-dialog', 'act
 }
 for (const marker of ["lifecycleOperation('entity.trash'", "lifecycleOperation('entity.restore'", "operationType: 'entity.purge'"]) {
   if (!clientSource.includes(marker)) throw new Error(`El cliente P2P perdió una operación de ciclo de vida: ${marker}`);
+}
+
+for (const marker of [
+  'localLifecycleCapabilityAuthorization',
+  'completedPurgeProofForSpace',
+  'lifecycleReplicationPairAuthorized',
+  "tombstone?.status === 'completed'",
+  "status: 'prepared'",
+  "status: 'completed'",
+  'trashAppliedOrAlreadyAbsent'
+]) {
+  if (!clientSource.includes(marker)) throw new Error(`La recuperación idempotente P2P_sin_ perdió el contrato: ${marker}`);
 }
 
 const observerStart = clientSource.indexOf('const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS');

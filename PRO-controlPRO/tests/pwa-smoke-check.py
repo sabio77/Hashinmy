@@ -972,6 +972,10 @@ globalThis.__apiPost = () => {
 };
 ackClient.scheduleAck(30, { immediate: true });
 takeAckTimer(0).callback();
+await flushAckMicrotasks();
+if (typeof resolveInflightAck !== 'function' || inflightAckCalls !== 1) {
+  throw new Error('El ACK en vuelo no alcanzó la llamada HTTP después de preparar sus comprobantes durables.');
+}
 ackClient.scheduleAck(31);
 if (ackTimers.some((timer) => !timer.cancelled) || ackClient.highestPendingAck !== 31) {
   throw new Error('El cliente abrió un segundo ACK mientras existía otro en vuelo.');

@@ -920,10 +920,16 @@ function applyOperationToState(input = {}, operation = {}) {
     const expected = payload.expected && typeof payload.expected === 'object' && !Array.isArray(payload.expected)
       ? payload.expected
       : null;
-    const current = state.exists && !state.deleted && state.value && typeof state.value === 'object' && !Array.isArray(state.value)
+    const storedCurrent = state.exists && !state.deleted && state.value && typeof state.value === 'object' && !Array.isArray(state.value)
       ? state.value
       : null;
-    if (!current || (expected && !comparableValuesEqual(current, expected))) {
+    const recoverableProjectRoot = operation.type === 'entity.trash'
+      && !storedCurrent
+      && expected
+      && String(operation.entityType || '') === 'admin.project'
+      && String(operation.entityId || '') === 'project';
+    const current = storedCurrent || (recoverableProjectRoot ? expected : null);
+    if (!current || (storedCurrent && expected && !comparableValuesEqual(storedCurrent, expected))) {
       return {
         supported: true,
         conflicts: [{ field: '__entity__', expected, actual: current }],

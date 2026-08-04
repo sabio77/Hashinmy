@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.90 - 2026-08-04
+
+- La coordinación `P2P_sin_` de papelera y purga conserva ahora un comprobante durable en dos fases (`prepared` → `completed`): una caída después de registrar la intención ya no puede producir un ACK falso antes de aplicar la eliminación local, y el reintento continúa exactamente desde el estado pendiente.
+- Una réplica donde la card raíz ya no existe puede reconfirmar o reconstruir de forma segura la ubicación en papelera usando las capacidades firmadas de memoriaBACKEND para propietario y destinatario; la excepción queda limitada a `entity.trash` sobre la raíz `admin.project/project`, no afecta registros genéricos y nunca revive un proyecto con prueba durable de purga posterior.
+- Se reforzaron las regresiones de permisos, réplica ausente, compatibilidad de comprobantes anteriores, continuidad de ACK y transición durable, preservando el flujo normal con memoriaBACKEND y el carácter opcional de los bloques `P2P_sin_`.
+
 ## 1.9.89 - 2026-08-04
 
 - Se cerró el caso residual en el que todas las réplicas ya habían confirmado una acción crítica, pero el dispositivo iniciador podía conservar la card visible si perdía la señal final de papelera.

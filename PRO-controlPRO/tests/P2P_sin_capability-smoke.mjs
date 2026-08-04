@@ -12,6 +12,7 @@ const {
   verifyP2PLocalSignature
 } = await import('../src/js/p2p-crypto.js');
 const {
+  lifecycleReplicationPairAuthorized,
   memberAllowsDurableOperation,
   requiredPermissionForDurableOperation
 } = await import('../src/js/p2p-permissions.js');
@@ -170,4 +171,14 @@ assert.match(clientSource, /originalSourceDeviceId/);
 assert.match(clientSource, /P2P_SIN_RELAY_ENVELOPE_MISSING/);
 assert.match(clientSource, /optionalRelayUnavailable = relayCode === 'P2P_SIN_CAPABILITY_UNAVAILABLE'/);
 assert.doesNotMatch(clientSource, /body\?\.type\s*!==\s*['"]p2p\.sin\.operation['"]/);
+
+const lifecycleOwner = { resourceType: 'admin.project', permissionProfile: 'admin-project-v1', role: 'owner', permissions: ['read'] };
+const lifecycleReplica = { resourceType: 'admin.project', permissionProfile: 'admin-project-v1', role: 'member', permissions: ['read'] };
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'trash'), true);
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'purge'), true);
+assert.equal(lifecycleReplicationPairAuthorized({ ...lifecycleOwner, role: 'member' }, lifecycleReplica, 'purge'), false);
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, { ...lifecycleReplica, permissions: [] }, 'trash'), false);
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'restore'), false);
+assert.equal(lifecycleReplicationPairAuthorized({ ...lifecycleOwner, resourceType: 'generic' }, lifecycleReplica, 'purge'), false);
+
 console.log('P2P_sin capability smoke: OK');
