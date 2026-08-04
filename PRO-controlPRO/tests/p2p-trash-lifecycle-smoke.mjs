@@ -140,8 +140,11 @@ for (const marker of ['data-action-menu-scope', 'trash-project', 'trash-record',
 if (appSource.includes('data-record-action') || appSource.includes('semillaP2P.delete(')) {
   throw new Error('La interfaz conservó una ruta de eliminación inmediata fuera de la papelera.');
 }
-if (!appSource.includes('result = await semillaP2P.trash(pending.spaceId') || !appSource.includes('await refreshProjects();\n      closeDialog(elements.accessDialog); showDashboard();')) {
-  throw new Error('La eliminación desde participantes no usa la papelera o no actualiza la vista antes de volver al panel.');
+if (!appSource.includes('result = await semillaP2P.trashProjectAfterReplicas(pending.spaceId') || !appSource.includes('await refreshProjects();\n      closeDialog(elements.accessDialog); showDashboard();')) {
+  throw new Error('La eliminación desde participantes no usa la papelera coordinada o no actualiza la vista antes de volver al panel.');
+}
+if (!appSource.includes("pending.action === 'delete-project' && error?.p2pQueued")) {
+  throw new Error('La eliminación desde participantes perdió su recuperación offline y por red local.');
 }
 for (const marker of ['trash-button', 'trash-dialog', 'action-menu-dialog', 'action-menu-confirm-panel']) {
   if (!indexSource.includes(marker)) throw new Error(`index.html perdió la interfaz de papelera/menú: ${marker}`);
@@ -150,4 +153,48 @@ for (const marker of ["lifecycleOperation('entity.trash'", "lifecycleOperation('
   if (!clientSource.includes(marker)) throw new Error(`El cliente P2P perdió una operación de ciclo de vida: ${marker}`);
 }
 
-console.log('OK: menú vertical, papelera restaurable, purga permanente, métricas activas y concurrencia del ciclo de vida P2P validados.');
+const observerStart = clientSource.indexOf('const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS');
+const observerEnd = clientSource.indexOf('export function retryAfterMilliseconds', observerStart);
+if (observerStart < 0 || observerEnd <= observerStart) {
+  throw new Error('No se encontró el contrato reutilizable del observador de finalización.');
+}
+const observerSource = clientSource.slice(observerStart, observerEnd)
+  .replace('export function readySourceLifecycleTransactions', 'function readySourceLifecycleTransactions')
+  .replace('export function lifecycleFinalizationObserverDelay', 'function lifecycleFinalizationObserverDelay');
+const observerModuleUrl = `data:text/javascript;base64,${Buffer.from(`${observerSource}
+export { readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay };`).toString('base64')}`;
+const { readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay } = await import(observerModuleUrl);
+const readyTransactions = readySourceLifecycleTransactions([
+  { transactionId: 'tx_ready', spaceId: 'space_ready', role: 'source', status: 'ready' },
+  { transactionId: 'tx_waiting', spaceId: 'space_waiting', role: 'source', status: 'waiting' },
+  { transactionId: 'tx_target', spaceId: 'space_target', role: 'target', status: 'ready' },
+  { transactionId: 'tx_completed', spaceId: 'space_completed', role: 'source', status: 'completed' },
+  { transactionId: 'tx_ready', spaceId: 'space_ready', role: 'source', status: 'ready', updatedAt: 'later' }
+]);
+if (readyTransactions.length !== 1 || readyTransactions[0].transactionId !== 'tx_ready' || readyTransactions[0].updatedAt !== 'later') {
+  throw new Error('El observador no limita su trabajo a transacciones ready del dispositivo iniciador o no deduplica reintentos.');
+}
+if (
+  lifecycleFinalizationObserverDelay(0) !== 1500
+  || lifecycleFinalizationObserverDelay(1) !== 3000
+  || lifecycleFinalizationObserverDelay(99) !== 30000
+) {
+  throw new Error('El observador perdió su backoff acotado y podría consumir recursos de forma permanente.');
+}
+for (const marker of [
+  'lifecycleFinalizationObserverTimer',
+  'scheduleLifecycleFinalizationObserver',
+  'runLifecycleFinalizationObserver',
+  "apiPost('/api/p2p/lifecycle/resume'",
+  '!this.realtimeLeader',
+  'this.clearLifecycleFinalizationObserver()',
+  'this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext)',
+  'lifecycleTransactions: (Array.isArray(this.bootstrapState?.lifecycleTransactions)'
+]) {
+  if (!clientSource.includes(marker)) throw new Error(`El observador de finalización perdió una garantía requerida: ${marker}`);
+}
+if (clientSource.includes('setInterval(')) {
+  throw new Error('El observador de finalización introdujo polling permanente.');
+}
+
+console.log('OK: menú vertical, papelera restaurable, purga permanente, métricas activas, concurrencia y observador autodesactivable del ciclo de vida P2P validados.');

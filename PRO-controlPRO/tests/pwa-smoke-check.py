@@ -1291,11 +1291,11 @@ def main() -> None:
     assert_generator_syncs_prompts_and_fingerprints()
 
     index = (ROOT / "index.html").read_text(encoding="utf-8")
-    for marker in ['Control de proyectos', 'new-project-button', 'project-list', 'add-purchase-button', 'add-income-button', 'add-projection-button', 'manage-access-button', 'access-dialog', 'access-member-list', 'storage-durability-banner', 'protect-storage-button', 'trash-button', 'trash-dialog', 'action-menu-dialog', 'action-menu-confirm-panel']:
+    for marker in ['Control de proyectos', 'new-project-button', 'project-list', 'add-purchase-button', 'add-income-button', 'add-projection-button', 'manage-access-button', 'access-dialog', 'access-member-list', 'storage-durability-banner', 'protect-storage-button', 'trash-button', 'trash-dialog', 'action-menu-dialog', 'action-menu-confirm-panel', 'project-filter-input', 'project-filter-clear', 'project-filter-summary']:
         if marker not in index:
             fail(f"index.html no contiene la interfaz administrativa requerida: {marker}.")
     app_source = (ROOT / "src/js/app.js").read_text(encoding="utf-8")
-    for marker in ["pendingProjectCreation", "recordByType", "data-action-menu-scope", "admin.project", "admin.purchase", "admin.income", "admin.projection", "requestStorageProtection", "inspectStorageDurability", "semillaP2P.revoke", "semillaP2P.transfer", "semillaP2P.leave", "semillaP2P.updatePermissions", "accessPermissionEditor", "permissionsUpdated", "revokedRotationPending", "referenceGuards", "referenceRequirements", "projectionVarianceLabel", "varianceStatus", "deleteLinkedError"]:
+    for marker in ["pendingProjectCreation", "recordByType", "data-action-menu-scope", "admin.project", "admin.purchase", "admin.income", "admin.projection", "requestStorageProtection", "inspectStorageDurability", "semillaP2P.revoke", "semillaP2P.transfer", "semillaP2P.leave", "semillaP2P.updatePermissions", "accessPermissionEditor", "permissionsUpdated", "revokedRotationPending", "referenceGuards", "referenceRequirements", "projectionVarianceLabel", "varianceStatus", "deleteLinkedError", "normalizeProjectFilterText", "projectMatchesFilter", "projectFilterQuery"]:
         if marker not in app_source and marker not in (ROOT / "src/js/project-domain.js").read_text(encoding="utf-8"):
             fail(f"La interfaz administrativa perdió una capacidad funcional requerida: {marker}.")
 
@@ -1328,6 +1328,10 @@ def main() -> None:
         if needle not in css:
             fail(f"src/css/app.css no contiene soporte RTL robusto: {needle}")
 
+    for needle in ["project-filter-toolbar", "project-filter-field", "project-filter-summary", "focus-within"]:
+        if needle not in css:
+            fail(f"src/css/app.css no contiene la interfaz compacta del filtro de proyectos: {needle}")
+
     for needle in ["is-skeletonscreen-active", "data-skeleton-slot", "skeletonscreen-shimmer", "prefers-reduced-motion"]:
         if needle not in css:
             fail(f"src/css/app.css no contiene skeletonscreen robusto: {needle}")
@@ -1338,7 +1342,7 @@ def main() -> None:
 
     for code in sorted(textx_language_pairs()):
         payload = read_json(f"textX/app/{code}.json")
-        for namespace, key in [("projection", "overBudget"), ("projection", "underBudget"), ("projection", "onBudget"), ("projection", "deleteLinkedError"), ("p2p", "referenceDeletePreserved"), ("access", "deleteProject"), ("access", "deleteConfirm"), ("access", "deletedRemote"), ("trash", "title"), ("trash", "restore"), ("trash", "deletePermanently"), ("trash", "confirmPermanentProject"), ("actions", "projectMenu")]:
+        for namespace, key in [("projection", "overBudget"), ("projection", "underBudget"), ("projection", "onBudget"), ("projection", "deleteLinkedError"), ("p2p", "referenceDeletePreserved"), ("access", "deleteProject"), ("access", "deleteConfirm"), ("access", "deletedRemote"), ("trash", "title"), ("trash", "restore"), ("trash", "deletePermanently"), ("trash", "confirmPermanentProject"), ("actions", "projectMenu"), ("dashboard", "filterLabel"), ("dashboard", "filterPlaceholder"), ("dashboard", "clearFilter"), ("dashboard", "filterResults"), ("dashboard", "filterNoResultsTitle"), ("dashboard", "filterNoResultsDescription")]:
             if not str(payload.get(namespace, {}).get(key, "")).strip():
                 fail(f"textX/app/{code}.json no contiene el texto funcional {namespace}.{key}.")
 

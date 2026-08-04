@@ -143,6 +143,12 @@
     "totalAvailable": "Available",
     "emptyTitle": "No projects yet",
     "emptyDescription": "Use the + button to create the first one. You can then invite participants and record transactions.",
+    "filterLabel": "Filter projects",
+    "filterPlaceholder": "Filter by name, description, or address",
+    "clearFilter": "Clear",
+    "filterResults": "{shown} of {total} projects match",
+    "filterNoResultsTitle": "No matching projects",
+    "filterNoResultsDescription": "Try another word from the name, description, or address.",
     "loadError": "Projects could not be loaded."
   },
   "project": {

@@ -30,6 +30,27 @@ export function localDateValue(value = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function normalizeProjectFilterText(value = '') {
+  return cleanText(value, 1200)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function projectMatchesFilter(project = {}, query = '') {
+  const tokens = normalizeProjectFilterText(query).split(' ').filter(Boolean);
+  if (!tokens.length) return true;
+  const searchable = normalizeProjectFilterText([
+    project?.name,
+    project?.description,
+    project?.address
+  ].filter(Boolean).join(' '));
+  return tokens.every((token) => searchable.includes(token));
+}
+
 function normalizeMoneyString(value = '') {
   const raw = String(value ?? '').trim();
   if (!raw) return '';

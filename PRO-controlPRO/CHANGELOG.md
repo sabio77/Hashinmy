@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.89 - 2026-08-04
+
+- Se cerró el caso residual en el que todas las réplicas ya habían confirmado una acción crítica, pero el dispositivo iniciador podía conservar la card visible si perdía la señal final de papelera.
+- La pestaña líder activa ahora un único observador autodesactivable solo para transacciones `ready` de proyectos todavía presentes; solicita nuevamente la finalización idempotente con backoff acotado y se apaga al completar, perder liderazgo, cerrar sesión, quedar offline o desaparecer el proyecto.
+- Los estados de ciclo de vida se retiran junto con un espacio purgado y una respuesta no recuperable fuerza una lectura autoritativa, evitando reintentos permanentes sobre transacciones obsoletas. La regresión forma parte de la prueba de papelera P2P.
+
+## 1.9.87 - 2026-08-03
+
+- Se añadió sobre la lista un filtro compacto con icono de búsqueda para localizar proyectos por coincidencias parciales en nombre, descripción o dirección.
+- La búsqueda normaliza mayúsculas, tildes, símbolos y varias palabras, mantiene las métricas generales sin alterarlas y muestra el total de coincidencias o un estado vacío específico.
+- El filtro funciona completamente en memoria local, se limpia al cerrar sesión, incluye accesibilidad, soporte RTL, textos ES/EN/AR y regresiones integradas en la validación de la semilla.
+
 ## 1.9.85 - 2026-08-03
 
 - Los espacios compartidos que todavía no contienen la entidad raíz administrativa ya no generan cards fantasma con nombre genérico ni métricas en cero; permanecen fuera del panel y de los totales mientras se determina si existe una réplica válida.

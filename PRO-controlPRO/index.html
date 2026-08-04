@@ -78,6 +78,14 @@
 
         <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
         <p id="dashboard-status" class="inline-status" role="status" aria-live="polite"></p>
+        <div class="project-filter-toolbar">
+          <label class="project-filter-field" for="project-filter-input">
+            <span class="project-filter-icon" aria-hidden="true"></span>
+            <input id="project-filter-input" type="search" maxlength="300" autocomplete="off" enterkeyhint="search" aria-controls="project-list" aria-label="Filtrar proyectos" placeholder="Filtrar por nombre, descripción o dirección" data-i18n-attr="aria-label:dashboard.filterLabel;placeholder:dashboard.filterPlaceholder" />
+          </label>
+          <button id="project-filter-clear" class="button button-ghost button-compact project-filter-clear" type="button" data-i18n="dashboard.clearFilter" hidden>Limpiar</button>
+          <p id="project-filter-summary" class="project-filter-summary" role="status" aria-live="polite" hidden></p>
+        </div>
         <section id="project-list" class="project-grid" aria-live="polite"></section>
       </section>
 

@@ -749,6 +749,30 @@ const DEFAULT_SNAPSHOT_TRANSFER_MAX_BYTES = 1536 * 1024;
 const DEFAULT_SNAPSHOT_MAX_CHUNKS = 500;
 const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1000;
+const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
+const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
+const readySourceLifecycleTransactions = (transactions = []) => {
+  const ready = new Map();
+  for (const transaction of Array.isArray(transactions) ? transactions : []) {
+    const transactionId = String(transaction?.transactionId || '').trim();
+    const spaceId = String(transaction?.spaceId || '').trim();
+    if (
+      !transactionId
+      || !spaceId
+      || String(transaction?.role || '').trim() !== 'source'
+      || String(transaction?.status || '').trim() !== 'ready'
+    ) continue;
+    ready.set(transactionId, { ...transaction, transactionId, spaceId });
+  }
+  return [...ready.values()];
+};
+const lifecycleFinalizationObserverDelay = (attempt = 0) => {
+  const normalizedAttempt = Math.min(8, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(
+    LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS,
+    LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS * (2 ** normalizedAttempt)
+  );
+};
 const CURSOR_META_PREFIX = 'cursor:';
 const pendingApiCalls = [];
 const createdEventSources = [];
@@ -1160,6 +1184,66 @@ if (!purgedSpaceIds.includes('space_delete_local')
   throw new Error('La confirmación de borrado no purgó la réplica, limpió invitaciones ni coordinó el cierre en las demás pestañas.');
 }
 deletionClient.unbindTabRelays();
+
+const lifecycleObserverClient = new SemillaP2PClient();
+lifecycleObserverClient.user = { userId: 'usr_lifecycle_observer' };
+lifecycleObserverClient.deviceId = 'dev_lifecycle_observer';
+lifecycleObserverClient.started = true;
+lifecycleObserverClient.manualClose = false;
+lifecycleObserverClient.realtimeLeader = true;
+lifecycleObserverClient.sessionGeneration = 5;
+lifecycleObserverClient.bootstrapState = {
+  spaces: [{
+    spaceId: 'space_lifecycle_observer',
+    ownerUserId: 'usr_lifecycle_observer',
+    authorizationState: 'confirmed',
+    members: [{ userId: 'usr_lifecycle_observer', role: 'owner', permissions: ['read', 'write'] }]
+  }],
+  lifecycleTransactions: [{
+    transactionId: 'tx_lifecycle_observer',
+    spaceId: 'space_lifecycle_observer',
+    role: 'source',
+    status: 'ready'
+  }]
+};
+if (!lifecycleObserverClient.scheduleLifecycleFinalizationObserver({ immediate: true })) {
+  throw new Error('Una transacción ready visible no activó el observador de finalización.');
+}
+await new Promise((resolve) => setTimeout(resolve, 0));
+const lifecycleObserverRequest = pendingApiCalls.shift();
+if (lifecycleObserverRequest?.endpoint !== '/api/p2p/lifecycle/resume'
+  || lifecycleObserverRequest?.payload?.transactionId !== 'tx_lifecycle_observer'
+  || lifecycleObserverRequest?.payload?.deviceId !== 'dev_lifecycle_observer') {
+  throw new Error('El observador no reanudó de forma idempotente la acción lista del dispositivo iniciador.');
+}
+const lifecycleObserverTask = lifecycleObserverClient.lifecycleFinalizationObserverPromise;
+lifecycleObserverRequest.resolve({
+  ok: true,
+  lifecycle: {
+    transactionId: 'tx_lifecycle_observer',
+    spaceId: 'space_lifecycle_observer',
+    role: 'source',
+    status: 'completed'
+  }
+});
+await lifecycleObserverTask;
+if (lifecycleObserverClient.bootstrapState.lifecycleTransactions.length
+  || lifecycleObserverClient.lifecycleFinalizationObserverTimer
+  || lifecycleObserverClient.lifecycleFinalizationObserverPromise
+  || lifecycleObserverClient.lifecycleFinalizationObserverAttempt !== 0) {
+  throw new Error('El observador no se autodesactivó después de confirmar la finalización.');
+}
+lifecycleObserverClient.realtimeLeader = false;
+lifecycleObserverClient.bootstrapState.lifecycleTransactions = [{
+  transactionId: 'tx_lifecycle_follower',
+  spaceId: 'space_lifecycle_observer',
+  role: 'source',
+  status: 'ready'
+}];
+if (lifecycleObserverClient.scheduleLifecycleFinalizationObserver({ immediate: true }) !== false
+  || lifecycleObserverClient.lifecycleFinalizationObserverTimer) {
+  throw new Error('Una pestaña seguidora activó indebidamente el observador de finalización.');
+}
 
 const followerClient = new SemillaP2PClient();
 followerClient.user = { userId: 'usr_shared_tab' };

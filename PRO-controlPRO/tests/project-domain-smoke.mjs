@@ -12,6 +12,8 @@ import {
   hasPermission,
   normalizeCollaborationPermissions,
   normalizeProjectInput,
+  normalizeProjectFilterText,
+  projectMatchesFilter,
   normalizePurchaseInput,
   normalizeIncomeInput,
   normalizeProjectionInput,
@@ -28,6 +30,11 @@ assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe id
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);
 assert.equal(project.name, 'Obra Norte');
+assert.equal(normalizeProjectFilterText('  Dirección ÁRBOL #12  '), 'direccion arbol 12', 'El filtro debe ignorar mayúsculas, tildes y símbolos.');
+assert.equal(projectMatchesFilter({ name: 'مشروع البناء', description: 'مخزن مركزي', address: 'عمان' }, 'البناء مخزن'), true, 'El filtro debe conservar alfabetos no latinos admitidos por la interfaz multidioma.');
+assert.equal(projectMatchesFilter({ name: 'Obra Norte', description: 'Remodelación comercial', address: 'Carrera 7 Bogotá' }, 'nort remo'), true, 'Las palabras parciales coincidentes deben buscarse en todos los campos.');
+assert.equal(projectMatchesFilter({ name: 'Obra Norte', description: 'Remodelación comercial', address: 'Carrera 7 Bogotá' }, 'bogota comercial'), true, 'El filtro debe aceptar varias palabras aunque pertenezcan a campos diferentes.');
+assert.equal(projectMatchesFilter({ name: 'Obra Norte', description: 'Remodelación comercial', address: 'Carrera 7 Bogotá' }, 'bogota industrial'), false, 'Todas las palabras escritas deben coincidir para evitar resultados irrelevantes.');
 assert.equal(moneyValue('1e6'), 1000000, 'La notación científica de un input number no debe degradarse a 16.');
 assert.equal(moneyValue('1.25e6'), 1250000, 'La notación científica decimal debe conservar su magnitud.');
 assert.equal(moneyValue('1,25e6'), 1250000, 'La notación científica con coma decimal debe conservar su magnitud.');
@@ -215,9 +222,13 @@ assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false,
 assert.equal(appSource.includes('Math.abs(record.varianceAmount || 0)'), false, 'Math.abs no admite BigInt y no debe reaparecer en la ruta de renderizado monetario.');
 assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, data]) => data.project.loaded))'), true, 'La interfaz no debe materializar cards de espacios sin proyecto raíz.');
 assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica antes de permanecer ocultos.');
+assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFilter)'), true, 'La lista debe aplicar el filtro local sin consultar memoriaBACKEND.');
+assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');
 
 const indexSource = await fs.readFile(path.resolve(path.dirname(currentFile), '../index.html'), 'utf8');
 assert.equal(/id="project-budget-input"[^>]*max="9007199254740991"/.test(indexSource), true);
+assert.equal(indexSource.includes('id="project-filter-input"'), true, 'El panel debe incluir un input de filtro encima de la lista.');
+assert.equal(indexSource.includes('aria-controls="project-list"'), true, 'El filtro debe declarar accesiblemente la lista que controla.');
 assert.equal(/id="record-amount-input"[^>]*max="9007199254740991"/.test(indexSource), true);
 
 console.log('OK: dominio administrativo, raíz presupuestal exclusiva del propietario, vínculos de proyección autorizables, UI restringida, métricas exactas incluso en agregados superiores al entero seguro, permisos y parches concurrentes validados.');

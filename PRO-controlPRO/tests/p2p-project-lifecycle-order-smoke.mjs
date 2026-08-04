@@ -67,6 +67,10 @@ const tombstoneIndex = clientSource.indexOf('await this.rememberLocalLifecycleTo
 const purgeLocalIndex = clientSource.indexOf('const purge = await purgeLocalSpace(spaceId);', purgeRequestIndex);
 assert.ok(purgeRequestIndex >= 0 && tombstoneIndex > purgeRequestIndex && purgeLocalIndex > tombstoneIndex, 'La réplica puede borrar el proyecto antes de conservar el comprobante que permite repetir el ACK.');
 assert.ok(!appSource.includes("if (action === 'trash-project') result = await semillaP2P.trash(context.spaceId"), 'La interfaz volvió a aplicar la papelera local antes de las demás réplicas.');
+assert.ok(!appSource.includes("result = await semillaP2P.trash(pending.spaceId, PROJECT_ENTITY_TYPE"), 'La eliminación desde Participantes volvió a saltarse la coordinación por réplicas.');
+assert.ok(appSource.includes("result = await semillaP2P.trashProjectAfterReplicas(pending.spaceId"), 'La eliminación desde Participantes no usa el mismo ciclo coordinado del menú del proyecto.');
+assert.ok(appSource.includes("pending.action === 'delete-project' && error?.p2pQueued"), 'La eliminación desde Participantes no conserva la coordinación cuando memoriaBACKEND está temporalmente fuera de línea.');
+assert.ok(appSource.includes("Number(error?.p2pLocalDelivered || 0) > 0"), 'La eliminación desde Participantes perdió el respaldo P2P_sin_ para réplicas conectadas por Wi‑Fi.');
 assert.ok(!appSource.includes("if (action === 'purge-project') result = await semillaP2P.deleteSpace(context.spaceId)"), 'La interfaz volvió a purgar el iniciador antes de los demás dispositivos.');
 
 console.log('OK: proyecto visible, progreso por dispositivo, réplicas primero, iniciador al final y respaldo P2P_sin_ firmado validados.');

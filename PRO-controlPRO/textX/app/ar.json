@@ -143,6 +143,12 @@
     "totalAvailable": "المتاح",
     "emptyTitle": "لا توجد مشاريع بعد",
     "emptyDescription": "استخدم زر + لإنشاء المشروع الأول، ثم ادعُ المشاركين وسجّل الحركات.",
+    "filterLabel": "تصفية المشاريع",
+    "filterPlaceholder": "تصفية حسب الاسم أو الوصف أو العنوان",
+    "clearFilter": "مسح",
+    "filterResults": "تطابق {shown} من أصل {total} مشروعاً",
+    "filterNoResultsTitle": "لا توجد مشاريع مطابقة",
+    "filterNoResultsDescription": "جرّب كلمة أخرى من الاسم أو الوصف أو العنوان.",
     "loadError": "تعذر تحميل المشاريع."
   },
   "project": {

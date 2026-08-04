@@ -143,6 +143,12 @@
     "totalAvailable": "Disponible",
     "emptyTitle": "Aún no hay proyectos",
     "emptyDescription": "Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.",
+    "filterLabel": "Filtrar proyectos",
+    "filterPlaceholder": "Filtrar por nombre, descripción o dirección",
+    "clearFilter": "Limpiar",
+    "filterResults": "{shown} de {total} proyectos coinciden",
+    "filterNoResultsTitle": "No hay proyectos coincidentes",
+    "filterNoResultsDescription": "Prueba con otra palabra del nombre, la descripción o la dirección.",
     "loadError": "No se pudieron cargar los proyectos."
   },
   "project": {

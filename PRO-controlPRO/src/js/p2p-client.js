@@ -101,6 +101,32 @@ const LOCAL_CAPABILITY_REFRESH_RETRY_MAX_MS = 30 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pSinLifecycleTombstones';
 const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 128;
+const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
+const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
+
+export function readySourceLifecycleTransactions(transactions = []) {
+  const ready = new Map();
+  for (const transaction of Array.isArray(transactions) ? transactions : []) {
+    const transactionId = String(transaction?.transactionId || '').trim();
+    const spaceId = String(transaction?.spaceId || '').trim();
+    if (
+      !transactionId
+      || !spaceId
+      || String(transaction?.role || '').trim() !== 'source'
+      || String(transaction?.status || '').trim() !== 'ready'
+    ) continue;
+    ready.set(transactionId, { ...transaction, transactionId, spaceId });
+  }
+  return [...ready.values()];
+}
+
+export function lifecycleFinalizationObserverDelay(attempt = 0) {
+  const normalizedAttempt = Math.min(8, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(
+    LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS,
+    LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS * (2 ** normalizedAttempt)
+  );
+}
 
 export function retryAfterMilliseconds(error = null, options = {}) {
   const fallbackMs = Math.max(1000, Number(options.fallbackMs || SERVER_RETRY_FALLBACK_MS));
@@ -1407,6 +1433,9 @@ export class SemillaP2PClient {
     this.pendingLocalSnapshotRequests = new Map();
     this.servedLocalSnapshotRequests = new Map();
     this.pendingLocalLifecycleTransactions = new Map();
+    this.lifecycleFinalizationObserverTimer = 0;
+    this.lifecycleFinalizationObserverPromise = null;
+    this.lifecycleFinalizationObserverAttempt = 0;
     this.deviceSigningPublicKey = null;
   }
 
@@ -3312,8 +3341,12 @@ export class SemillaP2PClient {
         sent: invitations.sent.filter((invitation) => invitation?.spaceId !== cleanSpaceId)
       },
       replicaHealth: Object.fromEntries(Object.entries(this.bootstrapState?.replicaHealth || {})
-        .filter(([spaceId]) => spaceId !== cleanSpaceId))
+        .filter(([spaceId]) => spaceId !== cleanSpaceId)),
+      lifecycleTransactions: (Array.isArray(this.bootstrapState?.lifecycleTransactions)
+        ? this.bootstrapState.lifecycleTransactions
+        : []).filter((transaction) => String(transaction?.spaceId || '').trim() !== cleanSpaceId)
     };
+    this.scheduleLifecycleFinalizationObserver();
     if (this.recoveryRequirements && typeof this.recoveryRequirements === 'object') {
       const nextRequirements = { ...this.recoveryRequirements };
       delete nextRequirements[cleanSpaceId];
@@ -3369,11 +3402,134 @@ export class SemillaP2PClient {
     const current = Array.isArray(this.bootstrapState?.lifecycleTransactions)
       ? this.bootstrapState.lifecycleTransactions
       : [];
+    const previous = current.find((item) => String(item?.transactionId || '').trim() === transactionId) || null;
     const next = current.filter((item) => String(item?.transactionId || '').trim() !== transactionId);
     if (options.remove !== true && transaction.status !== 'completed') next.push({ ...transaction });
     this.bootstrapState = { ...(this.bootstrapState || {}), lifecycleTransactions: next };
     dispatch('p2p:state', { state: this.bootstrapState, lifecycleOnly: true });
+    if (options.observe !== false) {
+      const becameReady = String(transaction?.role || '').trim() === 'source'
+        && String(transaction?.status || '').trim() === 'ready'
+        && String(previous?.status || '').trim() !== 'ready';
+      if (becameReady) this.lifecycleFinalizationObserverAttempt = 0;
+      this.scheduleLifecycleFinalizationObserver({ immediate: becameReady });
+    }
     return transaction;
+  }
+
+  readyLifecycleFinalizations() {
+    const activeSpaceIds = new Set((Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : [])
+      .map((space) => String(space?.spaceId || '').trim())
+      .filter(Boolean));
+    return readySourceLifecycleTransactions(this.bootstrapState?.lifecycleTransactions || [])
+      .filter((transaction) => activeSpaceIds.has(transaction.spaceId));
+  }
+
+  clearLifecycleFinalizationObserver(options = {}) {
+    if (this.lifecycleFinalizationObserverTimer) window.clearTimeout(this.lifecycleFinalizationObserverTimer);
+    this.lifecycleFinalizationObserverTimer = 0;
+    if (options.resetAttempt !== false) this.lifecycleFinalizationObserverAttempt = 0;
+  }
+
+  scheduleLifecycleFinalizationObserver(options = {}, sessionContext = this.captureSessionContext()) {
+    const readyTransactions = this.readyLifecycleFinalizations();
+    if (
+      !readyTransactions.length
+      || !this.started
+      || this.manualClose
+      || !this.realtimeLeader
+      || !this.isSessionContextCurrent(sessionContext)
+    ) {
+      this.clearLifecycleFinalizationObserver();
+      return false;
+    }
+    if (this.lifecycleFinalizationObserverPromise) return true;
+    const immediate = options.immediate === true;
+    if (this.lifecycleFinalizationObserverTimer) {
+      if (!immediate) return true;
+      window.clearTimeout(this.lifecycleFinalizationObserverTimer);
+      this.lifecycleFinalizationObserverTimer = 0;
+    }
+    const delay = immediate ? 0 : lifecycleFinalizationObserverDelay(this.lifecycleFinalizationObserverAttempt);
+    this.lifecycleFinalizationObserverTimer = window.setTimeout(() => {
+      this.lifecycleFinalizationObserverTimer = 0;
+      this.runLifecycleFinalizationObserver(sessionContext).catch((error) => {
+        if (!this.isSessionContextChangedError(error)) {
+          dispatch('p2p:error', { error, stage: 'lifecycle-finalization-observer' });
+        }
+      });
+    }, delay);
+    return true;
+  }
+
+  async runLifecycleFinalizationObserver(sessionContext = this.captureSessionContext()) {
+    if (this.lifecycleFinalizationObserverPromise) return this.lifecycleFinalizationObserverPromise;
+    this.clearLifecycleFinalizationObserver({ resetAttempt: false });
+    const readyTransactions = this.readyLifecycleFinalizations();
+    if (
+      !readyTransactions.length
+      || !this.realtimeLeader
+      || !this.isSessionContextCurrent(sessionContext)
+    ) {
+      this.clearLifecycleFinalizationObserver();
+      return false;
+    }
+    if (navigator.onLine === false) return false;
+
+    const observerTask = (async () => {
+      let authoritativeRefreshRequired = false;
+      for (const transaction of readyTransactions) {
+        this.assertSessionContext(sessionContext);
+        if (!this.realtimeLeader) break;
+        try {
+          const response = await apiPost('/api/p2p/lifecycle/resume', {
+            transactionId: transaction.transactionId,
+            deviceId: sessionContext.deviceId
+          });
+          this.assertSessionContext(sessionContext);
+          if (response?.lifecycle?.status === 'completed') {
+            this.rememberLifecycleTransaction(response.lifecycle, { remove: true, observe: false });
+          }
+        } catch (error) {
+          if (this.isSessionContextChangedError(error)) throw error;
+          const retryable = this.isRetryableTransportError(error);
+          if (!retryable) authoritativeRefreshRequired = true;
+          dispatch('p2p:lifecycle-resume-deferred', {
+            transaction,
+            error,
+            observer: true,
+            retryable
+          });
+        }
+      }
+      if (authoritativeRefreshRequired && this.realtimeLeader && this.isSessionContextCurrent(sessionContext)) {
+        await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+          if (this.isSessionContextChangedError(error)) throw error;
+          dispatch('p2p:lifecycle-resume-deferred', {
+            observer: true,
+            refresh: true,
+            error,
+            retryable: this.isRetryableTransportError(error)
+          });
+        });
+      }
+      return true;
+    })();
+
+    this.lifecycleFinalizationObserverPromise = observerTask;
+    try {
+      return await observerTask;
+    } finally {
+      this.lifecycleFinalizationObserverPromise = null;
+      const observerCanContinue = this.isSessionContextCurrent(sessionContext) && this.realtimeLeader;
+      const remaining = observerCanContinue ? this.readyLifecycleFinalizations() : [];
+      if (!remaining.length) {
+        this.clearLifecycleFinalizationObserver();
+      } else {
+        this.lifecycleFinalizationObserverAttempt = Math.min(8, this.lifecycleFinalizationObserverAttempt + 1);
+        if (navigator.onLine !== false) this.scheduleLifecycleFinalizationObserver({}, sessionContext);
+      }
+    }
   }
 
   lifecycleTransactionFromControl(event = {}) {
@@ -3516,6 +3672,7 @@ export class SemillaP2PClient {
   closeRealtimeForFollower(sessionContext = this.captureSessionContext()) {
     if (!this.isSessionContextCurrent(sessionContext)) return;
     this.clearLocalCapabilityRefreshTimer();
+    this.clearLifecycleFinalizationObserver();
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
     this.clearServerRecoveryTimer();
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
@@ -4807,13 +4964,7 @@ export class SemillaP2PClient {
       } else {
         this.clearSnapshotRecovery();
       }
-      for (const transaction of lifecycleTransactions) {
-        if (transaction?.role !== 'source' || transaction?.status !== 'ready' || !transaction?.transactionId) continue;
-        apiPost('/api/p2p/lifecycle/resume', {
-          transactionId: transaction.transactionId,
-          deviceId: sessionContext.deviceId
-        }).catch((error) => dispatch('p2p:lifecycle-resume-deferred', { transaction, error }));
-      }
+      this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext);
       return this.bootstrapState;
     } catch (error) {
       if (controlStateCommitted && error && typeof error === 'object') {
@@ -5099,7 +5250,9 @@ export class SemillaP2PClient {
     const pendingBootstrap = this.bootstrapApplyQueue;
     const pendingTabStateReconcile = this.tabStateReconcileTask;
     const pendingLocalCapabilityRefresh = this.localCapabilityRefreshPromise;
+    const pendingLifecycleFinalizationObserver = this.lifecycleFinalizationObserverPromise;
     this.localCapabilityRefreshPromise = null;
+    this.lifecycleFinalizationObserverPromise = null;
     this.sessionGeneration += 1;
     this.bootstrapRequestSequence += 1;
     this.bootstrapAppliedSequence = 0;
@@ -5114,6 +5267,7 @@ export class SemillaP2PClient {
     this.activeLeaderMessageAt = 0;
     this.clearPendingTabStateRequest();
     this.clearLocalCapabilityRefreshTimer();
+    this.clearLifecycleFinalizationObserver();
     this.localCapabilityRefreshAttempt = 0;
     this.tabStateReconcileRequested = false;
     this.tabStateReconcileForceSnapshots = false;
@@ -5158,6 +5312,7 @@ export class SemillaP2PClient {
         pendingBootstrap.catch(() => null),
         pendingTabStateReconcile.catch(() => null),
         pendingLocalCapabilityRefresh?.catch(() => null),
+        pendingLifecycleFinalizationObserver?.catch(() => null),
         pendingLeadership.catch(() => null),
         pendingTabCoordinator,
         pendingLocalTransport.catch(() => null)

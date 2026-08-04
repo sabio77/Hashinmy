@@ -52,9 +52,11 @@ import {
   normalizeCollaborationPermissions,
   normalizeIncomeInput,
   normalizeProjectInput,
+  normalizeProjectFilterText,
   normalizeProjectionInput,
   normalizeProjectionLinkInput,
   normalizePurchaseInput,
+  projectMatchesFilter,
   projectRecord,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
@@ -84,7 +86,8 @@ const state = {
   pendingInvitationId: readInvitationIntent(window.location),
   invitationRefreshSequence: 0,
   missingProjectRecoveryActive: false,
-  missingProjectRecoveryAt: new Map()
+  missingProjectRecoveryAt: new Map(),
+  projectFilterQuery: ''
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
@@ -100,7 +103,7 @@ const elements = {
   devicesButton: byId('devices-button'), devicesDialog: byId('devices-dialog'), deviceList: byId('device-list'), deviceStatus: byId('device-status'), deviceConfirmPanel: byId('device-confirm-panel'), deviceConfirmMessage: byId('device-confirm-message'), deviceConfirmButton: byId('device-confirm-button'), deviceConfirmCancel: byId('device-confirm-cancel'),
   localNetworkButton: byId('local-network-button'), localNetworkDialog: byId('local-network-dialog'), localNetworkState: byId('local-network-state'), localNetworkInput: byId('local-network-input'), localNetworkOutput: byId('local-network-output'), localNetworkCreateOffer: byId('local-network-create-offer'), localNetworkAcceptOffer: byId('local-network-accept-offer'), localNetworkCompleteAnswer: byId('local-network-complete-answer'), localNetworkCopy: byId('local-network-copy'), localNetworkPeers: byId('local-network-peers'), localNetworkStatus: byId('local-network-status'),
   dashboardView: byId('dashboard-view'), projectView: byId('project-view'), dashboardStatus: byId('dashboard-status'), projectStatus: byId('project-status'),
-  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
+  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
   projectName: byId('project-name'), projectDescription: byId('project-description'), projectAddress: byId('project-address'), projectMemberSummary: byId('project-member-summary'), projectReplicaHealth: byId('project-replica-health'),
   projectMetrics: byId('project-metrics'), budgetProgressValue: byId('budget-progress-value'), budgetProgressLabel: byId('budget-progress-label'),
   inviteCollaboratorButton: byId('invite-collaborator-button'), manageAccessButton: byId('manage-access-button'), editProjectButton: byId('edit-project-button'), addPurchaseButton: byId('add-purchase-button'), addIncomeButton: byId('add-income-button'), addProjectionButton: byId('add-projection-button'),
@@ -442,6 +445,8 @@ function resetUserScopedInterface() {
   state.concurrentConflictOperations.clear();
   state.missingProjectRecoveryActive = false;
   state.missingProjectRecoveryAt.clear();
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
   state.invitationRefreshSequence += 1;
   state.storageDurability = null;
   state.storageRequestPromise = null;
@@ -684,12 +689,33 @@ function lifecycleStatusMessage(transaction = null) {
 function renderDashboard() {
   renderPortfolioMetrics();
   elements.projectList.replaceChildren();
-  const projects = [...state.projects.values()]
+  const allProjects = [...state.projects.values()]
     .filter((item) => !item.project.isTrashed)
     .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
-  if (!projects.length) {
+  const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
+  const projects = normalizedFilter
+    ? allProjects.filter((item) => projectMatchesFilter(item.project, normalizedFilter))
+    : allProjects;
+  if (elements.projectFilterInput && elements.projectFilterInput.value !== state.projectFilterQuery) {
+    elements.projectFilterInput.value = state.projectFilterQuery;
+  }
+  if (elements.projectFilterClear) elements.projectFilterClear.hidden = !normalizedFilter;
+  if (elements.projectFilterSummary) {
+    elements.projectFilterSummary.hidden = !normalizedFilter;
+    elements.projectFilterSummary.textContent = normalizedFilter
+      ? t('dashboard.filterResults', '{shown} de {total} proyectos coinciden')
+        .replace('{shown}', String(projects.length))
+        .replace('{total}', String(allProjects.length))
+      : '';
+  }
+  if (!allProjects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
     empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`;
+    elements.projectList.append(empty); return;
+  }
+  if (!projects.length) {
+    const empty = document.createElement('div'); empty.className = 'empty-state';
+    empty.innerHTML = `<strong>${t('dashboard.filterNoResultsTitle', 'No hay proyectos coincidentes')}</strong><p>${t('dashboard.filterNoResultsDescription', 'Prueba con otra palabra del nombre, la descripción o la dirección.')}</p>`;
     elements.projectList.append(empty); return;
   }
   for (const data of projects) {
@@ -993,19 +1019,28 @@ async function executeAccessAction() {
     if (pending.action === 'delete-project') {
       const data = state.projects.get(pending.spaceId);
       if (!data?.project?._entity?.value) throw new Error(t('trash.projectUnavailable', 'No se encontró la versión actual del proyecto.'));
-      result = await semillaP2P.trash(pending.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity.value });
+      result = await semillaP2P.trashProjectAfterReplicas(pending.spaceId, { expected: data.project._entity.value });
     }
     applyP2PState(semillaP2P.bootstrapState);
     clearAccessConfirmation();
-    if (pending.action === 'leave' || pending.action === 'delete-project') {
+    if (pending.action === 'leave') {
       await refreshProjects();
       closeDialog(elements.accessDialog); showDashboard();
+      setStatus(elements.dashboardStatus, t('access.leftSuccess', 'Abandonaste el proyecto y su copia local fue retirada.'), 'success');
+      return;
+    }
+    if (pending.action === 'delete-project') {
+      await refreshProjects();
+      closeDialog(elements.accessDialog); showDashboard();
+      const transaction = result?.lifecycle || activeProjectLifecycle(pending.spaceId);
       setStatus(
         elements.dashboardStatus,
-        pending.action === 'delete-project'
-          ? t('access.deletedSuccess', 'El proyecto fue enviado a la papelera y dejó de afectar el resumen administrativo.')
-          : t('access.leftSuccess', 'Abandonaste el proyecto y su copia local fue retirada.'),
-        'success'
+        result?.queued
+          ? t('lifecycle.queuedOffline', 'La acción quedó guardada. Se enviará al recuperar conexión y este dispositivo se actualizará al final.')
+          : transaction
+            ? lifecycleStatusMessage(transaction)
+            : t('lifecycle.queued', 'La acción quedó pendiente. Se aplicará en este dispositivo después de confirmar las demás copias.'),
+        'warning'
       );
       return;
     }
@@ -1019,6 +1054,20 @@ async function executeAccessAction() {
       setStatus(elements.accessStatus, message, 'success');
     }
   } catch (error) {
+    if (pending.action === 'delete-project' && error?.p2pQueued) {
+      applyP2PState(semillaP2P.bootstrapState);
+      await refreshProjects();
+      clearAccessConfirmation();
+      closeDialog(elements.accessDialog); showDashboard();
+      setStatus(
+        elements.dashboardStatus,
+        Number(error?.p2pLocalDelivered || 0) > 0
+          ? t('lifecycle.localNetworkStarted', 'La acción se envió por la red local. Este dispositivo se actualizará cuando las demás copias confirmen.')
+          : t('lifecycle.queuedOffline', 'La acción quedó guardada. Se enviará al recuperar conexión y este dispositivo se actualizará al final.'),
+        'warning'
+      );
+      return;
+    }
     const message = error?.code === 'P2P_OWNERSHIP_TARGET_REPLICA_REQUIRED'
       ? t('access.transferReplicaRequired', 'El nuevo propietario debe abrir y sincronizar completamente el proyecto en al menos uno de sus dispositivos antes de recibir la propiedad.')
       : error?.message || t('access.error', 'No se pudo completar el cambio de acceso.');
@@ -2252,6 +2301,25 @@ elements.deviceList?.addEventListener('click', (event) => { const button = event
 elements.deviceConfirmButton?.addEventListener('click', executeDeviceRetirement); elements.deviceConfirmCancel?.addEventListener('click', clearDeviceConfirmation);
 elements.protectStorageButton?.addEventListener('click', () => requestStorageProtection({ announce: true }));
 elements.newProjectButton?.addEventListener('click', () => { requestStorageProtection(); openProjectForm('create'); }); elements.projectForm?.addEventListener('submit', submitProject); elements.editProjectButton?.addEventListener('click', () => openProjectForm('edit'));
+elements.projectFilterInput?.addEventListener('input', (event) => {
+  state.projectFilterQuery = String(event.currentTarget?.value || '').slice(0, 300);
+  renderDashboard();
+});
+elements.projectFilterInput?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !state.projectFilterQuery) return;
+  event.preventDefault();
+  state.projectFilterQuery = '';
+  elements.projectFilterInput.value = '';
+  renderDashboard();
+});
+elements.projectFilterClear?.addEventListener('click', () => {
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) {
+    elements.projectFilterInput.value = '';
+    elements.projectFilterInput.focus();
+  }
+  renderDashboard();
+});
 elements.projectList?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope]');
   if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
