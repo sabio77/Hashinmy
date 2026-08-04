@@ -97,7 +97,16 @@
     "replicaRecoveryBadge": "Sincronizando",
     "replicaRecovery": "La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.",
     "replicaRecoveryDashboard": "La invitación fue aceptada. El proyecto permanecerá en solo lectura hasta recuperar y validar su copia completa.",
-    "replicaRecoveryConfirmed": "La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto."
+    "replicaRecoveryConfirmed": "La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.",
+    "missingProjectSearching": "Buscando una copia válida del proyecto compartido…",
+    "missingProjectsSearching": "Buscando copias válidas de los proyectos compartidos incompletos…",
+    "missingProjectHidden": "Se retiró de la vista un espacio compartido incompleto porque no existe una copia recuperable en este momento.",
+    "missingProjectsHidden": "Se retiraron de la vista los espacios compartidos incompletos que no tienen una copia recuperable en este momento.",
+    "missingProjectRecovered": "El proyecto compartido fue recuperado y volvió a estar disponible.",
+    "missingProjectsRecovered": "Los proyectos compartidos fueron recuperados y volvieron a estar disponibles.",
+    "missingProjectDeferred": "El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.",
+    "missingProjectRecoveryPending": "El espacio compartido incompleto se ocultó mientras otra réplica envía una copia válida.",
+    "missingProjectsRecoveryPending": "Los espacios compartidos incompletos se ocultaron mientras otras réplicas envían copias válidas."
   },
   "replicas": {
     "healthy": "Réplicas al día",

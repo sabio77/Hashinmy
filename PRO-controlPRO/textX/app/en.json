@@ -97,7 +97,16 @@
     "replicaRecoveryBadge": "Syncing",
     "replicaRecovery": "The invitation has been accepted. This copy remains read-only until the complete shared state is received and validated.",
     "replicaRecoveryDashboard": "The invitation was accepted. The project will remain read-only until its complete copy is recovered and validated.",
-    "replicaRecoveryConfirmed": "The shared copy is synchronized. You can now work on the project."
+    "replicaRecoveryConfirmed": "The shared copy is synchronized. You can now work on the project.",
+    "missingProjectSearching": "Looking for a valid copy of the shared project…",
+    "missingProjectsSearching": "Looking for valid copies of incomplete shared projects…",
+    "missingProjectHidden": "An incomplete shared space was removed from view because no recoverable copy is currently available.",
+    "missingProjectsHidden": "Incomplete shared spaces without a currently recoverable copy were removed from view.",
+    "missingProjectRecovered": "The shared project was recovered and is available again.",
+    "missingProjectsRecovered": "The shared projects were recovered and are available again.",
+    "missingProjectDeferred": "The incomplete shared space was hidden. It will reappear when a valid replica can recover it.",
+    "missingProjectRecoveryPending": "The incomplete shared space was hidden while another replica sends a valid copy.",
+    "missingProjectsRecoveryPending": "The incomplete shared spaces were hidden while other replicas send valid copies."
   },
   "replicas": {
     "healthy": "Replicas up to date",

@@ -98,6 +98,9 @@ const LOCAL_CAPABILITY_REFRESH_MIN_LEAD_MS = 5 * 60 * 1000;
 const LOCAL_CAPABILITY_REFRESH_MAX_LEAD_MS = 6 * 60 * 60 * 1000;
 const LOCAL_CAPABILITY_REFRESH_RETRY_BASE_MS = 60 * 1000;
 const LOCAL_CAPABILITY_REFRESH_RETRY_MAX_MS = 30 * 60 * 1000;
+const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pSinLifecycleTombstones';
+const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 128;
 
 export function retryAfterMilliseconds(error = null, options = {}) {
   const fallbackMs = Math.max(1000, Number(options.fallbackMs || SERVER_RETRY_FALLBACK_MS));
@@ -139,6 +142,14 @@ export function planLocalCapabilityRefresh(capability = {}, options = {}) {
     refreshAtMs,
     delayMs: Math.max(1000, refreshAtMs - nowMs)
   };
+}
+
+export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
+  const limit = Math.min(1000, Math.max(1, Math.floor(Number(maximum || 1000))));
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim().slice(0, 140))
+    .filter(Boolean)))
+    .slice(0, limit);
 }
 
 function createId(prefix = 'id') {
@@ -247,16 +258,24 @@ export function normalizePublishDeliveryIntent(type = '', options = {}) {
     .map((value) => String(value || '').trim())
     .filter(Boolean)));
   const durableStateOperation = isEntityOperationType(type);
+  const deferSourceUntilReplicas = options.deferSourceUntilReplicas === true;
   if (durableStateOperation && targetDeviceIds.length) {
     const error = new Error('Las operaciones durables deben sincronizarse con todas las réplicas autorizadas y no admiten destinos parciales.');
     error.status = 400;
     error.code = 'P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN';
     throw error;
   }
+  if (deferSourceUntilReplicas && String(type || '') !== 'entity.trash') {
+    const error = new Error('Solo el envío de un proyecto a la papelera puede diferirse hasta confirmar las demás réplicas.');
+    error.status = 400;
+    error.code = 'P2P_LIFECYCLE_OPERATION_INVALID';
+    throw error;
+  }
   return {
     targetDeviceIds,
-    includeSourceDevice: durableStateOperation ? true : Boolean(options.includeSourceDevice),
-    durableStateOperation
+    includeSourceDevice: durableStateOperation ? !deferSourceUntilReplicas : Boolean(options.includeSourceDevice),
+    durableStateOperation,
+    ...(deferSourceUntilReplicas ? { deferSourceUntilReplicas: true } : {})
   };
 }
 
@@ -333,7 +352,10 @@ const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.membership.changed',
   'p2p.invitation.created',
   'p2p.invitation.accepted',
-  'p2p.invitation.rejected'
+  'p2p.invitation.rejected',
+  'p2p.lifecycle.progress',
+  'p2p.lifecycle.finalize',
+  'p2p.lifecycle.remote-purge'
 ]);
 
 function isRecord(value) {
@@ -478,6 +500,46 @@ export function assertCanonicalControlEnvelope(event = {}) {
       || (data.selfRemoval === true && actorUserId !== revokedUserId)
       || (data.selfRemoval === false && actorUserId === revokedUserId)
     ) invalid('membership-revoked');
+    return event;
+  }
+
+  if (eventType.startsWith('p2p.lifecycle.')) {
+    const transactionId = String(data.transactionId || '').trim();
+    const action = String(data.action || '').trim().toLowerCase();
+    const status = String(data.status || '').trim().toLowerCase();
+    const completed = Number(data.completed);
+    const total = Number(data.total);
+    const remaining = Number(data.remaining);
+    if (
+      !sourceDeviceId
+      || !transactionId
+      || !['trash', 'purge'].includes(action)
+      || String(data.spaceId || '').trim() !== spaceId
+      || !Number.isSafeInteger(completed)
+      || completed < 0
+      || !Number.isSafeInteger(total)
+      || total < 0
+      || !Number.isSafeInteger(remaining)
+      || remaining < 0
+      || completed + remaining !== total
+    ) invalid('lifecycle');
+    if (eventType === 'p2p.lifecycle.remote-purge') {
+      if (action !== 'purge' || !['waiting', 'ready'].includes(status)) invalid('lifecycle-remote-purge');
+      return event;
+    }
+    if (!['waiting', 'ready', 'completed'].includes(status)) invalid('lifecycle-status');
+    if (eventType === 'p2p.lifecycle.finalize') {
+      const nested = data.event;
+      if (
+        action !== 'trash'
+        || status !== 'ready'
+        || !isRecord(nested)
+        || String(nested.eventType || '').trim() !== 'p2p.operation'
+        || String(nested.spaceId || '').trim() !== spaceId
+        || String(nested.actorUserId || '').trim() !== actorUserId
+        || String(nested.sourceDeviceId || '').trim() !== sourceDeviceId
+      ) invalid('lifecycle-finalize');
+    }
     return event;
   }
 
@@ -1288,6 +1350,7 @@ export class SemillaP2PClient {
     this.bootstrapAppliedSequence = 0;
     this.bootstrapMinimumApplicableSequence = 0;
     this.bootstrapApplyQueue = Promise.resolve();
+    this.nextBootstrapSnapshotSpaceIds = [];
     this.stopPromise = null;
     this.identityRecoveryPromise = null;
     this.identityRecoveryGeneration = 0;
@@ -1306,7 +1369,7 @@ export class SemillaP2PClient {
       snapshotMaxChunks: this.snapshotMaxChunks,
       snapshotSessionTtlSeconds: this.snapshotGrantTtlSeconds + 120
     });
-    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, replicaHealth: {} };
+    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, replicaHealth: {}, lifecycleTransactions: [] };
     this.tabCoordinator = new P2PTabCoordinator();
     this.tabCoordinationReady = false;
     this.realtimeLeader = true;
@@ -1343,6 +1406,7 @@ export class SemillaP2PClient {
     this.localCapabilityRefreshPromise = null;
     this.pendingLocalSnapshotRequests = new Map();
     this.servedLocalSnapshotRequests = new Map();
+    this.pendingLocalLifecycleTransactions = new Map();
     this.deviceSigningPublicKey = null;
   }
 
@@ -1454,6 +1518,7 @@ export class SemillaP2PClient {
     this.localTransportSession = null;
     this.pendingLocalSnapshotRequests.clear();
     this.servedLocalSnapshotRequests.clear();
+    this.pendingLocalLifecycleTransactions.clear();
     if (transport?.stop) await transport.stop().catch(() => null);
   }
 
@@ -1757,6 +1822,302 @@ export class SemillaP2PClient {
     return { type: 'p2p.sin.signed-snapshot', capability: this.localCapability, signedPayload, signature };
   }
 
+  normalizeLocalLifecycleTombstones(records = [], nowMs = Date.now()) {
+    return (Array.isArray(records) ? records : [])
+      .map((record) => ({
+        transactionId: String(record?.transactionId || '').trim(),
+        action: String(record?.action || '').trim(),
+        spaceId: String(record?.spaceId || '').trim(),
+        operationId: String(record?.operationId || '').trim(),
+        sourceUserId: String(record?.sourceUserId || '').trim(),
+        sourceDeviceId: String(record?.sourceDeviceId || '').trim(),
+        targetUserId: String(record?.targetUserId || '').trim(),
+        expiresAtMs: Math.max(0, Number(record?.expiresAtMs || 0))
+      }))
+      .filter((record) => (
+        record.transactionId
+        && record.action === 'purge'
+        && record.spaceId
+        && record.operationId
+        && record.sourceUserId
+        && record.sourceDeviceId
+        && record.targetUserId
+        && record.expiresAtMs > nowMs
+      ))
+      .slice(0, LOCAL_LIFECYCLE_TOMBSTONE_MAX);
+  }
+
+  async localLifecycleTombstones() {
+    const stored = await getMeta(LOCAL_LIFECYCLE_TOMBSTONE_META_KEY, []);
+    const normalized = this.normalizeLocalLifecycleTombstones(stored);
+    if (!Array.isArray(stored) || normalized.length !== stored.length) {
+      await setMeta(LOCAL_LIFECYCLE_TOMBSTONE_META_KEY, normalized);
+    }
+    return normalized;
+  }
+
+  async rememberLocalLifecycleTombstone(input = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const record = this.normalizeLocalLifecycleTombstones([{
+      transactionId: input.transactionId,
+      action: input.action,
+      spaceId: input.spaceId,
+      operationId: input.operationId,
+      sourceUserId: input.sourceUserId,
+      sourceDeviceId: input.sourceDeviceId,
+      targetUserId: sessionContext.userId,
+      expiresAtMs: Date.now() + LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS
+    }])[0] || null;
+    if (!record) throw new Error('No se pudo conservar el comprobante local de la eliminación remota.');
+    const records = await this.localLifecycleTombstones();
+    this.assertSessionContext(sessionContext);
+    const next = [record, ...records.filter((candidate) => candidate.transactionId !== record.transactionId)]
+      .slice(0, LOCAL_LIFECYCLE_TOMBSTONE_MAX);
+    await setMeta(LOCAL_LIFECYCLE_TOMBSTONE_META_KEY, next);
+    this.assertSessionContext(sessionContext);
+    return record;
+  }
+
+  async matchingLocalLifecycleTombstone(payload = {}, capabilityPayload = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const records = await this.localLifecycleTombstones();
+    this.assertSessionContext(sessionContext);
+    return records.find((record) => (
+      record.transactionId === String(payload.transactionId || '').trim()
+      && record.action === String(payload.action || '').trim()
+      && record.spaceId === String(payload.spaceId || '').trim()
+      && record.operationId === String(payload.operationId || '').trim()
+      && record.sourceUserId === String(capabilityPayload.userId || '').trim()
+      && record.sourceDeviceId === String(capabilityPayload.deviceId || '').trim()
+      && record.targetUserId === sessionContext.userId
+      && String(payload.sourceDeviceId || '').trim() === record.sourceDeviceId
+    )) || null;
+  }
+
+  localLifecyclePublicState(entry = {}, status = '') {
+    const targets = Array.isArray(entry.targets) ? entry.targets : [];
+    const completedDeviceIds = new Set(Array.isArray(entry.completedDeviceIds) ? entry.completedDeviceIds : []);
+    const completed = targets.filter((target) => completedDeviceIds.has(String(target.deviceId || '').trim())).length;
+    const total = targets.length;
+    return {
+      schemaVersion: 1,
+      transactionId: String(entry.transactionId || '').trim(),
+      action: String(entry.action || '').trim(),
+      status: status || (total > 0 && completed >= total ? 'ready' : 'waiting'),
+      role: 'source',
+      spaceId: String(entry.spaceId || '').trim(),
+      sourceDeviceId: this.deviceId,
+      operationId: String(entry.operationId || '').trim(),
+      completed,
+      total,
+      remaining: Math.max(0, total - completed),
+      updatedAt: new Date().toISOString(),
+      localNetwork: true
+    };
+  }
+
+  eligibleLocalLifecyclePeers(spaceId = '') {
+    const cleanSpaceId = String(spaceId || '').trim();
+    const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId) || null;
+    if (!space || space.authorizationState === 'unconfirmed') return [];
+    const members = new Map((space.members || []).map((member) => [String(member.userId || '').trim(), member]));
+    const seen = new Set();
+    const peers = [];
+    for (const peer of this.localTransport?.status?.().peers || []) {
+      const userId = String(peer?.userId || '').trim();
+      const deviceId = String(peer?.deviceId || '').trim();
+      const sessionId = String(peer?.sessionId || '').trim();
+      const member = members.get(userId);
+      if (!userId || !deviceId || !sessionId || deviceId === this.deviceId || !member?.permissions?.includes('read') || seen.has(deviceId)) continue;
+      seen.add(deviceId);
+      peers.push({ userId, deviceId, sessionId });
+    }
+    return peers;
+  }
+
+  async persistLocalLifecycleEntry(entry = {}, outboxItem = null) {
+    const transactionId = String(entry.transactionId || '').trim();
+    if (!transactionId) return null;
+    const normalized = {
+      ...entry,
+      targets: Array.isArray(entry.targets) ? entry.targets.map((target) => ({
+        userId: String(target.userId || '').trim(),
+        deviceId: String(target.deviceId || '').trim(),
+        sessionId: String(target.sessionId || '').trim()
+      })).filter((target) => target.userId && target.deviceId) : [],
+      completedDeviceIds: Array.from(new Set((Array.isArray(entry.completedDeviceIds) ? entry.completedDeviceIds : []).map((deviceId) => String(deviceId || '').trim()).filter(Boolean)))
+    };
+    this.pendingLocalLifecycleTransactions.set(transactionId, normalized);
+    if (outboxItem?.operationId) {
+      await enqueueOutbox({
+        ...outboxItem,
+        localLifecycle: {
+          transactionId: normalized.transactionId,
+          action: normalized.action,
+          spaceId: normalized.spaceId,
+          operationId: normalized.operationId,
+          targets: normalized.targets.map(({ userId, deviceId }) => ({ userId, deviceId })),
+          completedDeviceIds: normalized.completedDeviceIds,
+          updatedAt: new Date().toISOString()
+        }
+      });
+    }
+    const transaction = this.localLifecyclePublicState(normalized);
+    this.rememberLifecycleTransaction(transaction);
+    dispatch('p2p:lifecycle-progress', { transaction, source: 'local-network' });
+    return normalized;
+  }
+
+  async startLocalProjectLifecycle(outboxItem = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    if (!this.sinBackendEnabled() || outboxItem?.localLifecycleCompleted === true) return { delivered: 0, transaction: null };
+    const transport = await this.ensureLocalTransport(sessionContext);
+    if (!transport?.status?.().connected) return { delivered: 0, transaction: null };
+    const action = String(outboxItem.lifecycleAction || outboxItem.localLifecycle?.action || '').trim().toLowerCase();
+    const spaceId = String(outboxItem.spaceId || outboxItem.request?.spaceId || outboxItem.localLifecycle?.spaceId || '').trim();
+    const operationId = String(outboxItem.operationId || outboxItem.localLifecycle?.operationId || '').trim();
+    if (!['trash', 'purge'].includes(action) || !spaceId || !operationId) return { delivered: 0, transaction: null };
+    const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
+    if (!space || space.ownerUserId !== sessionContext.userId || space.authorizationState === 'unconfirmed') return { delivered: 0, transaction: null };
+
+    const transactionId = String(outboxItem.localLifecycle?.transactionId || `local_lifecycle_${operationId}`).trim();
+    const previousCompleted = Array.isArray(outboxItem.localLifecycle?.completedDeviceIds) ? outboxItem.localLifecycle.completedDeviceIds : [];
+    const candidates = this.eligibleLocalLifecyclePeers(spaceId);
+    if (!candidates.length) return { delivered: 0, transaction: null };
+    let entry = {
+      transactionId,
+      action,
+      spaceId,
+      operationId,
+      targets: candidates,
+      completedDeviceIds: previousCompleted,
+      outboxItem
+    };
+    await this.persistLocalLifecycleEntry(entry, outboxItem);
+
+    const deliveredTargets = [];
+    for (const target of candidates) {
+      let body;
+      if (action === 'trash') {
+        if (!outboxItem.request?.operation) continue;
+        body = await this.createSignedLocalOperationBody({
+          ...outboxItem.request,
+          localLifecycle: { transactionId, action, spaceId, operationId, sourceDeviceId: this.deviceId }
+        }, outboxItem.createdAt || new Date().toISOString(), sessionContext);
+      } else {
+        body = await this.createSignedLocalControlBody('lifecycle.purge.request', {
+          transactionId, action, spaceId, operationId, sourceDeviceId: this.deviceId
+        }, sessionContext);
+      }
+      const result = await transport.sendTo(target.sessionId, body);
+      if (Number(result?.delivered || 0) > 0) deliveredTargets.push(target);
+    }
+    this.assertSessionContext(sessionContext);
+    if (!deliveredTargets.length) {
+      this.pendingLocalLifecycleTransactions.delete(transactionId);
+      this.rememberLifecycleTransaction({ transactionId, status: 'completed' }, { remove: true });
+      return { delivered: 0, transaction: null };
+    }
+    const activeEntry = this.pendingLocalLifecycleTransactions.get(transactionId);
+    if (!activeEntry) return { delivered: deliveredTargets.length, transaction: null, completed: true };
+    entry = { ...activeEntry, targets: deliveredTargets, completedDeviceIds: activeEntry.completedDeviceIds || [] };
+    await this.persistLocalLifecycleEntry(entry, outboxItem);
+    return { delivered: deliveredTargets.length, transaction: this.localLifecyclePublicState(entry) };
+  }
+
+  async localLifecycleEntry(transactionId = '') {
+    const cleanTransactionId = String(transactionId || '').trim();
+    if (!cleanTransactionId) return null;
+    const active = this.pendingLocalLifecycleTransactions.get(cleanTransactionId);
+    if (active) return active;
+    const item = (await listOutbox()).find((candidate) => String(candidate?.localLifecycle?.transactionId || '').trim() === cleanTransactionId) || null;
+    if (!item?.localLifecycle) return null;
+    const entry = {
+      ...item.localLifecycle,
+      targets: Array.isArray(item.localLifecycle.targets) ? item.localLifecycle.targets : [],
+      completedDeviceIds: Array.isArray(item.localLifecycle.completedDeviceIds) ? item.localLifecycle.completedDeviceIds : [],
+      outboxItem: item
+    };
+    this.pendingLocalLifecycleTransactions.set(cleanTransactionId, entry);
+    return entry;
+  }
+
+  async finalizeLocalProjectLifecycle(entry = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const action = String(entry.action || '').trim();
+    const spaceId = String(entry.spaceId || '').trim();
+    if (action === 'trash') {
+      const transportOperation = entry.outboxItem?.request?.operation || {};
+      const event = {
+        eventId: `lan_lifecycle_source_${String(entry.transactionId || entry.operationId).replace(/[^a-zA-Z0-9._:-]/g, '_')}`,
+        eventType: 'p2p.operation',
+        deliverySequence: 0,
+        spaceSequence: 0,
+        spaceId,
+        actorUserId: sessionContext.userId,
+        sourceDeviceId: sessionContext.deviceId,
+        operation: transportOperation,
+        createdAt: entry.outboxItem?.createdAt || new Date().toISOString(),
+        localTransport: true
+      };
+      this.assertEncryptedTransportEvent(event);
+      const decryptedEvent = await decryptOperationEvent(event);
+      this.assertSessionContext(sessionContext);
+      const result = await applyP2PEvent({ ...decryptedEvent, optimistic: true, localTransport: true });
+      dispatch('p2p:operation', { event: decryptedEvent, result, localTransport: true, lifecycleFinalized: true });
+    } else if (action === 'purge') {
+      await this.fenceBootstrapResponses(sessionContext);
+      const purge = await purgeLocalSpace(spaceId);
+      await purgeSpaceCrypto(spaceId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      this.removeSpaceFromBootstrapState(spaceId);
+      dispatch('p2p:space-deleted', { spaceId, source: 'lifecycle-local-network', purge, pendingAuthoritativeDeletion: true });
+    }
+    const completedTransaction = this.localLifecyclePublicState(entry, 'completed');
+    const updatedOutbox = entry.outboxItem?.operationId ? {
+      ...entry.outboxItem,
+      localLifecycle: {
+        transactionId: String(entry.transactionId || '').trim(),
+        action: String(entry.action || '').trim(),
+        spaceId: String(entry.spaceId || '').trim(),
+        operationId: String(entry.operationId || '').trim(),
+        targets: (entry.targets || []).map(({ userId, deviceId }) => ({ userId, deviceId })),
+        completedDeviceIds: entry.completedDeviceIds,
+        completedAt: new Date().toISOString()
+      },
+      localLifecycleCompleted: true
+    } : null;
+    if (updatedOutbox) await enqueueOutbox(updatedOutbox);
+    this.pendingLocalLifecycleTransactions.delete(entry.transactionId);
+    this.rememberLifecycleTransaction(completedTransaction, { remove: true });
+    dispatch('p2p:lifecycle-completed', { transaction: completedTransaction, source: 'local-network' });
+    return completedTransaction;
+  }
+
+  async acknowledgeLocalProjectLifecycle(payload = {}, capabilityPayload = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const transactionId = String(payload.transactionId || '').trim();
+    const entry = await this.localLifecycleEntry(transactionId);
+    this.assertSessionContext(sessionContext);
+    if (!entry) return false;
+    const deviceId = String(capabilityPayload.deviceId || '').trim();
+    const userId = String(capabilityPayload.userId || '').trim();
+    const target = (entry.targets || []).find((candidate) => String(candidate.deviceId || '').trim() === deviceId && String(candidate.userId || '').trim() === userId);
+    const { space, member, permissions } = this.memberPermissionsForUser(entry.spaceId, userId);
+    if (
+      !target || !space || !member || space.authorizationState === 'unconfirmed' || !permissions.includes('read')
+      || String(payload.action || '').trim() !== String(entry.action || '').trim()
+      || String(payload.spaceId || '').trim() !== String(entry.spaceId || '').trim()
+      || String(payload.operationId || '').trim() !== String(entry.operationId || '').trim()
+      || String(payload.sourceDeviceId || '').trim() !== sessionContext.deviceId
+    ) return false;
+    entry.completedDeviceIds = Array.from(new Set([...(entry.completedDeviceIds || []), deviceId]));
+    await this.persistLocalLifecycleEntry(entry, entry.outboxItem);
+    const transaction = this.localLifecyclePublicState(entry);
+    if (transaction.total > 0 && transaction.remaining === 0) await this.finalizeLocalProjectLifecycle(entry, sessionContext);
+    return true;
+  }
+
   async handleLocalTransportConnected(detail = {}, sessionContext = this.captureSessionContext()) {
     this.assertSessionContext(sessionContext);
     const sessionId = String(detail?.sessionId || '').trim();
@@ -1901,6 +2262,60 @@ export class SemillaP2PClient {
         dispatch('p2p:local-network', { state: 'snapshot-error', error, peer: message.peer || null, spaceId });
         return false;
       }
+    }
+
+    if (action === 'lifecycle.purge.request') {
+      const transactionId = String(payload.transactionId || '').trim();
+      const spaceId = String(payload.spaceId || '').trim();
+      const operationId = String(payload.operationId || '').trim();
+      const sourceDeviceId = String(payload.sourceDeviceId || '').trim();
+      const acknowledgePurge = async () => {
+        const ack = await this.createSignedLocalControlBody('lifecycle.ack', {
+          transactionId, action: 'purge', spaceId, operationId, sourceDeviceId
+        }, sessionContext);
+        await this.localTransport?.sendTo?.(sessionId, ack);
+      };
+      const tombstone = await this.matchingLocalLifecycleTombstone({
+        transactionId, action: 'purge', spaceId, operationId, sourceDeviceId
+      }, capabilityPayload, sessionContext);
+      if (tombstone) {
+        await acknowledgePurge();
+        return true;
+      }
+      const { space, member, permissions } = this.memberPermissionsForUser(spaceId, sessionContext.userId);
+      const sourceMember = (space?.members || []).find((candidate) => candidate?.userId === capabilityPayload.userId) || null;
+      if (
+        !transactionId || !spaceId || !operationId || !sessionId
+        || sourceDeviceId !== capabilityPayload.deviceId
+        || !space || space.authorizationState === 'unconfirmed'
+        || space.ownerUserId !== capabilityPayload.userId || sourceMember?.role !== 'owner'
+        || !member || !permissions.includes('read')
+      ) {
+        const error = new Error('Se rechazó una eliminación local sin autoridad confirmada del propietario.');
+        error.code = 'P2P_SIN_LIFECYCLE_UNAUTHORIZED';
+        dispatch('p2p:local-network', { state: 'rejected', error, peer: message.peer || null, spaceId });
+        return false;
+      }
+      await this.rememberLocalLifecycleTombstone({
+        transactionId,
+        action: 'purge',
+        spaceId,
+        operationId,
+        sourceUserId: capabilityPayload.userId,
+        sourceDeviceId
+      }, sessionContext);
+      await this.fenceBootstrapResponses(sessionContext);
+      const purge = await purgeLocalSpace(spaceId);
+      await purgeSpaceCrypto(spaceId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      this.removeSpaceFromBootstrapState(spaceId);
+      dispatch('p2p:space-deleted', { spaceId, source: 'lifecycle-local-network-remote', purge, pendingAuthoritativeDeletion: true });
+      await acknowledgePurge();
+      return true;
+    }
+
+    if (action === 'lifecycle.ack') {
+      return this.acknowledgeLocalProjectLifecycle(payload, capabilityPayload, sessionContext);
     }
     return false;
   }
@@ -2249,8 +2664,18 @@ export class SemillaP2PClient {
       && String(signedPayload.operationId || '').trim() === String(transportOperation.operationId || '').trim()
       && (!request.deviceId || String(request.deviceId || '').trim() === String(capabilityPayload.deviceId || '').trim());
     const certifiedPeer = { userId: capabilityPayload.userId, deviceId: capabilityPayload.deviceId };
+    const localLifecycle = request.localLifecycle && typeof request.localLifecycle === 'object' ? request.localLifecycle : null;
+    const lifecycleSpace = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
+    const lifecycleAuthorized = !localLifecycle || (
+      String(localLifecycle.action || '').trim() === 'trash'
+      && String(localLifecycle.spaceId || '').trim() === spaceId
+      && String(localLifecycle.operationId || '').trim() === String(transportOperation.operationId || '').trim()
+      && String(localLifecycle.sourceDeviceId || '').trim() === String(capabilityPayload.deviceId || '').trim()
+      && lifecycleSpace?.ownerUserId === String(capabilityPayload.userId || '').trim()
+    );
     if (
       !operationIdentityValid
+      || !lifecycleAuthorized
       || !this.capabilityOperationAuthorized(capabilityPayload, spaceId, transportOperation)
       || !this.localOperationAuthorized(spaceId, transportOperation, certifiedPeer)
     ) {
@@ -2307,11 +2732,24 @@ export class SemillaP2PClient {
       }
     };
     const optimisticEvent = { ...decryptedEvent, optimistic: true, localTransport: true };
-    const result = await enqueueOptimisticOperation(relayedOutboxItem, optimisticEvent);
+    const result = localLifecycle
+      ? await applyP2PEvent(optimisticEvent)
+      : await enqueueOptimisticOperation(relayedOutboxItem, optimisticEvent);
     this.assertSessionContext(sessionContext);
-    dispatch('p2p:operation', { event: optimisticEvent, result, localTransport: true, optimistic: true });
-    dispatch('p2p:local-operation', { event: decryptedEvent, result, peer: message.peer || null });
-    dispatch('p2p:outbox', { queued: true, operationId: relayedOperation.operationId, localNetworkRelay: true });
+    dispatch('p2p:operation', { event: optimisticEvent, result, localTransport: true, optimistic: true, lifecycleRemote: Boolean(localLifecycle) });
+    dispatch('p2p:local-operation', { event: decryptedEvent, result, peer: message.peer || null, lifecycleRemote: Boolean(localLifecycle) });
+    if (localLifecycle) {
+      const ack = await this.createSignedLocalControlBody('lifecycle.ack', {
+        transactionId: String(localLifecycle.transactionId || '').trim(),
+        action: 'trash',
+        spaceId,
+        operationId: relayedOperation.operationId,
+        sourceDeviceId: String(localLifecycle.sourceDeviceId || '').trim()
+      }, sessionContext);
+      await this.localTransport?.sendTo?.(String(message.sessionId || '').trim(), ack);
+    } else {
+      dispatch('p2p:outbox', { queued: true, operationId: relayedOperation.operationId, localNetworkRelay: true });
+    }
     return true;
   }
 
@@ -2543,6 +2981,14 @@ export class SemillaP2PClient {
       if (item?.relayedFromLocalNetwork === true) continue;
       const operationId = String(item?.operationId || '').trim();
       if (!operationId || processedOperationIds.has(operationId)) continue;
+      if (item?.lifecycleAction) {
+        if (item.localLifecycleCompleted !== true) {
+          const result = await this.startLocalProjectLifecycle(item, this.captureSessionContext());
+          delivered += Number(result?.delivered || 0);
+        }
+        processedOperationIds.add(operationId);
+        continue;
+      }
       const atomicBatch = this.completeAtomicOutboxBatch(pending, item, individualBatchFallbackIds);
       if (atomicBatch.length) {
         const preparedEntries = atomicBatch.map((candidate) => ({
@@ -2915,6 +3361,37 @@ export class SemillaP2PClient {
       });
     }
     return this.bootstrapState;
+  }
+
+  rememberLifecycleTransaction(transaction = {}, options = {}) {
+    const transactionId = String(transaction?.transactionId || '').trim();
+    if (!transactionId) return null;
+    const current = Array.isArray(this.bootstrapState?.lifecycleTransactions)
+      ? this.bootstrapState.lifecycleTransactions
+      : [];
+    const next = current.filter((item) => String(item?.transactionId || '').trim() !== transactionId);
+    if (options.remove !== true && transaction.status !== 'completed') next.push({ ...transaction });
+    this.bootstrapState = { ...(this.bootstrapState || {}), lifecycleTransactions: next };
+    dispatch('p2p:state', { state: this.bootstrapState, lifecycleOnly: true });
+    return transaction;
+  }
+
+  lifecycleTransactionFromControl(event = {}) {
+    const data = event.data || {};
+    return {
+      schemaVersion: 1,
+      transactionId: String(data.transactionId || '').trim(),
+      action: String(data.action || '').trim(),
+      status: String(data.status || '').trim(),
+      role: String(data.sourceDeviceId || event.sourceDeviceId || '').trim() === this.deviceId ? 'source' : 'target',
+      spaceId: String(data.spaceId || event.spaceId || '').trim(),
+      sourceDeviceId: String(data.sourceDeviceId || event.sourceDeviceId || '').trim(),
+      operationId: String(data.operationId || '').trim(),
+      completed: Math.max(0, Number(data.completed || 0)),
+      total: Math.max(0, Number(data.total || 0)),
+      remaining: Math.max(0, Number(data.remaining || 0)),
+      updatedAt: String(data.updatedAt || event.createdAt || new Date().toISOString())
+    };
   }
 
   handleTabMessage(message = {}, sessionContext = this.captureSessionContext()) {
@@ -4185,7 +4662,7 @@ export class SemillaP2PClient {
       }
       if (invitation.inviterUserId === userId) invitations.sent.push(invitation);
     }
-    return { spaces: spaces || [], invitations, devices: [], snapshotRequests: [], replicaHealth: {}, localOnly: true };
+    return { spaces: spaces || [], invitations, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], localOnly: true };
   }
 
   async applyBootstrapData(data = {}, context = {}) {
@@ -4230,15 +4707,29 @@ export class SemillaP2PClient {
         await this.persistLocalCapabilityState(data.localCapabilityAuthority, data.localCapability, sessionContext);
         this.assertSessionContext(sessionContext);
       }
+      const lifecycleTransactions = Array.isArray(data.lifecycleTransactions)
+        ? data.lifecycleTransactions.filter((transaction) => transaction && typeof transaction === 'object')
+        : [];
+      const lifecyclePurgeSpaceIds = new Set(lifecycleTransactions
+        .filter((transaction) => transaction.role === 'target'
+          && transaction.action === 'purge'
+          && ['waiting', 'ready'].includes(transaction.status))
+        .map((transaction) => String(transaction.spaceId || '').trim())
+        .filter(Boolean));
       const nextBootstrapState = {
-        spaces: Array.isArray(data.spaces) ? data.spaces : [],
-        revokedSpaceIds: Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : [],
+        spaces: (Array.isArray(data.spaces) ? data.spaces : [])
+          .filter((space) => !lifecyclePurgeSpaceIds.has(String(space?.spaceId || '').trim())),
+        revokedSpaceIds: Array.from(new Set([
+          ...(Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : []),
+          ...lifecyclePurgeSpaceIds
+        ])),
         invitations,
         devices: Array.isArray(data.devices) ? data.devices : [],
         stateRevisions: backendStateRevisions,
         deliveryState: data.deliveryState && typeof data.deliveryState === 'object' ? data.deliveryState : { sequence: 0 },
         snapshotRequests: Array.isArray(data.snapshotRequests) ? data.snapshotRequests : [],
         replicaHealth: normalizeReplicaHealthMap(data.replicaHealth || {}),
+        lifecycleTransactions,
         localOnly: false
       };
       const spaceReplacement = await replaceBootstrapControlState(
@@ -4315,6 +4806,13 @@ export class SemillaP2PClient {
         );
       } else {
         this.clearSnapshotRecovery();
+      }
+      for (const transaction of lifecycleTransactions) {
+        if (transaction?.role !== 'source' || transaction?.status !== 'ready' || !transaction?.transactionId) continue;
+        apiPost('/api/p2p/lifecycle/resume', {
+          transactionId: transaction.transactionId,
+          deviceId: sessionContext.deviceId
+        }).catch((error) => dispatch('p2p:lifecycle-resume-deferred', { transaction, error }));
       }
       return this.bootstrapState;
     } catch (error) {
@@ -4409,6 +4907,14 @@ export class SemillaP2PClient {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const requestSequence = ++this.bootstrapRequestSequence;
+    const snapshotSpaceIds = Array.from(new Set(
+      (Array.isArray(this.nextBootstrapSnapshotSpaceIds) ? this.nextBootstrapSnapshotSpaceIds : [])
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+    )).slice(0, 1_000);
+    // Consumir antes del primer await evita que dos bootstrap concurrentes
+    // compartan accidentalmente los objetivos de recuperación.
+    this.nextBootstrapSnapshotSpaceIds = [];
     const localSpaces = await listSpaces();
     this.assertSessionContext(sessionContext);
     const stateRevisions = await listStateRevisions(localSpaces.map((space) => space.spaceId));
@@ -4416,6 +4922,7 @@ export class SemillaP2PClient {
     const data = await apiPost('/api/p2p/bootstrap', {
       device: this.device,
       requestSnapshots,
+      snapshotSpaceIds,
       stateRevisions,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
         ? {}
@@ -4681,14 +5188,24 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false } = {}) {
+  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [] } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
+    this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
     const state = await this.fetchBootstrap(snapshotMode);
     this.assertSessionContext(sessionContext);
     dispatch('p2p:state', { state });
     return state;
+  }
+
+  async recoverMissingProjectRoots(spaceIds = []) {
+    const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
+    if (!normalizedSpaceIds.length) return this.bootstrapState;
+    return this.refreshBootstrap({
+      requestSnapshots: 'force',
+      snapshotSpaceIds: normalizedSpaceIds
+    });
   }
 
   async recoverOnline() {
@@ -5375,6 +5892,45 @@ export class SemillaP2PClient {
           retryable: this.isRetryableTransportError(error)
         });
       }
+    } else if (event.eventType === 'p2p.lifecycle.progress') {
+      const transaction = this.lifecycleTransactionFromControl(event);
+      this.rememberLifecycleTransaction(transaction);
+      dispatch('p2p:lifecycle-progress', { transaction, event });
+    } else if (event.eventType === 'p2p.lifecycle.finalize') {
+      const transaction = this.lifecycleTransactionFromControl(event);
+      const nestedEvent = event.data?.event || {};
+      this.assertEncryptedTransportEvent(nestedEvent);
+      const decryptedEvent = await decryptOperationEvent(nestedEvent);
+      this.assertSessionContext(sessionContext);
+      await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);
+      this.assertSessionContext(sessionContext);
+      const operationId = String(decryptedEvent.operation?.operationId || transaction.operationId || '').trim();
+      if (operationId) await removeOutbox(operationId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      await apiPost('/api/p2p/lifecycle/complete', {
+        transactionId: transaction.transactionId,
+        deviceId: sessionContext.deviceId
+      });
+      this.assertSessionContext(sessionContext);
+      this.rememberLifecycleTransaction({ ...transaction, status: 'completed' }, { remove: true });
+      dispatch('p2p:lifecycle-completed', { transaction: { ...transaction, status: 'completed' }, event, operationEvent: decryptedEvent });
+    } else if (event.eventType === 'p2p.lifecycle.remote-purge') {
+      await this.fenceBootstrapResponses(sessionContext);
+      const transaction = this.lifecycleTransactionFromControl(event);
+      const cleanSpaceId = String(transaction.spaceId || '').trim();
+      if (cleanSpaceId) {
+        const purge = await purgeLocalSpace(cleanSpaceId);
+        await purgeSpaceCrypto(cleanSpaceId).catch(() => null);
+        this.assertSessionContext(sessionContext);
+        this.removeSpaceFromBootstrapState(cleanSpaceId);
+        dispatch('p2p:space-deleted', {
+          spaceId: cleanSpaceId,
+          source: 'lifecycle-remote-purge',
+          purge,
+          event,
+          pendingAuthoritativeDeletion: true
+        });
+      }
     } else if (event.eventType === 'p2p.space.deleted') {
       await this.fenceBootstrapResponses(sessionContext);
       const cleanSpaceId = String(event.spaceId || event.data?.spaceId || '').trim();
@@ -5858,6 +6414,91 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     dispatch('p2p:access-revoked', { spaceIds: [cleanSpaceId], source: 'local-leave', purge });
     return data;
+  }
+
+  async startProjectLifecycle(action = '', spaceId = '', options = {}) {
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const cleanAction = String(action || '').trim().toLowerCase();
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!['trash', 'purge'].includes(cleanAction) || !cleanSpaceId) throw new Error('La acción crítica del proyecto no es válida.');
+    this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
+
+    let outboxItem;
+    if (cleanAction === 'trash') {
+      const operationId = String(options.operationId || '').trim() || createId('op');
+      const prepared = await this.preparePublishEnvelope(cleanSpaceId, {
+        operationId,
+        type: 'entity.trash',
+        entityType: 'admin.project',
+        entityId: 'project',
+        payload: {
+          ...(options.expected && typeof options.expected === 'object' ? { expected: options.expected } : {}),
+          at: String(options.at || '').trim() || new Date().toISOString(),
+          actorUserId: String(this.user?.userId || '').trim()
+        }
+      }, { applyLocally: false, deferSourceUntilReplicas: true }, sessionContext);
+      outboxItem = {
+        ...prepared.outboxItem,
+        endpoint: '/api/p2p/lifecycle/start',
+        lifecycleAction: cleanAction,
+        request: {
+          action: cleanAction,
+          deviceId: sessionContext.deviceId,
+          spaceId: cleanSpaceId,
+          operation: prepared.request.operation
+        }
+      };
+    } else {
+      const operationId = String(options.operationId || '').trim() || createId('op');
+      outboxItem = {
+        operationId,
+        spaceId: cleanSpaceId,
+        endpoint: '/api/p2p/lifecycle/start',
+        lifecycleAction: cleanAction,
+        request: {
+          action: cleanAction,
+          operationId,
+          deviceId: sessionContext.deviceId,
+          spaceId: cleanSpaceId
+        },
+        plainOperation: null,
+        createdAt: new Date().toISOString(),
+        attempts: 0
+      };
+    }
+
+    try {
+      const data = await apiPost(outboxItem.endpoint, outboxItem.request);
+      this.assertSessionContext(sessionContext);
+      await removeOutbox(outboxItem.operationId).catch(() => null);
+      const transaction = data.lifecycle || null;
+      if (transaction) {
+        this.rememberLifecycleTransaction(transaction);
+        dispatch('p2p:lifecycle-progress', { transaction, source: 'local-start' });
+      }
+      return data;
+    } catch (error) {
+      if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) throw this.createSessionContextChangedError();
+      if (this.isRetryableTransportError(error) && options.queueWhenOffline !== false) {
+        await enqueueOutbox(outboxItem);
+        this.assertSessionContext(sessionContext);
+        error.p2pQueued = true;
+        const localDelivery = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
+        this.assertSessionContext(sessionContext);
+        if (Number(localDelivery?.delivered || 0) > 0) error.p2pLocalDelivered = Number(localDelivery.delivered || 0);
+        dispatch('p2p:outbox', { queued: true, operationId: outboxItem.operationId, lifecycleAction: cleanAction, localDelivered: Number(localDelivery?.delivered || 0) });
+      }
+      throw error;
+    }
+  }
+
+  trashProjectAfterReplicas(spaceId = '', options = {}) {
+    return this.startProjectLifecycle('trash', spaceId, options);
+  }
+
+  deleteProjectAfterReplicas(spaceId = '', options = {}) {
+    return this.startProjectLifecycle('purge', spaceId, options);
   }
 
   async deleteSpace(spaceId = '') {
@@ -6700,8 +7341,23 @@ export class SemillaP2PClient {
       while (true) {
         this.assertSessionContext(sessionContext);
         try {
-          const data = await apiPost('/api/p2p/events/publish', item.request);
+          const endpoint = String(item?.endpoint || '/api/p2p/events/publish');
+          const data = await apiPost(endpoint, item.request);
           this.assertSessionContext(sessionContext);
+          if (item?.lifecycleAction) {
+            await removeOutbox(item.operationId);
+            this.assertSessionContext(sessionContext);
+            if (data?.lifecycle) {
+              this.rememberLifecycleTransaction(data.lifecycle);
+              dispatch('p2p:lifecycle-progress', { transaction: data.lifecycle, source: 'outbox' });
+            }
+            sent += 1;
+            sentOperations.push({
+              operationId: String(item?.operationId || '').trim(),
+              lifecycleAction: String(item.lifecycleAction || '').trim()
+            });
+            break;
+          }
           const operation = item?.request?.operation || {};
           const orderedSourceConfirmation = item?.request?.includeSourceDevice === true
             && isEntityOperationType(operation.type)

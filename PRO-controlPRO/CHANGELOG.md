@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.85 - 2026-08-03
+
+- Los espacios compartidos que todavía no contienen la entidad raíz administrativa ya no generan cards fantasma con nombre genérico ni métricas en cero; permanecen fuera del panel y de los totales mientras se determina si existe una réplica válida.
+- La PWA solicita una recuperación dirigida únicamente para esos proyectos incompletos, sin polling y sin forzar snapshots de los demás espacios. Si otra instalación conserva la copia, la sincronización existente la restaura; si no existe una fuente disponible, la card queda retirada de la interfaz.
+- memoriaBACKEND acepta objetivos explícitos de recuperación y permite solicitar una réplica incluso cuando ambas revisiones declaradas son `0`, caso necesario para reconstruir una raíz ausente sin debilitar el control normal de revisiones.
+- Se añadieron mensajes de producción en español, inglés y árabe, junto con regresiones para raíz ausente, filtrado de métricas, recuperación dirigida, deduplicación y límites de espacios.
+
 ## 1.9.83 - 2026-08-03
 
 - Cada card de proyecto y cada compra, ingreso o proyección usa ahora un menú vertical de tres puntos con opciones permitidas por rol, presentado en una ventana modal centrada y accesible.

@@ -1383,7 +1383,7 @@ def main() -> None:
         fail("src/js/api.js debe conservar un código estructurado cuando falta el backend.")
     if "auth.backendNotConfigured" not in app_source:
         fail("src/js/app.js debe mostrar un mensaje de producción cuando el build no inyectó el backend.")
-    for required in ["synchronizeExternalSession", "queueExternalSessionSynchronization", "resetUserScopedInterface", "subscribeSessionTokenChanges", "delete-project", "p2p:space-deleted", "p2p:access-revoked", "semillaP2P.deleteSpace"]:
+    for required in ["synchronizeExternalSession", "queueExternalSessionSynchronization", "resetUserScopedInterface", "subscribeSessionTokenChanges", "delete-project", "p2p:space-deleted", "p2p:access-revoked", "semillaP2P.deleteProjectAfterReplicas"]:
         if required not in app_source:
             fail(f"src/js/app.js perdió la transición segura de cuenta: {required}")
 

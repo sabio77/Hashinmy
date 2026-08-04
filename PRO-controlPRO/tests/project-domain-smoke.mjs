@@ -16,10 +16,14 @@ import {
   normalizeIncomeInput,
   normalizeProjectionInput,
   normalizeProjectionLinkInput,
+  projectRecord,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
   sumMoneyValues
 } from '../src/js/project-domain.js';
+
+const missingProject = projectRecord({ spaceId: 'space_missing', title: 'Espacio compartido' }, []);
+assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe identificarse como incompleto.');
 
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);
@@ -209,6 +213,8 @@ assert.equal(appSource.includes('money(absoluteMoneyValue(record.varianceAmount 
 assert.equal(appSource.includes('const today = localDateValue()'), true, 'El formulario debe usar el día calendario local del dispositivo.');
 assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false, 'La interfaz no debe volver a derivar fechas administrativas desde UTC.');
 assert.equal(appSource.includes('Math.abs(record.varianceAmount || 0)'), false, 'Math.abs no admite BigInt y no debe reaparecer en la ruta de renderizado monetario.');
+assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, data]) => data.project.loaded))'), true, 'La interfaz no debe materializar cards de espacios sin proyecto raíz.');
+assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica antes de permanecer ocultos.');
 
 const indexSource = await fs.readFile(path.resolve(path.dirname(currentFile), '../index.html'), 'utf8');
 assert.equal(/id="project-budget-input"[^>]*max="9007199254740991"/.test(indexSource), true);

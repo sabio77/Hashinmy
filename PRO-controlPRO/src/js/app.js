@@ -69,7 +69,7 @@ const state = {
   p2pBusy: false,
   selectedSpaceId: '',
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {} },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -82,8 +82,12 @@ const state = {
   concurrentConflictOperations: new Map(),
   sessionTransitionSequence: 0,
   pendingInvitationId: readInvitationIntent(window.location),
-  invitationRefreshSequence: 0
+  invitationRefreshSequence: 0,
+  missingProjectRecoveryActive: false,
+  missingProjectRecoveryAt: new Map()
 };
+
+const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
 
 let externalSessionQueue = Promise.resolve();
 
@@ -427,7 +431,7 @@ function requestStorageProtection(options = {}) {
 function resetUserScopedInterface() {
   state.renderSequence += 1;
   state.selectedSpaceId = '';
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {} };
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -436,6 +440,8 @@ function resetUserScopedInterface() {
   state.actionMenuContext = null;
   state.pendingActionMenuAction = null;
   state.concurrentConflictOperations.clear();
+  state.missingProjectRecoveryActive = false;
+  state.missingProjectRecoveryAt.clear();
   state.invitationRefreshSequence += 1;
   state.storageDurability = null;
   state.storageRequestPromise = null;
@@ -508,6 +514,72 @@ function resolvedProjectData(space, entities) {
   };
 }
 
+async function recoverMissingProjectCards(spaceIds = []) {
+  if (state.missingProjectRecoveryActive || !state.user || !getSessionToken()) return false;
+  const now = Date.now();
+  const candidates = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean)))
+    .filter((spaceId) => now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) >= MISSING_PROJECT_RECOVERY_COOLDOWN_MS);
+  if (!candidates.length) return false;
+
+  state.missingProjectRecoveryActive = true;
+  candidates.forEach((spaceId) => state.missingProjectRecoveryAt.set(spaceId, now));
+  setStatus(
+    elements.dashboardStatus,
+    candidates.length === 1
+      ? t('p2p.missingProjectSearching', 'Buscando una copia válida del proyecto compartido…')
+      : t('p2p.missingProjectsSearching', 'Buscando copias válidas de los proyectos compartidos incompletos…'),
+    'warning'
+  );
+
+  try {
+    const recoveryState = await semillaP2P.recoverMissingProjectRoots(candidates);
+    const requestedRecoverySpaceIds = new Set((recoveryState?.snapshotRequests || [])
+      .map((request) => String(request?.spaceId || '').trim())
+      .filter(Boolean));
+    const unresolved = [];
+    for (const spaceId of candidates) {
+      const space = state.p2pState.spaces.find((candidate) => candidate?.spaceId === spaceId) || null;
+      if (!space) continue;
+      const entities = await semillaP2P.listEntities(spaceId).catch(() => []);
+      if (!projectRecord(space, entities).loaded) unresolved.push(spaceId);
+    }
+    if (unresolved.length) {
+      const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
+      setStatus(
+        elements.dashboardStatus,
+        pendingRecoveryCount > 0
+          ? pendingRecoveryCount === 1
+            ? t('p2p.missingProjectRecoveryPending', 'El espacio compartido incompleto se ocultó mientras otra réplica envía una copia válida.')
+            : t('p2p.missingProjectsRecoveryPending', 'Los espacios compartidos incompletos se ocultaron mientras otras réplicas envían copias válidas.')
+          : unresolved.length === 1
+            ? t('p2p.missingProjectHidden', 'Se retiró de la vista un espacio compartido incompleto porque no existe una copia recuperable en este momento.')
+            : t('p2p.missingProjectsHidden', 'Se retiraron de la vista los espacios compartidos incompletos que no tienen una copia recuperable en este momento.'),
+        'warning'
+      );
+    } else {
+      setStatus(
+        elements.dashboardStatus,
+        candidates.length === 1
+          ? t('p2p.missingProjectRecovered', 'El proyecto compartido fue recuperado y volvió a estar disponible.')
+          : t('p2p.missingProjectsRecovered', 'Los proyectos compartidos fueron recuperados y volvieron a estar disponibles.'),
+        'success'
+      );
+    }
+    return unresolved.length === 0;
+  } catch (error) {
+    setStatus(
+      elements.dashboardStatus,
+      error?.message || t('p2p.missingProjectDeferred', 'El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.'),
+      'warning'
+    );
+    return false;
+  } finally {
+    state.missingProjectRecoveryActive = false;
+  }
+}
+
 async function refreshProjects() {
   const renderSequence = ++state.renderSequence;
   const spaces = Array.isArray(state.p2pState.spaces) ? state.p2pState.spaces : [];
@@ -516,12 +588,16 @@ async function refreshProjects() {
     return [space.spaceId, resolvedProjectData(space, entities)];
   }));
   if (renderSequence !== state.renderSequence) return;
-  state.projects = new Map(entries);
+  const missingProjectSpaceIds = entries
+    .filter(([, data]) => !data.project.loaded)
+    .map(([spaceId]) => spaceId);
+  state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
   if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
   renderDashboard();
   renderTrash();
   if (state.selectedSpaceId) renderProject();
+  if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
 function renderPortfolioMetrics() {
@@ -552,6 +628,59 @@ function contextMenuButton(context = {}, label = '') {
   return button;
 }
 
+function activeProjectLifecycle(spaceId = '') {
+  const cleanSpaceId = String(spaceId || '').trim();
+  if (!cleanSpaceId) return null;
+  return (state.p2pState.lifecycleTransactions || []).find((transaction) => (
+    transaction?.role === 'source'
+    && String(transaction.spaceId || '').trim() === cleanSpaceId
+    && ['waiting', 'ready'].includes(String(transaction.status || '').trim())
+  )) || null;
+}
+
+function lifecycleProgressPresentation(transaction = null) {
+  if (!transaction) return null;
+  const action = String(transaction.action || '').trim();
+  const completed = Math.max(0, Number(transaction.completed || 0));
+  const total = Math.max(0, Number(transaction.total || 0));
+  const remaining = Math.max(0, Number(transaction.remaining ?? Math.max(0, total - completed)));
+  const percentage = total > 0 ? Math.min(100, (completed / total) * 100) : 100;
+  const title = action === 'purge'
+    ? t('lifecycle.purgeTitle', 'Eliminación permanente en curso')
+    : t('lifecycle.trashTitle', 'Envío a papelera en curso');
+  const summary = total > 0
+    ? t('lifecycle.deviceProgress', '{completed} de {total} dispositivos completados · {remaining} pendientes')
+      .replace('{completed}', String(completed))
+      .replace('{total}', String(total))
+      .replace('{remaining}', String(remaining))
+    : t('lifecycle.noRemoteDevices', 'No hay otros dispositivos pendientes · aplicando en este dispositivo');
+  return { action, completed, total, remaining, percentage, title, summary };
+}
+
+function lifecycleProgressNode(transaction = null, options = {}) {
+  const presentation = lifecycleProgressPresentation(transaction);
+  if (!presentation) return null;
+  const container = document.createElement('div');
+  container.className = options.compact === true ? 'project-lifecycle-progress is-compact' : 'project-lifecycle-progress';
+  container.dataset.action = presentation.action;
+  const heading = document.createElement('div'); heading.className = 'project-lifecycle-heading';
+  const title = document.createElement('strong'); title.textContent = presentation.title;
+  const count = document.createElement('span'); count.textContent = `${presentation.completed}/${presentation.total}`;
+  heading.append(title, count);
+  const track = document.createElement('div'); track.className = 'project-lifecycle-track'; track.setAttribute('aria-hidden', 'true');
+  const fill = document.createElement('span'); fill.style.width = `${presentation.percentage}%`; track.append(fill);
+  const detail = document.createElement('p'); detail.textContent = presentation.summary;
+  container.append(heading, track, detail);
+  return container;
+}
+
+function lifecycleStatusMessage(transaction = null) {
+  const presentation = lifecycleProgressPresentation(transaction);
+  return presentation
+    ? `${presentation.title}. ${presentation.summary}. ${t('lifecycle.sourceLast', 'Este dispositivo se actualizará al final, después de confirmar las demás copias.')}`
+    : '';
+}
+
 function renderDashboard() {
   renderPortfolioMetrics();
   elements.projectList.replaceChildren();
@@ -565,6 +694,7 @@ function renderDashboard() {
   }
   for (const data of projects) {
     const card = document.createElement('article'); card.className = 'project-card';
+    const lifecycleTransaction = activeProjectLifecycle(data.space.spaceId);
     const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'project-card-main'; openButton.dataset.openProject = data.space.spaceId;
     const authorizationUnconfirmed = isAuthorizationUnconfirmed(data.space);
     const replicaRecoveryPending = isReplicaRecoveryPending(data.space);
@@ -579,7 +709,15 @@ function renderDashboard() {
     const metrics = document.createElement('div'); metrics.className = 'project-card-metrics';
     metrics.innerHTML = `<div><span>${t('project.available', 'Disponible')}</span><strong>${money(data.metrics.availableCapital)}</strong></div><div><span>${t('project.expenses', 'Gastos')}</span><strong>${money(data.metrics.totalPurchases)}</strong></div>`;
     openButton.append(header, description, metrics);
-    card.append(openButton, contextMenuButton({ scope: 'project', spaceId: data.space.spaceId }, t('actions.projectMenu', 'Opciones del proyecto')));
+    if (lifecycleTransaction) {
+      card.dataset.lifecycle = lifecycleTransaction.action;
+      openButton.disabled = true;
+      const progress = lifecycleProgressNode(lifecycleTransaction);
+      if (progress) openButton.append(progress);
+    }
+    const menu = contextMenuButton({ scope: 'project', spaceId: data.space.spaceId }, t('actions.projectMenu', 'Opciones del proyecto'));
+    menu.disabled = Boolean(lifecycleTransaction);
+    card.append(openButton, menu);
     elements.projectList.append(card);
   }
 }
@@ -931,6 +1069,7 @@ function renderRecordList(container, records, type) {
 
 function renderProject() {
   const data = selectedProjectData(); if (!data || data.project.isTrashed) { showDashboard(); return; }
+  const lifecycleTransaction = activeProjectLifecycle(data.space.spaceId);
   elements.projectName.textContent = data.project.name; elements.projectDescription.textContent = data.project.description || t('project.noDescription', 'Sin descripción'); elements.projectAddress.textContent = data.project.address || t('project.noAddress', 'Sin dirección');
   renderMembers(data);
   if (elements.projectReplicaHealth) {
@@ -957,8 +1096,13 @@ function renderProject() {
   const replicaRecoveryPending = isReplicaRecoveryPending(data.space);
   elements.inviteCollaboratorButton.disabled = authorizationUnconfirmed || (!userCan('invite') && data.space.ownerUserId !== state.user?.userId);
   elements.manageAccessButton.disabled = authorizationUnconfirmed || !(data.space.members || []).some((member) => member.userId === state.user?.userId);
+  const lifecycleLocked = Boolean(lifecycleTransaction);
+  elements.inviteCollaboratorButton.disabled = lifecycleLocked || elements.inviteCollaboratorButton.disabled;
+  elements.manageAccessButton.disabled = lifecycleLocked || elements.manageAccessButton.disabled;
   elements.editProjectButton.disabled = !isSelectedProjectOwner(); elements.addPurchaseButton.disabled = !userCan('add'); elements.addIncomeButton.disabled = !userCan('add'); elements.addProjectionButton.disabled = !userCan('projection');
-  if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
+  if (lifecycleLocked) [elements.editProjectButton, elements.addPurchaseButton, elements.addIncomeButton, elements.addProjectionButton].forEach((button) => { button.disabled = true; });
+  if (lifecycleTransaction) setStatus(elements.projectStatus, lifecycleStatusMessage(lifecycleTransaction), 'warning');
+  else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
 }
 
 function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); }
@@ -981,7 +1125,8 @@ function applyP2PState(nextState = {}) {
       sent: Array.isArray(nextState.invitations?.sent) ? nextState.invitations.sent : []
     },
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
-    replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {}
+    replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
+    lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
   };
   renderInvitations(); if (elements.devicesDialog?.open) renderDevices(); refreshProjects().catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
 }
@@ -1717,9 +1862,9 @@ async function executeLifecycleAction(action = '', context = null) {
     let queued = false;
     if (isProjectAction) {
       if (!isSpaceOwner(data.space)) throw new Error(t('permissions.ownerRequired', 'Solo el propietario puede realizar esta acción.'));
-      if (action === 'trash-project') result = await semillaP2P.trash(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
+      if (action === 'trash-project') result = await semillaP2P.trashProjectAfterReplicas(context.spaceId, { expected: data.project._entity?.value || {} });
       if (action === 'restore-project') result = await semillaP2P.restore(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
-      if (action === 'purge-project') result = await semillaP2P.deleteSpace(context.spaceId);
+      if (action === 'purge-project') result = await semillaP2P.deleteProjectAfterReplicas(context.spaceId);
     } else {
       if (!recordCanDelete(data.space, context.type)) throw new Error(t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'));
       const entityType = RECORD_ENTITY_TYPES[context.type];
@@ -1739,6 +1884,18 @@ async function executeLifecycleAction(action = '', context = null) {
     await refreshProjects();
     clearActionMenuConfirmation();
     closeDialog(elements.actionMenuDialog);
+    const coordinatedProjectAction = isProjectAction && ['trash-project', 'purge-project'].includes(action);
+    if (coordinatedProjectAction) {
+      showDashboard();
+      if (elements.trashDialog?.open) renderTrash();
+      const transaction = result?.lifecycle || activeProjectLifecycle(context.spaceId);
+      const target = elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus;
+      const pendingMessage = transaction
+        ? lifecycleStatusMessage(transaction)
+        : t('lifecycle.queued', 'La acción quedó pendiente. Se aplicará en este dispositivo después de confirmar las demás copias.');
+      setStatus(target, queued || result?.queued ? t('lifecycle.queuedOffline', 'La acción quedó guardada. Se enviará al recuperar conexión y este dispositivo se actualizará al final.') : pendingMessage, 'warning');
+      return;
+    }
     if (isProjectAction && action !== 'restore-project') showDashboard();
     if (elements.trashDialog?.open) renderTrash();
     const message = action.startsWith('trash-')
@@ -1750,9 +1907,16 @@ async function executeLifecycleAction(action = '', context = null) {
     setStatus(target, queued || result?.queued ? t('p2p.queuedOffline', 'El cambio quedó guardado localmente y se enviará al recuperar conexión.') : message, 'success');
   } catch (error) {
     if (error?.p2pQueued) {
+      applyP2PState(semillaP2P.bootstrapState);
       await refreshProjects();
       closeDialog(elements.actionMenuDialog);
-      setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, t('p2p.queuedOffline', 'El cambio quedó guardado localmente y se enviará al recuperar conexión.'), 'success');
+      const isCoordinatedProjectAction = context?.scope?.includes('project') && ['trash-project', 'purge-project'].includes(action);
+      const message = isCoordinatedProjectAction
+        ? Number(error?.p2pLocalDelivered || 0) > 0
+          ? t('lifecycle.localNetworkStarted', 'La acción se envió por la red local. Este dispositivo se actualizará cuando las demás copias confirmen.')
+          : t('lifecycle.queuedOffline', 'La acción quedó guardada. Se enviará al recuperar conexión y este dispositivo se actualizará al final.')
+        : t('p2p.queuedOffline', 'El cambio quedó guardado localmente y se enviará al recuperar conexión.');
+      setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, message, isCoordinatedProjectAction ? 'warning' : 'success');
     } else {
       setStatus(elements.actionMenuStatus, error?.message || t('trash.actionError', 'No se pudo completar la acción.'), 'error');
     }
@@ -1806,9 +1970,16 @@ function renderTrashItem(data = null, context = null, titleText = '', detailText
   const detail = document.createElement('p'); detail.textContent = [detailText, context.scope === 'trash-project' ? shortDateTime(data.project.trashedAt) : shortDateTime(actionMenuRecord(context)?.trashedAt)].filter(Boolean).join(' · ');
   content.append(title, detail);
   const menu = contextMenuButton(context, t('actions.trashMenu', 'Opciones del elemento en papelera'));
+  const lifecycleTransaction = context.scope === 'trash-project' ? activeProjectLifecycle(data.space.spaceId) : null;
   const canAct = context.scope === 'trash-project' ? isSpaceOwner(data.space) : recordCanDelete(data.space, context.type);
-  menu.disabled = !canAct;
-  item.append(content, menu);
+  menu.disabled = !canAct || Boolean(lifecycleTransaction);
+  item.append(content);
+  if (lifecycleTransaction) {
+    item.dataset.lifecycle = lifecycleTransaction.action;
+    const progress = lifecycleProgressNode(lifecycleTransaction, { compact: true });
+    if (progress) item.append(progress);
+  }
+  item.append(menu);
   return item;
 }
 
@@ -2015,6 +2186,25 @@ window.addEventListener('p2p:access-revoked', (event) => {
     closeDialog(elements.recordDialog);
     showDashboard();
   }
+});
+window.addEventListener('p2p:lifecycle-progress', (event) => {
+  const transaction = event.detail?.transaction || null;
+  applyP2PState(semillaP2P.bootstrapState);
+  renderDashboard();
+  if (elements.trashDialog?.open) renderTrash();
+  if (state.selectedSpaceId && transaction?.spaceId === state.selectedSpaceId) renderProject();
+  const target = elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus;
+  if (transaction) setStatus(target, lifecycleStatusMessage(transaction), 'warning');
+});
+window.addEventListener('p2p:lifecycle-completed', (event) => {
+  const transaction = event.detail?.transaction || null;
+  applyP2PState(semillaP2P.bootstrapState);
+  if (transaction?.spaceId === state.selectedSpaceId) showDashboard();
+  if (elements.trashDialog?.open) renderTrash();
+  const message = transaction?.action === 'purge'
+    ? t('lifecycle.purgeCompleted', 'Todos los dispositivos confirmaron la eliminación permanente del proyecto.')
+    : t('lifecycle.trashCompleted', 'Todos los dispositivos confirmaron el envío del proyecto a la papelera.');
+  setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, message, 'success');
 });
 window.addEventListener('p2p:space-deleted', (event) => {
   const deletedSpaceId = String(event.detail?.spaceId || '').trim();
