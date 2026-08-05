@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.10.10 - 2026-08-05
+
+- La card de un panel invitado exige ahora igualdad exacta entre el inventario autoritativo del propietario y los proyectos autorizados en el plano de control; ya no basta con haber cargado todos los esperados si existe además una raíz sobrante o desactualizada.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` informa los `spaceId` autoritativos, los presentes en control, los inesperados y los ausentes, manteniendo la card oculta hasta eliminar cualquier divergencia.
+- Se añadió una regresión que reproduce un panel con todos los proyectos correctos más un proyecto residual y confirma que no puede mostrarse ni activarse.
+
+## 1.10.7 - 2026-08-05
+
+- La card de un panel invitado ya no considera suficiente que exista la entidad raíz de cada proyecto: exige que todos los espacios esperados hayan salido del estado provisional de recuperación y conserven permiso de lectura confirmado.
+- Las altas heredadas por un panel persisten una frontera `replica_recovery` antes del primer bootstrap, evitando que compras, ingresos o proyecciones parciales aparezcan mientras replay o snapshot todavía alcanzan la revisión autoritativa.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` identifica las réplicas pendientes de autorización por `spaceId`, y las regresiones cubren raíces presentes con contenido aún no confirmado sin alterar invitaciones individuales ni paneles vacíos válidos.
+
+## 1.10.6 - 2026-08-05
+
+- Cerrada la ventana de hidratación en la que el primer proyecto recibido podía crear una card virtual `shared-portfolio` y eludir la barrera aplicada únicamente al espacio administrativo `portfolio`.
+- Una invitación global aceptada queda registrada como pendiente desde antes del siguiente bootstrap; su card no aparece hasta recibir el manifiesto autoritativo, la raíz administrativa autorizada y todas las raíces de proyecto esperadas.
+- Las invitaciones individuales de proyecto conservan su comportamiento: pueden usar un panel virtual sin exigir un manifiesto global que no les corresponde.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` informa también si falta la raíz del panel; una revocación limpia barreras pendientes obsoletas y la regresión cubre panel virtual parcial, panel real completo y proyecto compartido individual.
+
 ## 1.10.4 - 2026-08-05
 
 - Cerrada la condición residual por la que un panel aceptado podía activarse apenas aparecía su espacio administrativo, antes de que IndexedDB terminara de hidratar las raíces de todos los proyectos autorizados.

@@ -68,7 +68,9 @@ import {
   normalizePurchaseInput,
   projectMatchesFilter,
   projectRecord,
+  panelRequiresAuthoritativeHydration,
   pendingPanelExpectedProjectSpaceIds,
+  invitedPortfolioHydrationStatus,
   roleLabel,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
@@ -88,8 +90,9 @@ const state = {
   selectedSpaceId: '',
   activePanelId: '',
   pendingPanelId: '',
+  pendingAuthoritativePanelIds: new Set(),
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -109,7 +112,8 @@ const state = {
   inviteScope: 'project',
   portfolioInviteAccepting: false,
   accessScopeContext: 'project',
-  portfolioReconciliationActive: false
+  portfolioReconciliationActive: false,
+  incompletePanelWarnings: new Map()
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
@@ -201,7 +205,7 @@ function portfolioOwnerProfile(portfolioSpace = null) {
   const ownerUserId = String(portfolioSpace?.ownerUserId || '').trim();
   return (portfolioSpace?.members || []).find((member) => String(member?.userId || '').trim() === ownerUserId)?.profile || null;
 }
-function panelScopes() {
+function allPanelScopes() {
   return buildProjectPanelScopes({
     spaces: state.p2pState.spaces,
     projects: [...state.projects.values()],
@@ -212,10 +216,97 @@ function panelScopes() {
     sharedProjectsPanelId: SHARED_PROJECTS_PANEL_ID
   });
 }
-function pendingPanelIsHydrated(panelId = '') {
-  const expectedSpaceIds = pendingPanelExpectedProjectSpaceIds({
+function portfolioHydrationStatus(panelId = '') {
+  return invitedPortfolioHydrationStatus({
     spaces: state.p2pState.spaces,
     panelId,
+    currentUserId: state.user?.userId || '',
+    portfolioHydration: state.p2pState.portfolioHydration,
+    loadedProjectSpaceIds: [...state.projects.keys()],
+    portfolioResourceType: PORTFOLIO_RESOURCE_TYPE,
+    projectResourceType: PROJECT_RESOURCE_TYPE,
+    personalPanelId: PERSONAL_PANEL_ID,
+    sharedProjectsPanelId: SHARED_PROJECTS_PANEL_ID
+  });
+}
+function panelNeedsAuthoritativeHydration(panel = null) {
+  const panelId = String(panel?.id || '').trim();
+  return panelRequiresAuthoritativeHydration({
+    panel,
+    portfolioHydration: state.p2pState.portfolioHydration,
+    pendingAuthoritativePanel: Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
+  });
+}
+function reportIncompleteInvitedPanel(panel = null, status = {}) {
+  const panelId = String(panel?.id || status?.panelId || '').trim();
+  if (!panelId) return;
+  const signature = JSON.stringify({
+    reason: status?.reason || 'unknown',
+    manifestInventoryRevision: Math.max(0, Number(status?.manifestInventoryRevision || 0)),
+    portfolioInventoryRevision: Math.max(0, Number(status?.portfolioInventoryRevision || 0)),
+    projectInventoryMatches: status?.projectInventoryMatches === true,
+    authoritative: status?.authoritativeProjectSpaceIds || [],
+    control: status?.controlProjectSpaceIds || [],
+    unexpected: status?.unexpectedProjectSpaceIds || [],
+    absentControl: status?.absentControlProjectSpaceIds || [],
+    expected: status?.expectedProjectSpaceIds || [],
+    pendingAuthorization: status?.pendingProjectAuthorizationSpaceIds || [],
+    missing: status?.missingProjectSpaceIds || []
+  });
+  if (state.incompletePanelWarnings.get(panelId) === signature) return;
+  state.incompletePanelWarnings.set(panelId, signature);
+  console.error('[P2P_PANEL_INCOMPLETO] La card del panel invitado fue bloqueada porque todavía no coincide con el panel autoritativo del propietario.', {
+    panelId,
+    reason: status?.reason || 'unknown',
+    comparisonComplete: status?.comparisonComplete === true,
+    comparisonAuthoritative: status?.comparisonAuthoritative === true,
+    portfolioRootLoaded: status?.portfolioRootLoaded === true,
+    manifestInventoryRevision: Math.max(0, Number(status?.manifestInventoryRevision || 0)),
+    portfolioInventoryRevision: Math.max(0, Number(status?.portfolioInventoryRevision || 0)),
+    inventoryRevisionMatches: status?.inventoryRevisionMatches === true,
+    projectInventoryMatches: status?.projectInventoryMatches === true,
+    authoritativeProjectSpaceIds: status?.authoritativeProjectSpaceIds || [],
+    controlProjectSpaceIds: status?.controlProjectSpaceIds || [],
+    unexpectedProjectSpaceIds: status?.unexpectedProjectSpaceIds || [],
+    absentControlProjectSpaceIds: status?.absentControlProjectSpaceIds || [],
+    expectedProjectSpaceIds: status?.expectedProjectSpaceIds || [],
+    authorizedProjectSpaceIds: status?.authorizedProjectSpaceIds || [],
+    pendingProjectAuthorizationSpaceIds: status?.pendingProjectAuthorizationSpaceIds || [],
+    loadedProjectSpaceIds: status?.loadedProjectSpaceIds || [],
+    missingProjectSpaceIds: status?.missingProjectSpaceIds || []
+  });
+}
+function panelScopes() {
+  return allPanelScopes().filter((panel) => {
+    if (!panelNeedsAuthoritativeHydration(panel)) return true;
+    const status = portfolioHydrationStatus(panel.id);
+    if (!status.ready) {
+      reportIncompleteInvitedPanel(panel, status);
+      return false;
+    }
+    state.incompletePanelWarnings.delete(panel.id);
+    state.pendingAuthoritativePanelIds.delete(panel.id);
+    return true;
+  });
+}
+function pendingPanelIsHydrated(panelId = '') {
+  const cleanPanelId = String(panelId || '').trim();
+  if (!cleanPanelId) return false;
+  const portfolioSpace = (state.p2pState.spaces || []).find((space) => (
+    space?.resourceType === PORTFOLIO_RESOURCE_TYPE
+    && String(space?.spaceId || '').trim() === cleanPanelId
+    && String(space?.ownerUserId || '').trim() !== String(state.user?.userId || '').trim()
+  ));
+  const panel = allPanelScopes().find((scope) => String(scope?.id || '').trim() === cleanPanelId)
+    || {
+      id: cleanPanelId,
+      type: portfolioSpace ? 'portfolio' : 'shared-portfolio',
+      owned: false
+    };
+  if (panelNeedsAuthoritativeHydration(panel)) return portfolioHydrationStatus(cleanPanelId).ready;
+  const expectedSpaceIds = pendingPanelExpectedProjectSpaceIds({
+    spaces: state.p2pState.spaces,
+    panelId: cleanPanelId,
     currentUserId: state.user?.userId || '',
     portfolioResourceType: PORTFOLIO_RESOURCE_TYPE,
     projectResourceType: PROJECT_RESOURCE_TYPE,
@@ -767,7 +858,8 @@ function resetUserScopedInterface() {
   state.selectedSpaceId = '';
   state.activePanelId = '';
   state.pendingPanelId = '';
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
+  state.pendingAuthoritativePanelIds.clear();
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -778,6 +870,7 @@ function resetUserScopedInterface() {
   state.concurrentConflictOperations.clear();
   state.missingProjectRecoveryActive = false;
   state.missingProjectRecoveryAt.clear();
+  state.incompletePanelWarnings.clear();
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
   state.invitationRefreshSequence += 1;
@@ -943,6 +1036,7 @@ async function refreshProjects() {
     && panelScopes().some((panel) => panel.id === state.pendingPanelId)
   ) {
     setActivePanelId(state.pendingPanelId);
+    state.pendingAuthoritativePanelIds.delete(state.pendingPanelId);
     state.pendingPanelId = '';
   }
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
@@ -1768,7 +1862,8 @@ function applyP2PState(nextState = {}) {
     },
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
-    lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
+    lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : [],
+    portfolioHydration: Array.isArray(nextState.portfolioHydration) ? nextState.portfolioHydration : []
   };
   renderInvitations();
   if (elements.devicesDialog?.open) renderDevices();
@@ -2940,6 +3035,9 @@ async function respondInvitation(event) {
         : String(invitation?.governanceSpaceId || '').trim()
           || sharedOwnerPanelId(result?.space?.ownerUserId || invitation?.inviterUserId || '')
           || SHARED_PROJECTS_PANEL_ID;
+      if (invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && state.pendingPanelId) {
+        state.pendingAuthoritativePanelIds.add(state.pendingPanelId);
+      }
     }
     await applyP2PState(semillaP2P.bootstrapState);
     showDashboard();
@@ -3103,6 +3201,8 @@ window.addEventListener('p2p:access-revoked', (event) => {
   const revokedSpaceIds = Array.from(new Set((Array.isArray(event.detail?.spaceIds) ? event.detail.spaceIds : [])
     .map((spaceId) => String(spaceId || '').trim())
     .filter(Boolean)));
+  for (const spaceId of revokedSpaceIds) state.pendingAuthoritativePanelIds.delete(spaceId);
+  if (state.pendingPanelId && revokedSpaceIds.includes(state.pendingPanelId)) state.pendingPanelId = '';
   const wasSelected = Boolean(state.selectedSpaceId && revokedSpaceIds.includes(state.selectedSpaceId));
   applyP2PState(semillaP2P.bootstrapState);
   if (wasSelected) {

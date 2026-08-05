@@ -16,7 +16,19 @@ const harness = `
 const CURSOR_META_PREFIX = 'cursor:';
 const dispatched = [];
 const metaWrites = [];
+const controlCommits = [];
 function dispatch(name, detail = {}) { dispatched.push({ name, detail }); }
+function prepareCommittedControlState({ spaces = [], invitations = [] } = {}, options = {}) {
+  return {
+    spaces: spaces.map((space) => ({
+      ...space,
+      authorizationState: options.authorizationState === 'unconfirmed' ? 'unconfirmed' : 'confirmed',
+      ...(options.authorizationState === 'unconfirmed' ? { authorizationPendingReason: 'replica_recovery' } : {})
+    })),
+    invitations
+  };
+}
+async function saveControlStateAtomically(state) { controlCommits.push(state); }
 function assertRealtimeEventEnvelope(event) { return event; }
 function assertRealtimeSequenceContinuity() { return true; }
 function eventCursorSequence(event = {}) { return Number(event.deviceSequence || 0); }
@@ -34,15 +46,17 @@ class TestClient {
     this.lastAcceptedStreamSequence = 0;
     this.lastProcessedSequence = 0;
     this.pendingAckReplicaSpaceIds = new Set();
+    this.bootstrapState = { spaces: [] };
     this.acks = [];
   }
   captureSessionContext() { return { deviceId: 'device_membership_0001' }; }
   assertSessionContext() { return true; }
   async fenceBootstrapResponses() { return true; }
+  applyCommittedControlState(state) { this.bootstrapState = { ...this.bootstrapState, spaces: state.spaces }; }
   scheduleAck(sequence) { this.acks.push(sequence); }
 ${methodSource}
 }
-export { TestClient, dispatched, metaWrites };
+export { TestClient, dispatched, metaWrites, controlCommits };
 `;
 
 const module = await import(`data:text/javascript;base64,${Buffer.from(harness).toString('base64')}`);
@@ -105,7 +119,12 @@ const inheritedMembershipEvent = {
   spaceId: 'space_inherited_1',
   data: {
     ...event.data,
-    targetUserId: 'user_guest_1'
+    targetUserId: 'user_guest_1',
+    space: {
+      spaceId: 'space_inherited_1',
+      ownerUserId: 'user_owner_1',
+      members: [{ userId: 'user_guest_1', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+    }
   }
 };
 const inheritedSpace = {
@@ -115,6 +134,9 @@ const inheritedSpace = {
 };
 const inheritedClient = new module.TestClient(async () => ({ spaces: [inheritedSpace] }), 'user_guest_1');
 await inheritedClient.handleEvent(inheritedMembershipEvent);
+assert.equal(module.controlCommits.length, 1, 'La membresía heredada no creó una frontera durable antes del primer bootstrap.');
+assert.equal(module.controlCommits[0]?.spaces?.[0]?.authorizationState, 'unconfirmed');
+assert.equal(module.controlCommits[0]?.spaces?.[0]?.authorizationPendingReason, 'replica_recovery');
 assert.deepEqual(
   inheritedClient.refreshCalls,
   [

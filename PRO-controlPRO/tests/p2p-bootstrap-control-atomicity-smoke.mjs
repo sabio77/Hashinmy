@@ -20,9 +20,12 @@ assert.match(
 assert.match(storageMethod, /await replaceSpacesInStores\(stores, spaces, options\)/);
 assert.match(storageMethod, /stores\[STORES\.invitations\]\.clear\(\)/);
 assert.match(storageMethod, /stores\[STORES\.invitations\]\.put\(invitation\)/);
+assert.match(storageMethod, /normalizedMetaEntries/, 'El manifiesto de hidratación no se prepara dentro del commit de control.');
+assert.match(storageMethod, /stores\[STORES\.meta\]\.put\(entry\)/, 'El manifiesto de hidratación no se guarda atómicamente con espacios e invitaciones.');
 
 assert.match(clientSource, /replaceBootstrapControlState,/);
 assert.doesNotMatch(clientSource, /replaceSpaces\(this\.bootstrapState\.spaces[\s\S]*replaceInvitations/);
+assert.match(clientSource, /metaEntries: \[\{ key: PORTFOLIO_HYDRATION_META_KEY, value: portfolioHydration \}\]/);
 
 const applyStart = clientSource.indexOf('  async applyBootstrapData(data = {}, context = {})');
 const applyEnd = clientSource.indexOf('\n  mergeReplicaHealth(', applyStart);
@@ -31,6 +34,7 @@ const applyMethod = clientSource.slice(applyStart, applyEnd);
 
 const applyHarness = `
 const CURSOR_META_PREFIX = 'deliveryCursor:';
+const PORTFOLIO_HYDRATION_META_KEY = 'p2pPortfolioHydrationManifests';
 let replaceFailure = null;
 let recoveryFailure = null;
 function normalizeInvitationCollection(value = {}) {
@@ -40,6 +44,8 @@ function normalizeInvitationCollection(value = {}) {
   };
 }
 function normalizeReplicaHealthMap(value = {}) { return value; }
+function normalizePortfolioHydrationManifests(value = []) { return Array.isArray(value) ? value : []; }
+function invitedReplicaRecoverySpaceIds() { return []; }
 async function getMeta() { return 0; }
 async function setMeta() { return true; }
 async function replaceBootstrapControlState(spaces, invitations) {

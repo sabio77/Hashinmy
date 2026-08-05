@@ -452,6 +452,31 @@ export function sharedOwnerPanelId(ownerUserId = '') {
 }
 
 /**
+ * Determina si una card de panel invitado debe permanecer detrás de la
+ * comparación autoritativa del inventario completo.
+ *
+ * Los proyectos de una invitación individual también se agrupan en un panel
+ * virtual `shared-portfolio`, por lo que ese tipo por sí solo no demuestra que
+ * exista una invitación global. La barrera solo se activa cuando memoriaBACKEND
+ * ya entregó un manifiesto del panel o cuando la aceptación local de ese panel
+ * todavía está pendiente de completar su hidratación.
+ */
+export function panelRequiresAuthoritativeHydration(input = {}) {
+  const panel = input.panel && typeof input.panel === 'object' ? input.panel : {};
+  const panelId = cleanText(panel.id || input.panelId || '', 220);
+  const panelType = cleanText(panel.type || input.panelType || '', 40).toLowerCase();
+  if (!panelId || panel.owned === true) return false;
+  if (panelType === 'portfolio') return true;
+  if (panelType !== 'shared-portfolio') return false;
+
+  const manifests = Array.isArray(input.portfolioHydration) ? input.portfolioHydration : [];
+  const hasAuthoritativeManifest = manifests.some((candidate) => (
+    cleanText(candidate?.portfolioSpaceId || '', 140) === panelId
+  ));
+  return input.pendingAuthoritativePanel === true || hasAuthoritativeManifest;
+}
+
+/**
  * Identifica los espacios de proyecto que deben estar hidratados antes de
  * abrir automáticamente un panel recién aceptado.
  *
@@ -512,6 +537,123 @@ export function pendingPanelExpectedProjectSpaceIds(input = {}) {
     .map((space) => cleanText(space?.spaceId || '', 140))
     .filter(Boolean)))
     .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Verifica que un panel invitado tenga una comparación autoritativa contra el
+ * panel del propietario y que cada proyecto esperado tenga su réplica autorizada
+ * y materializada hasta la revisión autoritativa antes de mostrar su card.
+ */
+export function invitedPortfolioHydrationStatus(input = {}) {
+  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const panelId = cleanText(input.panelId || '', 220);
+  const currentUserId = cleanText(input.currentUserId || '', 140);
+  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
+  const projectResourceType = cleanText(input.projectResourceType || PROJECT_ENTITY_TYPE, 80) || PROJECT_ENTITY_TYPE;
+  const loadedProjectSpaceIds = new Set((Array.isArray(input.loadedProjectSpaceIds)
+    ? input.loadedProjectSpaceIds
+    : [])
+    .map((spaceId) => cleanText(spaceId || '', 140))
+    .filter(Boolean));
+  const manifests = Array.isArray(input.portfolioHydration) ? input.portfolioHydration : [];
+  const manifest = manifests.find((candidate) => (
+    cleanText(candidate?.portfolioSpaceId || '', 140) === panelId
+  )) || null;
+  const controlExpectedSpaceIds = pendingPanelExpectedProjectSpaceIds(input);
+  const manifestExpectedSpaceIds = Array.from(new Set(Array.isArray(manifest?.expectedProjectSpaceIds)
+    ? manifest.expectedProjectSpaceIds
+      .map((spaceId) => cleanText(spaceId || '', 140))
+      .filter(Boolean)
+    : []))
+    .sort((left, right) => left.localeCompare(right));
+  const authoritativeProjectSpaceIdSet = new Set(manifestExpectedSpaceIds);
+  const controlProjectSpaceIdSet = new Set(controlExpectedSpaceIds);
+  const unexpectedProjectSpaceIds = controlExpectedSpaceIds
+    .filter((spaceId) => !authoritativeProjectSpaceIdSet.has(spaceId));
+  const absentControlProjectSpaceIds = manifestExpectedSpaceIds
+    .filter((spaceId) => !controlProjectSpaceIdSet.has(spaceId));
+  const projectInventoryMatches = Boolean(manifest)
+    && unexpectedProjectSpaceIds.length === 0
+    && absentControlProjectSpaceIds.length === 0;
+  const expectedProjectSpaceIds = Array.from(new Set([
+    ...manifestExpectedSpaceIds,
+    ...controlExpectedSpaceIds
+  ])).sort((left, right) => left.localeCompare(right));
+  const projectSpacesById = new Map(spaces
+    .filter((space) => cleanText(space?.resourceType || '', 80) === projectResourceType)
+    .map((space) => [cleanText(space?.spaceId || '', 140), space])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const pendingProjectAuthorizationSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    return !projectSpace
+      || projectSpace.authorizationState === 'unconfirmed'
+      || !currentUserId
+      || !hasPermission(projectSpace, currentUserId, 'read');
+  });
+  const pendingProjectAuthorizationSpaceIdSet = new Set(pendingProjectAuthorizationSpaceIds);
+  const missingProjectSpaceIds = expectedProjectSpaceIds
+    .filter((spaceId) => !loadedProjectSpaceIds.has(spaceId));
+  const comparisonComplete = manifest?.complete === true;
+  const comparisonAuthoritative = Boolean(manifest && manifest?.authoritative !== false);
+  const portfolioSpace = spaces.find((space) => (
+    cleanText(space?.resourceType || '', 80) === portfolioResourceType
+    && cleanText(space?.spaceId || '', 140) === panelId
+    && space?.authorizationState !== 'unconfirmed'
+  )) || null;
+  const portfolioRootLoaded = Boolean(
+    portfolioSpace
+    && currentUserId
+    && hasPermission(portfolioSpace, currentUserId, 'read')
+  );
+  const manifestInventoryRevision = Math.max(0, Math.floor(Number(manifest?.inventoryRevision || 0)));
+  const portfolioInventoryRevision = Math.max(0, Math.floor(Number(portfolioSpace?.projectInventoryRevision || 0)));
+  const inventoryRevisionMatches = Boolean(manifest) && manifestInventoryRevision === portfolioInventoryRevision;
+  return {
+    panelId,
+    ready: Boolean(
+      panelId
+      && comparisonComplete
+      && comparisonAuthoritative
+      && portfolioRootLoaded
+      && inventoryRevisionMatches
+      && projectInventoryMatches
+      && pendingProjectAuthorizationSpaceIds.length === 0
+      && missingProjectSpaceIds.length === 0
+    ),
+    comparisonComplete,
+    comparisonAuthoritative,
+    portfolioRootLoaded,
+    manifestInventoryRevision,
+    portfolioInventoryRevision,
+    inventoryRevisionMatches,
+    projectInventoryMatches,
+    authoritativeProjectSpaceIds: manifestExpectedSpaceIds,
+    controlProjectSpaceIds: controlExpectedSpaceIds,
+    unexpectedProjectSpaceIds,
+    absentControlProjectSpaceIds,
+    expectedProjectSpaceIds,
+    authorizedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => !pendingProjectAuthorizationSpaceIdSet.has(spaceId)),
+    pendingProjectAuthorizationSpaceIds,
+    loadedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => loadedProjectSpaceIds.has(spaceId)),
+    missingProjectSpaceIds,
+    reason: !manifest
+      ? 'authoritative_manifest_missing'
+      : !comparisonComplete
+        ? 'authoritative_comparison_incomplete'
+        : !comparisonAuthoritative
+          ? 'authoritative_comparison_stale'
+          : !portfolioRootLoaded
+            ? 'portfolio_root_missing'
+            : !inventoryRevisionMatches
+              ? 'portfolio_inventory_revision_mismatch'
+              : pendingProjectAuthorizationSpaceIds.length
+                ? 'project_replica_unconfirmed'
+                : missingProjectSpaceIds.length
+                  ? 'project_roots_missing'
+                  : !projectInventoryMatches
+                    ? 'project_inventory_set_mismatch'
+                    : 'ready'
+  };
 }
 
 function projectOwnerProfile(data = {}) {

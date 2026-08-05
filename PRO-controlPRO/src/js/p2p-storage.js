@@ -613,6 +613,9 @@ export async function replaceSpaces(spaces = [], options = {}) {
 export async function replaceBootstrapControlState(spaces = [], invitations = [], options = {}) {
   const normalizedInvitations = (Array.isArray(invitations) ? invitations : [])
     .filter((invitation) => String(invitation?.invitationId || '').trim());
+  const normalizedMetaEntries = (Array.isArray(options.metaEntries) ? options.metaEntries : [])
+    .map((entry) => ({ key: String(entry?.key || '').trim(), value: entry?.value }))
+    .filter((entry) => entry.key);
   return withStores(
     [STORES.spaces, STORES.invitations, STORES.entities, STORES.outbox, STORES.snapshots, STORES.meta],
     'readwrite',
@@ -621,6 +624,9 @@ export async function replaceBootstrapControlState(spaces = [], invitations = []
       await requestToPromise(stores[STORES.invitations].clear());
       for (const invitation of normalizedInvitations) {
         await requestToPromise(stores[STORES.invitations].put(invitation));
+      }
+      for (const entry of normalizedMetaEntries) {
+        await requestToPromise(stores[STORES.meta].put(entry));
       }
       return {
         ...spaceReplacement,
