@@ -38,14 +38,17 @@ const controlEvent = (eventType, overrides = {}) => ({
 });
 
 const publicKey = { kty: 'EC', crv: 'P-256', x: 'x'.repeat(43), y: 'y'.repeat(43) };
-const invitation = (status = 'created') => ({
+const invitation = (status = 'created', overrides = {}) => ({
   invitationId: `inv_${status}`,
   spaceId: 'space_control_1',
   inviterUserId: 'user_inviter_1',
   recipientUserId: 'user_recipient_1',
   recipientEmail: 'persona@example.com',
   permissions: ['read', 'add'],
-  status
+  role: 'member',
+  accessScope: 'project',
+  status,
+  ...overrides
 });
 const space = {
   spaceId: 'space_control_1',
@@ -71,6 +74,17 @@ const spaceAfterInviterExit = {
       permissions: ['read', 'add', 'delete', 'projection', 'invite', 'write']
     },
     { userId: 'user_recipient_1', role: 'member', permissions: ['read', 'add'] }
+  ]
+};
+
+const elevatedPermissions = ['read', 'add', 'delete', 'projection', 'invite', 'write'];
+const spaceWithElevatedGrant = {
+  spaceId: 'space_control_1',
+  ownerUserId: 'user_owner_1',
+  members: [
+    { userId: 'user_owner_1', role: 'owner', permissions: elevatedPermissions },
+    { userId: 'user_manager_1', role: 'manager', permissions: elevatedPermissions },
+    { userId: 'user_recipient_1', role: 'admin', accessScope: 'portfolio', permissions: elevatedPermissions }
   ]
 };
 
@@ -132,6 +146,16 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.cha
     permissions: ['read', 'add']
   }
 })).eventType, 'p2p.membership.changed');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
+  actorUserId: 'user_manager_1',
+  data: {
+    space: spaceWithElevatedGrant,
+    targetUserId: 'user_recipient_1',
+    permissions: elevatedPermissions,
+    role: 'admin',
+    accessScope: 'portfolio'
+  }
+})).eventType, 'p2p.membership.changed');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked', {
   data: { spaceId: 'space_control_1', revokedUserId: 'user_revoked_1', selfRemoval: false }
 })).eventType, 'p2p.membership.revoked');
@@ -149,6 +173,13 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.acc
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
   actorUserId: 'user_recipient_1',
   data: { invitation: invitation('accepted'), space: spaceAfterInviterExit }
+})).eventType, 'p2p.invitation.accepted');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
+  actorUserId: 'user_recipient_1',
+  data: {
+    invitation: invitation('accepted', { role: 'admin', accessScope: 'portfolio', permissions: elevatedPermissions }),
+    space: spaceWithElevatedGrant
+  }
 })).eventType, 'p2p.invitation.accepted');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rejected', {
   actorUserId: 'user_recipient_1',
@@ -275,6 +306,21 @@ assert.throws(
   'Un evento de permisos contradictorio siguió reemplazando el estado canónico local.'
 );
 assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
+    actorUserId: 'user_inviter_1',
+    data: {
+      space,
+      targetUserId: 'user_recipient_1',
+      permissions: ['read', 'add'],
+      role: 'member',
+      accessScope: 'project'
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'membership-changed',
+  'Un miembro sin facultad administrativa siguió pudiendo reemplazar permisos mediante un evento realtime.'
+);
+assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
     actorUserId: 'user_recipient_1',
     data: { invitation: invitation('accepted'), space: null }
@@ -294,6 +340,18 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'invitation-accepted-space',
   'Una aceptación sin el invitado dentro de la membresía siguió cerrándose como válida.'
+);
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
+    actorUserId: 'user_recipient_1',
+    data: {
+      invitation: invitation('accepted', { role: 'manager', accessScope: 'portfolio', permissions: elevatedPermissions }),
+      space: spaceWithElevatedGrant
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'invitation-accepted-space',
+  'Una aceptación con rol distinto al persistido siguió avanzando el cursor del cliente.'
 );
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rejected', {

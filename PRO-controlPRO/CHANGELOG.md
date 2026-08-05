@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0 - 2026-08-05
+
+- La revocación de un panel compartido ya no depende de los proyectos visibles en la interfaz: memoriaBACKEND recorre el índice completo de la cuenta y retira también proyectos autorizados cuya entidad raíz aún no fue recuperada, sin cruzar otros paneles ni invitaciones exclusivas.
+- Las membresías heredadas de proyectos quedan subordinadas en cada autorización al grant vigente del panel; una baja o reducción corta inmediatamente lectura, edición, relay, snapshots y fan-out aunque exista un índice físico transitorio.
+- La PWA consume `rotationSpaceIds`, rota por separado las claves de todos los proyectos afectados y conserva tanto el resultado individual como el agregado sin mutaciones por referencia. Se añadieron regresiones de panel raíz ausente, aislamiento, idempotencia, jerarquía y rotación múltiple.
+
 ## 1.9.97 - 2026-08-04
 
 - Las invitaciones heredadas del panel ahora se correlacionan con el `governanceSpaceId` autoritativo: aceptar o rechazar **Control de proyectos** solo procesa los proyectos gobernados por ese mismo panel, incluso cuando otro panel comparte remitente, rol y permisos.

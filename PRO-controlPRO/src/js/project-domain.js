@@ -445,3 +445,155 @@ export function normalizeCollaborationPermissions(input = []) {
   values.add('read');
   return COLLABORATION_PERMISSIONS.filter((permission) => values.has(permission));
 }
+
+export function sharedOwnerPanelId(ownerUserId = '') {
+  const normalizedOwnerUserId = cleanText(ownerUserId, 140);
+  return normalizedOwnerUserId ? `__shared_owner_panel__:${normalizedOwnerUserId}` : '';
+}
+
+function projectOwnerProfile(data = {}) {
+  const ownerUserId = cleanText(data?.space?.ownerUserId || '', 140);
+  if (!ownerUserId) return null;
+  return (Array.isArray(data?.space?.members) ? data.space.members : [])
+    .find((member) => cleanText(member?.userId || '', 140) === ownerUserId)?.profile || null;
+}
+
+function projectPortfolioId(data = {}) {
+  return cleanText(data?.space?.governanceSpaceId || data?.project?.portfolioSpaceId || '', 140);
+}
+
+/**
+ * Construye las vistas de panel únicamente a partir de espacios autorizados.
+ *
+ * Un usuario invitado a uno o varios proyectos no necesita ser miembro del
+ * espacio administrativo del panel. En ese caso se crea una vista virtual con
+ * la misma identidad del portfolio (o, para proyectos legacy, del propietario)
+ * y solo se agregan los proyectos que ya están presentes en su bootstrap.
+ * Esto evita mezclar propietarios diferentes y jamás revela proyectos para los
+ * que la cuenta no recibió membresía.
+ */
+export function buildProjectPanelScopes(input = {}) {
+  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const projects = Array.isArray(input.projects) ? input.projects : [];
+  const currentUserId = cleanText(input.currentUserId || '', 140);
+  const activePanelId = cleanText(input.activePanelId || '', 220);
+  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
+  const personalPanelId = cleanText(input.personalPanelId || '__personal_panel__', 220) || '__personal_panel__';
+  const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
+
+  const scopes = spaces
+    .filter((space) => space?.resourceType === portfolioResourceType && space?.authorizationState !== 'unconfirmed')
+    .map((space) => ({
+      id: cleanText(space?.spaceId || '', 140),
+      type: 'portfolio',
+      space,
+      ownerUserId: cleanText(space?.ownerUserId || '', 140),
+      ownerProfile: projectOwnerProfile({ space }),
+      owned: cleanText(space?.ownerUserId || '', 140) === currentUserId,
+      projects: []
+    }))
+    .filter((scope) => scope.id);
+  const scopesById = new Map(scopes.map((scope) => [scope.id, scope]));
+  const scopesByOwner = new Map();
+  for (const scope of scopes) {
+    if (!scope.ownerUserId) continue;
+    const ownerScopes = scopesByOwner.get(scope.ownerUserId) || [];
+    ownerScopes.push(scope);
+    scopesByOwner.set(scope.ownerUserId, ownerScopes);
+  }
+
+  const personalProjects = [];
+  const ungroupedSharedProjects = [];
+
+  const resolveActualOwnerScope = (ownerUserId = '') => {
+    const candidates = scopesByOwner.get(ownerUserId) || [];
+    return candidates.find((scope) => scope.id === activePanelId)
+      || candidates.find((scope) => scope.owned)
+      || candidates[0]
+      || null;
+  };
+
+  const resolveVirtualScope = (data = {}, portfolioId = '', ownerUserId = '') => {
+    const virtualId = portfolioId || sharedOwnerPanelId(ownerUserId);
+    if (!virtualId) return null;
+    let scope = scopesById.get(virtualId);
+    if (!scope) {
+      scope = {
+        id: virtualId,
+        type: 'shared-portfolio',
+        space: null,
+        ownerUserId,
+        ownerProfile: projectOwnerProfile(data),
+        owned: false,
+        projects: []
+      };
+      scopes.push(scope);
+      scopesById.set(virtualId, scope);
+    } else if (!scope.ownerProfile) {
+      scope.ownerProfile = projectOwnerProfile(data);
+    }
+    return scope;
+  };
+
+  for (const data of projects) {
+    const spaceId = cleanText(data?.space?.spaceId || '', 140);
+    if (!spaceId) continue;
+    const ownerUserId = cleanText(data?.space?.ownerUserId || data?.project?.portfolioOwnerUserId || '', 140);
+    const portfolioId = projectPortfolioId(data);
+    const ownedProject = Boolean(currentUserId && cleanText(data?.space?.ownerUserId || '', 140) === currentUserId);
+
+    if (portfolioId && scopesById.has(portfolioId)) {
+      scopesById.get(portfolioId).projects.push(data);
+      continue;
+    }
+
+    const ownerScope = resolveActualOwnerScope(ownerUserId);
+    if (!portfolioId && ownerScope) {
+      ownerScope.projects.push(data);
+      continue;
+    }
+
+    if (ownedProject) {
+      personalProjects.push(data);
+      continue;
+    }
+
+    const virtualScope = resolveVirtualScope(data, portfolioId, ownerUserId);
+    if (virtualScope) virtualScope.projects.push(data);
+    else ungroupedSharedProjects.push(data);
+  }
+
+  if (!scopes.some((scope) => scope.owned) || personalProjects.length) {
+    scopes.push({
+      id: personalPanelId,
+      type: 'personal',
+      space: null,
+      ownerUserId: currentUserId,
+      ownerProfile: null,
+      owned: true,
+      projects: personalProjects
+    });
+  }
+  if (ungroupedSharedProjects.length) {
+    scopes.push({
+      id: sharedProjectsPanelId,
+      type: 'shared',
+      space: null,
+      ownerUserId: '',
+      ownerProfile: null,
+      owned: false,
+      projects: ungroupedSharedProjects
+    });
+  }
+
+  return scopes.sort((left, right) => {
+    const rank = (scope) => scope.type === 'personal' || scope.owned
+      ? 0
+      : scope.type === 'portfolio' || scope.type === 'shared-portfolio'
+        ? 1
+        : 2;
+    const rankDifference = rank(left) - rank(right);
+    if (rankDifference) return rankDifference;
+    return String(left.id || '').localeCompare(String(right.id || ''));
+  });
+}

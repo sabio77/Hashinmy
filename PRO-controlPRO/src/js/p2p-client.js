@@ -605,12 +605,22 @@ export function assertCanonicalControlEnvelope(event = {}) {
       ) invalid('membership-changed');
     }
     if (hasPermissionUpdate) {
+      const actor = graph.members.get(actorUserId);
       const target = graph.members.get(targetUserId);
       const permissions = canonicalPermissionList(data.permissions, () => invalid('membership-changed'));
+      const role = String(data.role || target?.role || '').trim().toLowerCase();
+      const accessScope = String(data.accessScope || target?.accessScope || 'project').trim().toLowerCase() === 'portfolio'
+        ? 'portfolio'
+        : 'project';
       if (
-        actorUserId !== graph.ownerUserId
+        !actor
+        || !['owner', 'manager', 'admin'].includes(actor.role)
         || !target
-        || target.role !== 'member'
+        || target.role === 'owner'
+        || !CANONICAL_MEMBER_ROLES.has(role)
+        || role === 'owner'
+        || target.role !== role
+        || target.accessScope !== accessScope
         || !samePermissionSet(target.permissions, permissions)
       ) invalid('membership-changed');
     }
@@ -641,9 +651,16 @@ export function assertCanonicalControlEnvelope(event = {}) {
       invitation.permissions,
       () => invalid('invitation-accepted-space')
     );
+    const invitationRole = String(invitation.role || 'member').trim().toLowerCase();
+    const invitationAccessScope = String(invitation.accessScope || 'project').trim().toLowerCase() === 'portfolio'
+      ? 'portfolio'
+      : 'project';
     if (
       !recipient
-      || recipient.role !== 'member'
+      || !CANONICAL_MEMBER_ROLES.has(invitationRole)
+      || invitationRole === 'owner'
+      || recipient.role !== invitationRole
+      || recipient.accessScope !== invitationAccessScope
       || !samePermissionSet(recipient.permissions, invitationPermissions)
     ) invalid('invitation-accepted-space');
   } else if (invitationEventAction === 'rejected' && data.space !== null && data.space !== undefined) {
@@ -6872,11 +6889,21 @@ export class SemillaP2PClient {
     const data = await apiPost('/api/p2p/access/leave', { spaceId: cleanSpaceId });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
-    const purge = await purgeLocalSpace(cleanSpaceId);
-    await purgeSpaceCrypto(cleanSpaceId).catch(() => null);
-    this.assertSessionContext(sessionContext);
-    this.removeSpaceFromBootstrapState(cleanSpaceId);
-    this.recoveryRequirements = await getRecoveryRequirements();
+    const revokedSpaceIds = [...new Set([
+      ...(Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : []),
+      cleanSpaceId
+    ].map((candidate) => String(candidate || '').trim()).filter(Boolean))];
+    const purges = [];
+    for (const revokedSpaceId of revokedSpaceIds) {
+      const purge = await purgeLocalSpace(revokedSpaceId);
+      await purgeSpaceCrypto(revokedSpaceId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      this.removeSpaceFromBootstrapState(revokedSpaceId);
+      purges.push({ spaceId: revokedSpaceId, purge });
+    }
+    this.recoveryRequirements = await updateRecoveryRequirements({
+      retainSpaceIds: this.readableSpaceIds()
+    });
     this.assertSessionContext(sessionContext);
     this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
     await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
@@ -6884,7 +6911,12 @@ export class SemillaP2PClient {
       return null;
     });
     this.assertSessionContext(sessionContext);
-    dispatch('p2p:access-revoked', { spaceIds: [cleanSpaceId], source: 'local-leave', purge });
+    dispatch('p2p:access-revoked', {
+      spaceIds: revokedSpaceIds,
+      source: 'local-leave',
+      purge: purges.find((entry) => entry.spaceId === cleanSpaceId)?.purge || null,
+      purges
+    });
     return data;
   }
 
@@ -7024,21 +7056,36 @@ export class SemillaP2PClient {
     await this.fenceBootstrapResponses(sessionContext);
     await this.refreshBootstrap({ requestSnapshots: false });
     this.assertSessionContext(sessionContext);
-    if (this.spaceRequiresEncryption(cleanSpaceId)) {
+    const rotationSpaceIds = [...new Set([
+      ...(Array.isArray(data.rotationSpaceIds) ? data.rotationSpaceIds : []),
+      cleanSpaceId
+    ].map((candidate) => String(candidate || '').trim()).filter(Boolean))]
+      .filter((candidate) => this.spaceRequiresEncryption(candidate));
+    const rotations = [];
+    for (const rotationSpaceId of rotationSpaceIds) {
       try {
-        const activeKey = await this.ensureCurrentSpaceKey(cleanSpaceId, { requireAuthority: true });
-        data.keyRotation = {
+        const activeKey = await this.ensureCurrentSpaceKey(rotationSpaceId, { requireAuthority: true });
+        rotations.push({
+          spaceId: rotationSpaceId,
           completed: true,
           keyId: String(activeKey?.keyId || '').trim(),
           keyEpoch: Math.max(0, Number(activeKey?.keyEpoch || 0)),
           distributionPending: activeKey?.distribution === null,
           ...(activeKey?.distribution || {})
-        };
+        });
       } catch (error) {
-        data.keyRotation = { completed: false, message: String(error?.message || error) };
-        dispatch('p2p:key-rotation-pending', { spaceId: cleanSpaceId, error });
+        rotations.push({ spaceId: rotationSpaceId, completed: false, message: String(error?.message || error) });
+        dispatch('p2p:key-rotation-pending', { spaceId: rotationSpaceId, error });
       }
       this.assertSessionContext(sessionContext);
+    }
+    if (rotations.length) {
+      data.keyRotations = rotations;
+      const primaryRotation = rotations.find((rotation) => rotation.spaceId === cleanSpaceId) || null;
+      data.keyRotation = {
+        ...(primaryRotation || {}),
+        completed: rotations.every((rotation) => rotation.completed !== false)
+      };
     }
     return data;
   }

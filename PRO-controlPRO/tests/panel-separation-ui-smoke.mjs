@@ -13,9 +13,12 @@ assert.match(html, /id="panel-list"/, 'Los paneles disponibles deben tener una l
 assert.match(appSource, /const PERSONAL_PANEL_ID = '__personal_panel__'/, 'El panel personal debe tener identidad estable y separada.');
 assert.match(appSource, /const SHARED_PROJECTS_PANEL_ID = '__shared_projects_panel__'/, 'Las invitaciones individuales deben agruparse sin mezclarse con el panel personal.');
 assert.match(appSource, /function panelScopes\(\)/, 'La clasificación de paneles debe estar centralizada.');
+assert.match(appSource, /buildProjectPanelScopes\(\{/, 'La clasificación debe usar el modelo puro que separa paneles virtuales por propietario.');
+assert.match(appSource, /\['shared', 'shared-portfolio'\]\.includes/, 'Los paneles virtuales de proyectos individuales no deben habilitar acciones de panel completo.');
 assert.match(appSource, /const allProjects = panelProjects[\s\S]*?\.filter\(\(item\) => !item\.project\.isTrashed\)/, 'El dashboard debe filtrar únicamente los proyectos del panel activo.');
 assert.match(appSource, /const ordered = \[\.\.\.activePanelProjects\(\)\]/, 'La papelera también debe respetar el panel activo.');
 assert.match(appSource, /state\.pendingPanelId = invitation\?\.resourceType === PORTFOLIO_RESOURCE_TYPE/, 'Aceptar una invitación debe preparar la entrada automática al panel correcto.');
+assert.match(appSource, /sharedOwnerPanelId\(result\?\.space\?\.ownerUserId/, 'Una invitación legacy a un proyecto debe abrir el panel virtual estable del propietario.');
 assert.match(appSource, /relatedPortfolioProjectInvitations\(state\.p2pState\.invitations\?\.received/, 'Aceptar un panel debe procesar también los proyectos heredados asociados.');
 assert.match(appSource, /elements\.panelList\?\.addEventListener\('click'/, 'El usuario debe poder cambiar de panel explícitamente.');
 assert.match(css, /\.panel-switcher-card\[data-active="true"\]/, 'El panel activo debe distinguirse visualmente.');
