@@ -292,7 +292,6 @@ assert.equal(indexSource.includes('id="access-dialog-title"'), true, 'El diálog
 assert.equal(/id="record-amount-input"[^>]*max="9007199254740991"/.test(indexSource), true);
 
 console.log('OK: dominio administrativo, roles Gerente/Admin/Individual, invitación global, autoría temporal, vínculos de proyección, métricas exactas, permisos y parches concurrentes validados.');
-assert.equal(appSource.includes('function invitationGovernanceSpaceId(invitation = {})'), true, 'Las invitaciones globales deben correlacionarse con el panel autoritativo.');
-assert.equal(appSource.includes('const authorizedInvitersByPortfolio = new Map()'), true, 'La aceptación automática debe separar remitentes autorizados por cada panel.');
-assert.equal(/authorizedInvitersByPortfolio\.get\(governanceSpaceId\)/.test(appSource), true, 'Cada invitación heredada debe validarse contra su panel exacto.');
-assert.equal(/invitationGovernanceSpaceId\(item\) === String\(invitation\.spaceId \|\| ''\)\.trim\(\)/.test(appSource), true, 'Aceptar o rechazar un panel solo debe afectar invitaciones de proyectos gobernados por ese panel.');
+assert.equal(appSource.includes('relatedPortfolioProjectInvitations('), true, 'Aceptar un panel debe incorporar en una sola operación sus proyectos heredados correlacionados.');
+assert.equal(appSource.includes('autoAcceptablePortfolioProjectInvitations('), true, 'La aceptación automática debe recuperar proyectos heredados incluso para paneles legacy sin mezclar asociaciones ambiguas.');
+assert.equal(appSource.includes('portfolioAuthorizations.push({'), true, 'Cada panel aceptado debe declarar por separado su rol y sus remitentes autorizados.');

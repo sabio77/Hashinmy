@@ -23,10 +23,13 @@ import {
 } from './p2p-space-creation-intent.js';
 import {
   clearInvitationIntentFromUrl,
+  autoAcceptablePortfolioProjectInvitations,
   findPendingInvitation,
+  invitationGovernanceSpaceId,
   invitationIntentFromServiceWorkerMessage,
   normalizeInvitationIntentId,
   readInvitationIntent,
+  relatedPortfolioProjectInvitations,
   resolveCanonicalInvitationDecision
 } from './p2p-invitation-intent.js';
 import {
@@ -1134,31 +1137,16 @@ async function refreshInvitationIntent(invitationId = '') {
   }
 }
 
-function invitationGovernanceSpaceId(invitation = {}) {
-  return String(invitation.resourceType === PORTFOLIO_RESOURCE_TYPE
-    ? invitation.spaceId || ''
-    : invitation.governanceSpaceId || '').trim();
-}
-
-function invitationGroupKey(invitation = {}) {
-  return [
-    invitationGovernanceSpaceId(invitation),
-    invitation.inviterUserId || '',
-    normalizeCollaborationRole(invitation.role),
-    invitation.accessScope || 'project'
-  ].join('|');
-}
-
 function renderInvitations() {
   const allPending = (state.p2pState.invitations?.received || []).filter((invitation) => invitation.status === 'pending');
-  const portfolioKeys = new Set(allPending
+  const inheritedInvitationIds = new Set(allPending
     .filter((invitation) => invitation.resourceType === PORTFOLIO_RESOURCE_TYPE)
-    .map(invitationGroupKey));
-  const pending = allPending.filter((invitation) => !(
-    invitation.resourceType !== PORTFOLIO_RESOURCE_TYPE
-    && invitation.accessScope === 'portfolio'
-    && portfolioKeys.has(invitationGroupKey(invitation))
-  ));
+    .flatMap((portfolioInvitation) => relatedPortfolioProjectInvitations(allPending, portfolioInvitation, {
+      portfolioResourceType: PORTFOLIO_RESOURCE_TYPE
+    }))
+    .map((invitation) => String(invitation.invitationId || '').trim())
+    .filter(Boolean));
+  const pending = allPending.filter((invitation) => !inheritedInvitationIds.has(String(invitation.invitationId || '').trim()));
   elements.invitationCount.textContent = String(pending.length);
   elements.invitationCount.hidden = pending.length === 0;
   elements.invitationList.replaceChildren();
@@ -1200,30 +1188,31 @@ function renderInvitations() {
 
 async function autoAcceptInheritedPortfolioInvitations() {
   if (state.portfolioInviteAccepting || !state.user?.userId) return false;
-  const authorizedInvitersByPortfolio = new Map();
-  for (const space of portfolioSpaces().filter((candidate) => memberForUser(candidate, state.user.userId))) {
+  const portfolioAuthorizations = [];
+  for (const space of portfolioSpaces()) {
+    const membership = memberForUser(space, state.user.userId);
     const portfolioSpaceId = String(space.spaceId || '').trim();
-    if (!portfolioSpaceId) continue;
-    const authorizedInviters = new Set();
+    if (!membership || !portfolioSpaceId) continue;
+    const authorizedInviterUserIds = [];
     const ownerUserId = String(space.ownerUserId || '').trim();
-    if (ownerUserId) authorizedInviters.add(ownerUserId);
+    if (ownerUserId) authorizedInviterUserIds.push(ownerUserId);
     for (const member of space.members || []) {
       if (['owner', 'manager', 'admin'].includes(normalizeCollaborationRole(member?.role)) && member?.userId) {
-        authorizedInviters.add(String(member.userId).trim());
+        authorizedInviterUserIds.push(String(member.userId).trim());
       }
     }
-    authorizedInvitersByPortfolio.set(portfolioSpaceId, authorizedInviters);
+    portfolioAuthorizations.push({
+      spaceId: portfolioSpaceId,
+      role: normalizeCollaborationRole(membership.role),
+      authorizedInviterUserIds
+    });
   }
-  if (!authorizedInvitersByPortfolio.size) return false;
-  const pending = (state.p2pState.invitations?.received || []).filter((invitation) => {
-    const governanceSpaceId = invitationGovernanceSpaceId(invitation);
-    const authorizedInviters = authorizedInvitersByPortfolio.get(governanceSpaceId);
-    return invitation?.status === 'pending'
-      && invitation.resourceType !== PORTFOLIO_RESOURCE_TYPE
-      && invitation.accessScope === 'portfolio'
-      && Boolean(governanceSpaceId)
-      && authorizedInviters?.has(String(invitation.inviterUserId || '').trim());
-  });
+  if (!portfolioAuthorizations.length) return false;
+  const pending = autoAcceptablePortfolioProjectInvitations(
+    state.p2pState.invitations?.received || [],
+    portfolioAuthorizations,
+    { portfolioResourceType: PORTFOLIO_RESOURCE_TYPE }
+  );
   if (!pending.length) return false;
   state.portfolioInviteAccepting = true;
   try {
@@ -2827,15 +2816,9 @@ async function respondInvitation(event) {
   const decision = button.dataset.decision;
   const invitation = (state.p2pState.invitations?.received || []).find((item) => item.invitationId === invitationId) || null;
   const related = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
-    ? (state.p2pState.invitations?.received || []).filter((item) => (
-      item.status === 'pending'
-      && item.invitationId !== invitationId
-      && item.resourceType !== PORTFOLIO_RESOURCE_TYPE
-      && item.accessScope === 'portfolio'
-      && invitationGovernanceSpaceId(item) === String(invitation.spaceId || '').trim()
-      && item.inviterUserId === invitation.inviterUserId
-      && normalizeCollaborationRole(item.role) === normalizeCollaborationRole(invitation.role)
-    ))
+    ? relatedPortfolioProjectInvitations(state.p2pState.invitations?.received || [], invitation, {
+      portfolioResourceType: PORTFOLIO_RESOURCE_TYPE
+    })
     : [];
   setP2PBusy(true);
   setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
