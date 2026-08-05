@@ -71,6 +71,76 @@ assert.equal(ready.projectInventoryMatches, true);
 assert.deepEqual(ready.authoritativeProjectSpaceIds, ['project_1', 'project_2']);
 assert.deepEqual(ready.controlProjectSpaceIds, ['project_1', 'project_2']);
 
+const legacySpaces = [
+  { spaceId: panelId, resourceType: 'admin.portfolio', ownerUserId: 'user_owner', members: [member], projectInventoryRevision: 0 },
+  { spaceId: 'legacy_1', resourceType: 'admin.project', governanceSpaceId: '', ownerUserId: 'user_owner', members: [member] },
+  { spaceId: 'legacy_2', resourceType: 'admin.project', governanceSpaceId: '', ownerUserId: 'user_owner', members: [member] },
+  { spaceId: 'legacy_3', resourceType: 'admin.project', governanceSpaceId: '', ownerUserId: 'user_owner', members: [member] }
+];
+const legacyManifest = [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: [],
+  inventoryRevision: 0,
+  complete: true
+}];
+const legacyReady = domain.invitedPortfolioHydrationStatus({
+  spaces: legacySpaces,
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: legacyManifest,
+  loadedProjectSpaceIds: ['legacy_1', 'legacy_2', 'legacy_3']
+});
+assert.equal(legacyReady.ready, true, 'Los proyectos anteriores al panel con concesión portfolio no pueden quedar bloqueados por un manifiesto administrado vacío.');
+assert.equal(legacyReady.projectInventoryMatches, true);
+assert.deepEqual(legacyReady.authoritativeProjectSpaceIds, []);
+assert.deepEqual(legacyReady.legacyProjectSpaceIds, ['legacy_1', 'legacy_2', 'legacy_3']);
+assert.deepEqual(legacyReady.unexpectedProjectSpaceIds, []);
+
+const legacyReplicaPending = domain.invitedPortfolioHydrationStatus({
+  spaces: legacySpaces.map((space) => space.spaceId === 'legacy_2'
+    ? { ...space, authorizationState: 'unconfirmed', authorizationPendingReason: 'replica_recovery' }
+    : space),
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: legacyManifest,
+  loadedProjectSpaceIds: ['legacy_1', 'legacy_2', 'legacy_3']
+});
+assert.equal(legacyReplicaPending.ready, false);
+assert.equal(legacyReplicaPending.reason, 'project_replica_unconfirmed');
+assert.deepEqual(legacyReplicaPending.pendingProjectAuthorizationSpaceIds, ['legacy_2']);
+
+const ambiguousLegacyPanel = domain.invitedPortfolioHydrationStatus({
+  spaces: [
+    ...legacySpaces,
+    { spaceId: 'portfolio_2', resourceType: 'admin.portfolio', ownerUserId: 'user_owner', members: [member], projectInventoryRevision: 0 }
+  ],
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: legacyManifest,
+  loadedProjectSpaceIds: ['legacy_1', 'legacy_2', 'legacy_3']
+});
+assert.equal(ambiguousLegacyPanel.ready, false, 'Un proyecto legacy sin vínculo persistido no puede mezclarse automáticamente entre dos paneles del mismo propietario.');
+assert.equal(ambiguousLegacyPanel.reason, 'project_inventory_set_mismatch');
+assert.deepEqual(ambiguousLegacyPanel.legacyProjectSpaceIds, []);
+assert.deepEqual(ambiguousLegacyPanel.unexpectedProjectSpaceIds, ['legacy_1', 'legacy_2', 'legacy_3']);
+
+const explicitlyBoundLegacyPanel = domain.invitedPortfolioHydrationStatus({
+  spaces: [
+    ...legacySpaces,
+    { spaceId: 'portfolio_2', resourceType: 'admin.portfolio', ownerUserId: 'user_owner', members: [member], projectInventoryRevision: 0 }
+  ],
+  projects: legacySpaces.slice(1).map((space) => ({
+    space,
+    project: { portfolioSpaceId: panelId }
+  })),
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: legacyManifest,
+  loadedProjectSpaceIds: ['legacy_1', 'legacy_2', 'legacy_3']
+});
+assert.equal(explicitlyBoundLegacyPanel.ready, true, 'El vínculo persistido de la entidad debe resolver de forma segura la coexistencia de varios paneles del mismo propietario.');
+assert.deepEqual(explicitlyBoundLegacyPanel.legacyProjectSpaceIds, ['legacy_1', 'legacy_2', 'legacy_3']);
+
 const panelWithUnexpectedProject = domain.invitedPortfolioHydrationStatus({
   spaces: [
     ...spaces,
@@ -184,6 +254,7 @@ assert.match(clientSource, /participationReconciliation\?\.portfolioHydration/, 
 assert.match(appSource, /function allPanelScopes\(\)/);
 assert.match(appSource, /function panelNeedsAuthoritativeHydration\(panel = null\)/);
 assert.match(appSource, /pendingAuthoritativePanelIds: new Set\(\)/, 'Falta recordar paneles aceptados antes de que llegue el manifiesto.');
+assert.match(appSource, /projects: \[\.\.\.state\.projects\.values\(\)\]/, 'La barrera no recibe la asociación persistida necesaria para distinguir proyectos legacy entre varios paneles.');
 assert.match(appSource, /if \(!panelNeedsAuthoritativeHydration\(panel\)\) return true;/, 'Los paneles virtuales todavía pueden saltarse la barrera autoritativa.');
 assert.match(appSource, /if \(!status\.ready\) \{[\s\S]*reportIncompleteInvitedPanel\(panel, status\);[\s\S]*return false;/, 'La card invitada todavía se renderiza cuando faltan proyectos.');
 assert.match(appSource, /console\.error\('\[P2P_PANEL_INCOMPLETO\]/, 'Falta el error de consola exigido para una carga parcial.');
@@ -191,6 +262,7 @@ assert.match(appSource, /portfolioRootLoaded: status\?\.portfolioRootLoaded === 
 assert.match(appSource, /inventoryRevisionMatches: status\?\.inventoryRevisionMatches === true/, 'El diagnóstico no informa la divergencia entre el panel y su manifiesto.');
 assert.match(appSource, /projectInventoryMatches: status\?\.projectInventoryMatches === true/, 'El diagnóstico no informa si el conjunto de proyectos difiere del inventario autoritativo.');
 assert.match(appSource, /unexpectedProjectSpaceIds: status\?\.unexpectedProjectSpaceIds \|\| \[\]/, 'El diagnóstico no identifica proyectos sobrantes o desactualizados.');
+assert.match(appSource, /legacyProjectSpaceIds: status\?\.legacyProjectSpaceIds \|\| \[\]/, 'El diagnóstico no distingue las concesiones legacy válidas del inventario administrado.');
 assert.match(appSource, /pendingProjectAuthorizationSpaceIds: status\?\.pendingProjectAuthorizationSpaceIds \|\| \[\]/, 'El diagnóstico no informa qué réplicas siguen sin confirmación autoritativa.');
 assert.match(appSource, /portfolioHydration: Array\.isArray\(nextState\.portfolioHydration\)/, 'La interfaz descarta el manifiesto al aplicar el estado P2P.');
 assert.match(appSource, /if \(panelNeedsAuthoritativeHydration\(panel\)\) return portfolioHydrationStatus\(cleanPanelId\)\.ready;/, 'La apertura automática no usa la misma barrera autoritativa que la card.');

@@ -546,6 +546,7 @@ export function pendingPanelExpectedProjectSpaceIds(input = {}) {
  */
 export function invitedPortfolioHydrationStatus(input = {}) {
   const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const projects = Array.isArray(input.projects) ? input.projects : [];
   const panelId = cleanText(input.panelId || '', 220);
   const currentUserId = cleanText(input.currentUserId || '', 140);
   const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
@@ -568,8 +569,54 @@ export function invitedPortfolioHydrationStatus(input = {}) {
     .sort((left, right) => left.localeCompare(right));
   const authoritativeProjectSpaceIdSet = new Set(manifestExpectedSpaceIds);
   const controlProjectSpaceIdSet = new Set(controlExpectedSpaceIds);
+  const projectSpacesById = new Map(spaces
+    .filter((space) => cleanText(space?.resourceType || '', 80) === projectResourceType)
+    .map((space) => [cleanText(space?.spaceId || '', 140), space])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const projectDataBySpaceId = new Map(projects
+    .map((data) => [cleanText(data?.space?.spaceId || '', 140), data])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const portfolioSpace = spaces.find((space) => (
+    cleanText(space?.resourceType || '', 80) === portfolioResourceType
+    && cleanText(space?.spaceId || '', 140) === panelId
+    && space?.authorizationState !== 'unconfirmed'
+  )) || null;
+  const portfolioOwnerUserId = cleanText(portfolioSpace?.ownerUserId || '', 140);
+  const readableOwnerPortfolioIds = Array.from(new Set(spaces
+    .filter((space) => (
+      cleanText(space?.resourceType || '', 80) === portfolioResourceType
+      && cleanText(space?.ownerUserId || '', 140) === portfolioOwnerUserId
+      && space?.authorizationState !== 'unconfirmed'
+      && currentUserId
+      && hasPermission(space, currentUserId, 'read')
+    ))
+    .map((space) => cleanText(space?.spaceId || '', 140))
+    .filter(Boolean)));
+  const legacyProjectSpaceIds = controlExpectedSpaceIds.filter((spaceId) => {
+    if (authoritativeProjectSpaceIdSet.has(spaceId) || !portfolioOwnerUserId) return false;
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    if (!projectSpace
+      || cleanText(projectSpace?.governanceSpaceId || '', 140)
+      || cleanText(projectSpace?.ownerUserId || '', 140) !== portfolioOwnerUserId) return false;
+    const member = memberForUser(projectSpace, currentUserId);
+    if (String(member?.accessScope || '').trim().toLowerCase() !== 'portfolio'
+      || !hasPermission(projectSpace, currentUserId, 'read')) return false;
+
+    const persistedPortfolioSpaceId = cleanText(
+      projectDataBySpaceId.get(spaceId)?.project?.portfolioSpaceId || '',
+      140
+    );
+    if (persistedPortfolioSpaceId) return persistedPortfolioSpaceId === panelId;
+
+    // Los proyectos creados antes del primer panel no conservaban governanceSpaceId
+    // ni portfolioSpaceId. En ese formato histórico solo es seguro asociarlos cuando
+    // el propietario tiene un único panel legible para esta cuenta. La membresía con
+    // accessScope=portfolio sigue siendo una concesión autoritativa de memoriaBACKEND.
+    return readableOwnerPortfolioIds.length === 1 && readableOwnerPortfolioIds[0] === panelId;
+  });
+  const legacyProjectSpaceIdSet = new Set(legacyProjectSpaceIds);
   const unexpectedProjectSpaceIds = controlExpectedSpaceIds
-    .filter((spaceId) => !authoritativeProjectSpaceIdSet.has(spaceId));
+    .filter((spaceId) => !authoritativeProjectSpaceIdSet.has(spaceId) && !legacyProjectSpaceIdSet.has(spaceId));
   const absentControlProjectSpaceIds = manifestExpectedSpaceIds
     .filter((spaceId) => !controlProjectSpaceIdSet.has(spaceId));
   const projectInventoryMatches = Boolean(manifest)
@@ -577,12 +624,9 @@ export function invitedPortfolioHydrationStatus(input = {}) {
     && absentControlProjectSpaceIds.length === 0;
   const expectedProjectSpaceIds = Array.from(new Set([
     ...manifestExpectedSpaceIds,
-    ...controlExpectedSpaceIds
+    ...legacyProjectSpaceIds,
+    ...unexpectedProjectSpaceIds
   ])).sort((left, right) => left.localeCompare(right));
-  const projectSpacesById = new Map(spaces
-    .filter((space) => cleanText(space?.resourceType || '', 80) === projectResourceType)
-    .map((space) => [cleanText(space?.spaceId || '', 140), space])
-    .filter(([spaceId]) => Boolean(spaceId)));
   const pendingProjectAuthorizationSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
     const projectSpace = projectSpacesById.get(spaceId) || null;
     return !projectSpace
@@ -595,11 +639,6 @@ export function invitedPortfolioHydrationStatus(input = {}) {
     .filter((spaceId) => !loadedProjectSpaceIds.has(spaceId));
   const comparisonComplete = manifest?.complete === true;
   const comparisonAuthoritative = Boolean(manifest && manifest?.authoritative !== false);
-  const portfolioSpace = spaces.find((space) => (
-    cleanText(space?.resourceType || '', 80) === portfolioResourceType
-    && cleanText(space?.spaceId || '', 140) === panelId
-    && space?.authorizationState !== 'unconfirmed'
-  )) || null;
   const portfolioRootLoaded = Boolean(
     portfolioSpace
     && currentUserId
@@ -628,6 +667,7 @@ export function invitedPortfolioHydrationStatus(input = {}) {
     inventoryRevisionMatches,
     projectInventoryMatches,
     authoritativeProjectSpaceIds: manifestExpectedSpaceIds,
+    legacyProjectSpaceIds,
     controlProjectSpaceIds: controlExpectedSpaceIds,
     unexpectedProjectSpaceIds,
     absentControlProjectSpaceIds,

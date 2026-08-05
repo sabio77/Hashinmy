@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.10.10+2026-08-05-175",
-  "version": "1.10.10",
-  "build": "2026-08-05-175",
-  "releasedAt": "2026-08-05T17:32:38-05:00",
+  "releaseId": "semilla-appweb-pwa@1.10.11+2026-08-05-176",
+  "version": "1.10.11",
+  "build": "2026-08-05-176",
+  "releasedAt": "2026-08-05T18:17:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -52,7 +52,7 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "bf26978e2256ba8bd67c99bea50da9ef90c87283b54bdcd2b8f5c535b8bbd352",
+      "sha256": "b604092f7623968dde03ed673f35118c01e6bdd598e285cb26cb69533592f109",
       "bytes": 5265
     },
     {
@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/project-domain.js",
-      "sha256": "e915df9d5d1c89b3e612f39e41f7cdf10dce097bf41d8f9f04cadf91a8a13657",
-      "bytes": 36619
+      "sha256": "9a4f9dcb9a82baff5e48068aeba66aa2948c423b43e44994eed9aca8d3d05629",
+      "bytes": 38866
     },
     {
       "url": "./src/js/device-management.js",
@@ -157,12 +157,12 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "5073897cea9afdef888560c75aa22afce690e45642c1b24cdd98784e52f8665d",
-      "bytes": 191287
+      "sha256": "34d7203bacf5e01ff079c0a2c6c51e67e1160a059e0c7e5a56bdc8758b146d91",
+      "bytes": 191444
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "06221ea6738202388d7f04df714ac9214119d9a32a0c0861c848574af76be251",
+      "sha256": "b5441f741f44f66b15e63d9181724c2f69204e84ef1067a602554238a0f68f98",
       "bytes": 981
     },
     {

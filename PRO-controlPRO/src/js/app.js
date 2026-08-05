@@ -219,6 +219,7 @@ function allPanelScopes() {
 function portfolioHydrationStatus(panelId = '') {
   return invitedPortfolioHydrationStatus({
     spaces: state.p2pState.spaces,
+    projects: [...state.projects.values()],
     panelId,
     currentUserId: state.user?.userId || '',
     portfolioHydration: state.p2pState.portfolioHydration,
@@ -246,6 +247,7 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     portfolioInventoryRevision: Math.max(0, Number(status?.portfolioInventoryRevision || 0)),
     projectInventoryMatches: status?.projectInventoryMatches === true,
     authoritative: status?.authoritativeProjectSpaceIds || [],
+    legacy: status?.legacyProjectSpaceIds || [],
     control: status?.controlProjectSpaceIds || [],
     unexpected: status?.unexpectedProjectSpaceIds || [],
     absentControl: status?.absentControlProjectSpaceIds || [],
@@ -266,6 +268,7 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     inventoryRevisionMatches: status?.inventoryRevisionMatches === true,
     projectInventoryMatches: status?.projectInventoryMatches === true,
     authoritativeProjectSpaceIds: status?.authoritativeProjectSpaceIds || [],
+    legacyProjectSpaceIds: status?.legacyProjectSpaceIds || [],
     controlProjectSpaceIds: status?.controlProjectSpaceIds || [],
     unexpectedProjectSpaceIds: status?.unexpectedProjectSpaceIds || [],
     absentControlProjectSpaceIds: status?.absentControlProjectSpaceIds || [],

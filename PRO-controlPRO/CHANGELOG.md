@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.11 - 2026-08-05
+
+- Corregida la regresión que ocultaba indefinidamente un panel invitado cuando sus proyectos fueron creados antes del primer panel y, por compatibilidad, se comparten mediante concesiones `accessScope=portfolio` sin `governanceSpaceId`.
+- La comparación autoritativa continúa siendo exacta para proyectos administrados; los proyectos legacy solo se aceptan como complemento cuando memoriaBACKEND confirma lectura, alcance de panel, mismo propietario y una asociación única o persistida con el panel correcto.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` distingue ahora `legacyProjectSpaceIds`, y las regresiones cubren paneles con tres proyectos históricos, réplica pendiente y varios paneles del mismo propietario sin permitir cruces ambiguos.
+
 ## 1.10.10 - 2026-08-05
 
 - La card de un panel invitado exige ahora igualdad exacta entre el inventario autoritativo del propietario y los proyectos autorizados en el plano de control; ya no basta con haber cargado todos los esperados si existe además una raíz sobrante o desactualizada.
