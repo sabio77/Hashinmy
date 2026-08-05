@@ -92,7 +92,7 @@ const state = {
   pendingPanelId: '',
   pendingAuthoritativePanelIds: new Set(),
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -238,10 +238,49 @@ function panelNeedsAuthoritativeHydration(panel = null) {
     pendingAuthoritativePanel: Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
   });
 }
+function panelRecoveryProgress(status = {}) {
+  const expectedProjectSpaceIds = [...new Set((status?.expectedProjectSpaceIds || [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean))];
+  const authorizedProjectSpaceIds = new Set((status?.authorizedProjectSpaceIds || [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean));
+  const loadedProjectSpaceIds = new Set((status?.loadedProjectSpaceIds || [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean));
+  const pendingAuthorizationSpaceIds = new Set((status?.pendingProjectAuthorizationSpaceIds || [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean));
+  const activeSnapshotSpaceIds = [...new Set((state.p2pState.snapshotRequests || [])
+    .map((request) => String(request?.spaceId || '').trim())
+    .filter(Boolean))];
+  const readyProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => (
+    authorizedProjectSpaceIds.has(spaceId)
+    && loadedProjectSpaceIds.has(spaceId)
+    && !pendingAuthorizationSpaceIds.has(spaceId)
+  ));
+  return {
+    total: expectedProjectSpaceIds.length,
+    ready: readyProjectSpaceIds.length,
+    readyProjectSpaceIds,
+    pendingProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => !readyProjectSpaceIds.includes(spaceId)),
+    activeSnapshotSpaceIds: activeSnapshotSpaceIds.filter((spaceId) => expectedProjectSpaceIds.includes(spaceId))
+  };
+}
+function panelIsRecovering(panel = null, status = {}) {
+  const panelId = String(panel?.id || status?.panelId || '').trim();
+  if (status?.reason === 'project_replica_unconfirmed') return true;
+  return Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
+    && ['authoritative_manifest_missing', 'authoritative_comparison_incomplete', 'portfolio_root_missing', 'project_roots_missing']
+      .includes(String(status?.reason || ''));
+}
 function reportIncompleteInvitedPanel(panel = null, status = {}) {
   const panelId = String(panel?.id || status?.panelId || '').trim();
   if (!panelId) return;
+  const recovery = panelRecoveryProgress(status);
+  const recovering = panelIsRecovering(panel, status);
   const signature = JSON.stringify({
+    recovering,
     reason: status?.reason || 'unknown',
     manifestInventoryRevision: Math.max(0, Number(status?.manifestInventoryRevision || 0)),
     portfolioInventoryRevision: Math.max(0, Number(status?.portfolioInventoryRevision || 0)),
@@ -253,11 +292,12 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     absentControl: status?.absentControlProjectSpaceIds || [],
     expected: status?.expectedProjectSpaceIds || [],
     pendingAuthorization: status?.pendingProjectAuthorizationSpaceIds || [],
-    missing: status?.missingProjectSpaceIds || []
+    missing: status?.missingProjectSpaceIds || [],
+    activeSnapshots: recovery.activeSnapshotSpaceIds
   });
   if (state.incompletePanelWarnings.get(panelId) === signature) return;
   state.incompletePanelWarnings.set(panelId, signature);
-  console.error('[P2P_PANEL_INCOMPLETO] La card del panel invitado fue bloqueada porque todavía no coincide con el panel autoritativo del propietario.', {
+  const details = {
     panelId,
     reason: status?.reason || 'unknown',
     comparisonComplete: status?.comparisonComplete === true,
@@ -276,8 +316,14 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     authorizedProjectSpaceIds: status?.authorizedProjectSpaceIds || [],
     pendingProjectAuthorizationSpaceIds: status?.pendingProjectAuthorizationSpaceIds || [],
     loadedProjectSpaceIds: status?.loadedProjectSpaceIds || [],
-    missingProjectSpaceIds: status?.missingProjectSpaceIds || []
-  });
+    missingProjectSpaceIds: status?.missingProjectSpaceIds || [],
+    recovery
+  };
+  if (recovering) {
+    console.info('[P2P_PANEL_SINCRONIZANDO] El panel invitado permanece bloqueado de forma segura mientras se recuperan y validan sus réplicas.', details);
+    return;
+  }
+  console.error('[P2P_PANEL_INCOMPLETO] La card del panel invitado fue bloqueada porque todavía no coincide con el panel autoritativo del propietario.', details);
 }
 function panelScopes() {
   return allPanelScopes().filter((panel) => {
@@ -343,30 +389,49 @@ function panelTypeDescription(panel = null) {
 }
 function renderPanelSwitcher(activePanel = activePanelScope()) {
   if (!elements.panelList || !elements.panelSwitcher) return;
-  const scopes = panelScopes();
+  const readyScopes = panelScopes();
+  const readyPanelIds = new Set(readyScopes.map((panel) => String(panel?.id || '').trim()).filter(Boolean));
+  const recoveringScopes = allPanelScopes()
+    .filter((panel) => !readyPanelIds.has(String(panel?.id || '').trim()) && panelNeedsAuthoritativeHydration(panel))
+    .map((panel) => ({ panel, status: portfolioHydrationStatus(panel.id) }))
+    .filter(({ panel, status }) => !status.ready && panelIsRecovering(panel, status));
+  const scopes = [
+    ...readyScopes.map((panel) => ({ panel, status: null, recovering: false })),
+    ...recoveringScopes.map(({ panel, status }) => ({ panel, status, recovering: true }))
+  ];
   elements.panelSwitcher.hidden = false;
   elements.panelList.replaceChildren();
-  for (const panel of scopes) {
+  for (const entry of scopes) {
+    const { panel, status, recovering } = entry;
     const card = document.createElement('article');
     card.className = 'panel-switcher-card';
     card.dataset.panelId = panel.id;
+    if (recovering) card.dataset.syncing = 'true';
     if (panel.id === activePanel?.id) card.dataset.active = 'true';
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'panel-switcher-main';
     button.dataset.panelId = panel.id;
+    button.disabled = recovering;
     button.setAttribute('aria-pressed', panel.id === activePanel?.id ? 'true' : 'false');
-    const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
+    if (recovering) button.setAttribute('aria-busy', 'true');
+    const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = recovering ? '↻' : panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
     const copy = document.createElement('span'); copy.className = 'panel-switcher-copy';
     const title = document.createElement('strong'); title.textContent = panelDisplayName(panel);
     const detail = document.createElement('small');
-    const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
-    const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
-    detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
+    if (recovering) {
+      const progress = panelRecoveryProgress(status);
+      const progressLabel = progress.total > 0 ? ` · ${progress.ready}/${progress.total}` : '';
+      detail.textContent = `${t('p2p.replicaRecoveryBadge', 'Sincronizando')}${progressLabel}`;
+    } else {
+      const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
+      const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
+      detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
+    }
     copy.append(title, detail); button.append(marker, copy); card.append(button);
 
-    if (panel.type === 'portfolio' && !panel.owned && panel.space?.spaceId) {
+    if (!recovering && panel.type === 'portfolio' && !panel.owned && panel.space?.spaceId) {
       const menu = contextMenuButton(
         { scope: 'panel', spaceId: panel.space.spaceId, panelId: panel.id },
         t('actions.panelMenu', 'Opciones del panel')
@@ -862,7 +927,7 @@ function resetUserScopedInterface() {
   state.activePanelId = '';
   state.pendingPanelId = '';
   state.pendingAuthoritativePanelIds.clear();
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -1864,6 +1929,7 @@ function applyP2PState(nextState = {}) {
       sent: Array.isArray(nextState.invitations?.sent) ? nextState.invitations.sent : []
     },
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
+    snapshotRequests: Array.isArray(nextState.snapshotRequests) ? nextState.snapshotRequests : [],
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : [],
     portfolioHydration: Array.isArray(nextState.portfolioHydration) ? nextState.portfolioHydration : []
@@ -3306,7 +3372,7 @@ elements.panelList?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope="panel"]');
   if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
   const button = event.target.closest('button[data-panel-id]');
-  if (!button) return;
+  if (!button || button.disabled || button.getAttribute('aria-busy') === 'true') return;
   setActivePanelId(button.dataset.panelId);
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';

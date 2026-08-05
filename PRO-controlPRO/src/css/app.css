@@ -356,6 +356,13 @@ html[dir="rtl"] .update-status {
 .panel-switcher-card { position: relative; min-width: min(280px, 78vw); flex: 1 0 230px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--surface-soft); overflow: hidden; scroll-snap-align: start; }
 .panel-switcher-card:hover { border-color: color-mix(in srgb, var(--primary) 42%, var(--line)); transform: translateY(-1px); }
 .panel-switcher-card[data-active="true"] { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: color-mix(in srgb, var(--surface-soft) 82%, var(--primary) 18%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent); }
+.panel-switcher-card[data-syncing="true"] { border-style: dashed; border-color: color-mix(in srgb, var(--primary) 34%, var(--line)); background: color-mix(in srgb, var(--surface-soft) 92%, var(--primary) 8%); }
+.panel-switcher-card[data-syncing="true"]:hover { border-color: color-mix(in srgb, var(--primary) 34%, var(--line)); transform: none; }
+.panel-switcher-card[data-syncing="true"] .panel-switcher-main { cursor: progress; }
+.panel-switcher-card[data-syncing="true"] .panel-switcher-marker { animation: panel-sync-rotation 1.1s linear infinite; }
+.panel-switcher-main:disabled { opacity: 1; }
+@keyframes panel-sync-rotation { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .panel-switcher-card[data-syncing="true"] .panel-switcher-marker { animation: none; } }
 .panel-switcher-main { min-width: 0; display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 10px; padding: 12px; text-align: start; border: 0; color: inherit; background: transparent; cursor: pointer; }
 .panel-switcher-main:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 60%, transparent); outline-offset: -3px; }
 .panel-switcher-card > .panel-context-menu-button { position: static; width: 42px; height: auto; min-height: 58px; margin: 7px 7px 7px 0; align-self: stretch; box-shadow: none; background: color-mix(in srgb, var(--surface) 82%, transparent); }
