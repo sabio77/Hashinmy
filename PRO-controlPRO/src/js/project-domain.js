@@ -6,7 +6,7 @@ export const PROJECTION_ENTITY_TYPE = 'admin.projection';
 export const PROJECTION_LINK_ENTITY_TYPE = 'admin.projection-link';
 export const ADMIN_PROJECT_PERMISSION_PROFILE = 'admin-project-v1';
 
-export const COLLABORATION_PERMISSIONS = Object.freeze(['read', 'add', 'delete', 'projection']);
+export const COLLABORATION_PERMISSIONS = Object.freeze(['read', 'add', 'delete', 'projection', 'invite']);
 export const COLLABORATION_ROLES = Object.freeze(['manager', 'admin', 'individual', 'member']);
 export const INDIVIDUAL_EDIT_WINDOW_MS = 60 * 60 * 1000;
 export const MAX_MONEY_VALUE = Number.MAX_SAFE_INTEGER;

@@ -239,12 +239,16 @@ function renderPanelSwitcher(activePanel = activePanelScope()) {
   elements.panelSwitcher.hidden = false;
   elements.panelList.replaceChildren();
   for (const panel of scopes) {
+    const card = document.createElement('article');
+    card.className = 'panel-switcher-card';
+    card.dataset.panelId = panel.id;
+    if (panel.id === activePanel?.id) card.dataset.active = 'true';
+
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'panel-switcher-card';
+    button.className = 'panel-switcher-main';
     button.dataset.panelId = panel.id;
     button.setAttribute('aria-pressed', panel.id === activePanel?.id ? 'true' : 'false');
-    if (panel.id === activePanel?.id) button.dataset.active = 'true';
     const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
     const copy = document.createElement('span'); copy.className = 'panel-switcher-copy';
     const title = document.createElement('strong'); title.textContent = panelDisplayName(panel);
@@ -252,7 +256,17 @@ function renderPanelSwitcher(activePanel = activePanelScope()) {
     const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
     const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
     detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
-    copy.append(title, detail); button.append(marker, copy); elements.panelList.append(button);
+    copy.append(title, detail); button.append(marker, copy); card.append(button);
+
+    if (panel.type === 'portfolio' && !panel.owned && panel.space?.spaceId) {
+      const menu = contextMenuButton(
+        { scope: 'panel', spaceId: panel.space.spaceId, panelId: panel.id },
+        t('actions.panelMenu', 'Opciones del panel')
+      );
+      menu.classList.add('panel-context-menu-button');
+      card.append(menu);
+    }
+    elements.panelList.append(card);
   }
   if (elements.activePanelSummary) {
     elements.activePanelSummary.textContent = activePanel ? `${panelDisplayName(activePanel)} · ${panelTypeDescription(activePanel)}` : '';
@@ -912,6 +926,7 @@ function contextMenuButton(context = {}, label = '') {
   button.className = 'context-menu-button';
   button.dataset.actionMenuScope = context.scope || '';
   button.dataset.spaceId = context.spaceId || '';
+  if (context.panelId) button.dataset.panelId = context.panelId;
   if (context.type) button.dataset.recordType = context.type;
   if (context.entityId) button.dataset.entityId = context.entityId;
   button.setAttribute('aria-label', label || t('actions.openMenu', 'Abrir opciones'));
@@ -980,9 +995,10 @@ function renderDashboard() {
   renderPortfolioMetrics(panelProjects);
   const portfolioSpace = panel?.type === 'portfolio' ? panel.space : null;
   const canManagePortfolio = Boolean(portfolioSpace && spaceUserCan(portfolioSpace, 'manage_access'));
+  const canInvitePortfolio = Boolean(portfolioSpace && spaceUserCan(portfolioSpace, 'invite'));
   const sharedOnlyPanel = ['shared', 'shared-portfolio'].includes(panel?.type);
   if (elements.managePortfolioAccessButton) elements.managePortfolioAccessButton.hidden = !canManagePortfolio;
-  if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = sharedOnlyPanel || Boolean(portfolioSpace && !canManagePortfolio);
+  if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = sharedOnlyPanel || Boolean(portfolioSpace && !canInvitePortfolio);
   if (elements.newProjectButton) elements.newProjectButton.hidden = !canCreatePortfolioProject(portfolioSpace);
   elements.projectList.replaceChildren();
   const allProjects = panelProjects
@@ -1281,9 +1297,10 @@ function accessPermissionEditor(member = {}, space = null) {
     read: t('invite.read', 'Lectura'),
     add: t('invite.add', 'Agregar'),
     delete: t('invite.delete', 'Eliminar'),
-    projection: t('invite.projection', 'Proyecciones')
+    projection: t('invite.projection', 'Proyecciones'),
+    invite: t('invite.invite', 'Invitar')
   };
-  for (const permission of ['read', 'add', 'delete', 'projection']) {
+  for (const permission of ['read', 'add', 'delete', 'projection', 'invite']) {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox'; checkbox.name = 'permissions'; checkbox.value = permission;
@@ -2336,6 +2353,7 @@ function actionMenuContextFromButton(button = null) {
   return {
     scope,
     spaceId,
+    panelId: String(button.dataset.panelId || '').trim(),
     type: String(button.dataset.recordType || '').trim(),
     entityId: String(button.dataset.entityId || '').trim()
   };
@@ -2349,16 +2367,35 @@ function actionMenuRecord(context = null) {
   });
 }
 
+function actionMenuPanel(context = null) {
+  if (!context || context.scope !== 'panel') return null;
+  return panelScopes().find((panel) => (
+    panel.id === context.panelId
+    || String(panel.space?.spaceId || '').trim() === String(context.spaceId || '').trim()
+  )) || null;
+}
+
 function renderActionMenu() {
   const context = state.actionMenuContext;
   if (!context || !elements.actionMenuList) return;
   clearActionMenuConfirmation();
   setStatus(elements.actionMenuStatus, '');
   elements.actionMenuList.replaceChildren();
-  const data = state.projects.get(context.spaceId);
-  if (!data) return;
-  const space = data.space;
+  const panel = actionMenuPanel(context);
+  const data = context.scope === 'panel' ? null : state.projects.get(context.spaceId);
+  if (context.scope === 'panel' && !panel) return;
+  if (context.scope !== 'panel' && !data) return;
+  const space = panel?.space || data?.space || null;
   const actions = [];
+
+  if (context.scope === 'panel') {
+    elements.actionMenuTitle.textContent = panelDisplayName(panel);
+    elements.actionMenuContext.textContent = t('actions.panelContext', 'Acciones generales del panel compartido');
+    if (!panel.owned && panel.type === 'portfolio' && !isAuthorizationUnconfirmed(space)) {
+      if (spaceUserCan(space, 'invite')) actions.push(menuActionButton('invite-panel', '＋', t('actions.invitePanel', 'Invitar')));
+      if (currentMember(space)) actions.push(menuActionButton('leave-panel', '↩', t('actions.leavePanel', 'Abandonar panel'), { danger: true }));
+    }
+  }
 
   if (context.scope === 'project') {
     elements.actionMenuTitle.textContent = data.project.name;
@@ -2411,12 +2448,14 @@ function openActionMenu(context = null) {
 
 function prepareActionMenuConfirmation(action = '') {
   const context = state.actionMenuContext;
-  const data = context ? state.projects.get(context.spaceId) : null;
+  const panel = context ? actionMenuPanel(context) : null;
+  const data = context && context.scope !== 'panel' ? state.projects.get(context.spaceId) : null;
   const record = context ? actionMenuRecord(context) : null;
-  if (!context || !data) return;
-  const projectName = data.project.name || t('project.defaultName', 'Proyecto compartido');
+  if (!context || (context.scope === 'panel' ? !panel : !data)) return;
+  const projectName = data?.project?.name || t('project.defaultName', 'Proyecto compartido');
   const recordName = record?.description || recordTypeLabel(context.type);
   const messages = {
+    'leave-panel': t('actions.leavePanelConfirm', 'Perderás acceso al panel “{name}”, a sus proyectos heredados y a sus copias locales en este dispositivo.').replace('{name}', panelDisplayName(panel)),
     'trash-project': t('trash.confirmProject', 'El proyecto “{name}” y todos sus registros dejarán de aparecer en las vistas activas y en las métricas. Podrás restaurarlo desde la papelera.').replace('{name}', projectName),
     'trash-record': t('trash.confirmRecord', '“{name}” dejará de aparecer en el proyecto y dejará de afectar sus métricas. Podrás restaurarlo desde la papelera.').replace('{name}', recordName),
     'purge-project': t('trash.confirmPermanentProject', 'Se eliminarán permanentemente “{name}”, todos sus registros, el acceso de los participantes y las copias sincronizadas. Esta acción no se puede deshacer.').replace('{name}', projectName),
@@ -2425,9 +2464,11 @@ function prepareActionMenuConfirmation(action = '') {
   if (!messages[action]) return;
   state.pendingActionMenuAction = { action, context: { ...context } };
   elements.actionMenuConfirmMessage.textContent = messages[action];
-  elements.actionMenuConfirmButton.textContent = action.startsWith('purge-')
-    ? t('trash.deletePermanently', 'Eliminar permanentemente')
-    : t('trash.moveToTrash', 'Mover a papelera');
+  elements.actionMenuConfirmButton.textContent = action === 'leave-panel'
+    ? t('actions.leavePanelConfirmButton', 'Abandonar panel')
+    : action.startsWith('purge-')
+      ? t('trash.deletePermanently', 'Eliminar permanentemente')
+      : t('trash.moveToTrash', 'Mover a papelera');
   elements.actionMenuConfirmPanel.classList.remove('hidden');
   elements.actionMenuConfirmButton.focus();
 }
@@ -2547,9 +2588,33 @@ async function executeLifecycleAction(action = '', context = null) {
   }
 }
 
+async function executePanelLeave(context = null) {
+  const panel = actionMenuPanel(context);
+  if (!panel?.space?.spaceId || panel.owned || state.p2pBusy) return;
+  setP2PBusy(true);
+  setStatus(elements.actionMenuStatus, t('actions.leavingPanel', 'Abandonando panel…'));
+  try {
+    await semillaP2P.leave(panel.space.spaceId);
+    applyP2PState(semillaP2P.bootstrapState);
+    clearActionMenuConfirmation();
+    closeDialog(elements.actionMenuDialog);
+    await refreshProjects();
+    showDashboard();
+    setStatus(elements.dashboardStatus, t('actions.leftPanelSuccess', 'Abandonaste el panel y sus copias locales fueron retiradas.'), 'success');
+  } catch (error) {
+    setStatus(elements.actionMenuStatus, error?.message || t('actions.leavePanelError', 'No se pudo abandonar el panel.'), 'error');
+  } finally {
+    setP2PBusy(false);
+  }
+}
+
 async function executeActionMenuConfirmation() {
   const pending = state.pendingActionMenuAction;
   if (!pending) return;
+  if (pending.action === 'leave-panel') {
+    await executePanelLeave(pending.context);
+    return;
+  }
   await executeLifecycleAction(pending.action, pending.context);
 }
 
@@ -2559,7 +2624,7 @@ async function handleActionMenuSelection(event) {
   const action = button.dataset.menuAction;
   const context = state.actionMenuContext;
   if (!context) return;
-  if (['trash-project', 'trash-record', 'purge-project', 'purge-record'].includes(action)) {
+  if (['leave-panel', 'trash-project', 'trash-record', 'purge-project', 'purge-record'].includes(action)) {
     prepareActionMenuConfirmation(action);
     return;
   }
@@ -2568,6 +2633,14 @@ async function handleActionMenuSelection(event) {
     return;
   }
   closeDialog(elements.actionMenuDialog);
+  if (action === 'invite-panel') {
+    const panel = actionMenuPanel(context);
+    if (panel?.space?.spaceId && spaceUserCan(panel.space, 'invite')) {
+      setActivePanelId(panel.id);
+      renderDashboard();
+      openInviteForm('portfolio');
+    }
+  }
   if (action === 'open-project') openProject(context.spaceId);
   if (action === 'edit-project') { openProject(context.spaceId); openProjectForm('edit'); }
   if (action === 'invite-project') { openProject(context.spaceId); openInviteForm(); }
@@ -2651,8 +2724,23 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
   let portfolioSpace = primaryPortfolioSpace();
   let portfolioResult = null;
   if (portfolioSpace) {
-    if (!spaceUserCan(portfolioSpace, 'manage_access')) throw new Error(t('permissions.denied', 'Tus permisos no permiten realizar esta acción.'));
-    portfolioResult = await upsertSpaceAccessByEmail(portfolioSpace, email, { ...grant, accessScope: 'portfolio' });
+    if (!spaceUserCan(portfolioSpace, 'invite')) throw new Error(t('permissions.denied', 'Tus permisos no permiten realizar esta acción.'));
+    if (spaceUserCan(portfolioSpace, 'manage_access')) {
+      portfolioResult = await upsertSpaceAccessByEmail(portfolioSpace, email, { ...grant, accessScope: 'portfolio' });
+    } else {
+      if (memberByEmail(portfolioSpace, email)) throw new Error(t('invite.alreadyMember', 'Esa cuenta ya participa en el panel.'));
+      const pending = pendingInvitationMatches(portfolioSpace, email, grant);
+      portfolioResult = pending
+        ? { reused: true, invitation: pending, space: portfolioSpace }
+        : await semillaP2P.invite(email, {
+          spaceId: portfolioSpace.spaceId,
+          resourceType: PORTFOLIO_RESOURCE_TYPE,
+          permissions: grant.permissions,
+          role: grant.role,
+          accessScope: 'portfolio',
+          requestId: createLocalId('portfolio_invite_request')
+        });
+    }
   } else {
     portfolioResult = await semillaP2P.invite(email, {
       resourceType: PORTFOLIO_RESOURCE_TYPE,
@@ -2676,15 +2764,53 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
   };
 }
 
+function invitationTargetSpace(scope = state.inviteScope) {
+  return scope === 'portfolio' ? primaryPortfolioSpace() : selectedSpace();
+}
+function inviteRolesForCurrentMember(space = null) {
+  if (!space) return ['manager', 'admin', 'individual', 'member'];
+  const role = currentRole(space);
+  if (['owner', 'manager'].includes(role)) return ['manager', 'admin', 'individual', 'member'];
+  if (role === 'admin') return ['admin', 'individual', 'member'];
+  return ['member'];
+}
+function refreshInvitePermissionControls() {
+  const role = normalizeCollaborationRole(elements.inviteRoleSelect?.value || 'member');
+  applyRolePresetToPermissionControls(elements.invitePermissionFieldset, role);
+  if (role !== 'member') return;
+  const space = invitationTargetSpace();
+  const actor = currentMember(space);
+  const grantable = new Set(space ? rolePermissions(actor?.role, actor?.permissions) : ['read', 'add', 'delete', 'projection', 'invite']);
+  if (grantable.has('write')) ['add', 'delete', 'projection'].forEach((permission) => grantable.add(permission));
+  elements.invitePermissionFieldset?.querySelectorAll('input[name="permission"]').forEach((checkbox) => {
+    if (checkbox.value === 'read') return;
+    const allowed = grantable.has(checkbox.value);
+    checkbox.disabled = !allowed;
+    if (!allowed) checkbox.checked = false;
+  });
+}
+function configureInviteRoleOptions(scope = state.inviteScope) {
+  const allowed = new Set(inviteRolesForCurrentMember(invitationTargetSpace(scope)));
+  let firstAllowed = '';
+  elements.inviteRoleSelect?.querySelectorAll('option').forEach((option) => {
+    const enabled = allowed.has(option.value);
+    option.disabled = !enabled;
+    option.hidden = !enabled;
+    if (enabled && !firstAllowed) firstAllowed = option.value;
+  });
+  if (elements.inviteRoleSelect) elements.inviteRoleSelect.value = firstAllowed || 'member';
+}
 function openInviteForm(scope = 'project') {
   const normalizedScope = scope === 'portfolio' ? 'portfolio' : 'project';
   if (normalizedScope === 'project' && !selectedProjectData()) return;
+  const targetSpace = normalizedScope === 'portfolio' ? primaryPortfolioSpace() : selectedSpace();
+  if (targetSpace && !spaceUserCan(targetSpace, 'invite')) return;
   state.inviteScope = normalizedScope;
   elements.inviteForm.reset();
-  if (elements.inviteRoleSelect) elements.inviteRoleSelect.value = 'member';
+  configureInviteRoleOptions(normalizedScope);
   const defaults = new Set(['read', 'add', 'projection']);
   elements.inviteForm.querySelectorAll('input[name="permission"]').forEach((input) => { input.checked = defaults.has(input.value); });
-  applyRolePresetToPermissionControls(elements.invitePermissionFieldset, elements.inviteRoleSelect?.value || 'member');
+  refreshInvitePermissionControls();
   if (elements.inviteDialogTitle) elements.inviteDialogTitle.textContent = normalizedScope === 'portfolio'
     ? t('invite.portfolioTitle', 'Invitar a Control de proyectos')
     : t('invite.title', 'Invitar participante');
@@ -3017,6 +3143,8 @@ elements.projectFilterClear?.addEventListener('click', () => {
   renderDashboard();
 });
 elements.panelList?.addEventListener('click', (event) => {
+  const menu = event.target.closest('button[data-action-menu-scope="panel"]');
+  if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
   const button = event.target.closest('button[data-panel-id]');
   if (!button) return;
   setActivePanelId(button.dataset.panelId);
@@ -3046,7 +3174,7 @@ elements.actionMenuList?.addEventListener('click', handleActionMenuSelection);
 elements.actionMenuConfirmButton?.addEventListener('click', executeActionMenuConfirmation);
 elements.actionMenuConfirmCancel?.addEventListener('click', clearActionMenuConfirmation);
 elements.inviteCollaboratorButton?.addEventListener('click', () => openInviteForm('project'));
-elements.inviteRoleSelect?.addEventListener('change', () => applyRolePresetToPermissionControls(elements.invitePermissionFieldset, elements.inviteRoleSelect.value)); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
+elements.inviteRoleSelect?.addEventListener('change', refreshInvitePermissionControls); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
 elements.manageAccessButton?.addEventListener('click', () => openAccessManagement('project'));
 elements.accessMemberList?.addEventListener('click', (event) => {
   const cancel = event.target.closest('button[data-permission-cancel]');

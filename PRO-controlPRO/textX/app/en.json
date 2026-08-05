@@ -301,7 +301,9 @@
     "portfolioPartial": "Dashboard access was saved, but {failed} projects must retry when connectivity returns.",
     "portfolioNoProjects": "Dashboard access was created. It will be inherited automatically by new projects.",
     "portfolioAccepting": "Accepting dashboard and project access…",
-    "portfolioAccepted": "Dashboard access accepted. Shared projects are being added automatically."
+    "portfolioAccepted": "Dashboard access accepted. Shared projects are being added automatically.",
+    "invite": "Invite",
+    "alreadyMember": "That account already participates in the dashboard."
   },
   "permissions": {
     "denied": "Your permissions do not allow this action.",
@@ -454,7 +456,16 @@
     "trashMenu": "Trash item options",
     "projectContext": "General project actions",
     "openProject": "Open project",
-    "noneAvailable": "No actions are available for your permissions."
+    "noneAvailable": "No actions are available for your permissions.",
+    "panelMenu": "Dashboard options",
+    "panelContext": "General shared dashboard actions",
+    "invitePanel": "Invite",
+    "leavePanel": "Leave dashboard",
+    "leavePanelConfirm": "You will lose access to “{name}”, its inherited projects, and their local copies on this device.",
+    "leavePanelConfirmButton": "Leave dashboard",
+    "leavingPanel": "Leaving dashboard…",
+    "leftPanelSuccess": "You left the dashboard and its local copies were removed.",
+    "leavePanelError": "The dashboard could not be left."
   },
   "trash": {
     "open": "Open recycle bin",

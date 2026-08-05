@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.1 - 2026-08-05
+
+- Las cards de paneles compartidos reales incorporan un menú de tres puntos independiente del selector, con acciones para invitar cuando la membresía posee `invite` y abandonar el panel mediante la revocación autoritativa existente.
+- El permiso `invite` ya puede concederse a roles personalizados desde invitaciones y gestión de participantes; la interfaz limita roles y permisos al alcance que el actor puede delegar.
+- El abandono conserva la limpieza en cascada de proyectos heredados y copias locales, incorpora confirmación, estados ES/EN/AR y una regresión dedicada sin modificar memoriaBACKEND.
+
 ## 1.10.0 - 2026-08-05
 
 - La revocación de un panel compartido ya no depende de los proyectos visibles en la interfaz: memoriaBACKEND recorre el índice completo de la cuenta y retira también proyectos autorizados cuya entidad raíz aún no fue recuperada, sin cruzar otros paneles ni invitaciones exclusivas.

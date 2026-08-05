@@ -301,7 +301,9 @@
     "portfolioPartial": "El acceso al panel se guardó, pero {failed} proyectos deberán reintentarse al recuperar conexión.",
     "portfolioNoProjects": "El acceso al panel se creó. Se heredará automáticamente en los proyectos nuevos.",
     "portfolioAccepting": "Aceptando acceso al panel y a sus proyectos…",
-    "portfolioAccepted": "Acceso al panel aceptado. Los proyectos compartidos se están incorporando automáticamente."
+    "portfolioAccepted": "Acceso al panel aceptado. Los proyectos compartidos se están incorporando automáticamente.",
+    "invite": "Invitar",
+    "alreadyMember": "Esa cuenta ya participa en el panel."
   },
   "permissions": {
     "denied": "Tus permisos no permiten realizar esta acción.",
@@ -454,7 +456,16 @@
     "trashMenu": "Opciones del elemento en papelera",
     "projectContext": "Acciones generales del proyecto",
     "openProject": "Abrir proyecto",
-    "noneAvailable": "No hay acciones disponibles para tus permisos."
+    "noneAvailable": "No hay acciones disponibles para tus permisos.",
+    "panelMenu": "Opciones del panel",
+    "panelContext": "Acciones generales del panel compartido",
+    "invitePanel": "Invitar",
+    "leavePanel": "Abandonar panel",
+    "leavePanelConfirm": "Perderás acceso al panel “{name}”, a sus proyectos heredados y a sus copias locales en este dispositivo.",
+    "leavePanelConfirmButton": "Abandonar panel",
+    "leavingPanel": "Abandonando panel…",
+    "leftPanelSuccess": "Abandonaste el panel y sus copias locales fueron retiradas.",
+    "leavePanelError": "No se pudo abandonar el panel."
   },
   "trash": {
     "open": "Abrir papelera",

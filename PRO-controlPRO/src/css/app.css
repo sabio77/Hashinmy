@@ -143,7 +143,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .access-permission-heading { display: grid; gap: 3px; }
 .access-permission-heading strong { font-size: .82rem; }
 .access-permission-heading small { color: var(--muted); font-size: .7rem; line-height: 1.4; }
-.access-permission-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.access-permission-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 7px; }
 .access-permission-options label { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 8px 9px; border-radius: 11px; background: var(--surface-soft); color: var(--text); font-size: .72rem; font-weight: 740; }
 .access-permission-options input { inline-size: 16px; block-size: 16px; accent-color: var(--primary); }
 .access-permission-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
@@ -353,14 +353,18 @@ html[dir="rtl"] .update-status {
 .panel-switcher-heading h3 { margin: 0; font-size: 1.05rem; letter-spacing: -.02em; }
 .panel-active-summary { max-width: 58ch; margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.4; text-align: end; }
 .panel-list { display: flex; gap: 10px; overflow-x: auto; padding: 2px 1px 5px; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.panel-switcher-card { min-width: min(280px, 78vw); flex: 1 0 230px; display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 10px; padding: 12px; text-align: start; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--surface-soft); cursor: pointer; scroll-snap-align: start; }
+.panel-switcher-card { position: relative; min-width: min(280px, 78vw); flex: 1 0 230px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--surface-soft); overflow: hidden; scroll-snap-align: start; }
 .panel-switcher-card:hover { border-color: color-mix(in srgb, var(--primary) 42%, var(--line)); transform: translateY(-1px); }
 .panel-switcher-card[data-active="true"] { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: color-mix(in srgb, var(--surface-soft) 82%, var(--primary) 18%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent); }
+.panel-switcher-main { min-width: 0; display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 10px; padding: 12px; text-align: start; border: 0; color: inherit; background: transparent; cursor: pointer; }
+.panel-switcher-main:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 60%, transparent); outline-offset: -3px; }
+.panel-switcher-card > .panel-context-menu-button { position: static; width: 42px; height: auto; min-height: 58px; margin: 7px 7px 7px 0; align-self: stretch; box-shadow: none; background: color-mix(in srgb, var(--surface) 82%, transparent); }
 .panel-switcher-marker { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: var(--primary-strong); background: color-mix(in srgb, var(--surface) 74%, var(--primary) 26%); font-weight: 900; }
 .panel-switcher-copy { min-width: 0; display: grid; gap: 3px; }
 .panel-switcher-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
 .panel-switcher-copy small { color: var(--muted); font-size: .7rem; line-height: 1.35; }
-html[dir="rtl"] .panel-switcher-card { text-align: right; }
+html[dir="rtl"] .panel-switcher-main { text-align: right; }
+html[dir="rtl"] .panel-switcher-card > .panel-context-menu-button { margin: 7px 0 7px 7px; left: auto; }
 html[dir="rtl"] .panel-active-summary { text-align: start; }
 .dashboard-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .invite-scope-message { margin: -2px 0 2px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; color: var(--muted); background: var(--surface-soft); font-size: .78rem; line-height: 1.45; }
