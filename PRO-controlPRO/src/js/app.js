@@ -54,6 +54,7 @@ import {
   entitiesByType,
   hasPermission,
   individualRecordAccess,
+  legacyPortfolioProjectsForInvitation,
   memberForUser,
   normalizeCollaborationPermissions,
   normalizeCollaborationRole,
@@ -374,6 +375,35 @@ async function invitePortfolioCollaboratorsToProject(spaceId = '', collaborators
     failed: results.filter((result) => result.status === 'rejected').length
   };
 }
+
+async function inviteLegacyPortfolioProjects(email = '', portfolioSpace = null, grant = {}) {
+  const legacyProjects = legacyPortfolioProjectsForInvitation(
+    [...state.projects.values()],
+    portfolioSpace || {}
+  );
+  const failures = [];
+  let succeeded = 0;
+
+  for (const data of legacyProjects) {
+    try {
+      await upsertSpaceAccessByEmail(data.space, email, { ...grant, accessScope: 'portfolio' });
+      succeeded += 1;
+    } catch (error) {
+      failures.push({
+        spaceId: String(data?.space?.spaceId || '').trim(),
+        message: String(error?.message || t('invite.error', 'No se pudo enviar la invitación.'))
+      });
+    }
+  }
+
+  return {
+    total: legacyProjects.length,
+    succeeded,
+    failed: failures.length,
+    failures
+  };
+}
+
 async function reconcilePortfolioAccess() {
   if (state.portfolioReconciliationActive || state.p2pBusy || !state.user?.userId || navigator.onLine === false) return { changed: 0, failed: 0 };
   const manageablePortfolios = portfolioSpaces().filter((space) => spaceUserCan(space, 'manage_access'));
@@ -2752,14 +2782,16 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
     portfolioSpace = portfolioResult?.space || null;
     if (portfolioSpace?.spaceId) setActivePanelId(portfolioSpace.spaceId);
   }
+  const legacyProjectInvitations = await inviteLegacyPortfolioProjects(email, portfolioSpace, grant);
   await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
   applyP2PState(semillaP2P.bootstrapState);
   await refreshProjects();
   return {
     portfolioResult,
     totalProjects: portfolioProjectSpaces(portfolioSpace).length,
-    succeeded: 0,
-    failed: 0,
+    succeeded: legacyProjectInvitations.succeeded,
+    failed: legacyProjectInvitations.failed,
+    legacyProjectInvitations,
     inheritedOnAcceptance: true
   };
 }
@@ -2837,12 +2869,16 @@ async function submitInvitation(event) {
     if (scope === 'portfolio') {
       const result = await inviteAcrossPortfolio(email, { role, permissions, accessScope: 'portfolio' });
       closeDialog(elements.inviteDialog);
+      const partialLegacyFailure = Number(result.failed || 0) > 0;
       setStatus(
         elements.dashboardStatus,
-        result.portfolioResult?.reused
+        partialLegacyFailure
+          ? t('invite.portfolioPartial', 'El acceso al panel se guardó, pero {failed} proyectos deberán reintentarse al recuperar conexión.')
+              .replace('{failed}', String(result.failed))
+          : result.portfolioResult?.reused
           ? t('invite.alreadyPending', 'La invitación al panel ya estaba pendiente.')
           : t('invite.portfolioSent', 'Invitación al panel enviada. Al aceptarla, se habilitarán automáticamente los proyectos autorizados.'),
-        'success'
+        partialLegacyFailure ? 'warning' : 'success'
       );
     } else {
       const result = await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: PROJECT_RESOURCE_TYPE, permissions, role, accessScope: 'project' });

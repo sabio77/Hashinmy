@@ -463,6 +463,39 @@ function projectPortfolioId(data = {}) {
 }
 
 /**
+ * Devuelve únicamente proyectos administrativos anteriores a la creación del
+ * panel que todavía no quedaron gobernados por ese portfolio en el backend.
+ *
+ * Estos espacios deben recibir una concesión explícita al enviar la primera
+ * invitación global; los proyectos nuevos, que sí tienen governanceSpaceId,
+ * continúan heredando participantes exclusivamente desde memoriaBACKEND.
+ */
+export function legacyPortfolioProjectsForInvitation(projects = [], portfolioSpace = {}) {
+  const portfolioSpaceId = cleanText(portfolioSpace?.spaceId || '', 140);
+  const portfolioOwnerUserId = cleanText(portfolioSpace?.ownerUserId || '', 140);
+  if (!portfolioSpaceId || !portfolioOwnerUserId) return [];
+
+  return (Array.isArray(projects) ? projects : []).filter((data) => {
+    const projectSpaceId = cleanText(data?.space?.spaceId || '', 140);
+    if (!projectSpaceId || data?.space?.resourceType !== PROJECT_ENTITY_TYPE) return false;
+    if (data?.space?.authorizationState === 'unconfirmed') return false;
+
+    const projectOwnerUserId = cleanText(
+      data?.space?.ownerUserId || data?.project?.portfolioOwnerUserId || '',
+      140
+    );
+    if (projectOwnerUserId !== portfolioOwnerUserId) return false;
+
+    const backendGovernanceSpaceId = cleanText(data?.space?.governanceSpaceId || '', 140);
+    if (backendGovernanceSpaceId === portfolioSpaceId) return false;
+    if (backendGovernanceSpaceId) return false;
+
+    const persistedPortfolioSpaceId = cleanText(data?.project?.portfolioSpaceId || '', 140);
+    return !persistedPortfolioSpaceId || persistedPortfolioSpaceId === portfolioSpaceId;
+  });
+}
+
+/**
  * Construye las vistas de panel únicamente a partir de espacios autorizados.
  *
  * Un usuario invitado a uno o varios proyectos no necesita ser miembro del

@@ -192,6 +192,128 @@ SNAPSHOT_REFRESH_JS = r"""
 """
 
 
+LEGACY_INVITATION_FLOW_JS = r"""
+({ role, permissions, projectCount, directMembership }) => {
+  const D = window.ProjectDomain;
+  const I = window.InvitationIntent;
+  const ownerUserId = 'account_owner';
+  const guestUserId = 'account_guest';
+  const portfolioSpaceId = 'portfolio_created_after_projects';
+  const effectivePermissions = D.rolePermissions(role, permissions);
+  const ownerPermissions = D.rolePermissions('owner', []);
+  const projects = Array.from({ length: projectCount }, (_, offset) => {
+    const index = offset + 1;
+    const space = {
+      spaceId: `legacy_project_${index}`,
+      resourceType: 'admin.project',
+      permissionProfile: D.ADMIN_PROJECT_PERMISSION_PROFILE,
+      governanceSpaceId: '',
+      ownerUserId,
+      authorizationState: 'confirmed',
+      members: [{ userId: ownerUserId, role: 'owner', permissions: ownerPermissions }]
+    };
+    return {
+      space,
+      project: {
+        id: D.PROJECT_ENTITY_ID,
+        loaded: true,
+        name: `Proyecto anterior ${index}`,
+        description: `Creado antes del panel ${index}`,
+        address: `Dirección legacy ${index}`,
+        initialBudget: 2000 * index,
+        portfolioSpaceId: '',
+        portfolioOwnerUserId: ownerUserId,
+        isTrashed: false
+      },
+      purchases: [{ id: `legacy_purchase_${index}`, amount: 250 * index, createdByUserId: ownerUserId }],
+      incomes: [{ id: `legacy_income_${index}`, amount: 100 * index, createdByUserId: ownerUserId }],
+      projections: [{ id: `legacy_projection_${index}`, projectedAmount: 220 * index, actualAmount: 250 * index, status: 'completed', createdByUserId: ownerUserId }]
+    };
+  }).map((entry) => ({
+    ...entry,
+    metrics: D.calculateProjectMetrics(entry.project, entry.purchases, entry.incomes, entry.projections)
+  }));
+
+  const portfolio = {
+    spaceId: portfolioSpaceId,
+    resourceType: 'admin.portfolio',
+    ownerUserId,
+    authorizationState: 'confirmed',
+    members: [
+      { userId: ownerUserId, role: 'owner', accessScope: 'portfolio', permissions: ownerPermissions },
+      { userId: guestUserId, role, accessScope: 'portfolio', permissions: effectivePermissions }
+    ]
+  };
+  const legacyTargets = D.legacyPortfolioProjectsForInvitation(projects, portfolio);
+  const portfolioInvitation = {
+    invitationId: 'inv_portfolio',
+    spaceId: portfolioSpaceId,
+    resourceType: 'admin.portfolio',
+    inviterUserId: ownerUserId,
+    recipientUserId: guestUserId,
+    role,
+    permissions: effectivePermissions,
+    accessScope: 'portfolio',
+    status: 'pending'
+  };
+  const projectInvitations = directMembership ? [] : legacyTargets.map((entry, offset) => ({
+    invitationId: `inv_legacy_${offset + 1}`,
+    spaceId: entry.space.spaceId,
+    resourceType: 'admin.project',
+    governanceSpaceId: '',
+    inviterUserId: ownerUserId,
+    recipientUserId: guestUserId,
+    role,
+    permissions: effectivePermissions,
+    accessScope: 'portfolio',
+    status: 'pending'
+  }));
+  const related = I.relatedPortfolioProjectInvitations(
+    [portfolioInvitation, ...projectInvitations],
+    portfolioInvitation,
+    { portfolioResourceType: 'admin.portfolio' }
+  );
+  const acceptedIds = new Set(directMembership ? legacyTargets.map((entry) => entry.space.spaceId) : related.map((entry) => entry.spaceId));
+  const acceptedProjects = projects.map((entry) => ({
+    ...entry,
+    space: acceptedIds.has(entry.space.spaceId)
+      ? {
+          ...entry.space,
+          members: [
+            ...entry.space.members,
+            { userId: guestUserId, role, permissions: effectivePermissions, accessScope: 'portfolio' }
+          ]
+        }
+      : entry.space
+  }));
+  const scopes = D.buildProjectPanelScopes({
+    spaces: [portfolio, ...acceptedProjects.map((entry) => entry.space)],
+    projects: acceptedProjects.filter((entry) => acceptedIds.has(entry.space.spaceId)),
+    currentUserId: guestUserId,
+    portfolioResourceType: 'admin.portfolio',
+    personalPanelId: '__personal_panel__',
+    sharedProjectsPanelId: '__shared_projects_panel__'
+  });
+  const panel = scopes.find((scope) => scope.id === portfolioSpaceId);
+  const first = panel?.projects?.[0] || null;
+  return {
+    legacyTargetIds: legacyTargets.map((entry) => entry.space.spaceId),
+    relatedInvitationIds: related.map((entry) => entry.spaceId),
+    projectCount: panel?.projects?.length ?? -1,
+    firstProjectName: first?.project?.name || '',
+    firstCapital: first?.metrics?.totalCapital ?? null,
+    firstExpenses: first?.metrics?.totalPurchases ?? null,
+    canRead: D.hasPermission(first?.space || {}, guestUserId, 'read'),
+    canAdd: D.hasPermission(first?.space || {}, guestUserId, 'add'),
+    canDelete: D.hasPermission(first?.space || {}, guestUserId, 'delete'),
+    canProjection: D.hasPermission(first?.space || {}, guestUserId, 'projection'),
+    canDeleteProject: D.hasPermission(first?.space || {}, guestUserId, 'delete_project'),
+    canManageAccess: D.hasPermission(first?.space || {}, guestUserId, 'manage_access')
+  };
+}
+"""
+
+
 def expected_permissions(role: str, permissions: list[str]) -> tuple[bool, bool, bool, bool, bool]:
     if role == "manager":
         return True, True, True, True, True
@@ -245,20 +367,24 @@ def main() -> None:
         owner_page = owner_context.new_page()
         guest_page = guest_context.new_page()
         domain_source = (ROOT / "src/js/project-domain.js").read_text(encoding="utf-8")
+        invitation_source = (ROOT / "src/js/p2p-invitation-intent.js").read_text(encoding="utf-8")
         for page, account in ((owner_page, "account_owner"), (guest_page, "account_guest")):
             page.set_content("<!doctype html><html lang='es'><body><main id='result'></main></body></html>")
             page.evaluate(
-                """async ({ source, account }) => {
+                """async ({ source, invitationSource, account }) => {
                   const moduleUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+                  const invitationModuleUrl = URL.createObjectURL(new Blob([invitationSource], { type: 'text/javascript' }));
                   try {
                     window.ProjectDomain = await import(moduleUrl);
+                    window.InvitationIntent = await import(invitationModuleUrl);
                     window.__testAccount = account;
                     window.__panelHarnessReady = true;
                   } finally {
                     URL.revokeObjectURL(moduleUrl);
+                    URL.revokeObjectURL(invitationModuleUrl);
                   }
                 }""",
-                {"source": domain_source, "account": account},
+                {"source": domain_source, "invitationSource": invitation_source, "account": account},
             )
             page.wait_for_function("window.__panelHarnessReady === true")
 
@@ -291,6 +417,35 @@ def main() -> None:
                     assert guest["canDeleteProject"] is can_delete_project, (role, permissions, guest)
                     assert guest["canManageAccess"] is can_manage, (role, permissions, guest)
 
+                for direct_membership in (False, True):
+                    legacy = guest_page.evaluate(
+                        LEGACY_INVITATION_FLOW_JS,
+                        {
+                            "role": role,
+                            "permissions": permissions,
+                            "projectCount": project_count,
+                            "directMembership": direct_membership,
+                        },
+                    )
+                    expected_ids = [f"legacy_project_{index}" for index in range(1, project_count + 1)]
+                    assert legacy["legacyTargetIds"] == expected_ids, (role, project_count, direct_membership, legacy)
+                    assert legacy["projectCount"] == project_count, (role, project_count, direct_membership, legacy)
+                    if direct_membership:
+                        assert legacy["relatedInvitationIds"] == []
+                    else:
+                        assert legacy["relatedInvitationIds"] == expected_ids
+                    if project_count:
+                        assert legacy["firstProjectName"] == "Proyecto anterior 1"
+                        assert legacy["firstCapital"] == 2100
+                        assert legacy["firstExpenses"] == 250
+                        assert legacy["canRead"] is True
+                        can_add, can_delete, can_projection, can_delete_project, can_manage = expected_permissions(role, permissions)
+                        assert legacy["canAdd"] is can_add, (role, permissions, legacy)
+                        assert legacy["canDelete"] is can_delete, (role, permissions, legacy)
+                        assert legacy["canProjection"] is can_projection, (role, permissions, legacy)
+                        assert legacy["canDeleteProject"] is can_delete_project, (role, permissions, legacy)
+                        assert legacy["canManageAccess"] is can_manage, (role, permissions, legacy)
+
         snapshot_refresh = guest_page.evaluate(SNAPSHOT_REFRESH_JS, {"projectCount": 2})
         assert snapshot_refresh == {"before": 0, "after": 2}, snapshot_refresh
         assert guest_page.locator("#result").text_content() == "2"
@@ -302,7 +457,7 @@ def main() -> None:
         guest_context.close()
         browser.close()
 
-    print("OK: Playwright validó dos cuentas aisladas, roles Gerente/Admin/Individual/Personalizado, permisos lectura/agregar/eliminar/proyección, 0/1/2/5 proyectos, datos administrativos, aislamiento entre paneles y refresco tras snapshot.")
+    print("OK: Playwright validó dos cuentas aisladas, roles Gerente/Admin/Individual/Personalizado, permisos lectura/agregar/eliminar/proyección, 0/1/2/5 proyectos, paneles gobernados y legacy, aceptación por invitaciones o membresía directa, datos administrativos, aislamiento y refresco tras snapshot.")
 
 
 if __name__ == "__main__":

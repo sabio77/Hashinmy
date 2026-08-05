@@ -13,6 +13,7 @@ import {
   hasPermission,
   individualRecordAccess,
   INDIVIDUAL_EDIT_WINDOW_MS,
+  legacyPortfolioProjectsForInvitation,
   normalizeCollaborationRole,
   operationAuthorship,
   rolePermissions,
@@ -81,6 +82,39 @@ const afterFullRevocation = buildProjectPanelScopes({
 });
 assert.equal(afterFullRevocation.some((panel) => panel.id === 'portfolio_a'), false, 'Al revocar todos los proyectos de un panel debe desaparecer también la vinculación visual completa.');
 assert.equal(sharedOwnerPanelId(' owner_legacy '), '__shared_owner_panel__:owner_legacy', 'Los proyectos legacy sin governanceSpaceId deben conservar una agrupación estable por propietario.');
+
+const portfolioForLegacyRecovery = {
+  spaceId: 'portfolio_legacy',
+  resourceType: 'admin.portfolio',
+  ownerUserId: 'owner_a'
+};
+const legacyProjects = [
+  {
+    space: { spaceId: 'legacy_blank', resourceType: 'admin.project', ownerUserId: 'owner_a', governanceSpaceId: '' },
+    project: { name: 'Proyecto anterior', portfolioSpaceId: '', portfolioOwnerUserId: 'owner_a' }
+  },
+  {
+    space: { spaceId: 'legacy_persisted', resourceType: 'admin.project', ownerUserId: 'owner_a', governanceSpaceId: '' },
+    project: { name: 'Proyecto anterior enlazado', portfolioSpaceId: 'portfolio_legacy', portfolioOwnerUserId: 'owner_a' }
+  },
+  {
+    space: { spaceId: 'governed', resourceType: 'admin.project', ownerUserId: 'owner_a', governanceSpaceId: 'portfolio_legacy' },
+    project: { name: 'Proyecto nuevo', portfolioSpaceId: 'portfolio_legacy', portfolioOwnerUserId: 'owner_a' }
+  },
+  {
+    space: { spaceId: 'other_portfolio', resourceType: 'admin.project', ownerUserId: 'owner_a', governanceSpaceId: 'portfolio_other' },
+    project: { name: 'Proyecto de otro panel', portfolioSpaceId: 'portfolio_other', portfolioOwnerUserId: 'owner_a' }
+  },
+  {
+    space: { spaceId: 'other_owner', resourceType: 'admin.project', ownerUserId: 'owner_b', governanceSpaceId: '' },
+    project: { name: 'Proyecto ajeno', portfolioSpaceId: '', portfolioOwnerUserId: 'owner_b' }
+  }
+];
+assert.deepEqual(
+  legacyPortfolioProjectsForInvitation(legacyProjects, portfolioForLegacyRecovery).map((entry) => entry.space.spaceId),
+  ['legacy_blank', 'legacy_persisted'],
+  'La compatibilidad debe seleccionar solo proyectos anteriores del mismo propietario que el backend todavía no gobierna.'
+);
 
 const acceptedPortfolioPanels = buildProjectPanelScopes({
   spaces: [{
@@ -332,11 +366,13 @@ assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFi
 assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');
 assert.equal(appSource.includes("const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio'"), true, 'La invitación global debe usar un espacio de cartera aislado de los proyectos.');
 assert.equal(appSource.includes("accessScope: 'portfolio'"), true, 'El alcance global debe persistirse explícitamente.');
-assert.equal(appSource.includes('inviteAcrossPortfolio(email'), true, 'El panel debe crear una única invitación global.');
+assert.equal(appSource.includes('inviteAcrossPortfolio(email'), true, 'El panel debe crear la invitación global.');
 assert.equal(appSource.includes('inheritedOnAcceptance: true'), true, 'La interfaz debe delegar en memoriaBACKEND la herencia de proyectos al aceptar el panel.');
 assert.equal(appSource.includes("const inheritedCollaborators = mode === 'create'"), false, 'La creación de proyectos no debe volver a generar invitaciones secundarias desde la interfaz.');
 assert.equal(appSource.includes('? await invitePortfolioCollaboratorsToProject(spaceId'), false, 'Los proyectos futuros deben heredar participantes desde el backend, no mediante una cascada de invitaciones del navegador.');
-assert.equal(appSource.includes('for (const invitation of state.p2pState.invitations?.sent || [])'), false, 'Una invitación pendiente al panel no debe multiplicarse en una invitación por proyecto.');
+assert.equal(appSource.includes('legacyPortfolioProjectsForInvitation('), true, 'La invitación global debe detectar proyectos anteriores que todavía no tienen gobernanza backend.');
+assert.equal(appSource.includes('await inviteLegacyPortfolioProjects(email, portfolioSpace, grant)'), true, 'Solo los proyectos legacy deben recibir una concesión explícita de compatibilidad.');
+assert.equal(/for \(const data of legacyProjects\)[\s\S]*upsertSpaceAccessByEmail\(data\.space, email/.test(appSource), true, 'La recuperación legacy debe ser determinista y conservar rol, permisos y alcance de panel.');
 assert.equal(appSource.includes('function projectBelongsToPortfolio(data = null, portfolioSpace = null)'), true, 'La propagación global debe resolver explícitamente qué proyectos pertenecen a cada panel.');
 assert.equal(appSource.includes("data.project?.portfolioSpaceId"), true, 'El aislamiento global debe priorizar el identificador persistido del panel.');
 assert.equal(appSource.includes('async function reconcilePortfolioAccess()'), true, 'Las propagaciones parciales deben reconciliarse automáticamente al recuperar conectividad.');

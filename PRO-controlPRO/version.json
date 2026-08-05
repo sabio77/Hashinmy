@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/project-domain.js",
-      "sha256": "ebd1f8743d7c84a8945bd1d13fb7007a6c5038b0f671adefd9584665bc55c7a8",
-      "bytes": 24762
+      "sha256": "530fe398043c6ae591d1afeed76a6b21890b47e0a26edaffe746448970fb94a8",
+      "bytes": 26384
     },
     {
       "url": "./src/js/device-management.js",
@@ -157,8 +157,8 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "1af4e411b2add6b00ad0df2a6b53086e1642caf67ef6130690f0a30fdba09908",
-      "bytes": 184007
+      "sha256": "bc948a7bc372f2f9fd5d42f9a5701a022e761ca70f0f773ff8cb42af02fa67ac",
+      "bytes": 185348
     },
     {
       "url": "./textX/languages.json",
