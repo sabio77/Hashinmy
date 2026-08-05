@@ -80,7 +80,18 @@
           </div>
         </div>
 
-        <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
+        <section id="panel-switcher" class="panel-switcher" aria-labelledby="panel-switcher-title">
+          <div class="panel-switcher-heading">
+            <div>
+              <p class="eyebrow" data-i18n="dashboard.panelsEyebrow">Espacios separados</p>
+              <h3 id="panel-switcher-title" data-i18n="dashboard.panelsTitle">Paneles</h3>
+            </div>
+            <p id="active-panel-summary" class="panel-active-summary" role="status" aria-live="polite"></p>
+          </div>
+          <div id="panel-list" class="panel-list" aria-label="Paneles disponibles" data-i18n-attr="aria-label:dashboard.panelsAvailable"></div>
+        </section>
+
+        <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen del panel activo" data-i18n-attr="aria-label:dashboard.activePanelMetrics"></section>
         <p id="dashboard-status" class="inline-status" role="status" aria-live="polite"></p>
         <div class="project-filter-toolbar">
           <label class="project-filter-field" for="project-filter-input">

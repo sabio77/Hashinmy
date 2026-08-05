@@ -70,12 +70,17 @@ import {
 } from './project-domain.js';
 
 const CACHED_USER_STORAGE_KEY = scopedStorageKey('semilla_authenticated_user');
+const ACTIVE_PANEL_STORAGE_KEY = scopedStorageKey('admin_active_panel');
+const PERSONAL_PANEL_ID = '__personal_panel__';
+const SHARED_PROJECTS_PANEL_ID = '__shared_projects_panel__';
 const state = {
   firebaseWebConfig: null,
   user: null,
   busy: false,
   p2pBusy: false,
   selectedSpaceId: '',
+  activePanelId: '',
+  pendingPanelId: '',
   renderSequence: 0,
   p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
   projects: new Map(),
@@ -115,6 +120,7 @@ const elements = {
   devicesButton: byId('devices-button'), devicesDialog: byId('devices-dialog'), deviceList: byId('device-list'), deviceStatus: byId('device-status'), deviceConfirmPanel: byId('device-confirm-panel'), deviceConfirmMessage: byId('device-confirm-message'), deviceConfirmButton: byId('device-confirm-button'), deviceConfirmCancel: byId('device-confirm-cancel'),
   localNetworkButton: byId('local-network-button'), localNetworkDialog: byId('local-network-dialog'), localNetworkState: byId('local-network-state'), localNetworkInput: byId('local-network-input'), localNetworkOutput: byId('local-network-output'), localNetworkCreateOffer: byId('local-network-create-offer'), localNetworkAcceptOffer: byId('local-network-accept-offer'), localNetworkCompleteAnswer: byId('local-network-complete-answer'), localNetworkCopy: byId('local-network-copy'), localNetworkPeers: byId('local-network-peers'), localNetworkStatus: byId('local-network-status'),
   dashboardView: byId('dashboard-view'), projectView: byId('project-view'), dashboardStatus: byId('dashboard-status'), projectStatus: byId('project-status'),
+  panelSwitcher: byId('panel-switcher'), panelList: byId('panel-list'), activePanelSummary: byId('active-panel-summary'),
   portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), managePortfolioAccessButton: byId('manage-portfolio-access-button'), invitePortfolioButton: byId('invite-portfolio-button'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
   projectName: byId('project-name'), projectDescription: byId('project-description'), projectAddress: byId('project-address'), projectMemberSummary: byId('project-member-summary'), projectReplicaHealth: byId('project-replica-health'),
   projectMetrics: byId('project-metrics'), budgetProgressValue: byId('budget-progress-value'), budgetProgressLabel: byId('budget-progress-label'),
@@ -132,6 +138,8 @@ function t(key, fallback) { return window.AppI18n?.t?.(key, fallback) || fallbac
 function setStatus(element, message = '', status = '') { if (!element) return; element.textContent = message; status ? element.dataset.state = status : delete element.dataset.state; }
 function getCachedUser() { try { const value = JSON.parse(localStorage.getItem(CACHED_USER_STORAGE_KEY) || 'null'); return value?.userId ? value : null; } catch { return null; } }
 function setCachedUser(user = null) { try { user?.userId ? localStorage.setItem(CACHED_USER_STORAGE_KEY, JSON.stringify({ userId: user.userId, email: user.email || '', displayName: user.displayName || '', photoUrl: user.photoUrl || '' })) : localStorage.removeItem(CACHED_USER_STORAGE_KEY); } catch {} }
+function getCachedActivePanelId(userId = '') { try { const value = JSON.parse(localStorage.getItem(ACTIVE_PANEL_STORAGE_KEY) || 'null'); return value?.userId === String(userId || '') ? String(value.panelId || '') : ''; } catch { return ''; } }
+function setActivePanelId(panelId = '', options = {}) { const normalized = String(panelId || '').trim(); state.activePanelId = normalized; if (options.persist === false || !state.user?.userId) return normalized; try { normalized ? localStorage.setItem(ACTIVE_PANEL_STORAGE_KEY, JSON.stringify({ userId: state.user.userId, panelId: normalized })) : localStorage.removeItem(ACTIVE_PANEL_STORAGE_KEY); } catch {} return normalized; }
 function money(amount = 0) { const exactAmount = typeof amount === 'bigint' ? amount : Number(amount || 0); return new Intl.NumberFormat(document.documentElement.lang || 'es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(exactAmount); }
 function shortDate(value = '') { const date = value ? new Date(value.length <= 10 ? `${value}T12:00:00` : value) : null; return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || 'es-CO', { dateStyle: 'medium' }).format(date) : ''; }
 function shortDateTime(value = '') { const date = value ? new Date(value) : null; return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || 'es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(date) : ''; }
@@ -170,11 +178,8 @@ function portfolioSpaceById(spaceId = '') {
   return portfolioSpaces().find((space) => String(space?.spaceId || '').trim() === cleanSpaceId) || null;
 }
 function primaryPortfolioSpace() {
-  const spaces = portfolioSpaces();
-  return spaces.find((space) => space.ownerUserId === state.user?.userId)
-    || spaces.find((space) => spaceUserCan(space, 'manage_access'))
-    || spaces[0]
-    || null;
+  const panel = activePanelScope();
+  return panel?.type === 'portfolio' ? panel.space : null;
 }
 function projectBelongsToPortfolio(data = null, portfolioSpace = null) {
   if (!data?.space || !portfolioSpace?.spaceId || data.space.resourceType === PORTFOLIO_RESOURCE_TYPE) return false;
@@ -184,6 +189,104 @@ function projectBelongsToPortfolio(data = null, portfolioSpace = null) {
   const portfolioOwnerUserId = String(portfolioSpace.ownerUserId || '').trim();
   if (projectPortfolioOwnerUserId) return projectPortfolioOwnerUserId === portfolioOwnerUserId;
   return String(data.space.ownerUserId || '').trim() === portfolioOwnerUserId;
+}
+function portfolioOwnerProfile(portfolioSpace = null) {
+  const ownerUserId = String(portfolioSpace?.ownerUserId || '').trim();
+  return (portfolioSpace?.members || []).find((member) => String(member?.userId || '').trim() === ownerUserId)?.profile || null;
+}
+function panelScopes() {
+  const currentUserId = String(state.user?.userId || '').trim();
+  const projects = [...state.projects.values()];
+  const scopes = portfolioSpaces()
+    .map((space) => ({
+      id: String(space.spaceId || '').trim(),
+      type: 'portfolio',
+      space,
+      owned: String(space.ownerUserId || '').trim() === currentUserId,
+      projects: []
+    }))
+    .filter((scope) => scope.id);
+  const scopesById = new Map(scopes.map((scope) => [scope.id, scope]));
+  const unassignedProjects = [];
+  for (const data of projects) {
+    const explicitPortfolioId = String(data.project?.portfolioSpaceId || '').trim();
+    if (explicitPortfolioId) {
+      const explicitScope = scopesById.get(explicitPortfolioId);
+      if (explicitScope) explicitScope.projects.push(data);
+      else unassignedProjects.push(data);
+      continue;
+    }
+    const ownerUserId = String(data.project?.portfolioOwnerUserId || data.space?.ownerUserId || '').trim();
+    const matchingScopes = scopes.filter((scope) => String(scope.space?.ownerUserId || '').trim() === ownerUserId);
+    const targetScope = matchingScopes.find((scope) => scope.id === state.activePanelId)
+      || matchingScopes.find((scope) => scope.owned)
+      || matchingScopes[0]
+      || null;
+    if (targetScope) targetScope.projects.push(data);
+    else unassignedProjects.push(data);
+  }
+  const personalProjects = unassignedProjects.filter((data) => String(data.space?.ownerUserId || '').trim() === currentUserId);
+  const sharedProjects = unassignedProjects.filter((data) => String(data.space?.ownerUserId || '').trim() !== currentUserId);
+  if (!scopes.some((scope) => scope.owned) || personalProjects.length) {
+    scopes.push({ id: PERSONAL_PANEL_ID, type: 'personal', space: null, owned: true, projects: personalProjects });
+  }
+  if (sharedProjects.length) {
+    scopes.push({ id: SHARED_PROJECTS_PANEL_ID, type: 'shared', space: null, owned: false, projects: sharedProjects });
+  }
+  return scopes.sort((left, right) => {
+    const rank = (scope) => scope.type === 'personal' || scope.owned ? 0 : scope.type === 'portfolio' ? 1 : 2;
+    const rankDifference = rank(left) - rank(right);
+    if (rankDifference) return rankDifference;
+    return String(left.id || '').localeCompare(String(right.id || ''));
+  });
+}
+function activePanelScope() {
+  const scopes = panelScopes();
+  let active = scopes.find((scope) => scope.id === state.activePanelId)
+    || scopes.find((scope) => scope.type === 'portfolio' && scope.owned)
+    || scopes.find((scope) => scope.type === 'personal')
+    || scopes[0]
+    || null;
+  if (active && state.activePanelId !== active.id) setActivePanelId(active.id);
+  return active;
+}
+function activePanelProjects() { return activePanelScope()?.projects || []; }
+function panelDisplayName(panel = null) {
+  if (!panel || panel.type === 'personal' || panel.owned) return t('dashboard.personalPanel', 'Mi panel');
+  if (panel.type === 'shared') return t('dashboard.sharedProjectsPanel', 'Proyectos compartidos');
+  const profile = portfolioOwnerProfile(panel.space);
+  const ownerName = profile?.displayName || profile?.email || t('dashboard.otherOwner', 'otro usuario');
+  return t('dashboard.invitedPanel', 'Panel de {name}').replace('{name}', ownerName);
+}
+function panelTypeDescription(panel = null) {
+  if (!panel || panel.type === 'personal' || panel.owned) return t('dashboard.personalPanelHint', 'Tus proyectos y participantes propios.');
+  if (panel.type === 'shared') return t('dashboard.sharedProjectsHint', 'Proyectos a los que te invitaron de forma individual.');
+  return t('dashboard.invitedPanelHint', 'Panel compartido al que perteneces como participante.');
+}
+function renderPanelSwitcher(activePanel = activePanelScope()) {
+  if (!elements.panelList || !elements.panelSwitcher) return;
+  const scopes = panelScopes();
+  elements.panelSwitcher.hidden = false;
+  elements.panelList.replaceChildren();
+  for (const panel of scopes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'panel-switcher-card';
+    button.dataset.panelId = panel.id;
+    button.setAttribute('aria-pressed', panel.id === activePanel?.id ? 'true' : 'false');
+    if (panel.id === activePanel?.id) button.dataset.active = 'true';
+    const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
+    const copy = document.createElement('span'); copy.className = 'panel-switcher-copy';
+    const title = document.createElement('strong'); title.textContent = panelDisplayName(panel);
+    const detail = document.createElement('small');
+    const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
+    const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
+    detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
+    copy.append(title, detail); button.append(marker, copy); elements.panelList.append(button);
+  }
+  if (elements.activePanelSummary) {
+    elements.activePanelSummary.textContent = activePanel ? `${panelDisplayName(activePanel)} · ${panelTypeDescription(activePanel)}` : '';
+  }
 }
 function portfolioProjectSpaces(portfolioSpace = primaryPortfolioSpace()) {
   if (!portfolioSpace?.spaceId) return [];
@@ -197,6 +300,7 @@ function portfolioProjectsOwnedBy(portfolioSpace = null, userId = '') {
   return portfolioProjectSpaces(portfolioSpace).filter((space) => String(space?.ownerUserId || '').trim() === cleanUserId);
 }
 function canCreatePortfolioProject(portfolioSpace = primaryPortfolioSpace()) {
+  if (activePanelScope()?.type === 'shared') return false;
   return !portfolioSpace || ['owner', 'manager', 'admin'].includes(currentRole(portfolioSpace));
 }
 function portfolioCollaborators(portfolioSpace = primaryPortfolioSpace()) {
@@ -646,6 +750,8 @@ function requestStorageProtection(options = {}) {
 function resetUserScopedInterface() {
   state.renderSequence += 1;
   state.selectedSpaceId = '';
+  state.activePanelId = '';
+  state.pendingPanelId = '';
   state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
@@ -685,6 +791,7 @@ function showAuth(message = '') {
 
 function showWorkspace(user = {}, options = {}) {
   state.user = user;
+  state.activePanelId = getCachedActivePanelId(user.userId);
   if (options.persist !== false) setCachedUser(user);
   elements.authCard?.classList.add('hidden');
   elements.workspace?.classList.remove('hidden');
@@ -815,6 +922,10 @@ async function refreshProjects() {
     .filter(([, data]) => !data.project.loaded)
     .map(([spaceId]) => spaceId);
   state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
+  if (state.pendingPanelId && panelScopes().some((panel) => panel.id === state.pendingPanelId)) {
+    setActivePanelId(state.pendingPanelId);
+    state.pendingPanelId = '';
+  }
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
   if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
   renderDashboard();
@@ -823,9 +934,9 @@ async function refreshProjects() {
   if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
-function renderPortfolioMetrics() {
+function renderPortfolioMetrics(projects = activePanelProjects()) {
   elements.portfolioMetrics.replaceChildren();
-  const projects = [...state.projects.values()].filter((item) => !item.project.isTrashed);
+  projects = (Array.isArray(projects) ? projects : []).filter((item) => !item.project.isTrashed);
   const totalCapital = sumMoneyValues(projects, (item) => item.metrics.totalCapital);
   const totalPurchases = sumMoneyValues(projects, (item) => item.metrics.totalPurchases);
   const available = sumMoneyValues(projects, (item) => item.metrics.availableCapital);
@@ -905,14 +1016,18 @@ function lifecycleStatusMessage(transaction = null) {
 }
 
 function renderDashboard() {
-  renderPortfolioMetrics();
-  const portfolioSpace = primaryPortfolioSpace();
+  const panel = activePanelScope();
+  renderPanelSwitcher(panel);
+  const panelProjects = panel?.projects || [];
+  renderPortfolioMetrics(panelProjects);
+  const portfolioSpace = panel?.type === 'portfolio' ? panel.space : null;
   const canManagePortfolio = Boolean(portfolioSpace && spaceUserCan(portfolioSpace, 'manage_access'));
+  const sharedOnlyPanel = panel?.type === 'shared';
   if (elements.managePortfolioAccessButton) elements.managePortfolioAccessButton.hidden = !canManagePortfolio;
-  if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = Boolean(portfolioSpace && !canManagePortfolio);
+  if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = sharedOnlyPanel || Boolean(portfolioSpace && !canManagePortfolio);
   if (elements.newProjectButton) elements.newProjectButton.hidden = !canCreatePortfolioProject(portfolioSpace);
   elements.projectList.replaceChildren();
-  const allProjects = [...state.projects.values()]
+  const allProjects = panelProjects
     .filter((item) => !item.project.isTrashed)
     .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
   const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
@@ -1648,7 +1763,7 @@ function renderProject() {
   else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
 }
 
-function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); }
+function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); renderDashboard(); renderTrash(); }
 function openProject(spaceId) {
   const data = state.projects.get(spaceId);
   if (!data || data.project.isTrashed) return;
@@ -2586,7 +2701,7 @@ function renderTrash() {
   if (!elements.trashList || !elements.trashCount) return;
   elements.trashList.replaceChildren();
   let count = 0;
-  const ordered = [...state.projects.values()].sort((left, right) => String(right.project.trashedAt || right.project.updatedAt || '').localeCompare(String(left.project.trashedAt || left.project.updatedAt || '')));
+  const ordered = [...activePanelProjects()].sort((left, right) => String(right.project.trashedAt || right.project.updatedAt || '').localeCompare(String(left.project.trashedAt || left.project.updatedAt || '')));
   for (const data of ordered) {
     if (data.project.isTrashed) {
       count += 1;
@@ -2638,6 +2753,7 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
       requestId: createLocalId('portfolio_invite_request')
     });
     portfolioSpace = portfolioResult?.space || null;
+    if (portfolioSpace?.spaceId) setActivePanelId(portfolioSpace.spaceId);
   }
   await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
   applyP2PState(semillaP2P.bootstrapState);
@@ -2733,7 +2849,13 @@ async function respondInvitation(event) {
     const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);
     const accessRevoked = result?.accessRevoked === true;
     const replicaPending = result?.replicaPending === true || relatedResults.some((entry) => entry?.replicaPending === true);
+    if (canonicalDecision === 'accept' && !accessRevoked) {
+      state.pendingPanelId = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
+        ? String(invitation.spaceId || '').trim()
+        : String(invitation?.governanceSpaceId || '').trim() || SHARED_PROJECTS_PANEL_ID;
+    }
     applyP2PState(semillaP2P.bootstrapState);
+    showDashboard();
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = accessRevoked
       ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.')
@@ -2989,6 +3111,15 @@ elements.projectFilterClear?.addEventListener('click', () => {
     elements.projectFilterInput.focus();
   }
   renderDashboard();
+});
+elements.panelList?.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-panel-id]');
+  if (!button) return;
+  setActivePanelId(button.dataset.panelId);
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  renderDashboard();
+  renderTrash();
 });
 elements.projectList?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope]');

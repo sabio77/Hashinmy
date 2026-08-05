@@ -165,7 +165,20 @@
     "loadError": "تعذر تحميل المشاريع.",
     "invitePortfolio": "دعوة إلى لوحة التحكم",
     "managePortfolio": "المشاركون",
-    "emptyRestrictedDescription": "لا توجد مشاريع متاحة لحسابك بعد. يمكن لمالك لوحة التحكم أو المدير أو المشرف إنشاء المشروع الأول."
+    "emptyRestrictedDescription": "لا توجد مشاريع متاحة لحسابك بعد. يمكن لمالك لوحة التحكم أو المدير أو المشرف إنشاء المشروع الأول.",
+    "panelsEyebrow": "مساحات منفصلة",
+    "panelsTitle": "لوحات التحكم",
+    "panelsAvailable": "لوحات التحكم المتاحة",
+    "activePanelMetrics": "ملخص لوحة التحكم النشطة",
+    "personalPanel": "لوحتي",
+    "sharedProjectsPanel": "المشاريع المشتركة",
+    "otherOwner": "مستخدم آخر",
+    "invitedPanel": "لوحة {name}",
+    "personalPanelHint": "مشاريعك ومشاركونك الخاصون.",
+    "sharedProjectsHint": "مشاريع تمت دعوتك إليها بشكل فردي.",
+    "invitedPanelHint": "لوحة مشتركة تشارك فيها.",
+    "panelProjectCountOne": "{count} مشروع",
+    "panelProjectCountMany": "{count} مشاريع"
   },
   "project": {
     "back": "المشاريع →",

@@ -165,7 +165,20 @@
     "loadError": "Projects could not be loaded.",
     "invitePortfolio": "Invite to dashboard",
     "managePortfolio": "Participants",
-    "emptyRestrictedDescription": "No projects are available for your account yet. The dashboard owner, a Manager, or an Admin can create the first one."
+    "emptyRestrictedDescription": "No projects are available for your account yet. The dashboard owner, a Manager, or an Admin can create the first one.",
+    "panelsEyebrow": "Separated workspaces",
+    "panelsTitle": "Dashboards",
+    "panelsAvailable": "Available dashboards",
+    "activePanelMetrics": "Active dashboard summary",
+    "personalPanel": "My dashboard",
+    "sharedProjectsPanel": "Shared projects",
+    "otherOwner": "another user",
+    "invitedPanel": "{name}'s dashboard",
+    "personalPanelHint": "Your own projects and participants.",
+    "sharedProjectsHint": "Projects shared with you individually.",
+    "invitedPanelHint": "A shared dashboard where you participate.",
+    "panelProjectCountOne": "{count} project",
+    "panelProjectCountMany": "{count} projects"
   },
   "project": {
     "back": "← Projects",

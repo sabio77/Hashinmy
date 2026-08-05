@@ -348,6 +348,20 @@ html[dir="rtl"] .update-status {
 }
 
 /* Invitaciones por panel y roles de colaboración. */
+.panel-switcher { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 22px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 10px 28px rgba(15,61,55,.05); }
+.panel-switcher-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.panel-switcher-heading h3 { margin: 0; font-size: 1.05rem; letter-spacing: -.02em; }
+.panel-active-summary { max-width: 58ch; margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.4; text-align: end; }
+.panel-list { display: flex; gap: 10px; overflow-x: auto; padding: 2px 1px 5px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.panel-switcher-card { min-width: min(280px, 78vw); flex: 1 0 230px; display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 10px; padding: 12px; text-align: start; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--surface-soft); cursor: pointer; scroll-snap-align: start; }
+.panel-switcher-card:hover { border-color: color-mix(in srgb, var(--primary) 42%, var(--line)); transform: translateY(-1px); }
+.panel-switcher-card[data-active="true"] { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: color-mix(in srgb, var(--surface-soft) 82%, var(--primary) 18%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent); }
+.panel-switcher-marker { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: var(--primary-strong); background: color-mix(in srgb, var(--surface) 74%, var(--primary) 26%); font-weight: 900; }
+.panel-switcher-copy { min-width: 0; display: grid; gap: 3px; }
+.panel-switcher-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.panel-switcher-copy small { color: var(--muted); font-size: .7rem; line-height: 1.35; }
+html[dir="rtl"] .panel-switcher-card { text-align: right; }
+html[dir="rtl"] .panel-active-summary { text-align: start; }
 .dashboard-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .invite-scope-message { margin: -2px 0 2px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; color: var(--muted); background: var(--surface-soft); font-size: .78rem; line-height: 1.45; }
 .permission-grid[data-role-preset="true"] { opacity: .72; }
@@ -356,4 +370,4 @@ html[dir="rtl"] .update-status {
 .access-role-controls label { display: grid; gap: 6px; color: var(--muted); font-size: .72rem; font-weight: 760; }
 .access-role-controls select { min-height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface); }
 .access-scope-badge { display: inline-flex; margin-inline-start: 7px; padding: 3px 7px; border-radius: 999px; color: var(--primary-strong); background: rgba(20,184,166,.13); font-size: .62rem; font-weight: 850; vertical-align: middle; }
-@media (max-width: 620px) { .dashboard-heading-actions { align-items: stretch; flex-direction: column-reverse; } .dashboard-heading-actions .button { width: 100%; } .dashboard-heading-actions .add-project-button { align-self: flex-end; } .access-role-controls { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .panel-switcher-heading { align-items: flex-start; flex-direction: column; } .panel-active-summary { max-width: none; text-align: start; } .dashboard-heading-actions { align-items: stretch; flex-direction: column-reverse; } .dashboard-heading-actions .button { width: 100%; } .dashboard-heading-actions .add-project-button { align-self: flex-end; } .access-role-controls { grid-template-columns: 1fr; } }

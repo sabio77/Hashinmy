@@ -165,7 +165,20 @@
     "loadError": "No se pudieron cargar los proyectos.",
     "invitePortfolio": "Invitar al panel",
     "managePortfolio": "Participantes",
-    "emptyRestrictedDescription": "Aún no hay proyectos disponibles para tu cuenta. El propietario, un Gerente o un Admin del panel puede crear el primero."
+    "emptyRestrictedDescription": "Aún no hay proyectos disponibles para tu cuenta. El propietario, un Gerente o un Admin del panel puede crear el primero.",
+    "panelsEyebrow": "Espacios separados",
+    "panelsTitle": "Paneles",
+    "panelsAvailable": "Paneles disponibles",
+    "activePanelMetrics": "Resumen del panel activo",
+    "personalPanel": "Mi panel",
+    "sharedProjectsPanel": "Proyectos compartidos",
+    "otherOwner": "otro usuario",
+    "invitedPanel": "Panel de {name}",
+    "personalPanelHint": "Tus proyectos y participantes propios.",
+    "sharedProjectsHint": "Proyectos a los que te invitaron de forma individual.",
+    "invitedPanelHint": "Panel compartido al que perteneces como participante.",
+    "panelProjectCountOne": "{count} proyecto",
+    "panelProjectCountMany": "{count} proyectos"
   },
   "project": {
     "back": "← Proyectos",
