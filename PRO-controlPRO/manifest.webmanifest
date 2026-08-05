@@ -25,49 +25,109 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "./assets/icons/icon-192.png",
+      "src": "./assets/logoAPP_16x16.png?v=1078e781510356620e5d",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_32x32.png?v=9251f6dedc9239502030",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_48x48.png?v=c9e20856102de013fd0c",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_72x72.png?v=b36cbed2ee69cca7ddea",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_96x96.png?v=0279392149e4d3765df5",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_128x128.png?v=f5e6e40b8a6d922f6831",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_144x144.png?v=fd0c5d21feb4651f96e0",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_152x152.png?v=fcccce6032508170e7e7",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_180x180.png?v=1197b4d6e5a0580b1d10",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/icons/icon-512.png",
+      "src": "./assets/logoAPP_384x384.png?v=e0da336cf0dfa5c57988",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logoAPP_512x512.png?v=d644211fc47131d7859e",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/icons/maskable-192.png",
+      "src": "./assets/logoAPP_maskable_192x192.png?v=6ad4aeccaa64a65201bb",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "./assets/icons/maskable-512.png",
+      "src": "./assets/logoAPP_maskable_512x512.png?v=a8603e3b67e851fea0b1",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22192%22%20height=%22192%22%20viewBox=%220%200%20192%20192%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20instalable%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2242%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2242%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2223%22%20y=%2223%22%20width=%22146%22%20height=%22146%22%20rx=%2229%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%2296%22%20cy=%2283%22%20r=%2227%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%2063%20123c15-21%2046-21%2065%200%22%20stroke=%22%23fff%22%20stroke-width=%229%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22161%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2231%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22192%22%20height%3D%22192%22%20viewBox%3D%220%200%20192%20192%22%20role%3D%22img%22%20aria-label%3D%22Logo%20geom%C3%A9trico%20de%20respaldo%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23128c7e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23075e54%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22192%22%20height%3D%22192%22%20rx%3D%2242%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2233.58%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2211%22%20opacity%3D%22.94%22%2F%3E%3Cpath%20d%3D%22M%2023%2096%20C%2053.76%2044.16%2C%2082.56%2044.16%2C%2096%2096%20C%20109.44%20147.84%2C%20138.24%20147.84%2C%20169%2096%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2211%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.94%22%2F%3E%3C%2Fsvg%3E",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22512%22%20height=%22512%22%20viewBox=%220%200%20512%20512%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20instalable%20512%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22113%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22113%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2261%22%20y=%2261%22%20width=%22390%22%20height=%22390%22%20rx=%2278%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22220%22%20r=%2272%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%20169%20328c41-56%20123-56%20174%200%22%20stroke=%22%23fff%22%20stroke-width=%2223%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22430%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2282%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22192%22%20height=%22192%22%20viewBox=%220%200%20192%20192%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20adaptable%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2254%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2254%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2235%22%20y=%2235%22%20width=%22122%22%20height=%22122%22%20rx=%2224%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%2296%22%20cy=%2283%22%20r=%2227%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%2063%20123c15-21%2046-21%2065%200%22%20stroke=%22%23fff%22%20stroke-width=%229%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22161%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2231%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22192%22%20height%3D%22192%22%20viewBox%3D%220%200%20192%20192%22%20role%3D%22img%22%20aria-label%3D%22Logo%20geom%C3%A9trico%20de%20respaldo%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23128c7e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23075e54%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22192%22%20height%3D%22192%22%20rx%3D%2254%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2226.68%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2211%22%20opacity%3D%22.94%22%2F%3E%3Cpath%20d%3D%22M%2038%2096%20C%2053.76%2044.16%2C%2082.56%2044.16%2C%2096%2096%20C%20109.44%20147.84%2C%20138.24%20147.84%2C%20154%2096%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2211%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.94%22%2F%3E%3C%2Fsvg%3E",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22512%22%20height=%22512%22%20viewBox=%220%200%20512%20512%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20adaptable%20512%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22143%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22143%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2292%22%20y=%2292%22%20width=%22328%22%20height=%22328%22%20rx=%2266%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22220%22%20r=%2272%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%20169%20328c41-56%20123-56%20174%200%22%20stroke=%22%23fff%22%20stroke-width=%2223%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22430%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2282%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22512%22%20height%3D%22512%22%20viewBox%3D%220%200%20512%20512%22%20role%3D%22img%22%20aria-label%3D%22Logo%20geom%C3%A9trico%20de%20respaldo%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23128c7e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23075e54%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22113%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Ccircle%20cx%3D%22256%22%20cy%3D%22256%22%20r%3D%2289.7%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2228%22%20opacity%3D%22.94%22%2F%3E%3Cpath%20d%3D%22M%2061%20256%20C%20143.36%20117.76%2C%20220.16%20117.76%2C%20256%20256%20C%20291.84%20394.24%2C%20368.64%20394.24%2C%20451%20256%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2228%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.94%22%2F%3E%3C%2Fsvg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22512%22%20height%3D%22512%22%20viewBox%3D%220%200%20512%20512%22%20role%3D%22img%22%20aria-label%3D%22Logo%20geom%C3%A9trico%20de%20respaldo%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23128c7e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23075e54%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22143%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Ccircle%20cx%3D%22256%22%20cy%3D%22256%22%20r%3D%2270.84%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2228%22%20opacity%3D%22.94%22%2F%3E%3Cpath%20d%3D%22M%20102%20256%20C%20143.36%20117.76%2C%20220.16%20117.76%2C%20256%20256%20C%20291.84%20394.24%2C%20368.64%20394.24%2C%20410%20256%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2228%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.94%22%2F%3E%3C%2Fsvg%3E",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -81,7 +141,7 @@
       "url": "./?shortcut=open",
       "icons": [
         {
-          "src": "./assets/icons/icon-192.png",
+          "src": "./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7",
           "sizes": "192x192",
           "type": "image/png"
         }

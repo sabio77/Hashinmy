@@ -40,7 +40,8 @@
     lastPrefetchedReleaseAssets: storagePrefix + ':last-prefetched-release-assets-key',
     lastReloadAt: storagePrefix + ':last-reload-at',
     lastReloadKey: storagePrefix + ':last-reload-key',
-    leaderLock: storagePrefix + ':update-leader-lock'
+    leaderLock: storagePrefix + ':update-leader-lock',
+    appIdentity: storagePrefix + ':app-identity-key'
   };
 
   var channel = createBroadcastChannel();
@@ -83,6 +84,61 @@
       payload.channel || payload.updateChannel,
       payload.releaseId
     ].filter(Boolean).join('|');
+  }
+
+  function normalizeAppIdentity(payload) {
+    var identity = payload && payload.appIdentity;
+    if (!identity || typeof identity !== 'object') return '';
+    return [identity.iconVersion, identity.interfaceLogo, identity.favicon, identity.appleTouchIcon]
+      .filter(Boolean)
+      .join('|');
+  }
+
+  function normalizeSameOriginAssetUrl(value) {
+    if (!value) return '';
+    try {
+      var url = new URL(String(value), window.location.href);
+      if (url.origin !== window.location.origin) return '';
+      return url.toString();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function updateIdentityLink(role, url) {
+    var safeUrl = normalizeSameOriginAssetUrl(url);
+    if (!safeUrl) return false;
+    var link = document.querySelector('link[data-app-icon-role="' + role + '"]');
+    if (!link) return false;
+    if (link.href === safeUrl) return false;
+    link.href = safeUrl;
+    return true;
+  }
+
+  function syncDocumentAppIdentity(payload) {
+    var identity = payload && payload.appIdentity;
+    if (!identity || typeof identity !== 'object') return false;
+
+    var identityKey = normalizeAppIdentity(payload);
+    var previousIdentityKey = localStorage.getItem(storageKeys.appIdentity) || '';
+    if (identityKey && previousIdentityKey === identityKey) return false;
+
+    var changed = false;
+    changed = updateIdentityLink('favicon', identity.favicon) || changed;
+    changed = updateIdentityLink('apple-touch-icon', identity.appleTouchIcon) || changed;
+
+    var interfaceLogo = normalizeSameOriginAssetUrl(identity.interfaceLogo);
+    if (interfaceLogo && window.AppAssetLoader && typeof window.AppAssetLoader.refreshAppIdentity === 'function') {
+      window.AppAssetLoader.refreshAppIdentity(interfaceLogo);
+      changed = true;
+    }
+
+    if (identityKey) localStorage.setItem(storageKeys.appIdentity, identityKey);
+
+    if (changed) {
+      document.dispatchEvent(new CustomEvent('app-identity-updated', { detail: identity }));
+    }
+    return changed;
   }
 
   function normalizeReleaseAssets(payload) {
@@ -305,6 +361,7 @@
   async function checkVersionEndpoint() {
     var payload = await fetchJsonNoStore(config.versionEndpoint || './version.json');
     state.lastServerPayload = payload;
+    syncDocumentAppIdentity(payload);
 
     var serverVersionKey = normalizeVersion(payload);
     var storedVersionKey = localStorage.getItem(storageKeys.version) || '';

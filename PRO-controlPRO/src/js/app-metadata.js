@@ -37,9 +37,9 @@
 
   var metadata = Object.freeze({
     appName: 'Semilla App Web',
-    version: '1.9.97',
-    build: '2026-08-04-158',
-    releasedAt: '2026-08-04T16:09:38-05:00',
+    version: '1.9.98',
+    build: '2026-08-04-159',
+    releasedAt: '2026-08-04T20:47:00-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
@@ -47,6 +47,13 @@
     cacheNamespace: applicationId === 'root' ? 'semilla-appweb-pwa' : 'semilla-appweb-pwa:' + applicationStorageScope,
     updateChannel: 'stable',
     environment: 'production',
+    appIconVersion: '4719159321b39a5d3eac',
+    appIconPaths: Object.freeze({
+      interface: './assets/logoAPP_192x192.png',
+      favicon: './assets/logoAPP_32x32.png',
+      appleTouch: './assets/logoAPP_180x180.png',
+      notification: './assets/logoAPP_192x192.png'
+    }),
 
     // Lista mínima del shell instalable. Puedes agregar más archivos de tu app real.
     // Los íconos pueden no existir al crear la semilla; por eso se manejan como assets opcionales.
@@ -87,11 +94,20 @@
       './textX/app/en.json',
       './textX/seo/en.json',
       './P2P_sin_RED_LOCALx/P2P_sin_transport.js',
-      './assets/icons/logo.png',
-      './assets/icons/icon-192.png',
-      './assets/icons/icon-512.png',
-      './assets/icons/maskable-192.png',
-      './assets/icons/maskable-512.png'
+      './assets/logoAPP_16x16.png',
+      './assets/logoAPP_32x32.png',
+      './assets/logoAPP_48x48.png',
+      './assets/logoAPP_72x72.png',
+      './assets/logoAPP_96x96.png',
+      './assets/logoAPP_128x128.png',
+      './assets/logoAPP_144x144.png',
+      './assets/logoAPP_152x152.png',
+      './assets/logoAPP_180x180.png',
+      './assets/logoAPP_192x192.png',
+      './assets/logoAPP_384x384.png',
+      './assets/logoAPP_512x512.png',
+      './assets/logoAPP_maskable_192x192.png',
+      './assets/logoAPP_maskable_512x512.png'
     ],
 
     // Rutas típicas de APIs reales: no se cachean para evitar datos obsoletos.

@@ -19,10 +19,12 @@ import hashlib
 import json
 import os
 import re
+import struct
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Set
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "version.json"
@@ -31,6 +33,8 @@ CONFIG_FILE = ROOT / "src" / "js" / "config.js"
 RUNTIME_CONFIG_FILE = ROOT / "src" / "js" / "runtime-config.js"
 TEXTX_DIR = ROOT / "textX"
 LANGUAGE_MANIFEST_FILE = TEXTX_DIR / "languages.json"
+MANIFEST_FILE = ROOT / "manifest.webmanifest"
+INDEX_FILE = ROOT / "index.html"
 
 DEFAULT_FALLBACK_LANGUAGE = "es"
 DEFAULT_CRITICAL_ASSETS = [
@@ -63,22 +67,30 @@ DEFAULT_CRITICAL_ASSETS = [
     "./src/js/app.js",
 ]
 
-OPTIONAL_RUNTIME_ASSETS = [
-    "./P2P_sin_RED_LOCALx/P2P_sin_transport.js",
-    "./assets/icons/logo.png",
-    "./assets/icons/icon-192.png",
-    "./assets/icons/icon-512.png",
-    "./assets/icons/maskable-192.png",
-    "./assets/icons/maskable-512.png",
+APP_ICON_SPECS = [
+    {"path": "./assets/logoAPP_16x16.png", "sizes": "16x16", "purpose": "any"},
+    {"path": "./assets/logoAPP_32x32.png", "sizes": "32x32", "purpose": "any"},
+    {"path": "./assets/logoAPP_48x48.png", "sizes": "48x48", "purpose": "any"},
+    {"path": "./assets/logoAPP_72x72.png", "sizes": "72x72", "purpose": "any"},
+    {"path": "./assets/logoAPP_96x96.png", "sizes": "96x96", "purpose": "any"},
+    {"path": "./assets/logoAPP_128x128.png", "sizes": "128x128", "purpose": "any"},
+    {"path": "./assets/logoAPP_144x144.png", "sizes": "144x144", "purpose": "any"},
+    {"path": "./assets/logoAPP_152x152.png", "sizes": "152x152", "purpose": "any"},
+    {"path": "./assets/logoAPP_180x180.png", "sizes": "180x180", "purpose": "any"},
+    {"path": "./assets/logoAPP_192x192.png", "sizes": "192x192", "purpose": "any"},
+    {"path": "./assets/logoAPP_384x384.png", "sizes": "384x384", "purpose": "any"},
+    {"path": "./assets/logoAPP_512x512.png", "sizes": "512x512", "purpose": "any"},
+    {"path": "./assets/logoAPP_maskable_192x192.png", "sizes": "192x192", "purpose": "maskable"},
+    {"path": "./assets/logoAPP_maskable_512x512.png", "sizes": "512x512", "purpose": "maskable"}
 ]
 
-DEFAULT_PROMPT_ASSETS = [
-    "./assets/icons/logo.png.txt",
-    "./assets/icons/icon-192.png.txt",
-    "./assets/icons/icon-512.png.txt",
-    "./assets/icons/maskable-192.png.txt",
-    "./assets/icons/maskable-512.png.txt",
+OPTIONAL_RUNTIME_ASSETS = [
+    "./P2P_sin_RED_LOCALx/P2P_sin_transport.js",
+    *[item["path"] for item in APP_ICON_SPECS],
 ]
+
+DEFAULT_PROMPT_ASSETS = [f"{item['path']}.txt" for item in APP_ICON_SPECS]
+
 
 
 def read_json(path: Path) -> Dict[str, Any]:
@@ -103,6 +115,203 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def app_icon_source_file(public_path: str) -> Path | None:
+    image = public_to_file(public_path)
+    if image.exists():
+        return image
+    prompt = Path(str(image) + ".txt")
+    return prompt if prompt.exists() else None
+
+
+def validate_png_dimensions(public_path: str, expected_sizes: str) -> None:
+    image = public_to_file(public_path)
+    if not image.exists():
+        return
+
+    raw = image.read_bytes()
+    if len(raw) < 33 or raw[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"{public_path} existe pero no es un PNG válido.")
+
+    offset = 8
+    width = height = 0
+    saw_ihdr = saw_idat = saw_iend = False
+    while offset + 12 <= len(raw):
+        length = struct.unpack(">I", raw[offset:offset + 4])[0]
+        chunk_type = raw[offset + 4:offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(raw):
+            raise ValueError(f"{public_path} contiene un chunk PNG truncado.")
+
+        chunk_data = raw[data_start:data_end]
+        expected_crc = struct.unpack(">I", raw[data_end:crc_end])[0]
+        actual_crc = zlib.crc32(chunk_type)
+        actual_crc = zlib.crc32(chunk_data, actual_crc) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise ValueError(f"{public_path} contiene un chunk PNG con CRC inválido.")
+
+        if chunk_type == b"IHDR":
+            if saw_ihdr or offset != 8 or length != 13:
+                raise ValueError(f"{public_path} contiene un IHDR PNG inválido.")
+            width, height = struct.unpack(">II", chunk_data[:8])
+            saw_ihdr = True
+        elif chunk_type == b"IDAT":
+            saw_idat = True
+        elif chunk_type == b"IEND":
+            if length != 0:
+                raise ValueError(f"{public_path} contiene un IEND PNG inválido.")
+            saw_iend = True
+            offset = crc_end
+            break
+
+        offset = crc_end
+
+    if not (saw_ihdr and saw_idat and saw_iend) or offset != len(raw):
+        raise ValueError(f"{public_path} no contiene una estructura PNG completa.")
+
+    expected_width, expected_height = (int(value) for value in expected_sizes.lower().split("x", 1))
+    if (width, height) != (expected_width, expected_height):
+        raise ValueError(
+            f"{public_path} debe medir {expected_width}x{expected_height}px, "
+            f"pero mide {width}x{height}px."
+        )
+
+
+def app_icon_fingerprint(public_path: str) -> str:
+    source = app_icon_source_file(public_path)
+    return sha256_file(source)[:20] if source else "missing"
+
+
+def versioned_app_icon_url(public_path: str) -> str:
+    return f"{public_path}?v={app_icon_fingerprint(public_path)}"
+
+
+def build_app_identity() -> Dict[str, Any]:
+    icons: List[Dict[str, Any]] = []
+    for spec in APP_ICON_SPECS:
+        public_path = str(spec["path"])
+        image = public_to_file(public_path)
+        validate_png_dimensions(public_path, str(spec["sizes"]))
+        icons.append({
+            "url": versioned_app_icon_url(public_path),
+            "path": public_path,
+            "sizes": spec["sizes"],
+            "purpose": spec["purpose"],
+            "fingerprint": app_icon_fingerprint(public_path),
+            "available": image.exists(),
+        })
+
+    fingerprint_material = "|".join(
+        f"{item['path']}:{item['fingerprint']}:{item['purpose']}" for item in icons
+    ).encode("utf-8")
+    icon_version = hashlib.sha256(fingerprint_material).hexdigest()[:20]
+
+    by_path = {item["path"]: item for item in icons}
+    return {
+        "manifest": "./manifest.webmanifest",
+        "iconVersion": icon_version,
+        "updateMode": "fingerprinted-icon-url",
+        "interfaceLogo": by_path["./assets/logoAPP_192x192.png"]["url"],
+        "favicon": by_path["./assets/logoAPP_32x32.png"]["url"],
+        "appleTouchIcon": by_path["./assets/logoAPP_180x180.png"]["url"],
+        "notificationIcon": by_path["./assets/logoAPP_192x192.png"]["url"],
+        "icons": icons,
+    }
+
+
+def generated_icon_fallback_data_uri(size: int, *, maskable: bool = False) -> str:
+    radius = round(size * (0.28 if maskable else 0.22))
+    margin = round(size * (0.20 if maskable else 0.12))
+    inner = size - (margin * 2)
+    stroke = max(2, round(size * 0.055))
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}" role="img" aria-label="Logo geométrico de respaldo">'
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#128c7e"/><stop offset="1" stop-color="#075e54"/></linearGradient></defs>'
+        f'<rect width="{size}" height="{size}" rx="{radius}" fill="url(#g)"/>'
+        f'<circle cx="{size/2:g}" cy="{size/2:g}" r="{inner*0.23:g}" fill="none" stroke="#fff" stroke-width="{stroke}" opacity=".94"/>'
+        f'<path d="M {margin} {size/2:g} C {size*0.28:g} {size*0.23:g}, {size*0.43:g} {size*0.23:g}, {size/2:g} {size/2:g} C {size*0.57:g} {size*0.77:g}, {size*0.72:g} {size*0.77:g}, {size-margin} {size/2:g}" fill="none" stroke="#fff" stroke-width="{stroke}" stroke-linecap="round" opacity=".94"/>'
+        '</svg>'
+    )
+    return "data:image/svg+xml," + quote(svg, safe="")
+
+
+def update_manifest_file(app_identity: Dict[str, Any]) -> None:
+    manifest = read_json(MANIFEST_FILE)
+    manifest_icons = [
+        {
+            "src": item["url"],
+            "sizes": item["sizes"],
+            "type": "image/png",
+            "purpose": item["purpose"],
+        }
+        for item in app_identity["icons"]
+    ]
+    for size in (192, 512):
+        manifest_icons.append({
+            "src": generated_icon_fallback_data_uri(size),
+            "sizes": f"{size}x{size}",
+            "type": "image/svg+xml",
+            "purpose": "any",
+        })
+        manifest_icons.append({
+            "src": generated_icon_fallback_data_uri(size, maskable=True),
+            "sizes": f"{size}x{size}",
+            "type": "image/svg+xml",
+            "purpose": "maskable",
+        })
+
+    manifest["icons"] = manifest_icons
+    shortcut_icon = next(
+        item for item in app_identity["icons"]
+        if item["path"] == "./assets/logoAPP_192x192.png"
+    )
+    for shortcut in manifest.get("shortcuts", []):
+        shortcut["icons"] = [{
+            "src": shortcut_icon["url"],
+            "sizes": shortcut_icon["sizes"],
+            "type": "image/png",
+        }]
+    write_json(MANIFEST_FILE, manifest)
+
+
+def replace_role_url(text: str, role: str, value: str, attribute: str = "href", *, replace_all: bool = False) -> str:
+    tag_pattern = re.compile(rf'<[^>]*\bdata-app-icon-role="{re.escape(role)}"[^>]*>')
+    matches = list(tag_pattern.finditer(text))
+    if not matches:
+        raise RuntimeError(f"No se encontró data-app-icon-role={role} en index.html")
+
+    selected = matches if replace_all else matches[:1]
+    chunks: List[str] = []
+    cursor = 0
+    for match in selected:
+        tag = match.group(0)
+        attribute_pattern = re.compile(rf'(\b{re.escape(attribute)}=")[^"]+(")')
+        updated_tag, count = attribute_pattern.subn(rf'\g<1>{value}\g<2>', tag, count=1)
+        if count != 1:
+            raise RuntimeError(f"El rol {role} no contiene el atributo {attribute} esperado.")
+        chunks.append(text[cursor:match.start()])
+        chunks.append(updated_tag)
+        cursor = match.end()
+    chunks.append(text[cursor:])
+    return "".join(chunks)
+
+
+def update_index_identity(app_identity: Dict[str, Any]) -> None:
+    text = INDEX_FILE.read_text(encoding="utf-8")
+    text = replace_role_url(text, "favicon", app_identity["favicon"])
+    text = replace_role_url(text, "apple-touch-icon", app_identity["appleTouchIcon"])
+
+    text = replace_role_url(
+        text,
+        "interface-logo",
+        app_identity["interfaceLogo"],
+        attribute="data-image-src",
+        replace_all=True,
+    )
+    INDEX_FILE.write_text(text, encoding="utf-8")
 
 
 def asset_record(public_path: str, *, required: bool = True) -> Dict[str, Any] | None:
@@ -428,7 +637,7 @@ def update_runtime_config_file(*, require_backend: bool = False) -> str:
     return backend_url
 
 
-def update_metadata_file(version: str, build: str, released_at: str, language_manifest: Dict[str, Any]) -> None:
+def update_metadata_file(version: str, build: str, released_at: str, language_manifest: Dict[str, Any], app_identity: Dict[str, Any]) -> None:
     if not METADATA_FILE.exists():
         return
 
@@ -437,6 +646,7 @@ def update_metadata_file(version: str, build: str, released_at: str, language_ma
         r"version:\s*'[^']+'": f"version: '{version}'",
         r"build:\s*'[^']+'": f"build: '{build}'",
         r"releasedAt:\s*'[^']+'": f"releasedAt: '{released_at}'",
+        r"appIconVersion:\s*'[^']+'": f"appIconVersion: '{app_identity['iconVersion']}'",
     }
 
     for pattern, value in replacements.items():
@@ -496,17 +706,20 @@ def main() -> None:
     backend_url = update_runtime_config_file(require_backend=args.require_backend or render_environment())
     language_manifest = discover_languages(released_at)
     prompt_assets = discover_prompt_assets()
+    app_identity = build_app_identity()
+    update_manifest_file(app_identity)
+    update_index_identity(app_identity)
     write_json(LANGUAGE_MANIFEST_FILE, language_manifest)
 
     if not args.no_metadata:
-        update_metadata_file(version, build, released_at, language_manifest)
+        update_metadata_file(version, build, released_at, language_manifest, app_identity)
         update_config_file(language_manifest, prompt_assets)
 
     assets = build_critical_assets(language_manifest, prompt_assets)
 
     next_payload = {
         **current,
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "releaseId": build_release_id(version, build),
         "version": version,
         "build": build,
@@ -531,6 +744,7 @@ def main() -> None:
             "requiresPair": ["textX/app/<code>.json", "textX/seo/<code>.json"],
             "languages": [item["code"] for item in language_manifest.get("languages", [])],
         },
+        "appIdentity": app_identity,
         "assetPrompts": {
             "autoDiscovery": "build-time scan of assets/**/*.png.txt",
             "count": len(prompt_assets),

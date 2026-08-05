@@ -1,8 +1,0 @@
-{
-  "target_image": "assets/icons/icon-512.png",
-  "type": "pwa_icon",
-  "size": "512x512",
-  "format": "png",
-  "purpose": "any",
-  "prompt": "Crear un ícono cuadrado profesional para una app web instalable reutilizable. Fondo sólido con gradiente sutil verde/azul, símbolo geométrico simple tipo semilla digital o ventana de app, alto contraste, bordes limpios, sin texto, legible en tamaños pequeños, estilo moderno de producción, centrado, margen seguro de 12%."
-}

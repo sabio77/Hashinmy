@@ -36,7 +36,7 @@ El archivo `render.yaml` incluido usa:
 python tools/generate-release.py
 ```
 
-como `buildCommand` y publica la raíz del proyecto. Así, al pegar un nuevo idioma en `textX/app` y `textX/seo`, o al agregar/cambiar `assets/icons/logo.png`, Render regenera los manifiestos antes de servir el static site.
+como `buildCommand` y publica la raíz del proyecto. Así, al pegar un nuevo idioma en `textX/app` y `textX/seo`, o al agregar/cambiar cualquier `assets/logoAPP_*.png`, Render regenera los manifiestos antes de servir el static site.
 
 ## Flujo recomendado de despliegue
 

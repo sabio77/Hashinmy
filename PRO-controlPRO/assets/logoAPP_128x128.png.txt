@@ -1,0 +1,20 @@
+{
+  "archivo_objetivo": "logoAPP_128x128.png",
+  "formato_salida": "PNG",
+  "dimensiones_px": {
+    "ancho": 128,
+    "alto": 128
+  },
+  "fondo": "transparente",
+  "uso": "launcher",
+  "prompt": "Logo de aplicación profesional, minimalista y geométrico para una plataforma moderna de control de proyectos y colaboración P2P. Crear un símbolo abstracto único que sugiera sincronización entre dispositivos, flujo de información y control administrativo, mediante dos formas continuas entrelazadas alrededor de un núcleo estable. Diseño simple, memorable, equilibrado, de bordes limpios, alto contraste, lectura inmediata en tamaños pequeños, sin letras, sin palabras, sin números, sin marcas conocidas y sin semejanza con logotipos existentes. Paleta principal verde petróleo y verde esmeralda con una variación tonal sutil; acabado plano, sin mockup y sin fondo.",
+  "zona_segura": "Mantener el símbolo legible con al menos 10% de margen interior y sin detalles menores a 2 píxeles en el tamaño final.",
+  "requisitos_tecnicos": [
+    "Composición centrada y perfectamente cuadrada.",
+    "Canal alfa real; no simular transparencia con cuadrícula.",
+    "Sin sombras externas, marcos, fotografías, texturas ni degradados complejos.",
+    "Conservar exactamente el mismo símbolo y proporciones en toda la familia logoAPP_.",
+    "Optimizar nitidez para el tamaño objetivo sin añadir texto."
+  ],
+  "negative_prompt": "texto, letras, APP, números, watermark, marca registrada, swoosh, Nike, icono genérico de nube, manos, personas, fotografía, 3D, mockup, fondo sólido, ruido, detalles diminutos, bordes borrosos"
+}

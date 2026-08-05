@@ -53,6 +53,7 @@ function createWorker(cacheNamespace, cacheNames = []) {
     cacheNamespace,
     version: '1.9.50',
     build: 'cache-isolation-test',
+    appIconVersion: 'logo-test',
     precacheUrls: []
   };
 
@@ -76,8 +77,8 @@ async function assertFullCacheCleanup(cacheNamespace, names, expectedDeleted) {
 }
 
 await assertOldCacheCleanup('semilla-appweb-pwa', [
-  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test',
+  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test-logo-test',
   'semilla-appweb-pwa-static-1.9.49-old',
   'semilla-appweb-pwa-runtime-1.9.49-old',
   'semilla-appweb-pwa:contabilidad-static-1.9.49-old',
@@ -89,18 +90,18 @@ await assertOldCacheCleanup('semilla-appweb-pwa', [
 ]);
 
 await assertFullCacheCleanup('semilla-appweb-pwa', [
-  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa:contabilidad-static-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa:contabilidad-runtime-1.9.50-cache-isolation-test'
+  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa:contabilidad-static-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa:contabilidad-runtime-1.9.50-cache-isolation-test-logo-test'
 ], [
-  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test'
+  'semilla-appweb-pwa-static-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa-runtime-1.9.50-cache-isolation-test-logo-test'
 ]);
 
 await assertOldCacheCleanup('semilla-appweb-pwa:contabilidad', [
-  'semilla-appweb-pwa:contabilidad-static-1.9.50-cache-isolation-test',
-  'semilla-appweb-pwa:contabilidad-runtime-1.9.50-cache-isolation-test',
+  'semilla-appweb-pwa:contabilidad-static-1.9.50-cache-isolation-test-logo-test',
+  'semilla-appweb-pwa:contabilidad-runtime-1.9.50-cache-isolation-test-logo-test',
   'semilla-appweb-pwa:contabilidad-static-1.9.49-old',
   'semilla-appweb-pwa:contabilidad-runtime-1.9.49-old',
   'semilla-appweb-pwa:contabilidad-pro-static-1.9.49-old',

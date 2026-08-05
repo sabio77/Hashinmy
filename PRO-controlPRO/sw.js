@@ -8,9 +8,12 @@ try {
 
 const APP_META = self.APP_SEED_METADATA || {};
 const CACHE_NAMESPACE = String(APP_META.cacheNamespace || 'semilla-appweb-pwa');
+const APP_ICON_VERSION = sanitizeCachePart(APP_META.appIconVersion || 'seed');
+const APP_ICON_PATHS = APP_META.appIconPaths || {};
 const APP_VERSION_KEY = sanitizeCachePart([
   APP_META.version || '0.0.0',
-  APP_META.build || 'desarrollo'
+  APP_META.build || 'desarrollo',
+  APP_ICON_VERSION
 ].join('-'));
 
 const STATIC_CACHE_PREFIX = `${CACHE_NAMESPACE}-static-`;
@@ -61,10 +64,20 @@ const DEFAULT_APP_SHELL = [
   './src/js/pwa-update-manager.js',
   './src/js/app.js',
   './P2P_sin_RED_LOCALx/P2P_sin_transport.js',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png',
-  './assets/icons/maskable-192.png',
-  './assets/icons/maskable-512.png'
+  './assets/logoAPP_16x16.png',
+  './assets/logoAPP_32x32.png',
+  './assets/logoAPP_48x48.png',
+  './assets/logoAPP_72x72.png',
+  './assets/logoAPP_96x96.png',
+  './assets/logoAPP_128x128.png',
+  './assets/logoAPP_144x144.png',
+  './assets/logoAPP_152x152.png',
+  './assets/logoAPP_180x180.png',
+  './assets/logoAPP_192x192.png',
+  './assets/logoAPP_384x384.png',
+  './assets/logoAPP_512x512.png',
+  './assets/logoAPP_maskable_192x192.png',
+  './assets/logoAPP_maskable_512x512.png'
 ];
 
 const APP_SHELL = Array.isArray(APP_META.precacheUrls) && APP_META.precacheUrls.length
@@ -110,11 +123,20 @@ const INTERNAL_CACHE_BUST_PARAMS = [
   '__asset'
 ];
 const GENERATED_IMAGE_FALLBACKS = [
-  { path: '/assets/icons/logo.png', width: 96, height: 96, label: 'Logo de la app' },
-  { path: '/assets/icons/icon-192.png', width: 192, height: 192, label: 'Icono instalable 192' },
-  { path: '/assets/icons/icon-512.png', width: 512, height: 512, label: 'Icono instalable 512' },
-  { path: '/assets/icons/maskable-192.png', width: 192, height: 192, label: 'Icono adaptable 192' },
-  { path: '/assets/icons/maskable-512.png', width: 512, height: 512, label: 'Icono adaptable 512' }
+  { path: '/assets/logoAPP_16x16.png', width: 16, height: 16, label: 'Logo de la app 16' },
+  { path: '/assets/logoAPP_32x32.png', width: 32, height: 32, label: 'Logo de la app 32' },
+  { path: '/assets/logoAPP_48x48.png', width: 48, height: 48, label: 'Logo de la app 48' },
+  { path: '/assets/logoAPP_72x72.png', width: 72, height: 72, label: 'Logo de la app 72' },
+  { path: '/assets/logoAPP_96x96.png', width: 96, height: 96, label: 'Logo de la app 96' },
+  { path: '/assets/logoAPP_128x128.png', width: 128, height: 128, label: 'Logo de la app 128' },
+  { path: '/assets/logoAPP_144x144.png', width: 144, height: 144, label: 'Logo de la app 144' },
+  { path: '/assets/logoAPP_152x152.png', width: 152, height: 152, label: 'Logo de la app 152' },
+  { path: '/assets/logoAPP_180x180.png', width: 180, height: 180, label: 'Logo de la app 180' },
+  { path: '/assets/logoAPP_192x192.png', width: 192, height: 192, label: 'Logo de la app 192' },
+  { path: '/assets/logoAPP_384x384.png', width: 384, height: 384, label: 'Logo de la app 384' },
+  { path: '/assets/logoAPP_512x512.png', width: 512, height: 512, label: 'Logo de la app 512' },
+  { path: '/assets/logoAPP_maskable_192x192.png', width: 192, height: 192, label: 'Logo de la app 192 adaptable' },
+  { path: '/assets/logoAPP_maskable_512x512.png', width: 512, height: 512, label: 'Logo de la app 512 adaptable' }
 ];
 const NETWORK_ONLY_PATH_PREFIXES = Array.isArray(APP_META.networkOnlyPathPrefixes)
   ? APP_META.networkOnlyPathPrefixes
@@ -853,6 +875,12 @@ async function broadcast(payload) {
   });
 }
 
+function buildVersionedAppIconUrl(path) {
+  const url = new URL(path || './assets/logoAPP_192x192.png', APP_BASE_URL);
+  url.searchParams.set('v', APP_ICON_VERSION);
+  return url.toString();
+}
+
 function sanitizeCachePart(value) {
   return String(value).replace(/[^a-zA-Z0-9._-]/g, '-');
 }
@@ -888,8 +916,8 @@ self.addEventListener('push', function receiveP2PPush(event) {
       body: payload.body || 'Tienes una nueva actualización compartida.',
       tag: payload.tag || 'semilla-p2p',
       renotify: true,
-      badge: './assets/icons/icon-192.png',
-      icon: './assets/icons/icon-192.png',
+      badge: buildVersionedAppIconUrl(APP_ICON_PATHS.notification || './assets/logoAPP_192x192.png'),
+      icon: buildVersionedAppIconUrl(APP_ICON_PATHS.notification || './assets/logoAPP_192x192.png'),
       data: {
         url: payload.url || './index.html',
         type: payload.type || 'p2p.notification',

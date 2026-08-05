@@ -377,7 +377,7 @@ El script regenera `textX/languages.json`; la app y el selector detectan el nuev
 
 ## Imágenes y logo
 
-No se crean imágenes dentro de la semilla. Cada imagen esperada tiene su prompt `.txt` en `assets/icons`. Si el PNG no existe, la UI muestra una figura geométrica del tamaño esperado; el manifest incluye íconos geométricos embebidos como `data:image/svg+xml` para mantener la instalabilidad inicial; y el Service Worker puede responder una figura vectorial de respaldo para las rutas PNG declaradas. Si luego subes `assets/icons/logo.png` o cambias los íconos del manifest, la app instalada detecta el cambio por `version.json`/huellas o por la verificación directa disparada por eventos reales, y recarga sin polling.
+No se crean imágenes dentro de la semilla. Cada imagen esperada tiene su prompt `.txt` directamente en `assets/` y toda la familia oficial comienza con `logoAPP_`. Si el PNG no existe, la UI muestra una figura geométrica del tamaño esperado; el manifest incluye íconos geométricos embebidos como `data:image/svg+xml` para mantener la instalabilidad inicial; y el Service Worker puede responder una figura vectorial de respaldo para las rutas PNG declaradas. Si luego agregas o sustituyes cualquiera de los PNG `assets/logoAPP_*.png` y despliegas, la app instalada detecta el cambio por `version.json`/huellas o por la verificación directa disparada por eventos reales, y recarga sin polling.
 
 ## Autoescalabilidad
 

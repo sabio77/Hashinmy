@@ -15,8 +15,8 @@
   <!-- Normaliza entradas de subcarpeta sin barra final antes de resolver CSS, scripts y manifest. -->
   <script id="app-path-bootstrap">(function(){'use strict';var p=String(window.location.pathname||'/');var s=p.slice(p.lastIndexOf('/')+1);if(p!=='/'&&p.charAt(p.length-1)!=='/'&&s&&s.indexOf('.')===-1){window.location.replace(p+'/'+window.location.search+window.location.hash);}})();</script>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="icon" data-app-icon-role="favicon" type="image/png" sizes="32x32" href="./assets/logoAPP_32x32.png?v=9251f6dedc9239502030" />
+  <link rel="apple-touch-icon" data-app-icon-role="apple-touch-icon" sizes="180x180" href="./assets/logoAPP_180x180.png?v=1197b4d6e5a0580b1d10" />
   <link rel="stylesheet" href="./src/css/app.css" />
 </head>
 <body>
@@ -24,7 +24,7 @@
 
   <main class="app-shell" aria-live="polite">
     <section id="auth-card" class="auth-card" aria-labelledby="auth-title">
-      <div class="app-logo" data-skeleton-slot data-image-src="./assets/icons/logo.png" data-image-width="88" data-image-height="88" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
+      <div class="app-logo" data-skeleton-slot data-app-icon-role="interface-logo" data-image-src="./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7" data-image-width="88" data-image-height="88" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
       <p class="eyebrow" data-i18n="auth.eyebrow">Acceso seguro</p>
       <h1 id="auth-title" data-i18n="auth.title">Administra proyectos en equipo</h1>
       <p class="auth-description" data-i18n="auth.description">Inicia sesión con Google. La información compartida se replica en los dispositivos autorizados.</p>
@@ -35,7 +35,7 @@
     <section id="app-workspace" class="workspace hidden" aria-labelledby="workspace-title">
       <header class="topbar">
         <div class="brand-lockup">
-          <div id="app-logo" class="app-logo app-logo-small" data-image-src="./assets/icons/logo.png" data-image-width="48" data-image-height="48" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
+          <div id="app-logo" class="app-logo app-logo-small" data-app-icon-role="interface-logo" data-image-src="./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7" data-image-width="48" data-image-height="48" data-image-alt="Logo de la aplicación" data-i18n-attr="data-image-alt:app.logoAlt" aria-hidden="true"></div>
           <div>
             <p id="user-identity" class="user-identity"></p>
             <h1 id="workspace-title" data-i18n="dashboard.title">Control de proyectos</h1>
