@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.3 - 2026-08-05
+
+- Corregido el panel compartido que podía mostrar 0 proyectos inmediatamente después de aceptar una invitación global, aunque las réplicas ya hubieran llegado y quedado guardadas en IndexedDB.
+- La finalización de un snapshot recibido desde memoriaBACKEND notifica ahora el nuevo estado a la interfaz cuando no hubo una promoción de autorización que ya hubiese emitido esa señal, evitando eventos duplicados.
+- Se añadieron regresiones de refresco y una prueba Playwright con dos cuentas aisladas, roles Gerente, Administrador, Individual y personalizados, y paneles con 0, 1, 2 y 5 proyectos con compras, ingresos y proyecciones.
+
 ## 1.10.2 - 2026-08-05
 
 - Corregida la apertura de **Invitar al panel**: el preset de permisos convertía la lista del rol en un `Set`, pero la consultaba con `includes()`, provocando un `TypeError` antes de mostrar la ventana.

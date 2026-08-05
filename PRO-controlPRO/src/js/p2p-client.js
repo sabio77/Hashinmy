@@ -6024,8 +6024,15 @@ export class SemillaP2PClient {
         });
         await this.reconcileSnapshotRecovery(sessionContext);
         this.assertSessionContext(sessionContext);
-        await this.confirmRecoveredReplicaAuthorization(event.spaceId, sessionContext);
+        const authorizationPromoted = await this.confirmRecoveredReplicaAuthorization(event.spaceId, sessionContext);
         this.assertSessionContext(sessionContext);
+        if (!authorizationPromoted) {
+          dispatch('p2p:state', {
+            state: this.bootstrapState,
+            source: 'snapshot-complete',
+            spaceId: String(event.spaceId || '').trim()
+          });
+        }
       }
     } else {
       if (event.operation?.type === 'snapshot.chunk'
