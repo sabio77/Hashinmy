@@ -6482,15 +6482,38 @@ export class SemillaP2PClient {
       // existe un cambio local seguro que permita confirmar la cola si esa lectura
       // falla. Propagar el error conserva el cursor durable, fuerza replay y evita
       // retirar de Redis el único aviso de permisos/propiedad todavía no aplicado.
-      const state = await this.refreshBootstrap({ requestSnapshots: false });
+      let state = await this.refreshBootstrap({ requestSnapshots: false });
       this.assertSessionContext(sessionContext);
-      const canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
+      let canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
       if (!canonicalSpace) {
         throw realtimeProtocolError(
           'El bootstrap autoritativo no confirmó el proyecto afectado por el cambio de membresía.',
           'P2P_REALTIME_MEMBERSHIP_STATE_MISSING',
           { eventId: event.eventId, spaceId: event.spaceId }
         );
+      }
+      const targetUserId = String(event.data?.targetUserId || '').trim();
+      const currentUserId = String(this.user?.userId || '').trim();
+      const currentMembership = (canonicalSpace.members || []).find((member) => member?.userId === currentUserId) || null;
+      if (
+        targetUserId
+        && targetUserId === currentUserId
+        && Array.isArray(currentMembership?.permissions)
+        && currentMembership.permissions.includes('read')
+      ) {
+        state = await this.refreshBootstrap({
+          requestSnapshots: 'force',
+          snapshotSpaceIds: [event.spaceId]
+        });
+        this.assertSessionContext(sessionContext);
+        canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
+        if (!canonicalSpace) {
+          throw realtimeProtocolError(
+            'La recuperación dirigida no confirmó el proyecto incorporado por el cambio de membresía.',
+            'P2P_REALTIME_MEMBERSHIP_RECOVERY_STATE_MISSING',
+            { eventId: event.eventId, spaceId: event.spaceId }
+          );
+        }
       }
       dispatch('p2p:membership', { event, space: canonicalSpace });
     } else if (event.eventType?.startsWith('p2p.invitation.')) {

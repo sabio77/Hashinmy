@@ -68,6 +68,7 @@ import {
   normalizePurchaseInput,
   projectMatchesFilter,
   projectRecord,
+  pendingPanelExpectedProjectSpaceIds,
   roleLabel,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
@@ -210,6 +211,18 @@ function panelScopes() {
     personalPanelId: PERSONAL_PANEL_ID,
     sharedProjectsPanelId: SHARED_PROJECTS_PANEL_ID
   });
+}
+function pendingPanelIsHydrated(panelId = '') {
+  const expectedSpaceIds = pendingPanelExpectedProjectSpaceIds({
+    spaces: state.p2pState.spaces,
+    panelId,
+    currentUserId: state.user?.userId || '',
+    portfolioResourceType: PORTFOLIO_RESOURCE_TYPE,
+    projectResourceType: PROJECT_RESOURCE_TYPE,
+    personalPanelId: PERSONAL_PANEL_ID,
+    sharedProjectsPanelId: SHARED_PROJECTS_PANEL_ID
+  });
+  return expectedSpaceIds.length === 0 || expectedSpaceIds.every((spaceId) => state.projects.has(spaceId));
 }
 function activePanelScope() {
   const scopes = panelScopes();
@@ -924,7 +937,11 @@ async function refreshProjects() {
     .filter(([, data]) => !data.project.loaded)
     .map(([spaceId]) => spaceId);
   state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
-  if (state.pendingPanelId && panelScopes().some((panel) => panel.id === state.pendingPanelId)) {
+  if (
+    state.pendingPanelId
+    && pendingPanelIsHydrated(state.pendingPanelId)
+    && panelScopes().some((panel) => panel.id === state.pendingPanelId)
+  ) {
     setActivePanelId(state.pendingPanelId);
     state.pendingPanelId = '';
   }

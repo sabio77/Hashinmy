@@ -7,6 +7,7 @@ const currentFile = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(currentFile), '..');
 const clientSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
 const storageSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-storage.js'), 'utf8');
+const projectDomainSource = fs.readFileSync(path.join(root, 'src', 'js', 'project-domain.js'), 'utf8');
 
 const snapshotIdsStart = clientSource.indexOf('export function normalizeSnapshotSpaceIds(');
 const snapshotIdsEnd = clientSource.indexOf('\nfunction createId(', snapshotIdsStart);
@@ -31,6 +32,52 @@ assert.deepEqual(
   snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({ spaces: [{ spaceId: 'project_1' }] }, 'project_1'),
   ['project_1'],
   'Aceptar un proyecto individual no conserva su raíz como objetivo de snapshot.'
+);
+
+const cleanTextStart = projectDomainSource.indexOf('export function cleanText(');
+const cleanTextEnd = projectDomainSource.indexOf('\nexport function localDateValue', cleanTextStart);
+const membershipStart = projectDomainSource.indexOf('export function memberForUser(');
+const membershipEnd = projectDomainSource.indexOf('\nexport function individualRecordAccess', membershipStart);
+const pendingPanelStart = projectDomainSource.indexOf('export function sharedOwnerPanelId(');
+const pendingPanelEnd = projectDomainSource.indexOf('\nfunction projectOwnerProfile', pendingPanelStart);
+assert.ok(cleanTextStart >= 0 && cleanTextEnd > cleanTextStart, 'No se encontró la normalización de texto del dominio.');
+assert.ok(membershipStart >= 0 && membershipEnd > membershipStart, 'No se encontró la política de permisos del dominio.');
+assert.ok(pendingPanelStart >= 0 && pendingPanelEnd > pendingPanelStart, 'No se encontró la barrera de hidratación del panel aceptado.');
+const pendingPanelSource = [
+  "const PROJECT_ENTITY_TYPE = 'admin.project';",
+  "const COLLABORATION_ROLES = Object.freeze(['manager', 'admin', 'individual', 'member']);",
+  projectDomainSource.slice(cleanTextStart, cleanTextEnd),
+  projectDomainSource.slice(membershipStart, membershipEnd),
+  projectDomainSource.slice(pendingPanelStart, pendingPanelEnd),
+  'export { pendingPanelExpectedProjectSpaceIds };'
+].join('\n').replaceAll('export function', 'function');
+const pendingPanelModule = await import(`data:text/javascript;base64,${Buffer.from(pendingPanelSource).toString('base64')}#pending-panel-projects`);
+const member = (userId, accessScope = 'project', permissions = ['read']) => ({ userId, role: 'member', permissions, accessScope });
+const hydrationSpaces = [
+  { spaceId: 'portfolio_1', resourceType: 'admin.portfolio', ownerUserId: 'owner_1', members: [member('guest_1', 'portfolio')] },
+  { spaceId: 'project_1', resourceType: 'admin.project', governanceSpaceId: 'portfolio_1', ownerUserId: 'owner_1', members: [member('guest_1', 'portfolio')] },
+  { spaceId: 'project_legacy', resourceType: 'admin.project', ownerUserId: 'owner_1', members: [member('guest_1', 'portfolio')] },
+  { spaceId: 'project_individual', resourceType: 'admin.project', ownerUserId: 'owner_1', members: [member('guest_1', 'project')] },
+  { spaceId: 'project_other_panel', resourceType: 'admin.project', governanceSpaceId: 'portfolio_2', ownerUserId: 'owner_2', members: [member('guest_1', 'portfolio')] },
+  { spaceId: 'project_without_read', resourceType: 'admin.project', governanceSpaceId: 'portfolio_1', ownerUserId: 'owner_1', members: [member('guest_1', 'portfolio', [])] }
+];
+assert.deepEqual(
+  pendingPanelModule.pendingPanelExpectedProjectSpaceIds({
+    spaces: hydrationSpaces,
+    panelId: 'portfolio_1',
+    currentUserId: 'guest_1'
+  }),
+  ['project_1', 'project_legacy'],
+  'El panel aceptado no espera exactamente sus proyectos gobernados o heredados con lectura.'
+);
+assert.deepEqual(
+  pendingPanelModule.pendingPanelExpectedProjectSpaceIds({
+    spaces: hydrationSpaces.filter((space) => space.spaceId !== 'portfolio_1'),
+    panelId: 'portfolio_1',
+    currentUserId: 'guest_1'
+  }),
+  ['project_1'],
+  'Un panel virtual no espera la raíz del proyecto gobernado que debe mostrar.'
 );
 
 const reconciliationStart = storageSource.indexOf('function cleanSpaceId(');
@@ -300,6 +347,13 @@ assert.match(appSource, /invite\.acceptedAccessRevoked/, 'Falta el mensaje de es
 assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recuperación posterior a la aceptación.');
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
+assert.match(appSource, /pendingPanelExpectedProjectSpaceIds\(/, 'La interfaz no calcula qué proyectos autorizados debe hidratar antes de abrir el panel.');
+assert.match(appSource, /expectedSpaceIds\.every\(\(spaceId\) => state\.projects\.has\(spaceId\)\)/, 'La interfaz no espera todas las raíces autorizadas del panel.');
+const refreshProjectsStart = appSource.indexOf('async function refreshProjects() {');
+const refreshProjectsEnd = appSource.indexOf('\nfunction renderPortfolioMetrics', refreshProjectsStart);
+const refreshProjectsMethod = appSource.slice(refreshProjectsStart, refreshProjectsEnd);
+assert.match(refreshProjectsMethod, /pendingPanelIsHydrated\(state\.pendingPanelId\)/, 'El panel pendiente todavía se activa antes de hidratar sus cards.');
+assert.match(refreshProjectsMethod, /state\.pendingPanelId = '';/, 'El panel pendiente no se consume después de completar su hidratación.');
 const applyStateStart = appSource.indexOf('function applyP2PState(nextState = {})');
 const applyStateEnd = appSource.indexOf('\nasync function loadPublicConfig', applyStateStart);
 const applyStateMethod = appSource.slice(applyStateStart, applyStateEnd);
@@ -310,4 +364,4 @@ const appResponseEnd = appSource.indexOf('\nfunction renderLocalNetworkStatus', 
 const appResponseMethod = appSource.slice(appResponseStart, appResponseEnd);
 assert.match(appResponseMethod, /await applyP2PState\(semillaP2P\.bootstrapState\);[\s\S]*showDashboard\(\);/, 'El panel se muestra antes de terminar de cargar sus proyectos internos.');
 
-console.log('OK: una membresía aceptada permanece en solo lectura hasta alcanzar la revisión autoritativa, recupera de forma dirigida el panel y sus proyectos, y la interfaz espera sus cards antes de mostrar el panel.');
+console.log('OK: una membresía aceptada permanece en solo lectura hasta alcanzar la revisión autoritativa, recupera de forma dirigida el panel y sus proyectos, y la interfaz no abre el panel hasta hidratar todas sus cards autorizadas.');

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.4 - 2026-08-05
+
+- Cerrada la condición residual por la que un panel aceptado podía activarse apenas aparecía su espacio administrativo, antes de que IndexedDB terminara de hidratar las raíces de todos los proyectos autorizados.
+- La interfaz conserva el panel como pendiente hasta que estén disponibles todas sus cards gobernadas o heredadas; los paneles realmente vacíos continúan abriéndose de inmediato.
+- Los eventos de membresía heredada dirigidos a la cuenta actual fuerzan ahora un snapshot específico del proyecto antes de confirmar el ACK, cubriendo incorporaciones tardías o reparadas por bootstrap sin ampliar el acceso a otros espacios.
+- Se ampliaron las regresiones de aceptación, hidratación y membresía para impedir paneles internos vacíos, cruces entre propietarios o confirmaciones realtime antes de recuperar la réplica.
+
 ## 1.10.3 - 2026-08-05
 
 - Corregido el panel compartido que podía mostrar 0 proyectos inmediatamente después de aceptar una invitación global, aunque las réplicas ya hubieran llegado y quedado guardadas en IndexedDB.

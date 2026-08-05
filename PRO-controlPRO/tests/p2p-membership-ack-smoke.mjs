@@ -24,8 +24,13 @@ function isEntityOperationType() { return false; }
 function realtimeProtocolError(message, code, detail = {}) { const error = new Error(message); error.code = code; Object.assign(error, detail); return error; }
 async function setMeta(key, value) { metaWrites.push({ key, value }); }
 class TestClient {
-  constructor(refreshBootstrap) {
-    this.refreshBootstrap = refreshBootstrap;
+  constructor(refreshBootstrap, userId = '') {
+    this.refreshCalls = [];
+    this.refreshBootstrap = async (options = {}) => {
+      this.refreshCalls.push(options);
+      return refreshBootstrap(options);
+    };
+    this.user = userId ? { userId } : null;
     this.lastAcceptedStreamSequence = 0;
     this.lastProcessedSequence = 0;
     this.pendingAckReplicaSpaceIds = new Set();
@@ -93,4 +98,32 @@ assert.equal(
   'La interfaz recibió el grafo transportado y no el estado autoritativo leído antes del ACK.'
 );
 
-console.log('OK: los cambios de membresía solo avanzan cursor y ACK después de confirmar el proyecto en el bootstrap autoritativo; fallas u omisiones conservan el evento para replay.');
+const inheritedMembershipEvent = {
+  ...event,
+  eventId: 'event_membership_inherited_1',
+  deviceSequence: 42,
+  spaceId: 'space_inherited_1',
+  data: {
+    ...event.data,
+    targetUserId: 'user_guest_1'
+  }
+};
+const inheritedSpace = {
+  spaceId: 'space_inherited_1',
+  ownerUserId: 'user_owner_1',
+  members: [{ userId: 'user_guest_1', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+};
+const inheritedClient = new module.TestClient(async () => ({ spaces: [inheritedSpace] }), 'user_guest_1');
+await inheritedClient.handleEvent(inheritedMembershipEvent);
+assert.deepEqual(
+  inheritedClient.refreshCalls,
+  [
+    { requestSnapshots: false },
+    { requestSnapshots: 'force', snapshotSpaceIds: ['space_inherited_1'] }
+  ],
+  'Una membresía heredada para la cuenta actual no fuerza la recuperación dirigida de su proyecto.'
+);
+assert.equal(inheritedClient.lastProcessedSequence, 42, 'La membresía heredada no avanzó después de confirmar su recuperación dirigida.');
+assert.deepEqual(inheritedClient.acks, [42], 'La membresía heredada no confirmó el evento después de la recuperación autoritativa.');
+
+console.log('OK: los cambios de membresía solo avanzan cursor y ACK después de confirmar el proyecto en el bootstrap autoritativo; las altas heredadas fuerzan snapshot dirigido y las fallas conservan el evento para replay.');

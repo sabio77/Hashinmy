@@ -451,6 +451,69 @@ export function sharedOwnerPanelId(ownerUserId = '') {
   return normalizedOwnerUserId ? `__shared_owner_panel__:${normalizedOwnerUserId}` : '';
 }
 
+/**
+ * Identifica los espacios de proyecto que deben estar hidratados antes de
+ * abrir automáticamente un panel recién aceptado.
+ *
+ * El plano de control puede confirmar el panel y sus membresías antes de que
+ * IndexedDB reciba las raíces de cada proyecto. Mantener esta selección en el
+ * dominio evita presentar un panel aparentemente vacío durante esa ventana y
+ * conserva el aislamiento entre paneles, propietarios y aplicaciones.
+ */
+export function pendingPanelExpectedProjectSpaceIds(input = {}) {
+  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const panelId = cleanText(input.panelId || '', 220);
+  const currentUserId = cleanText(input.currentUserId || '', 140);
+  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
+  const projectResourceType = cleanText(input.projectResourceType || PROJECT_ENTITY_TYPE, 80) || PROJECT_ENTITY_TYPE;
+  const personalPanelId = cleanText(input.personalPanelId || '__personal_panel__', 220) || '__personal_panel__';
+  const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
+  if (!panelId || !currentUserId || panelId === personalPanelId) return [];
+
+  const readableProjects = spaces.filter((space) => (
+    cleanText(space?.resourceType || '', 80) === projectResourceType
+    && Boolean(cleanText(space?.spaceId || '', 140))
+    && hasPermission(space, currentUserId, 'read')
+  ));
+  const portfolioSpace = spaces.find((space) => (
+    cleanText(space?.resourceType || '', 80) === portfolioResourceType
+    && cleanText(space?.spaceId || '', 140) === panelId
+  )) || null;
+
+  let candidates = [];
+  if (portfolioSpace) {
+    const ownerUserId = cleanText(portfolioSpace.ownerUserId || '', 140);
+    candidates = readableProjects.filter((space) => {
+      const governanceSpaceId = cleanText(space?.governanceSpaceId || '', 140);
+      if (governanceSpaceId) return governanceSpaceId === panelId;
+      const member = memberForUser(space, currentUserId);
+      return Boolean(
+        ownerUserId
+        && cleanText(space?.ownerUserId || '', 140) === ownerUserId
+        && String(member?.accessScope || '').trim().toLowerCase() === 'portfolio'
+      );
+    });
+  } else if (panelId.startsWith('__shared_owner_panel__:')) {
+    candidates = readableProjects.filter((space) => sharedOwnerPanelId(space?.ownerUserId || '') === panelId);
+  } else if (panelId === sharedProjectsPanelId) {
+    candidates = readableProjects.filter((space) => (
+      cleanText(space?.ownerUserId || '', 140) !== currentUserId
+      && !cleanText(space?.governanceSpaceId || '', 140)
+      && !sharedOwnerPanelId(space?.ownerUserId || '')
+    ));
+  } else {
+    // Un invitado puede recibir proyectos de un portfolio sin ser miembro del
+    // espacio administrativo. En ese caso el panel es virtual y usa como id el
+    // governanceSpaceId de los proyectos autorizados.
+    candidates = readableProjects.filter((space) => cleanText(space?.governanceSpaceId || '', 140) === panelId);
+  }
+
+  return Array.from(new Set(candidates
+    .map((space) => cleanText(space?.spaceId || '', 140))
+    .filter(Boolean)))
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function projectOwnerProfile(data = {}) {
   const ownerUserId = cleanText(data?.space?.ownerUserId || '', 140);
   if (!ownerUserId) return null;
