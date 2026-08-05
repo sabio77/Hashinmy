@@ -218,8 +218,22 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
     requestDeviceId: 'device_requester_0001',
     requestUserId: 'user_requester_1',
     spaceId: 'space_control_1',
+    reason: 'state_gap',
     localStateRevision: 4,
     currentStateRevision: 5
+  }
+})).eventType, 'p2p.snapshot.request');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    requestId: 'snapshot_request_forced_empty_root',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    spaceId: 'space_control_1',
+    reason: 'forced',
+    localStateRevision: 0,
+    currentStateRevision: 0
   }
 })).eventType, 'p2p.snapshot.request');
 
@@ -389,6 +403,7 @@ assert.throws(
       requestDeviceId: 'device_requester_0001',
       requestUserId: 'user_requester_1',
       spaceId: 'space_control_1',
+      reason: 'state_gap',
       localStateRevision: 5,
       currentStateRevision: 5
     }

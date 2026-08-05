@@ -597,6 +597,7 @@ await client.handleEvent({
     requestDeviceId: 'dev_target_000001',
     requestUserId: 'user_target_000001',
     spaceId: 'space_1',
+    reason: 'state_gap',
     localStateRevision: 1,
     currentStateRevision: 2
   }

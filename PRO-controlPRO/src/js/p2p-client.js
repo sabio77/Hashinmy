@@ -507,15 +507,23 @@ export function assertCanonicalControlEnvelope(event = {}) {
     const requestDeviceId = String(data.requestDeviceId || '').trim();
     const requestUserId = String(data.requestUserId || '').trim();
     const dataSpaceId = String(data.spaceId || '').trim();
+    const recoveryReason = String(data.reason || '').trim().toLowerCase();
+    const localStateRevision = data.localStateRevision;
+    const currentStateRevision = data.currentStateRevision;
+    const hasStateGap = isSafeRevision(currentStateRevision, { positive: true })
+      && currentStateRevision > localStateRevision;
+    const isDirectedForcedRecovery = recoveryReason === 'forced'
+      && isSafeRevision(currentStateRevision)
+      && currentStateRevision === localStateRevision;
     if (
       !sourceDeviceId
       || !requestId
       || requestDeviceId !== sourceDeviceId
       || requestUserId !== actorUserId
       || dataSpaceId !== spaceId
-      || !isSafeRevision(data.localStateRevision)
-      || !isSafeRevision(data.currentStateRevision, { positive: true })
-      || data.currentStateRevision <= data.localStateRevision
+      || !isSafeRevision(localStateRevision)
+      || !['forced', 'new_device', 'state_gap'].includes(recoveryReason)
+      || (!hasStateGap && !isDirectedForcedRecovery)
     ) invalid('snapshot-request');
     return event;
   }
