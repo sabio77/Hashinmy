@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.2 - 2026-08-05
+
+- Corregida la apertura de **Invitar al panel**: el preset de permisos convertía la lista del rol en un `Set`, pero la consultaba con `includes()`, provocando un `TypeError` antes de mostrar la ventana.
+- La interfaz usa ahora `Set.has()` y conserva sin cambios los roles, permisos delegables y validaciones de autorización existentes.
+- Se añadió una regresión ejecutable que reproduce la preparación del formulario y falla si vuelve a usarse una API incompatible con `Set`.
+
 ## 1.10.1 - 2026-08-05
 
 - Las cards de paneles compartidos reales incorporan un menú de tres puntos independiente del selector, con acciones para invitar cuando la membresía posee `invite` y abandonar el panel mediante la revocación autoritativa existente.

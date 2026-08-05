@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.10.1+2026-08-05-165",
-  "version": "1.10.1",
-  "build": "2026-08-05-165",
-  "releasedAt": "2026-08-05T07:04:00-05:00",
+  "releaseId": "semilla-appweb-pwa@1.10.2+2026-08-05-166",
+  "version": "1.10.2",
+  "build": "2026-08-05-166",
+  "releasedAt": "2026-08-05T07:36:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -52,7 +52,7 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "71b4ee79c53ca26aae0192e91fd7f8df483427026e033f7dee88c340a2a96903",
+      "sha256": "5a9c90a70f3c8128b3e81203309ca451f7bd207f411c3b7f42bf74e9867adfd4",
       "bytes": 5264
     },
     {
@@ -157,12 +157,12 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "f76ec763cbb245160c6e24afedcac9dc0b092ee527eb3951d105e0f375d974f3",
-      "bytes": 184012
+      "sha256": "1af4e411b2add6b00ad0df2a6b53086e1642caf67ef6130690f0a30fdba09908",
+      "bytes": 184007
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "e6cafd74a3fda1310d4eda76a67adbc9a8b9e99078e59df27c9160c7500659c8",
+      "sha256": "78b43bdb7cc7e146e27ec850361aa4a39a3483724b936d8b5862f4099af225b8",
       "bytes": 981
     },
     {

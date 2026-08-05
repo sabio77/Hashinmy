@@ -1251,7 +1251,7 @@ function applyRolePresetToPermissionControls(container = null, role = 'member') 
   container.dataset.rolePreset = preset ? 'true' : 'false';
   container.dataset.roleHint = preset ? roleHint(normalizedRole) : '';
   container.querySelectorAll('input[name="permissions"], input[name="permission"]').forEach((checkbox) => {
-    checkbox.checked = checkbox.value === 'read' || (preset ? permissions.includes(checkbox.value) : checkbox.checked);
+    checkbox.checked = checkbox.value === 'read' || (preset ? permissions.has(checkbox.value) : checkbox.checked);
     checkbox.disabled = checkbox.value === 'read' || preset;
   });
 }

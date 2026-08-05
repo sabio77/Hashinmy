@@ -29,6 +29,46 @@ assert.match(appSource, /menuActionButton\('leave-panel'/, 'El menú debe expone
 assert.match(appSource, /await semillaP2P\.leave\(panel\.space\.spaceId\)/, 'Abandonar panel debe usar la operación autoritativa existente del cliente P2P.');
 assert.match(appSource, /if \(targetSpace && !spaceUserCan\(targetSpace, 'invite'\)\) return;/, 'El formulario de invitación debe quedar protegido incluso si se intenta abrir por otra ruta.');
 assert.match(appSource, /return \['member'\];/, 'Un rol personalizado con invitar solo debe poder conceder un rol personalizado.');
+
+
+const rolePresetStart = appSource.indexOf('function applyRolePresetToPermissionControls(');
+const rolePresetEnd = appSource.indexOf('\nfunction accessPermissionEditor(', rolePresetStart);
+assert.ok(rolePresetStart >= 0 && rolePresetEnd > rolePresetStart, 'No se encontró el helper de permisos del formulario de invitación.');
+const rolePresetSource = appSource.slice(rolePresetStart, rolePresetEnd);
+const applyRolePresetToPermissionControls = Function(
+  'normalizeCollaborationRole',
+  'rolePermissions',
+  'roleHint',
+  `${rolePresetSource}; return applyRolePresetToPermissionControls;`
+)(
+  (role) => role,
+  (role) => role === 'manager' ? ['read', 'add', 'delete', 'projection', 'invite', 'write'] : ['read'],
+  () => ''
+);
+const invitePermissionControls = [
+  { value: 'read', checked: false, disabled: false },
+  { value: 'add', checked: false, disabled: false },
+  { value: 'invite', checked: false, disabled: false }
+];
+const invitePermissionFieldset = {
+  dataset: {},
+  querySelectorAll: () => invitePermissionControls
+};
+assert.doesNotThrow(
+  () => applyRolePresetToPermissionControls(invitePermissionFieldset, 'manager'),
+  'Abrir la invitación al panel no debe fallar al consultar el Set de permisos del rol.'
+);
+assert.deepEqual(
+  invitePermissionControls.map(({ value, checked, disabled }) => ({ value, checked, disabled })),
+  [
+    { value: 'read', checked: true, disabled: true },
+    { value: 'add', checked: true, disabled: true },
+    { value: 'invite', checked: true, disabled: true }
+  ],
+  'El preset Gerente debe marcar y bloquear correctamente los permisos disponibles antes de abrir el diálogo.'
+);
+assert.match(rolePresetSource, /permissions\.has\(checkbox\.value\)/, 'Los permisos convertidos a Set deben consultarse con has(), no con includes().');
+assert.doesNotMatch(rolePresetSource, /permissions\.includes\(/, 'Un Set no admite includes() y bloquearía la apertura del diálogo.');
 assert.match(css, /\.panel-switcher-card > \.panel-context-menu-button/, 'El botón de tres puntos debe estar integrado visualmente en la card del panel.');
 
 for (const language of ['es', 'en', 'ar']) {
