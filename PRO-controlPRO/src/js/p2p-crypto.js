@@ -899,6 +899,11 @@ function operationAad(spaceId = '', operation = {}, keyId = '') {
       })).filter((item) => item.entityType && item.entityId && item.relation)
     : [];
   if (dependentDeletes.length) parts.push(JSON.stringify(dependentDeletes));
+  const authorship = {
+    ownerUserId: String(operation?.authorship?.ownerUserId || operation?.authorship?.createdByUserId || '').trim(),
+    createdAt: String(operation?.authorship?.createdAt || '').trim()
+  };
+  if (authorship.ownerUserId || authorship.createdAt) parts.push(JSON.stringify(authorship));
   return parts.join('|');
 }
 

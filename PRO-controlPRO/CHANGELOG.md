@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.97 - 2026-08-04
+
+- Las invitaciones heredadas del panel ahora se correlacionan con el `governanceSpaceId` autoritativo: aceptar o rechazar **Control de proyectos** solo procesa los proyectos gobernados por ese mismo panel, incluso cuando otro panel comparte remitente, rol y permisos.
+- La aceptación automática separa los remitentes autorizados por panel y conserva como invitaciones manuales seguras cualquier registro heredado que no tenga vínculo autoritativo verificable.
+- Se reforzaron las regresiones de alcance global y roles para impedir cruces entre paneles sin alterar las invitaciones exclusivas de un proyecto.
+- La autoría del rol **Individual** se confirma ahora dentro del mismo commit Redis que secuencia la operación, releyendo el rol vigente del miembro y evitando propiedades fantasma, reutilización entre cuentas o espacios y carreras durante la ventana de una hora.
+
 ## 1.9.90 - 2026-08-04
 
 - La coordinación `P2P_sin_` de papelera y purga conserva ahora un comprobante durable en dos fases (`prepared` → `completed`): una caída después de registrar la intención ya no puede producir un ACK falso antes de aplicar la eliminación local, y el reintento continúa exactamente desde el estado pendiente.

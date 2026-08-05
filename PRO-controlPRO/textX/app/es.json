@@ -24,7 +24,20 @@
     "alreadyUpdated": "La app ya está actualizada.",
     "cacheCleared": "Caché local limpiada. Se aplicará la próxima carga limpia.",
     "unsupported": "Este navegador no soporta instalación PWA completa.",
-    "swRegisterError": "No se pudo activar instalación/offline."
+    "swRegisterError": "No se pudo activar instalación/offline.",
+    "installEyebrow": "Aplicación instalable",
+    "installTitle": "Lleva tu control de proyectos contigo",
+    "installDescription": "Instala la aplicación para abrirla como una app, conservar tus datos locales y trabajar con mayor rapidez.",
+    "installBenefitOffline": "Acceso a la información local incluso sin conexión.",
+    "installBenefitFast": "Inicio directo desde la pantalla principal.",
+    "installBenefitSync": "Sincronización segura cuando tus dispositivos vuelvan a conectarse.",
+    "installButton": "Instalar aplicación",
+    "installClose": "Cerrar presentación de instalación",
+    "installManualIos": "En Safari, abre Compartir y elige “Agregar a pantalla de inicio”.",
+    "installManualGeneric": "Abre el menú del navegador y selecciona “Instalar aplicación” o “Agregar a pantalla de inicio”.",
+    "installAccepted": "Instalación iniciada correctamente.",
+    "installDismissed": "La instalación se canceló. Puedes intentarlo nuevamente al volver a abrir la app.",
+    "installError": "No fue posible abrir el instalador. Usa la opción de instalación del menú del navegador."
   },
   "auth": {
     "eyebrow": "Acceso seguro",
@@ -149,7 +162,10 @@
     "filterResults": "{shown} de {total} proyectos coinciden",
     "filterNoResultsTitle": "No hay proyectos coincidentes",
     "filterNoResultsDescription": "Prueba con otra palabra del nombre, la descripción o la dirección.",
-    "loadError": "No se pudieron cargar los proyectos."
+    "loadError": "No se pudieron cargar los proyectos.",
+    "invitePortfolio": "Invitar al panel",
+    "managePortfolio": "Participantes",
+    "emptyRestrictedDescription": "Aún no hay proyectos disponibles para tu cuenta. El propietario, un Gerente o un Admin del panel puede crear el primero."
   },
   "project": {
     "back": "← Proyectos",
@@ -261,13 +277,29 @@
     "rejected": "Invitación rechazada.",
     "responseError": "No se pudo responder la invitación.",
     "acceptedAccessRevoked": "La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.",
-    "acceptedSyncing": "Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición."
+    "acceptedSyncing": "Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.",
+    "role": "Rol",
+    "portfolioTitle": "Invitar a Control de proyectos",
+    "projectScope": "Esta invitación aplica únicamente a este proyecto.",
+    "portfolioScope": "Esta invitación aplica al panel completo y a todos los proyectos actuales y futuros.",
+    "rolePreset": "Los permisos de este rol se aplican automáticamente.",
+    "portfolioSending": "Aplicando acceso a todo el panel…",
+    "portfolioSent": "El acceso al panel y a sus proyectos fue enviado correctamente.",
+    "portfolioPartial": "El acceso al panel se guardó, pero {failed} proyectos deberán reintentarse al recuperar conexión.",
+    "portfolioNoProjects": "El acceso al panel se creó. Se heredará automáticamente en los proyectos nuevos.",
+    "portfolioAccepting": "Aceptando acceso al panel y a sus proyectos…",
+    "portfolioAccepted": "Acceso al panel aceptado. Los proyectos compartidos se están incorporando automáticamente."
   },
   "permissions": {
     "denied": "Tus permisos no permiten realizar esta acción.",
     "deleteDenied": "No tienes permiso para eliminar registros.",
     "projectionDeleteDenied": "Necesitas permisos de proyección y eliminación para borrar una proyección.",
-    "ownerRequired": "Solo el propietario puede realizar esta acción."
+    "ownerRequired": "Solo el propietario puede realizar esta acción.",
+    "individualOwnOnly": "El rol Individual solo puede editar o eliminar registros creados por su propia cuenta.",
+    "individualExpired": "El plazo de una hora para editar o eliminar este registro ya terminó.",
+    "projectDeleteDenied": "Tu rol no permite eliminar proyectos.",
+    "projectEditDenied": "Tu rol no permite editar la información base de este proyecto.",
+    "projectCreateDenied": "Tu rol no permite crear proyectos dentro de este panel."
   },
   "devices": {
     "open": "Administrar dispositivos",
@@ -342,7 +374,28 @@
     "deleteConfirmButton": "Mover a papelera",
     "deletedSuccess": "El proyecto fue enviado a la papelera y dejó de afectar el resumen administrativo.",
     "deletedRemote": "El propietario eliminó un proyecto compartido. Su copia local fue retirada de este dispositivo.",
-    "transferReplicaRequired": "El nuevo propietario debe abrir y sincronizar completamente el proyecto en al menos uno de sus dispositivos antes de recibir la propiedad."
+    "transferReplicaRequired": "El nuevo propietario debe abrir y sincronizar completamente el proyecto en al menos uno de sus dispositivos antes de recibir la propiedad.",
+    "role": "Rol",
+    "scope": "Alcance",
+    "projectScope": "Solo este proyecto",
+    "portfolioScope": "Todo el panel",
+    "individualHint": "Puede ver sus propios registros y editarlos o eliminarlos únicamente durante la primera hora.",
+    "managerHint": "Control total, incluida la eliminación de proyectos.",
+    "adminHint": "Control administrativo sin permiso para eliminar proyectos.",
+    "customHint": "Permisos configurados manualmente.",
+    "portfolioTitle": "Participantes del panel",
+    "portfolioDescription": "Los cambios realizados aquí se aplican al panel completo y a todos sus proyectos actuales y futuros.",
+    "portfolioUnavailable": "No se pudo identificar el panel asociado a este participante.",
+    "portfolioPermissionsSaving": "Actualizando permisos en todo el panel…",
+    "portfolioPermissionsUpdated": "Los permisos se actualizaron en el panel y en todos sus proyectos.",
+    "portfolioPermissionsPartial": "Los permisos se actualizaron parcialmente. La reconciliación automática completará los proyectos pendientes al recuperar conexión.",
+    "portfolioRevokeConfirm": "{name} perderá el acceso al panel completo y a todos sus proyectos actuales y futuros.",
+    "portfolioRevokedSuccess": "El acceso al panel y a todos sus proyectos fue revocado correctamente.",
+    "portfolioRevokePartial": "No se revocó el acceso al panel porque uno o más proyectos no pudieron actualizarse. Se conservará el acceso global hasta completar una revocación consistente.",
+    "portfolioOwnerRoleBlocked": "Antes de cambiar este rol, transfiere la propiedad de los proyectos que pertenecen a este participante.",
+    "portfolioOwnerRevokeBlocked": "No se puede revocar el acceso global mientras este participante sea propietario de uno o más proyectos. Transfiere primero esas propiedades.",
+    "portfolioAuthorizationBlocked": "No se puede aplicar el cambio global porque tu rol no permite administrar a este participante en uno o más proyectos.",
+    "portfolioRevokedRotationPending": "El acceso global fue revocado, pero una o más rotaciones de clave quedaron pendientes. Reconecta antes de agregar información sensible."
   },
   "localNetwork": {
     "open": "Red local",
@@ -416,5 +469,12 @@
     "projectsSection": "Proyectos eliminados",
     "completeProject": "Proyecto completo",
     "empty": "La papelera está vacía."
+  },
+  "roles": {
+    "owner": "Propietario",
+    "manager": "Gerente",
+    "admin": "Admin",
+    "individual": "Individual",
+    "member": "Personalizado"
   }
 }

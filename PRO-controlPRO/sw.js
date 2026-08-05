@@ -57,6 +57,7 @@ const DEFAULT_APP_SHELL = [
   './src/js/skeleton-screen.js',
   './src/js/i18n.js',
   './src/js/asset-loader.js',
+  './src/js/pwa-install-prompt.js',
   './src/js/pwa-update-manager.js',
   './src/js/app.js',
   './P2P_sin_RED_LOCALx/P2P_sin_transport.js',

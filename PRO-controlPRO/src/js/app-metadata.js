@@ -37,9 +37,9 @@
 
   var metadata = Object.freeze({
     appName: 'Semilla App Web',
-    version: '1.9.90',
-    build: '2026-08-04-150',
-    releasedAt: '2026-08-04T12:30:00-05:00',
+    version: '1.9.97',
+    build: '2026-08-04-158',
+    releasedAt: '2026-08-04T16:09:38-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
@@ -76,6 +76,7 @@
       './src/js/skeleton-screen.js',
       './src/js/i18n.js',
       './src/js/asset-loader.js',
+      './src/js/pwa-install-prompt.js',
       './src/js/pwa-update-manager.js',
       './src/js/app.js',
       './textX/languages.json',

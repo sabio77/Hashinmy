@@ -58,6 +58,7 @@ DEFAULT_CRITICAL_ASSETS = [
     "./src/js/skeleton-screen.js",
     "./src/js/i18n.js",
     "./src/js/asset-loader.js",
+    "./src/js/pwa-install-prompt.js",
     "./src/js/pwa-update-manager.js",
     "./src/js/app.js",
 ]
@@ -361,6 +362,7 @@ def fingerprint_check_files(language_manifest: Dict[str, Any], prompt_assets: It
     "./src/js/device-management.js",
         "./src/js/i18n.js",
         "./src/js/asset-loader.js",
+        "./src/js/pwa-install-prompt.js",
         "./src/js/pwa-update-manager.js",
         "./src/js/app.js",
         *discover_optional_runtime_assets(prompt_assets),

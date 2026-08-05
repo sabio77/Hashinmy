@@ -71,9 +71,13 @@
             <h2 data-i18n="dashboard.projects">Proyectos</h2>
             <p class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
           </div>
-          <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
-            <span aria-hidden="true">+</span>
-          </button>
+          <div class="dashboard-heading-actions">
+            <button id="manage-portfolio-access-button" class="button button-ghost button-compact" type="button" data-i18n="dashboard.managePortfolio" hidden>Participantes</button>
+            <button id="invite-portfolio-button" class="button button-secondary button-compact" type="button" data-i18n="dashboard.invitePortfolio">Invitar al panel</button>
+            <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
         </div>
 
         <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
@@ -147,6 +151,25 @@
     </label>
   </main>
 
+  <dialog id="pwa-install-dialog" class="modal-card pwa-install-dialog" aria-labelledby="pwa-install-title" aria-describedby="pwa-install-description" hidden>
+    <section class="pwa-install-presentation">
+      <button id="pwa-install-close" class="icon-button pwa-install-close" type="button" aria-label="Cerrar presentación de instalación" data-i18n-attr="aria-label:pwa.installClose">×</button>
+      <div class="pwa-install-visual" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="pwa-install-copy">
+        <p class="eyebrow" data-i18n="pwa.installEyebrow">Aplicación instalable</p>
+        <h2 id="pwa-install-title" data-i18n="pwa.installTitle">Lleva tu control de proyectos contigo</h2>
+        <p id="pwa-install-description" class="section-description" data-i18n="pwa.installDescription">Instala la aplicación para abrirla como una app, conservar tus datos locales y trabajar con mayor rapidez.</p>
+      </div>
+      <ul class="pwa-install-benefits">
+        <li data-i18n="pwa.installBenefitOffline">Acceso a la información local incluso sin conexión.</li>
+        <li data-i18n="pwa.installBenefitFast">Inicio directo desde la pantalla principal.</li>
+        <li data-i18n="pwa.installBenefitSync">Sincronización segura cuando tus dispositivos vuelvan a conectarse.</li>
+      </ul>
+      <p id="pwa-install-status" class="inline-status pwa-install-status" role="status" aria-live="polite" hidden></p>
+      <button id="pwa-install-button" class="button button-primary pwa-install-button" type="button" data-i18n="pwa.installButton">Instalar aplicación</button>
+    </section>
+  </dialog>
+
   <dialog id="project-dialog" class="modal-card">
     <form id="project-form" class="modal-form">
       <div class="modal-heading"><div><p class="eyebrow" data-i18n="project.formEyebrow">Información base</p><h2 id="project-dialog-title" data-i18n="project.createTitle">Crear proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="project-dialog" aria-label="Cerrar">×</button></div>
@@ -176,9 +199,16 @@
 
   <dialog id="invite-dialog" class="modal-card">
     <form id="invite-form" class="modal-form">
-      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.eyebrow">Colaboración segura</p><h2 data-i18n="invite.title">Invitar participante</h2></div><button class="icon-button" type="button" data-close-dialog="invite-dialog" aria-label="Cerrar">×</button></div>
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.eyebrow">Colaboración segura</p><h2 id="invite-dialog-title" data-i18n="invite.title">Invitar participante</h2></div><button class="icon-button" type="button" data-close-dialog="invite-dialog" aria-label="Cerrar">×</button></div>
+      <p id="invite-scope-message" class="invite-scope-message"></p>
       <label><span data-i18n="invite.email">Correo de Google</span><input id="invite-email-input" type="email" maxlength="254" autocomplete="email" required /></label>
-      <fieldset class="permission-grid"><legend data-i18n="invite.permissions">Permisos</legend>
+      <label><span data-i18n="invite.role">Rol</span><select id="invite-role-select" required>
+        <option value="manager" data-i18n="roles.manager">Gerente</option>
+        <option value="admin" data-i18n="roles.admin">Admin</option>
+        <option value="individual" data-i18n="roles.individual">Individual</option>
+        <option value="member" data-i18n="roles.member">Personalizado</option>
+      </select></label>
+      <fieldset id="invite-permission-fieldset" class="permission-grid"><legend data-i18n="invite.permissions">Permisos</legend>
         <label><input type="checkbox" name="permission" value="read" checked disabled /><span data-i18n="invite.read">Lectura</span></label>
         <label><input type="checkbox" name="permission" value="add" checked /><span data-i18n="invite.add">Agregar y editar</span></label>
         <label><input type="checkbox" name="permission" value="delete" /><span data-i18n="invite.delete">Eliminar</span></label>
@@ -274,8 +304,8 @@
 
   <dialog id="access-dialog" class="modal-card modal-wide">
     <div class="modal-form">
-      <div class="modal-heading"><div><p class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
-      <p class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 id="access-dialog-title" data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
+      <p id="access-dialog-description" class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
       <div id="access-member-list" class="access-member-list"></div>
       <section id="access-owner-actions" class="access-owner-actions hidden">
         <div>
@@ -303,6 +333,7 @@
   <script src="./src/js/skeleton-screen.js" defer></script>
   <script src="./src/js/i18n.js" defer></script>
   <script src="./src/js/asset-loader.js" defer></script>
+  <script src="./src/js/pwa-install-prompt.js" defer></script>
   <script src="./src/js/pwa-update-manager.js" defer></script>
   <script type="module" src="./src/js/app.js"></script>
 </body>

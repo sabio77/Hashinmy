@@ -1,5 +1,5 @@
 import { P2P_APPLICATION_ID, scopedStorageKey } from './application-scope.js';
-import { lifecycleReplicationPairAuthorized, memberAllowsDurableOperation } from './p2p-permissions.js';
+import { lifecycleReplicationPairAuthorized, memberAllowsDurableOperation, usesAdminProjectPermissionProfile } from './p2p-permissions.js';
 import { apiGet, apiPost, getBackendUrl, getSessionToken, isSessionChangedError } from './api.js';
 import { P2PTabCoordinator, classifyTabStateRelay } from './p2p-tab-coordinator.js';
 import {
@@ -396,7 +396,7 @@ function isSafeRevision(value, options = {}) {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum;
 }
 
-const CANONICAL_MEMBER_ROLES = new Set(['owner', 'member']);
+const CANONICAL_MEMBER_ROLES = new Set(['owner', 'manager', 'admin', 'individual', 'member']);
 const CANONICAL_MEMBER_PERMISSIONS = new Set(['read', 'add', 'delete', 'projection', 'invite', 'write']);
 
 function canonicalPermissionList(value = [], invalid = () => {}) {
@@ -434,7 +434,7 @@ function canonicalSpaceMemberGraph(space = {}, expectedSpaceId = '', invalid = (
     if (!userId || !CANONICAL_MEMBER_ROLES.has(role) || members.has(userId)) invalid();
     const permissions = canonicalPermissionList(candidate.permissions, invalid);
     if (role === 'owner') ownerCount += 1;
-    members.set(userId, { userId, role, permissions });
+    members.set(userId, { userId, role, permissions, accessScope: String(candidate.accessScope || 'project').trim().toLowerCase() === 'portfolio' ? 'portfolio' : 'project' });
   }
 
   const owner = members.get(ownerUserId);
@@ -2823,7 +2823,7 @@ export class SemillaP2PClient {
   capabilityOperationAuthorized(capabilityPayload = {}, spaceId = '', operation = {}) {
     const membership = (Array.isArray(capabilityPayload?.memberships) ? capabilityPayload.memberships : [])
       .find((candidate) => candidate?.spaceId === String(spaceId || '').trim());
-    return memberAllowsDurableOperation(membership || {}, membership || {}, operation);
+    return memberAllowsDurableOperation(membership || {}, membership || {}, operation, { actorUserId: membership?.userId || '' });
   }
 
   memberPermissionsForUser(spaceId = '', userId = '') {
@@ -2835,7 +2835,7 @@ export class SemillaP2PClient {
   localOperationAuthorized(spaceId = '', operation = {}, peer = {}) {
     const { space, member } = this.memberPermissionsForUser(spaceId, peer?.userId);
     if (!space || !member || space.authorizationState === 'unconfirmed') return false;
-    return memberAllowsDurableOperation(space, member, operation);
+    return memberAllowsDurableOperation(space, member, operation, { actorUserId: peer?.userId || '' });
   }
 
   async handleLocalTransportPayload(message = {}, sessionContext = this.captureSessionContext()) {
@@ -6694,6 +6694,7 @@ export class SemillaP2PClient {
     const data = await apiPost('/api/p2p/spaces/create', {
       resourceType: options.resourceType || 'generic',
       permissionProfile: String(options.permissionProfile || '').trim().toLowerCase(),
+      governanceSpaceId: String(options.governanceSpaceId || options.portfolioSpaceId || '').trim(),
       requestId: String(options.requestId || options.clientRequestId || createId('space_request')).trim()
     });
     this.assertSessionContext(sessionContext);
@@ -6761,6 +6762,8 @@ export class SemillaP2PClient {
       spaceId: options.spaceId || '',
       resourceType: options.resourceType || 'generic',
       permissions: options.permissions || ['read', 'write'],
+      role: String(options.role || 'member').trim().toLowerCase(),
+      accessScope: String(options.accessScope || 'project').trim().toLowerCase(),
       requestId: String(options.requestId || options.clientRequestId || '').trim()
     });
     this.assertSessionContext(sessionContext);
@@ -7040,7 +7043,7 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async updatePermissions(spaceId = '', userId = '', permissions = []) {
+  async updatePermissions(spaceId = '', userId = '', permissions = [], options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
@@ -7056,7 +7059,9 @@ export class SemillaP2PClient {
     const data = await apiPost('/api/p2p/access/permissions', {
       spaceId: cleanSpaceId,
       userId: cleanUserId,
-      permissions: normalizedPermissions
+      permissions: normalizedPermissions,
+      role: String(options.role || 'member').trim().toLowerCase(),
+      accessScope: String(options.accessScope || 'project').trim().toLowerCase()
     });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
@@ -7096,7 +7101,11 @@ export class SemillaP2PClient {
       encrypted: Boolean(operation.encrypted),
       encryptionVersion: Math.max(0, Number(operation.encryptionVersion || 0)),
       keyId: String(operation.keyId || '').trim(),
-      clientCreatedAt: operation.clientCreatedAt || createdAt
+      clientCreatedAt: operation.clientCreatedAt || createdAt,
+      authorship: {
+        ownerUserId: String(operation.authorship?.ownerUserId || operation.authorship?.createdByUserId || '').trim(),
+        createdAt: String(operation.authorship?.createdAt || '').trim()
+      }
     };
     if (isEntityOperationType(normalized.type) && jsonByteLength(normalized) > this.entityMaxBytes) {
       const error = new Error('La entidad supera el tamaño seguro para sincronizarse y reconstruirse entre dispositivos.');
@@ -7348,12 +7357,15 @@ export class SemillaP2PClient {
 
   put(spaceId, entityType, entityId, value, options = {}) {
     const { operationId, referenceRequirements, ...publishOptions } = options || {};
+    const authorship = publishOptions.authorship;
+    delete publishOptions.authorship;
     const normalizedReferenceRequirements = normalizeReferenceRequirements(referenceRequirements);
     return this.publish(spaceId, {
       operationId: String(operationId || '').trim() || undefined,
       type: 'entity.put',
       entityType,
       entityId,
+      authorship,
       payload: {
         value,
         ...(normalizedReferenceRequirements.length ? { referenceRequirements: normalizedReferenceRequirements } : {})
@@ -7362,13 +7374,14 @@ export class SemillaP2PClient {
   }
 
   patch(spaceId, entityType, entityId, patch, options = {}) {
-    const { operationId, expected, conflictPolicy, ...publishOptions } = options || {};
+    const { operationId, expected, conflictPolicy, authorship, ...publishOptions } = options || {};
     const hasExpected = expected && typeof expected === 'object' && !Array.isArray(expected);
     return this.publish(spaceId, {
       operationId: String(operationId || '').trim() || undefined,
       type: 'entity.patch',
       entityType,
       entityId,
+      authorship,
       payload: {
         patch,
         ...(hasExpected ? {
@@ -7380,13 +7393,14 @@ export class SemillaP2PClient {
   }
 
   lifecycleOperation(type, spaceId, entityType, entityId, options = {}) {
-    const { operationId, expected, at, actorUserId, ...publishOptions } = options || {};
+    const { operationId, expected, at, actorUserId, authorship, ...publishOptions } = options || {};
     const hasExpected = expected && typeof expected === 'object' && !Array.isArray(expected);
     return this.publish(spaceId, {
       operationId: String(operationId || '').trim() || undefined,
       type,
       entityType,
       entityId,
+      authorship,
       payload: {
         ...(hasExpected ? { expected } : {}),
         at: String(at || '').trim() || new Date().toISOString(),
@@ -7408,7 +7422,7 @@ export class SemillaP2PClient {
   }
 
   delete(spaceId, entityType, entityId, options = {}) {
-    const { operationId, operationType = 'entity.delete', expected, conflictPolicy, referenceGuards, dependentDeletes, ...publishOptions } = options || {};
+    const { operationId, operationType = 'entity.delete', expected, conflictPolicy, referenceGuards, dependentDeletes, authorship, ...publishOptions } = options || {};
     const hasExpected = expected && typeof expected === 'object' && !Array.isArray(expected);
     const normalizedReferenceGuards = normalizeDeleteReferenceGuards(referenceGuards);
     const normalizedDependentDeletes = normalizeDependentDeletes(dependentDeletes, { entityType, entityId });
@@ -7417,6 +7431,7 @@ export class SemillaP2PClient {
       type: operationType === 'entity.purge' ? 'entity.purge' : 'entity.delete',
       entityType,
       entityId,
+      authorship,
       ...(normalizedDependentDeletes.length ? { dependentDeletes: normalizedDependentDeletes } : {}),
       payload: {
         ...(hasExpected ? {
@@ -8383,14 +8398,33 @@ export class SemillaP2PClient {
     return retirement;
   }
 
-  getEntity(spaceId, entityType, entityId) {
-    if (!this.canReadSpace(spaceId)) return Promise.resolve(null);
-    return getEntity(spaceId, entityType, entityId);
+  individualReadUserId(spaceId = '') {
+    const cleanSpaceId = String(spaceId || '').trim();
+    const space = (this.bootstrapState.spaces || []).find((candidate) => String(candidate?.spaceId || '').trim() === cleanSpaceId);
+    const currentUserId = String(this.user?.userId || '').trim();
+    if (!space || !currentUserId || !usesAdminProjectPermissionProfile(space)) return '';
+    const membership = (space.members || []).find((candidate) => String(candidate?.userId || '').trim() === currentUserId);
+    return String(membership?.role || '').trim().toLowerCase() === 'individual' ? currentUserId : '';
   }
 
-  listEntities(spaceId) {
-    if (!this.canReadSpace(spaceId)) return Promise.resolve([]);
-    return listEntities(spaceId);
+  entityVisibleToCurrentUser(spaceId = '', entity = null) {
+    const individualUserId = this.individualReadUserId(spaceId);
+    if (!individualUserId || !entity) return true;
+    const entityType = String(entity.entityType || '').trim().toLowerCase();
+    if (!['admin.purchase', 'admin.income', 'admin.projection', 'admin.projection-link'].includes(entityType)) return true;
+    return String(entity.value?.createdByUserId || '').trim() === individualUserId;
+  }
+
+  async getEntity(spaceId, entityType, entityId) {
+    if (!this.canReadSpace(spaceId)) return null;
+    const entity = await getEntity(spaceId, entityType, entityId);
+    return this.entityVisibleToCurrentUser(spaceId, entity) ? entity : null;
+  }
+
+  async listEntities(spaceId) {
+    if (!this.canReadSpace(spaceId)) return [];
+    const entities = await listEntities(spaceId);
+    return entities.filter((entity) => this.entityVisibleToCurrentUser(spaceId, entity));
   }
 
   listLocalSpaces() {

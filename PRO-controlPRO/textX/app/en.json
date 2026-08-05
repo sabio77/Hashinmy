@@ -24,7 +24,20 @@
     "alreadyUpdated": "The app is already up to date.",
     "cacheCleared": "Local cache cleared. The next load will be clean.",
     "unsupported": "This browser does not support full PWA installation.",
-    "swRegisterError": "Installation/offline mode could not be enabled."
+    "swRegisterError": "Installation/offline mode could not be enabled.",
+    "installEyebrow": "Installable application",
+    "installTitle": "Take project control with you",
+    "installDescription": "Install the application to open it like an app, keep your local data, and work faster.",
+    "installBenefitOffline": "Access local information even without a connection.",
+    "installBenefitFast": "Launch directly from your home screen.",
+    "installBenefitSync": "Secure synchronization when your devices reconnect.",
+    "installButton": "Install application",
+    "installClose": "Close installation presentation",
+    "installManualIos": "In Safari, open Share and choose “Add to Home Screen”.",
+    "installManualGeneric": "Open the browser menu and select “Install app” or “Add to Home Screen”.",
+    "installAccepted": "Installation started successfully.",
+    "installDismissed": "Installation was canceled. You can try again the next time you open the app.",
+    "installError": "The installer could not be opened. Use the installation option in the browser menu."
   },
   "auth": {
     "eyebrow": "Secure access",
@@ -149,7 +162,10 @@
     "filterResults": "{shown} of {total} projects match",
     "filterNoResultsTitle": "No matching projects",
     "filterNoResultsDescription": "Try another word from the name, description, or address.",
-    "loadError": "Projects could not be loaded."
+    "loadError": "Projects could not be loaded.",
+    "invitePortfolio": "Invite to dashboard",
+    "managePortfolio": "Participants",
+    "emptyRestrictedDescription": "No projects are available for your account yet. The dashboard owner, a Manager, or an Admin can create the first one."
   },
   "project": {
     "back": "← Projects",
@@ -261,13 +277,29 @@
     "rejected": "Invitation rejected.",
     "responseError": "The invitation could not be answered.",
     "acceptedAccessRevoked": "The invitation was accepted, but access was revoked before synchronization could finish.",
-    "acceptedSyncing": "Invitation accepted. The shared copy is being recovered before editing is enabled."
+    "acceptedSyncing": "Invitation accepted. The shared copy is being recovered before editing is enabled.",
+    "role": "Role",
+    "portfolioTitle": "Invite to Project control",
+    "projectScope": "This invitation applies only to this project.",
+    "portfolioScope": "This invitation applies to the full dashboard and all current and future projects.",
+    "rolePreset": "This role applies its permissions automatically.",
+    "portfolioSending": "Applying access across the dashboard…",
+    "portfolioSent": "Dashboard and project access was sent successfully.",
+    "portfolioPartial": "Dashboard access was saved, but {failed} projects must retry when connectivity returns.",
+    "portfolioNoProjects": "Dashboard access was created. It will be inherited automatically by new projects.",
+    "portfolioAccepting": "Accepting dashboard and project access…",
+    "portfolioAccepted": "Dashboard access accepted. Shared projects are being added automatically."
   },
   "permissions": {
     "denied": "Your permissions do not allow this action.",
     "deleteDenied": "You do not have permission to delete records.",
     "projectionDeleteDenied": "You need both projection and delete permissions to delete a projection.",
-    "ownerRequired": "Only the owner can perform this action."
+    "ownerRequired": "Only the owner can perform this action.",
+    "individualOwnOnly": "The Individual role can edit or delete only records created by the same account.",
+    "individualExpired": "The one-hour window to edit or delete this record has expired.",
+    "projectDeleteDenied": "Your role cannot delete projects.",
+    "projectEditDenied": "Your role cannot edit this project’s basic information.",
+    "projectCreateDenied": "Your role does not allow creating projects in this dashboard."
   },
   "devices": {
     "open": "Manage devices",
@@ -342,7 +374,28 @@
     "deleteConfirmButton": "Move to recycle bin",
     "deletedSuccess": "The project was moved to the recycle bin and no longer affects the administrative summary.",
     "deletedRemote": "The owner deleted a shared project. Its local copy was removed from this device.",
-    "transferReplicaRequired": "The new owner must open and fully synchronize the project on at least one of their devices before receiving ownership."
+    "transferReplicaRequired": "The new owner must open and fully synchronize the project on at least one of their devices before receiving ownership.",
+    "role": "Role",
+    "scope": "Scope",
+    "projectScope": "This project only",
+    "portfolioScope": "Entire dashboard",
+    "individualHint": "Can see their own records and edit or delete them only during the first hour.",
+    "managerHint": "Full control, including project deletion.",
+    "adminHint": "Administrative control without permission to delete projects.",
+    "customHint": "Manually configured permissions.",
+    "portfolioTitle": "Dashboard participants",
+    "portfolioDescription": "Changes made here apply to the entire dashboard and all its current and future projects.",
+    "portfolioUnavailable": "The dashboard associated with this participant could not be identified.",
+    "portfolioPermissionsSaving": "Updating permissions across the dashboard…",
+    "portfolioPermissionsUpdated": "Permissions were updated across the dashboard and all its projects.",
+    "portfolioPermissionsPartial": "Permissions were updated partially. Automatic reconciliation will complete pending projects when connectivity returns.",
+    "portfolioRevokeConfirm": "{name} will lose access to the entire dashboard and all its current and future projects.",
+    "portfolioRevokedSuccess": "Access to the dashboard and all its projects was revoked successfully.",
+    "portfolioRevokePartial": "Dashboard access was not revoked because one or more projects could not be updated. Global access will remain until a consistent revocation can be completed.",
+    "portfolioOwnerRoleBlocked": "Before changing this role, transfer ownership of the projects owned by this participant.",
+    "portfolioOwnerRevokeBlocked": "Global access cannot be revoked while this participant owns one or more projects. Transfer those projects first.",
+    "portfolioAuthorizationBlocked": "The global change cannot be applied because your role cannot manage this participant in one or more projects.",
+    "portfolioRevokedRotationPending": "Global access was revoked, but one or more key rotations remain pending. Reconnect before adding sensitive information."
   },
   "localNetwork": {
     "open": "Local network",
@@ -416,5 +469,12 @@
     "projectsSection": "Deleted projects",
     "completeProject": "Complete project",
     "empty": "The recycle bin is empty."
+  },
+  "roles": {
+    "owner": "Owner",
+    "manager": "Manager",
+    "admin": "Admin",
+    "individual": "Individual",
+    "member": "Custom"
   }
 }

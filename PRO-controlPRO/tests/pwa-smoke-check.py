@@ -44,11 +44,13 @@ REQUIRED_FILES = [
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
+    "src/js/pwa-install-prompt.js",
     "src/js/pwa-update-manager.js",
     "src/js/app.js",
     "src/css/app.css",
     "tests/application-scope-smoke.mjs",
     "tests/pwa-request-isolation-smoke.mjs",
+    "tests/pwa-install-prompt-smoke.mjs",
     "tests/p2p-local-state-smoke.mjs",
     "tests/p2p-batch-intent-smoke.mjs",
     "tests/p2p-replication-contract-smoke.mjs",
@@ -95,6 +97,7 @@ JAVASCRIPT_FILES = [
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
+    "src/js/pwa-install-prompt.js",
     "src/js/pwa-update-manager.js",
     "src/js/app.js",
     "sw.js",
@@ -224,6 +227,20 @@ def assert_application_scope() -> None:
     if result.returncode != 0:
         fail(f"Falló el aislamiento por dominio y aplicación: {result.stderr.strip() or result.stdout.strip()}")
 
+
+def assert_install_prompt() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba de presentación de instalación PWA.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "pwa-install-prompt-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló la presentación de instalación PWA: {result.stderr.strip() or result.stdout.strip()}")
 
 def assert_service_worker_request_isolation() -> None:
     node = shutil.which("node")
@@ -1288,6 +1305,7 @@ def main() -> None:
     assert_retry_after_recovery()
     assert_application_scope()
     assert_service_worker_request_isolation()
+    assert_install_prompt()
     assert_snapshot_request_liveness()
     assert_no_update_polling()
     assert_runtime_backend_injection()
@@ -1303,7 +1321,7 @@ def main() -> None:
         if marker not in app_source and marker not in (ROOT / "src/js/project-domain.js").read_text(encoding="utf-8"):
             fail(f"La interfaz administrativa perdió una capacidad funcional requerida: {marker}.")
 
-    for needle in ["manifest.webmanifest", "i18n.js", "skeleton-screen.js", "asset-loader.js", "pwa-update-manager.js", "data-language-selector", "data-skeleton-slot"]:
+    for needle in ["manifest.webmanifest", "i18n.js", "skeleton-screen.js", "asset-loader.js", "pwa-install-prompt.js", "pwa-update-manager.js", "pwa-install-dialog", "pwa-install-button", "pwa-install-close", "data-language-selector", "data-skeleton-slot"]:
         if needle not in index:
             fail(f"index.html no contiene {needle}.")
 
@@ -1331,6 +1349,16 @@ def main() -> None:
     for needle in ["html[dir=\"rtl\"]", "letter-spacing: 0", "left: calc(16px + var(--safe-left))"]:
         if needle not in css:
             fail(f"src/css/app.css no contiene soporte RTL robusto: {needle}")
+
+    install_prompt = (ROOT / "src/js/pwa-install-prompt.js").read_text(encoding="utf-8")
+    if "AppI18n.apply(dialog)" in install_prompt:
+        fail("La presentación PWA no debe redisparar el aplicador global de idioma desde app-language-ready.")
+    for required in ["beforeinstallprompt", "appinstalled", "display-mode: standalone", "navigator.standalone", "showModal", "installManualIos", "installManualGeneric"]:
+        if required not in install_prompt:
+            fail(f"src/js/pwa-install-prompt.js perdió una garantía de instalación: {required}")
+    for required in ["position: fixed", "inset: 0", ".pwa-install-close", ".pwa-install-button"]:
+        if required not in css:
+            fail(f"src/css/app.css no centra o presenta correctamente la instalación PWA: {required}")
 
     for needle in ["project-filter-toolbar", "project-filter-field", "project-filter-summary", "focus-within"]:
         if needle not in css:

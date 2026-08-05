@@ -184,6 +184,30 @@ dialog { color: var(--text); }
 .permission-grid label { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-soft); }
 .permission-grid input { width: 18px; min-height: 18px; }
 .modal-actions { justify-content: flex-end; margin-top: 4px; }
+
+.pwa-install-dialog { position: fixed; inset: 0; width: min(calc(100% - 28px), 520px); height: fit-content; max-height: min(92vh, 760px); margin: auto; overflow: auto; }
+.pwa-install-dialog[hidden] { display: none; }
+.pwa-install-dialog[open] { display: block; }
+.pwa-install-presentation { position: relative; display: grid; justify-items: center; gap: 18px; padding: clamp(24px, 6vw, 42px); text-align: center; }
+.pwa-install-close { position: absolute; top: 14px; right: 14px; z-index: 1; }
+.pwa-install-visual { position: relative; width: 112px; height: 112px; display: grid; place-items: center; border-radius: 32px; overflow: hidden; background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 76%, var(--primary) 24%), color-mix(in srgb, var(--surface) 92%, var(--primary) 8%)); box-shadow: inset 0 0 0 1px var(--line), 0 20px 42px rgba(15,118,110,.18); }
+.pwa-install-visual::before { content: ""; width: 54px; height: 54px; border-radius: 18px; background: linear-gradient(135deg, #14b8a6, var(--primary-strong)); transform: rotate(12deg); box-shadow: 0 12px 28px rgba(15,118,110,.24); }
+.pwa-install-visual span { position: absolute; display: block; border-radius: 999px; background: color-mix(in srgb, var(--primary) 72%, transparent); }
+.pwa-install-visual span:nth-child(1) { width: 11px; height: 11px; top: 20px; left: 23px; }
+.pwa-install-visual span:nth-child(2) { width: 8px; height: 8px; right: 22px; top: 30px; }
+.pwa-install-visual span:nth-child(3) { width: 14px; height: 14px; right: 27px; bottom: 19px; }
+.pwa-install-copy { display: grid; gap: 8px; }
+.pwa-install-copy h2 { max-width: 15ch; margin: 0 auto; font-size: clamp(1.8rem, 7vw, 2.8rem); line-height: 1; letter-spacing: -.05em; }
+.pwa-install-benefits { width: min(100%, 390px); display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; text-align: start; }
+.pwa-install-benefits li { position: relative; min-height: 38px; display: flex; align-items: center; padding: 9px 12px 9px 42px; border: 1px solid var(--line); border-radius: 14px; color: var(--muted); background: var(--surface-soft); font-size: .84rem; line-height: 1.38; }
+.pwa-install-benefits li::before { content: "✓"; position: absolute; left: 13px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 7px; color: var(--primary-strong); background: color-mix(in srgb, var(--surface) 74%, var(--primary) 26%); font-size: .72rem; font-weight: 900; }
+.pwa-install-button { width: min(100%, 390px); min-height: 52px; }
+.pwa-install-status { width: min(100%, 390px); margin: -4px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-soft); line-height: 1.4; }
+.pwa-install-status[data-state="error"] { color: var(--danger); }
+.pwa-install-status[data-state="success"] { color: var(--success); }
+html[dir="rtl"] .pwa-install-close { right: auto; left: 14px; }
+html[dir="rtl"] .pwa-install-benefits li { padding: 9px 42px 9px 12px; text-align: right; }
+html[dir="rtl"] .pwa-install-benefits li::before { left: auto; right: 13px; }
 .invitation-actions { display: flex; gap: 7px; }
 .update-status { position: fixed; right: calc(16px + var(--safe-right)); bottom: calc(16px + var(--safe-bottom)); z-index: 30; width: min(92vw, 360px); padding: 13px 15px; border-radius: 16px; color: #fff; background: #10211d; box-shadow: 0 16px 50px rgba(0,0,0,.24); font-size: .84rem; }
 .is-skeletonscreen-active [data-skeleton-slot] { position: relative; overflow: hidden; color: transparent !important; pointer-events: none; }
@@ -322,3 +346,14 @@ html[dir="rtl"] .update-status {
   .local-network-peer { align-items: flex-start; flex-direction: column; gap: .2rem; }
   .local-network-peer span { text-align: start; }
 }
+
+/* Invitaciones por panel y roles de colaboración. */
+.dashboard-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.invite-scope-message { margin: -2px 0 2px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; color: var(--muted); background: var(--surface-soft); font-size: .78rem; line-height: 1.45; }
+.permission-grid[data-role-preset="true"] { opacity: .72; }
+.permission-grid[data-role-preset="true"]::after { grid-column: 1 / -1; content: attr(data-role-hint); color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.access-role-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+.access-role-controls label { display: grid; gap: 6px; color: var(--muted); font-size: .72rem; font-weight: 760; }
+.access-role-controls select { min-height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface); }
+.access-scope-badge { display: inline-flex; margin-inline-start: 7px; padding: 3px 7px; border-radius: 999px; color: var(--primary-strong); background: rgba(20,184,166,.13); font-size: .62rem; font-weight: 850; vertical-align: middle; }
+@media (max-width: 620px) { .dashboard-heading-actions { align-items: stretch; flex-direction: column-reverse; } .dashboard-heading-actions .button { width: 100%; } .dashboard-heading-actions .add-project-button { align-self: flex-end; } .access-role-controls { grid-template-columns: 1fr; } }

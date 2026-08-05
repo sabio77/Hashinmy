@@ -7,6 +7,8 @@ export const PROJECTION_LINK_ENTITY_TYPE = 'admin.projection-link';
 export const ADMIN_PROJECT_PERMISSION_PROFILE = 'admin-project-v1';
 
 export const COLLABORATION_PERMISSIONS = Object.freeze(['read', 'add', 'delete', 'projection']);
+export const COLLABORATION_ROLES = Object.freeze(['manager', 'admin', 'individual', 'member']);
+export const INDIVIDUAL_EDIT_WINDOW_MS = 60 * 60 * 1000;
 export const MAX_MONEY_VALUE = Number.MAX_SAFE_INTEGER;
 const MAX_MONEY_BIGINT = BigInt(MAX_MONEY_VALUE);
 const MIN_MONEY_BIGINT = -MAX_MONEY_BIGINT;
@@ -162,6 +164,8 @@ export function normalizeProjectInput(input = {}) {
     description: cleanText(input.description, 900),
     address: cleanText(input.address, 240),
     initialBudget: moneyValue(input.initialBudget),
+    portfolioSpaceId: cleanText(input.portfolioSpaceId, 140),
+    portfolioOwnerUserId: cleanText(input.portfolioOwnerUserId, 140),
     createdAt: cleanText(input.createdAt, 60) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -174,6 +178,7 @@ export function normalizePurchaseInput(input = {}) {
     amount: moneyValue(input.amount),
     projectionId: cleanText(input.projectionId, 180),
     purchasedAt: cleanText(input.purchasedAt, 24) || localDateValue(),
+    createdByUserId: cleanText(input.createdByUserId, 140),
     createdAt: cleanText(input.createdAt, 60) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -184,6 +189,7 @@ export function normalizeIncomeInput(input = {}) {
     description: cleanText(input.description, 360),
     amount: moneyValue(input.amount),
     receivedAt: cleanText(input.receivedAt, 24) || localDateValue(),
+    createdByUserId: cleanText(input.createdByUserId, 140),
     createdAt: cleanText(input.createdAt, 60) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -197,6 +203,7 @@ export function normalizeProjectionInput(input = {}) {
     status: ['pending', 'completed'].includes(input.status) ? input.status : 'pending',
     actualPurchaseId: cleanText(input.actualPurchaseId, 180),
     actualAmount: moneyValue(input.actualAmount),
+    createdByUserId: cleanText(input.createdByUserId, 140),
     createdAt: cleanText(input.createdAt, 60) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -207,6 +214,7 @@ export function normalizeProjectionLinkInput(input = {}) {
     purchaseId: cleanText(input.purchaseId, 180),
     projectionId: cleanText(input.projectionId, 180),
     active: input.active !== false && Boolean(cleanText(input.projectionId, 180)),
+    createdByUserId: cleanText(input.createdByUserId, 140),
     createdAt: cleanText(input.createdAt, 60) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -388,13 +396,48 @@ export function memberForUser(space = {}, userId = '') {
   return (space?.members || []).find((member) => member?.userId === userId) || null;
 }
 
+export function normalizeCollaborationRole(value = '', fallback = 'member') {
+  const role = String(value || '').trim().toLowerCase();
+  return ['owner', ...COLLABORATION_ROLES].includes(role) ? role : fallback;
+}
+
+export function roleLabel(role = '') {
+  return ({ owner: 'Propietario', manager: 'Gerente', admin: 'Admin', individual: 'Individual', member: 'Personalizado' })[normalizeCollaborationRole(role)] || 'Personalizado';
+}
+
+export function rolePermissions(role = '', permissions = []) {
+  const normalizedRole = normalizeCollaborationRole(role);
+  if (['owner', 'manager', 'admin'].includes(normalizedRole)) return ['read', 'add', 'delete', 'projection', 'invite', 'write'];
+  if (normalizedRole === 'individual') return ['read', 'add', 'delete', 'projection'];
+  return Array.from(new Set((Array.isArray(permissions) ? permissions : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)));
+}
+
 export function hasPermission(space = {}, userId = '', permission = '') {
   const member = memberForUser(space, userId);
   if (!member) return false;
-  if (member.role === 'owner') return true;
-  const permissions = Array.isArray(member.permissions) ? member.permissions : [];
+  const role = normalizeCollaborationRole(member.role);
+  if (permission === 'manage_access') return ['owner', 'manager', 'admin'].includes(role);
+  if (permission === 'delete_project') return ['owner', 'manager'].includes(role);
+  if (permission === 'edit_project') return ['owner', 'manager', 'admin'].includes(role);
+  const permissions = rolePermissions(role, member.permissions);
   if (permissions.includes(permission)) return true;
   return permissions.includes('write') && ['add', 'delete', 'projection'].includes(permission);
+}
+
+export function individualRecordAccess(space = {}, userId = '', record = {}, now = Date.now()) {
+  const member = memberForUser(space, userId);
+  if (normalizeCollaborationRole(member?.role) !== 'individual') return { restricted: false, owner: true, withinWindow: true, allowed: true };
+  const createdAtMs = Date.parse(record?.createdAt || '');
+  const owner = Boolean(userId && record?.createdByUserId === userId);
+  const withinWindow = Number.isFinite(createdAtMs) && now >= createdAtMs && now - createdAtMs <= INDIVIDUAL_EDIT_WINDOW_MS;
+  return { restricted: true, owner, withinWindow, allowed: owner && withinWindow };
+}
+
+export function operationAuthorship(record = {}, userId = '') {
+  return {
+    ownerUserId: cleanText(record?.createdByUserId || userId, 140),
+    createdAt: cleanText(record?.createdAt || '', 60)
+  };
 }
 
 export function normalizeCollaborationPermissions(input = []) {
