@@ -181,6 +181,15 @@ export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
     .slice(0, limit);
 }
 
+export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId = '') {
+  const parentSpaceId = String(acceptedSpaceId || '').trim().slice(0, 140);
+  if (!parentSpaceId) return [];
+  const governedSpaceIds = (Array.isArray(state?.spaces) ? state.spaces : [])
+    .filter((space) => String(space?.governanceSpaceId || '').trim() === parentSpaceId)
+    .map((space) => space?.spaceId);
+  return normalizeSnapshotSpaceIds([parentSpaceId, ...governedSpaceIds]);
+}
+
 function createId(prefix = 'id') {
   const random = window.crypto?.randomUUID?.().replace(/-/g, '') || `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   return `${prefix}_${random}`;
@@ -6502,9 +6511,17 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
 
       if (requiresSnapshotRecovery) {
-        const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
+        let state = await this.refreshBootstrap({ requestSnapshots: 'force' });
         this.assertSessionContext(sessionContext);
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
+        const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, cleanSpaceId);
+        if (recoverySpaceIds.length) {
+          state = await this.refreshBootstrap({
+            requestSnapshots: 'force',
+            snapshotSpaceIds: recoverySpaceIds
+          });
+          this.assertSessionContext(sessionContext);
+        }
         const localStateRevisions = await listStateRevisions([cleanSpaceId]);
         this.assertSessionContext(sessionContext);
         const replicaState = assertAcceptedInvitationReplicaState(state, cleanSpaceId, {
@@ -6848,9 +6865,17 @@ export class SemillaP2PClient {
     this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
-      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
+      let state = await this.refreshBootstrap({ requestSnapshots: 'force' });
       this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
+      const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId);
+      if (recoverySpaceIds.length) {
+        state = await this.refreshBootstrap({
+          requestSnapshots: 'force',
+          snapshotSpaceIds: recoverySpaceIds
+        });
+        this.assertSessionContext(sessionContext);
+      }
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
       this.assertSessionContext(sessionContext);
       const replicaState = assertAcceptedInvitationReplicaState(

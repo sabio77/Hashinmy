@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "ca6a34102c1c70d2dc6ce162e2f71f9576918720f95330c60631d0189563bb97",
-      "bytes": 382351
+      "sha256": "b0e2428b5712ece3efac7767eb92f864d500903239b1e1e473a858814b461efe",
+      "bytes": 383490
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -157,8 +157,8 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "bc948a7bc372f2f9fd5d42f9a5701a022e761ca70f0f773ff8cb42af02fa67ac",
-      "bytes": 185348
+      "sha256": "79e82906361d630683e02bdb0b8d70ce0e833313a84690c90489220fcc732435",
+      "bytes": 185434
     },
     {
       "url": "./textX/languages.json",

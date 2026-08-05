@@ -1755,10 +1755,14 @@ function applyP2PState(nextState = {}) {
   };
   renderInvitations();
   if (elements.devicesDialog?.open) renderDevices();
-  refreshProjects()
+  const projectsReady = refreshProjects()
     .then(() => reconcilePortfolioAccess())
-    .catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
+    .catch((error) => {
+      setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error');
+      return null;
+    });
   queueMicrotask(() => autoAcceptInheritedPortfolioInvitations().catch(() => false));
+  return projectsReady;
 }
 
 async function loadPublicConfig() { if (state.firebaseWebConfig) return state.firebaseWebConfig; const data = await apiGet('/api/config'); if (String(data?.approvedApplication || '') !== P2P_APPLICATION_ID) { console.error('[semilla-auth] La aplicación aprobada por memoriaBACKEND no coincide con la carpeta pública.', { expected: P2P_APPLICATION_ID, received: data?.approvedApplication || '' }); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } const config = data?.firebaseWebConfig || {}; const error = getFirebaseWebConfigError(config); if (error) { console.error('[semilla-auth]', error); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } state.firebaseWebConfig = config; return config; }
@@ -2920,7 +2924,7 @@ async function respondInvitation(event) {
           || sharedOwnerPanelId(result?.space?.ownerUserId || invitation?.inviterUserId || '')
           || SHARED_PROJECTS_PANEL_ID;
     }
-    applyP2PState(semillaP2P.bootstrapState);
+    await applyP2PState(semillaP2P.bootstrapState);
     showDashboard();
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = accessRevoked

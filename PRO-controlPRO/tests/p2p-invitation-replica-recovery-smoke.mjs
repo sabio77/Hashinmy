@@ -8,6 +8,31 @@ const root = path.resolve(path.dirname(currentFile), '..');
 const clientSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
 const storageSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-storage.js'), 'utf8');
 
+const snapshotIdsStart = clientSource.indexOf('export function normalizeSnapshotSpaceIds(');
+const snapshotIdsEnd = clientSource.indexOf('\nfunction createId(', snapshotIdsStart);
+assert.ok(snapshotIdsStart >= 0 && snapshotIdsEnd > snapshotIdsStart, 'No se encontró la selección de snapshots de invitaciones.');
+const snapshotIdsSource = clientSource.slice(snapshotIdsStart, snapshotIdsEnd)
+  .replaceAll('export function', 'function');
+const snapshotIdsModule = await import(`data:text/javascript;base64,${Buffer.from(`${snapshotIdsSource}
+export { acceptedInvitationSnapshotSpaceIds };`).toString('base64')}#accepted-snapshot-spaces`);
+assert.deepEqual(
+  snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
+    spaces: [
+      { spaceId: 'portfolio_1' },
+      { spaceId: 'project_1', governanceSpaceId: 'portfolio_1' },
+      { spaceId: 'project_2', governanceSpaceId: 'portfolio_1' },
+      { spaceId: 'project_other', governanceSpaceId: 'portfolio_2' }
+    ]
+  }, 'portfolio_1'),
+  ['portfolio_1', 'project_1', 'project_2'],
+  'Aceptar un panel no dirige la recuperación a sus proyectos gobernados.'
+);
+assert.deepEqual(
+  snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({ spaces: [{ spaceId: 'project_1' }] }, 'project_1'),
+  ['project_1'],
+  'Aceptar un proyecto individual no conserva su raíz como objetivo de snapshot.'
+);
+
 const reconciliationStart = storageSource.indexOf('function cleanSpaceId(');
 const reconciliationEnd = storageSource.indexOf('\nasync function purgeSpaceRecords', reconciliationStart);
 assert.ok(reconciliationStart >= 0 && reconciliationEnd > reconciliationStart, 'No se encontró la reconciliación durable de proyectos.');
@@ -221,6 +246,7 @@ assert.match(realtimeMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \
 assert.match(realtimeMethod, /await saveControlStateAtomically\(committedControlState\)/);
 assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'realtime-invitation' \}\)/);
 assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: 'force' \}\)/, 'Una aceptación remota no fuerza snapshot para esta réplica.');
+assert.match(realtimeMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación remota no dirige la recuperación al panel y sus proyectos internos.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
 assert.match(realtimeMethod, /allowReplicaPending: true/, 'La aceptación remota bloquearía la cola antes de recibir el snapshot que debe completarla.');
@@ -244,6 +270,7 @@ const responseEnd = clientSource.indexOf('\n  async leave(', responseStart);
 const responseMethod = clientSource.slice(responseStart, responseEnd);
 assert.match(responseMethod, /canonicalDecision === 'accept'/);
 assert.match(responseMethod, /requestSnapshots: 'force'/, 'El dispositivo que acepta no fuerza su propia recuperación.');
+assert.match(responseMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación local no dirige el snapshot a los proyectos internos del panel.');
 assert.match(responseMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación local no confirma su réplica contra el bootstrap autoritativo.');
 assert.match(responseMethod, /P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED/, 'La aceptación local no distingue una réplica todavía no confirmada.');
 assert.match(responseMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación local ignora el watermark de recuperación local.');
@@ -273,5 +300,14 @@ assert.match(appSource, /invite\.acceptedAccessRevoked/, 'Falta el mensaje de es
 assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recuperación posterior a la aceptación.');
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
+const applyStateStart = appSource.indexOf('function applyP2PState(nextState = {})');
+const applyStateEnd = appSource.indexOf('\nasync function loadPublicConfig', applyStateStart);
+const applyStateMethod = appSource.slice(applyStateStart, applyStateEnd);
+assert.match(applyStateMethod, /const projectsReady = refreshProjects\(\)/, 'La aplicación del bootstrap no expone cuándo termina de reconstruir los proyectos.');
+assert.match(applyStateMethod, /return projectsReady;/, 'El flujo de aceptación no puede esperar la hidratación de las cards.');
+const appResponseStart = appSource.indexOf('async function respondInvitation(event) {');
+const appResponseEnd = appSource.indexOf('\nfunction renderLocalNetworkStatus', appResponseStart);
+const appResponseMethod = appSource.slice(appResponseStart, appResponseEnd);
+assert.match(appResponseMethod, /await applyP2PState\(semillaP2P\.bootstrapState\);[\s\S]*showDashboard\(\);/, 'El panel se muestra antes de terminar de cargar sus proyectos internos.');
 
-console.log('OK: una membresía aceptada permanece en solo lectura hasta alcanzar la revisión autoritativa, la cola SSE puede transportar el snapshot y la promoción final queda persistida.');
+console.log('OK: una membresía aceptada permanece en solo lectura hasta alcanzar la revisión autoritativa, recupera de forma dirigida el panel y sus proyectos, y la interfaz espera sus cards antes de mostrar el panel.');
