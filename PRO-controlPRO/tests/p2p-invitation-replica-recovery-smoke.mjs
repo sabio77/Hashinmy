@@ -15,17 +15,19 @@ assert.ok(snapshotIdsStart >= 0 && snapshotIdsEnd > snapshotIdsStart, 'No se enc
 const snapshotIdsSource = clientSource.slice(snapshotIdsStart, snapshotIdsEnd)
   .replaceAll('export function', 'function');
 const snapshotIdsModule = await import(`data:text/javascript;base64,${Buffer.from(`${snapshotIdsSource}
-export { acceptedInvitationSnapshotSpaceIds };`).toString('base64')}#accepted-snapshot-spaces`);
+export { acceptedInvitationSnapshotSpaceIds, isReplicaRecoveryPendingSpace, isMembershipAuthorizationUnconfirmedSpace };`).toString('base64')}#accepted-snapshot-spaces`);
 assert.deepEqual(
   snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
     spaces: [
       { spaceId: 'portfolio_1' },
       { spaceId: 'project_1', governanceSpaceId: 'portfolio_1' },
       { spaceId: 'project_2', governanceSpaceId: 'portfolio_1' },
+      { spaceId: 'project_3', governanceSpaceId: 'portfolio_1' },
+      { spaceId: 'project_4', governanceSpaceId: 'portfolio_1' },
       { spaceId: 'project_other', governanceSpaceId: 'portfolio_2' }
     ]
   }, 'portfolio_1'),
-  ['portfolio_1', 'project_1', 'project_2'],
+  ['portfolio_1', 'project_1', 'project_2', 'project_3', 'project_4'],
   'Aceptar un panel no dirige la recuperación a sus proyectos gobernados.'
 );
 assert.deepEqual(
@@ -33,6 +35,18 @@ assert.deepEqual(
   ['project_1'],
   'Aceptar un proyecto individual no conserva su raíz como objetivo de snapshot.'
 );
+assert.equal(snapshotIdsModule.isReplicaRecoveryPendingSpace({
+  authorizationState: 'unconfirmed',
+  authorizationPendingReason: 'replica_recovery'
+}), true, 'Una réplica atrasada no se identifica como estado recuperable.');
+assert.equal(snapshotIdsModule.isMembershipAuthorizationUnconfirmedSpace({
+  authorizationState: 'unconfirmed',
+  authorizationPendingReason: 'replica_recovery'
+}), false, 'Una réplica autorizada se sigue confundiendo con una membresía desconocida.');
+assert.equal(snapshotIdsModule.isMembershipAuthorizationUnconfirmedSpace({
+  authorizationState: 'unconfirmed',
+  authorizationPendingReason: 'membership_unconfirmed'
+}), true, 'Una membresía realmente desconocida dejó de permanecer bloqueada.');
 
 const cleanTextStart = projectDomainSource.indexOf('export function cleanText(');
 const cleanTextEnd = projectDomainSource.indexOf('\nexport function localDateValue', cleanTextStart);
@@ -292,7 +306,8 @@ assert.match(realtimeMethod, /authorizationState: requiresSnapshotRecovery \? 'u
 assert.match(realtimeMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'El replay no protege una réplica que ya estaba confirmada.');
 assert.match(realtimeMethod, /await saveControlStateAtomically\(committedControlState\)/);
 assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'realtime-invitation' \}\)/);
-assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: 'force' \}\)/, 'Una aceptación remota no fuerza snapshot para esta réplica.');
+assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: false \}\)/, 'Una aceptación remota crea primero una concesión estricta que puede bloquear la clonación dirigida.');
+assert.match(realtimeMethod, /requestSnapshots: 'initial-clone'/, 'Una aceptación remota no solicita la mejor copia persistida disponible.');
 assert.match(realtimeMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación remota no dirige la recuperación al panel y sus proyectos internos.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
@@ -316,7 +331,7 @@ const responseStart = inviteEnd + 1;
 const responseEnd = clientSource.indexOf('\n  async leave(', responseStart);
 const responseMethod = clientSource.slice(responseStart, responseEnd);
 assert.match(responseMethod, /canonicalDecision === 'accept'/);
-assert.match(responseMethod, /requestSnapshots: 'force'/, 'El dispositivo que acepta no fuerza su propia recuperación.');
+assert.match(responseMethod, /requestSnapshots: 'initial-clone'/, 'El dispositivo que acepta no solicita una clonación inicial dirigida.');
 assert.match(responseMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación local no dirige el snapshot a los proyectos internos del panel.');
 assert.match(responseMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación local no confirma su réplica contra el bootstrap autoritativo.');
 assert.match(responseMethod, /P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED/, 'La aceptación local no distingue una réplica todavía no confirmada.');
@@ -336,6 +351,9 @@ assert.match(clientSource, /const spaceIds = this\.recoveryEligibleSpaceIds\(\)/
 assert.match(clientSource, /appliedStateRevisions: localStateRevisions/, 'Un watermark ya satisfecho puede quedar persistido y bloquear la promoción después de reiniciar.');
 assert.match(clientSource, /recoveryRequirement > localStateRevision/, 'Un watermark satisfecho todavía se interpreta como réplica pendiente.');
 assert.match(clientSource, /membershipUnconfirmed/, 'El modo de recuperación no distingue una réplica atrasada de una membresía desconocida.');
+assert.match(clientSource, /isMembershipAuthorizationUnconfirmedSpace\(/, 'Las operaciones todavía usan el marcador de réplica atrasada como si fuera una membresía desconocida.');
+assert.match(clientSource, /allowStaleSource = request\.allowStaleSource === true && recoveryReason === 'initial_clone'/, 'La fuente no reconoce la concesión limitada de clonación inicial.');
+assert.match(clientSource, /sourceStateRevision > requestedStateRevision \|\| \(!allowStaleSource && sourceStateRevision !== requestedStateRevision\)/, 'La clonación inicial no conserva la barrera contra fuentes adelantadas ni el modo estricto normal.');
 assert.match(clientSource, /!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)[\s\S]*!this\.isSpaceReplicaRecoveryPending\(cleanSpaceId\)/, 'La réplica aceptada no puede solicitar su clave cifrada y queda bloqueada antes de aplicar el snapshot.');
 assert.match(clientSource, /confirmRecoveredReplicaAuthorization\(/, 'No existe promoción durable después de completar la réplica.');
 assert.match(clientSource, /p2p:replica-recovery-confirmed/, 'La interfaz no recibe la transición que habilita la edición.');
@@ -345,6 +363,8 @@ assert.match(appSource, /result\?\.accessRevoked === true/, 'La interfaz no dist
 assert.match(appSource, /result\?\.replicaPending === true/, 'La interfaz presenta como lista una invitación cuya réplica sigue en recuperación.');
 assert.match(appSource, /invite\.acceptedAccessRevoked/, 'Falta el mensaje de estado para una aceptación ya revocada.');
 assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recuperación posterior a la aceptación.');
+assert.match(appSource, /function isAuthorizationUnconfirmed\(space = null\) \{ return isMembershipAuthorizationUnconfirmed\(space\); \}/, 'La interfaz todavía deshabilita acciones por una réplica autorizada que solo está convergiendo.');
+assert.match(appSource, /authorizationUnconfirmed \|\| replicaRecoveryPending/, 'La interfaz perdió el indicador visual de sincronización al habilitar el clon inicial.');
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
 assert.match(appSource, /pendingPanelExpectedProjectSpaceIds\(/, 'La interfaz no calcula qué proyectos autorizados debe hidratar antes de abrir el panel.');
@@ -364,4 +384,4 @@ const appResponseEnd = appSource.indexOf('\nfunction renderLocalNetworkStatus', 
 const appResponseMethod = appSource.slice(appResponseStart, appResponseEnd);
 assert.match(appResponseMethod, /await applyP2PState\(semillaP2P\.bootstrapState\);[\s\S]*showDashboard\(\);/, 'El panel se muestra antes de terminar de cargar sus proyectos internos.');
 
-console.log('OK: una membresía aceptada permanece en solo lectura hasta alcanzar la revisión autoritativa, recupera de forma dirigida el panel y sus proyectos, y la interfaz no abre el panel hasta hidratar todas sus cards autorizadas.');
+console.log('OK: una invitación aceptada obtiene una clonación inicial dirigida, conserva bloqueadas las membresías desconocidas y permite trabajar sobre la mejor copia validada mientras converge.');

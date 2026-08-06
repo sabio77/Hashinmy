@@ -452,6 +452,31 @@ export function sharedOwnerPanelId(ownerUserId = '') {
 }
 
 /**
+ * Una réplica en recuperación ya tiene una membresía autoritativa concedida por
+ * memoriaBACKEND. El estado provisional únicamente indica que su contenido
+ * local todavía puede estar detrás de la revisión más reciente.
+ *
+ * Mantener esta distinción evita convertir una copia válida, recibida al aceptar
+ * una invitación, en un falso bloqueo de autorización. Las membresías realmente
+ * desconocidas continúan cerradas hasta que el backend las confirme.
+ */
+export function isReplicaRecoveryPendingSpace(space = null) {
+  return Boolean(
+    space
+    && space.authorizationState === 'unconfirmed'
+    && cleanText(space.authorizationPendingReason || '', 60) === 'replica_recovery'
+  );
+}
+
+export function isMembershipAuthorizationUnconfirmed(space = null) {
+  return Boolean(
+    space
+    && space.authorizationState === 'unconfirmed'
+    && !isReplicaRecoveryPendingSpace(space)
+  );
+}
+
+/**
  * Determina si una card de panel invitado debe permanecer detrás de la
  * comparación autoritativa del inventario completo.
  *
@@ -579,14 +604,14 @@ export function invitedPortfolioHydrationStatus(input = {}) {
   const portfolioSpace = spaces.find((space) => (
     cleanText(space?.resourceType || '', 80) === portfolioResourceType
     && cleanText(space?.spaceId || '', 140) === panelId
-    && space?.authorizationState !== 'unconfirmed'
+    && !isMembershipAuthorizationUnconfirmed(space)
   )) || null;
   const portfolioOwnerUserId = cleanText(portfolioSpace?.ownerUserId || '', 140);
   const readableOwnerPortfolioIds = Array.from(new Set(spaces
     .filter((space) => (
       cleanText(space?.resourceType || '', 80) === portfolioResourceType
       && cleanText(space?.ownerUserId || '', 140) === portfolioOwnerUserId
-      && space?.authorizationState !== 'unconfirmed'
+      && !isMembershipAuthorizationUnconfirmed(space)
       && currentUserId
       && hasPermission(space, currentUserId, 'read')
     ))
@@ -630,11 +655,20 @@ export function invitedPortfolioHydrationStatus(input = {}) {
   const pendingProjectAuthorizationSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
     const projectSpace = projectSpacesById.get(spaceId) || null;
     return !projectSpace
-      || projectSpace.authorizationState === 'unconfirmed'
+      || isMembershipAuthorizationUnconfirmed(projectSpace)
       || !currentUserId
       || !hasPermission(projectSpace, currentUserId, 'read');
   });
   const pendingProjectAuthorizationSpaceIdSet = new Set(pendingProjectAuthorizationSpaceIds);
+  const recoveringProjectReplicaSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    return Boolean(
+      projectSpace
+      && isReplicaRecoveryPendingSpace(projectSpace)
+      && currentUserId
+      && hasPermission(projectSpace, currentUserId, 'read')
+    );
+  });
   const missingProjectSpaceIds = expectedProjectSpaceIds
     .filter((spaceId) => !loadedProjectSpaceIds.has(spaceId));
   const comparisonComplete = manifest?.complete === true;
@@ -647,6 +681,7 @@ export function invitedPortfolioHydrationStatus(input = {}) {
   const manifestInventoryRevision = Math.max(0, Math.floor(Number(manifest?.inventoryRevision || 0)));
   const portfolioInventoryRevision = Math.max(0, Math.floor(Number(portfolioSpace?.projectInventoryRevision || 0)));
   const inventoryRevisionMatches = Boolean(manifest) && manifestInventoryRevision === portfolioInventoryRevision;
+  const portfolioReplicaRecoveryPending = isReplicaRecoveryPendingSpace(portfolioSpace);
   return {
     panelId,
     ready: Boolean(
@@ -674,6 +709,9 @@ export function invitedPortfolioHydrationStatus(input = {}) {
     expectedProjectSpaceIds,
     authorizedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => !pendingProjectAuthorizationSpaceIdSet.has(spaceId)),
     pendingProjectAuthorizationSpaceIds,
+    recoveringProjectReplicaSpaceIds,
+    portfolioReplicaRecoveryPending,
+    synchronizing: portfolioReplicaRecoveryPending || recoveringProjectReplicaSpaceIds.length > 0,
     loadedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => loadedProjectSpaceIds.has(spaceId)),
     missingProjectSpaceIds,
     reason: !manifest
@@ -687,12 +725,14 @@ export function invitedPortfolioHydrationStatus(input = {}) {
             : !inventoryRevisionMatches
               ? 'portfolio_inventory_revision_mismatch'
               : pendingProjectAuthorizationSpaceIds.length
-                ? 'project_replica_unconfirmed'
+                ? 'project_authorization_unconfirmed'
                 : missingProjectSpaceIds.length
                   ? 'project_roots_missing'
                   : !projectInventoryMatches
                     ? 'project_inventory_set_mismatch'
-                    : 'ready'
+                    : portfolioReplicaRecoveryPending || recoveringProjectReplicaSpaceIds.length
+                      ? 'ready_replica_recovery'
+                      : 'ready'
   };
 }
 
@@ -723,7 +763,7 @@ export function legacyPortfolioProjectsForInvitation(projects = [], portfolioSpa
   return (Array.isArray(projects) ? projects : []).filter((data) => {
     const projectSpaceId = cleanText(data?.space?.spaceId || '', 140);
     if (!projectSpaceId || data?.space?.resourceType !== PROJECT_ENTITY_TYPE) return false;
-    if (data?.space?.authorizationState === 'unconfirmed') return false;
+    if (isMembershipAuthorizationUnconfirmed(data?.space)) return false;
 
     const projectOwnerUserId = cleanText(
       data?.space?.ownerUserId || data?.project?.portfolioOwnerUserId || '',
@@ -760,7 +800,7 @@ export function buildProjectPanelScopes(input = {}) {
   const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
 
   const scopes = spaces
-    .filter((space) => space?.resourceType === portfolioResourceType && space?.authorizationState !== 'unconfirmed')
+    .filter((space) => space?.resourceType === portfolioResourceType && !isMembershipAuthorizationUnconfirmed(space))
     .map((space) => ({
       id: cleanText(space?.spaceId || '', 140),
       type: 'portfolio',

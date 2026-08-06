@@ -71,6 +71,19 @@ const freshStatus = domain.invitedPortfolioHydrationStatus({
 assert.equal(freshStatus.ready, true);
 assert.equal(freshStatus.comparisonAuthoritative, true);
 
+const recoveringStatus = domain.invitedPortfolioHydrationStatus({
+  spaces: spaces.map((space) => space.spaceId === 'project_a'
+    ? { ...space, authorizationState: 'unconfirmed', authorizationPendingReason: 'replica_recovery' }
+    : space),
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: freshManifest,
+  loadedProjectSpaceIds: ['project_a']
+});
+assert.equal(recoveringStatus.ready, true, 'Una brecha de revisión con raíz validada debe conservar visible el clon inicial.');
+assert.equal(recoveringStatus.reason, 'ready_replica_recovery');
+assert.deepEqual(recoveringStatus.recoveringProjectReplicaSpaceIds, ['project_a']);
+
 const recoverySpaceIds = client.invitedReplicaRecoverySpaceIds({
   userId: guestUserId,
   spaces: [
@@ -106,4 +119,4 @@ assert.match(clientSource, /\{ authoritative: true \}\s*\);/, 'El bootstrap remo
 assert.match(clientSource, /const pendingReplicaSpaceIds = invitedReplicaRecoverySpaceIds\(/, 'El bootstrap no bloquea réplicas invitadas que ya existían pero quedaron detrás.');
 assert.match(appSource, /comparisonAuthoritative: status\?\.comparisonAuthoritative === true/, 'El error de consola no permite distinguir una comparación antigua de una comparación fresca.');
 
-console.log('OK: un panel invitado no usa inventarios cacheados como prueba actual y vuelve a ocultarse ante cualquier brecha de revisión autoritativa.');
+console.log('OK: un panel invitado exige inventario autoritativo actual, pero conserva visible una copia validada mientras alcanza la última revisión.');

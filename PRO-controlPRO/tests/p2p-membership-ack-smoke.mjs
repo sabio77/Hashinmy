@@ -141,11 +141,11 @@ assert.deepEqual(
   inheritedClient.refreshCalls,
   [
     { requestSnapshots: false },
-    { requestSnapshots: 'force', snapshotSpaceIds: ['space_inherited_1'] }
+    { requestSnapshots: 'initial-clone', snapshotSpaceIds: ['space_inherited_1'] }
   ],
-  'Una membresía heredada para la cuenta actual no fuerza la recuperación dirigida de su proyecto.'
+  'Una membresía heredada para la cuenta actual no solicita la clonación inicial dirigida de su proyecto.'
 );
 assert.equal(inheritedClient.lastProcessedSequence, 42, 'La membresía heredada no avanzó después de confirmar su recuperación dirigida.');
 assert.deepEqual(inheritedClient.acks, [42], 'La membresía heredada no confirmó el evento después de la recuperación autoritativa.');
 
-console.log('OK: los cambios de membresía solo avanzan cursor y ACK después de confirmar el proyecto en el bootstrap autoritativo; las altas heredadas fuerzan snapshot dirigido y las fallas conservan el evento para replay.');
+console.log('OK: los cambios de membresía solo avanzan cursor y ACK después de confirmar el proyecto en el bootstrap autoritativo; las altas heredadas solicitan clonación inicial dirigida y las fallas conservan el evento para replay.');

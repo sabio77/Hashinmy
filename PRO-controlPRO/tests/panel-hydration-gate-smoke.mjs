@@ -105,9 +105,10 @@ const legacyReplicaPending = domain.invitedPortfolioHydrationStatus({
   portfolioHydration: legacyManifest,
   loadedProjectSpaceIds: ['legacy_1', 'legacy_2', 'legacy_3']
 });
-assert.equal(legacyReplicaPending.ready, false);
-assert.equal(legacyReplicaPending.reason, 'project_replica_unconfirmed');
-assert.deepEqual(legacyReplicaPending.pendingProjectAuthorizationSpaceIds, ['legacy_2']);
+assert.equal(legacyReplicaPending.ready, true, 'Una copia legacy validada no debe ocultar todo el panel mientras alcanza la revisión más reciente.');
+assert.equal(legacyReplicaPending.reason, 'ready_replica_recovery');
+assert.deepEqual(legacyReplicaPending.pendingProjectAuthorizationSpaceIds, []);
+assert.deepEqual(legacyReplicaPending.recoveringProjectReplicaSpaceIds, ['legacy_2']);
 
 const ambiguousLegacyPanel = domain.invitedPortfolioHydrationStatus({
   spaces: [
@@ -180,9 +181,25 @@ const unconfirmedProjectReplica = domain.invitedPortfolioHydrationStatus({
   portfolioHydration: completeManifest,
   loadedProjectSpaceIds: ['project_2', 'project_1']
 });
-assert.equal(unconfirmedProjectReplica.ready, false, 'Una raíz existente no demuestra que compras, ingresos y proyecciones hayan alcanzado la revisión autoritativa.');
-assert.equal(unconfirmedProjectReplica.reason, 'project_replica_unconfirmed');
-assert.deepEqual(unconfirmedProjectReplica.pendingProjectAuthorizationSpaceIds, ['project_2']);
+assert.equal(unconfirmedProjectReplica.ready, true, 'Una raíz validada debe abrir el panel como clon inicial aunque todavía esté alcanzando la revisión autoritativa.');
+assert.equal(unconfirmedProjectReplica.reason, 'ready_replica_recovery');
+assert.deepEqual(unconfirmedProjectReplica.pendingProjectAuthorizationSpaceIds, []);
+assert.deepEqual(unconfirmedProjectReplica.recoveringProjectReplicaSpaceIds, ['project_2']);
+assert.equal(unconfirmedProjectReplica.synchronizing, true);
+
+const membershipUnconfirmedProject = domain.invitedPortfolioHydrationStatus({
+  spaces: spaces.map((space) => space.spaceId === 'project_2'
+    ? { ...space, authorizationState: 'unconfirmed', authorizationPendingReason: 'membership_unconfirmed' }
+    : space),
+  panelId,
+  currentUserId: guestUserId,
+  portfolioHydration: completeManifest,
+  loadedProjectSpaceIds: ['project_2', 'project_1']
+});
+assert.equal(membershipUnconfirmedProject.ready, false, 'Una membresía desconocida debe continuar bloqueando el panel aunque exista una copia local.');
+assert.equal(membershipUnconfirmedProject.reason, 'project_authorization_unconfirmed');
+assert.deepEqual(membershipUnconfirmedProject.pendingProjectAuthorizationSpaceIds, ['project_2']);
+assert.deepEqual(membershipUnconfirmedProject.recoveringProjectReplicaSpaceIds, []);
 
 const virtualPartialPanel = domain.invitedPortfolioHydrationStatus({
   spaces: spaces.slice(1),
@@ -230,32 +247,6 @@ const missingManifest = domain.invitedPortfolioHydrationStatus({
 assert.equal(missingManifest.ready, false);
 assert.equal(missingManifest.reason, 'authoritative_manifest_missing');
 
-const recoveryStart = appSource.indexOf('function panelRecoveryProgress(');
-const recoveryEnd = appSource.indexOf('\nfunction reportIncompleteInvitedPanel', recoveryStart);
-assert.ok(recoveryStart >= 0 && recoveryEnd > recoveryStart);
-const recoveryModuleSource = `
-const state = {
-  p2pState: { snapshotRequests: [{ spaceId: 'project_3' }, { spaceId: 'other_project' }] },
-  pendingAuthoritativePanelIds: new Set(['${panelId}'])
-};
-${appSource.slice(recoveryStart, recoveryEnd)}
-export { panelRecoveryProgress, panelIsRecovering };
-`;
-const recoveryUi = await import(`data:text/javascript;base64,${Buffer.from(recoveryModuleSource).toString('base64')}#panel-recovery-ui`);
-const recoveryProgress = recoveryUi.panelRecoveryProgress({
-  expectedProjectSpaceIds: ['project_1', 'project_2', 'project_3', 'project_4'],
-  authorizedProjectSpaceIds: ['project_1', 'project_2'],
-  loadedProjectSpaceIds: ['project_1', 'project_2', 'project_3', 'project_4'],
-  pendingProjectAuthorizationSpaceIds: ['project_3', 'project_4']
-});
-assert.equal(recoveryProgress.ready, 2);
-assert.equal(recoveryProgress.total, 4);
-assert.deepEqual(recoveryProgress.pendingProjectSpaceIds, ['project_3', 'project_4']);
-assert.deepEqual(recoveryProgress.activeSnapshotSpaceIds, ['project_3']);
-assert.equal(recoveryUi.panelIsRecovering({ id: panelId }, { reason: 'project_replica_unconfirmed' }), true);
-assert.equal(recoveryUi.panelIsRecovering({ id: panelId }, { reason: 'project_roots_missing' }), true);
-assert.equal(recoveryUi.panelIsRecovering({ id: panelId }, { reason: 'portfolio_inventory_revision_mismatch' }), false, 'Una divergencia de revisión no puede degradarse a estado transitorio.');
-
 const normalizeStart = clientSource.indexOf('export function normalizeSnapshotSpaceIds(');
 const normalizeEnd = clientSource.indexOf('\nfunction createId(', normalizeStart);
 assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart);
@@ -284,22 +275,16 @@ assert.match(appSource, /projects: \[\.\.\.state\.projects\.values\(\)\]/, 'La b
 assert.match(appSource, /if \(!panelNeedsAuthoritativeHydration\(panel\)\) return true;/, 'Los paneles virtuales todavía pueden saltarse la barrera autoritativa.');
 assert.match(appSource, /if \(!status\.ready\) \{[\s\S]*reportIncompleteInvitedPanel\(panel, status\);[\s\S]*return false;/, 'La card invitada todavía se renderiza cuando faltan proyectos.');
 assert.match(appSource, /console\.error\('\[P2P_PANEL_INCOMPLETO\]/, 'Falta el error de consola exigido para una carga parcial.');
-assert.match(appSource, /snapshotRequests: Array\.isArray\(nextState\.snapshotRequests\)/, 'La interfaz descarta las solicitudes activas de snapshot y no puede explicar la recuperación.');
-assert.match(appSource, /console\.info\('\[P2P_PANEL_SINCRONIZANDO\]/, 'Una recuperación esperada todavía se reporta como error duro.');
-assert.match(appSource, /status\?\.reason === 'project_replica_unconfirmed'/, 'La réplica no confirmada debe reconocerse como transición segura de sincronización.');
-assert.match(appSource, /card\.dataset\.syncing = 'true'/, 'La card del panel no muestra el estado transitorio de sincronización.');
-assert.match(appSource, /button\.disabled = recovering/, 'La card en recuperación todavía puede activarse antes de validar todas las réplicas.');
-assert.match(appSource, /button\.setAttribute\('aria-busy', 'true'\)/, 'La card en recuperación no expone su estado a tecnologías de asistencia.');
-assert.match(appSource, /if \(!button \|\| button\.disabled \|\| button\.getAttribute\('aria-busy'\) === 'true'\) return;/, 'El delegado de clic no protege cards en recuperación.');
 assert.match(appSource, /portfolioRootLoaded: status\?\.portfolioRootLoaded === true/, 'El diagnóstico no informa cuando falta la raíz administrativa del panel.');
 assert.match(appSource, /inventoryRevisionMatches: status\?\.inventoryRevisionMatches === true/, 'El diagnóstico no informa la divergencia entre el panel y su manifiesto.');
 assert.match(appSource, /projectInventoryMatches: status\?\.projectInventoryMatches === true/, 'El diagnóstico no informa si el conjunto de proyectos difiere del inventario autoritativo.');
 assert.match(appSource, /unexpectedProjectSpaceIds: status\?\.unexpectedProjectSpaceIds \|\| \[\]/, 'El diagnóstico no identifica proyectos sobrantes o desactualizados.');
 assert.match(appSource, /legacyProjectSpaceIds: status\?\.legacyProjectSpaceIds \|\| \[\]/, 'El diagnóstico no distingue las concesiones legacy válidas del inventario administrado.');
 assert.match(appSource, /pendingProjectAuthorizationSpaceIds: status\?\.pendingProjectAuthorizationSpaceIds \|\| \[\]/, 'El diagnóstico no informa qué réplicas siguen sin confirmación autoritativa.');
+assert.match(appSource, /recoveringProjectReplicaSpaceIds: status\?\.recoveringProjectReplicaSpaceIds \|\| \[\]/, 'El diagnóstico no distingue las réplicas autorizadas que siguen convergiendo.');
 assert.match(appSource, /portfolioHydration: Array\.isArray\(nextState\.portfolioHydration\)/, 'La interfaz descarta el manifiesto al aplicar el estado P2P.');
 assert.match(appSource, /if \(panelNeedsAuthoritativeHydration\(panel\)\) return portfolioHydrationStatus\(cleanPanelId\)\.ready;/, 'La apertura automática no usa la misma barrera autoritativa que la card.');
 assert.match(appSource, /state\.pendingAuthoritativePanelIds\.add\(state\.pendingPanelId\)/, 'Aceptar un panel no activa la barrera antes del siguiente bootstrap.');
 assert.match(appSource, /for \(const spaceId of revokedSpaceIds\) state\.pendingAuthoritativePanelIds\.delete\(spaceId\);/, 'Una revocación puede dejar una barrera pendiente obsoleta.');
 
-console.log('OK: paneles reales y virtuales quedan ocultos hasta coincidir exactamente con el inventario autoritativo y cargar todas sus raíces.');
+console.log('OK: paneles reales y virtuales esperan inventario y raíces completas, pero una réplica autorizada puede abrirse como clon inicial mientras continúa convergiendo.');

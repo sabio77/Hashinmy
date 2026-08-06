@@ -1,11 +1,5 @@
 # Changelog
 
-## 1.10.12 - 2026-08-05
-
-- Corregido el falso error `P2P_PANEL_INCOMPLETO` durante la transición segura `project_replica_unconfirmed`: la aceptación conserva el bloqueo autoritativo, pero informa `P2P_PANEL_SINCRONIZANDO` mientras memoriaBACKEND recupera y valida las réplicas.
-- El selector mantiene visible una card deshabilitada y accesible del panel invitado, con progreso de proyectos confirmados, evitando que una invitación aceptada parezca desaparecer mientras llegan los snapshots.
-- La interfaz conserva ahora `snapshotRequests` del bootstrap para diagnosticar la recuperación activa; divergencias reales de manifiesto, revisión o inventario continúan registrándose como error y sin permitir abrir información parcial.
-
 ## 1.10.11 - 2026-08-05
 
 - Corregida la regresión que ocultaba indefinidamente un panel invitado cuando sus proyectos fueron creados antes del primer panel y, por compatibilidad, se comparten mediante concesiones `accessScope=portfolio` sin `governanceSpaceId`.

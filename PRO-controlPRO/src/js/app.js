@@ -71,6 +71,8 @@ import {
   panelRequiresAuthoritativeHydration,
   pendingPanelExpectedProjectSpaceIds,
   invitedPortfolioHydrationStatus,
+  isMembershipAuthorizationUnconfirmed,
+  isReplicaRecoveryPendingSpace,
   roleLabel,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
@@ -92,7 +94,7 @@ const state = {
   pendingPanelId: '',
   pendingAuthoritativePanelIds: new Set(),
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -158,8 +160,8 @@ function openDialog(dialog) { if (!dialog) return; if (typeof dialog.showModal =
 function closeDialog(dialog) { if (!dialog) return; if (typeof dialog.close === 'function') dialog.close(); else dialog.removeAttribute('open'); }
 function selectedProjectData() { return state.projects.get(state.selectedSpaceId) || null; }
 function selectedSpace() { return state.p2pState.spaces.find((space) => space.spaceId === state.selectedSpaceId) || null; }
-function isAuthorizationUnconfirmed(space = null) { return space?.authorizationState === 'unconfirmed'; }
-function isReplicaRecoveryPending(space = null) { return isAuthorizationUnconfirmed(space) && space?.authorizationPendingReason === 'replica_recovery'; }
+function isAuthorizationUnconfirmed(space = null) { return isMembershipAuthorizationUnconfirmed(space); }
+function isReplicaRecoveryPending(space = null) { return isReplicaRecoveryPendingSpace(space); }
 function isSelectedProjectOwner() {
   const space = selectedSpace();
   return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user?.userId && space.ownerUserId === state.user.userId);
@@ -238,49 +240,10 @@ function panelNeedsAuthoritativeHydration(panel = null) {
     pendingAuthoritativePanel: Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
   });
 }
-function panelRecoveryProgress(status = {}) {
-  const expectedProjectSpaceIds = [...new Set((status?.expectedProjectSpaceIds || [])
-    .map((spaceId) => String(spaceId || '').trim())
-    .filter(Boolean))];
-  const authorizedProjectSpaceIds = new Set((status?.authorizedProjectSpaceIds || [])
-    .map((spaceId) => String(spaceId || '').trim())
-    .filter(Boolean));
-  const loadedProjectSpaceIds = new Set((status?.loadedProjectSpaceIds || [])
-    .map((spaceId) => String(spaceId || '').trim())
-    .filter(Boolean));
-  const pendingAuthorizationSpaceIds = new Set((status?.pendingProjectAuthorizationSpaceIds || [])
-    .map((spaceId) => String(spaceId || '').trim())
-    .filter(Boolean));
-  const activeSnapshotSpaceIds = [...new Set((state.p2pState.snapshotRequests || [])
-    .map((request) => String(request?.spaceId || '').trim())
-    .filter(Boolean))];
-  const readyProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => (
-    authorizedProjectSpaceIds.has(spaceId)
-    && loadedProjectSpaceIds.has(spaceId)
-    && !pendingAuthorizationSpaceIds.has(spaceId)
-  ));
-  return {
-    total: expectedProjectSpaceIds.length,
-    ready: readyProjectSpaceIds.length,
-    readyProjectSpaceIds,
-    pendingProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => !readyProjectSpaceIds.includes(spaceId)),
-    activeSnapshotSpaceIds: activeSnapshotSpaceIds.filter((spaceId) => expectedProjectSpaceIds.includes(spaceId))
-  };
-}
-function panelIsRecovering(panel = null, status = {}) {
-  const panelId = String(panel?.id || status?.panelId || '').trim();
-  if (status?.reason === 'project_replica_unconfirmed') return true;
-  return Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
-    && ['authoritative_manifest_missing', 'authoritative_comparison_incomplete', 'portfolio_root_missing', 'project_roots_missing']
-      .includes(String(status?.reason || ''));
-}
 function reportIncompleteInvitedPanel(panel = null, status = {}) {
   const panelId = String(panel?.id || status?.panelId || '').trim();
   if (!panelId) return;
-  const recovery = panelRecoveryProgress(status);
-  const recovering = panelIsRecovering(panel, status);
   const signature = JSON.stringify({
-    recovering,
     reason: status?.reason || 'unknown',
     manifestInventoryRevision: Math.max(0, Number(status?.manifestInventoryRevision || 0)),
     portfolioInventoryRevision: Math.max(0, Number(status?.portfolioInventoryRevision || 0)),
@@ -292,12 +255,12 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     absentControl: status?.absentControlProjectSpaceIds || [],
     expected: status?.expectedProjectSpaceIds || [],
     pendingAuthorization: status?.pendingProjectAuthorizationSpaceIds || [],
-    missing: status?.missingProjectSpaceIds || [],
-    activeSnapshots: recovery.activeSnapshotSpaceIds
+    recoveringReplicas: status?.recoveringProjectReplicaSpaceIds || [],
+    missing: status?.missingProjectSpaceIds || []
   });
   if (state.incompletePanelWarnings.get(panelId) === signature) return;
   state.incompletePanelWarnings.set(panelId, signature);
-  const details = {
+  console.error('[P2P_PANEL_INCOMPLETO] La card del panel invitado fue bloqueada porque todavía no coincide con el panel autoritativo del propietario.', {
     panelId,
     reason: status?.reason || 'unknown',
     comparisonComplete: status?.comparisonComplete === true,
@@ -315,15 +278,11 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     expectedProjectSpaceIds: status?.expectedProjectSpaceIds || [],
     authorizedProjectSpaceIds: status?.authorizedProjectSpaceIds || [],
     pendingProjectAuthorizationSpaceIds: status?.pendingProjectAuthorizationSpaceIds || [],
+    recoveringProjectReplicaSpaceIds: status?.recoveringProjectReplicaSpaceIds || [],
+    portfolioReplicaRecoveryPending: status?.portfolioReplicaRecoveryPending === true,
     loadedProjectSpaceIds: status?.loadedProjectSpaceIds || [],
-    missingProjectSpaceIds: status?.missingProjectSpaceIds || [],
-    recovery
-  };
-  if (recovering) {
-    console.info('[P2P_PANEL_SINCRONIZANDO] El panel invitado permanece bloqueado de forma segura mientras se recuperan y validan sus réplicas.', details);
-    return;
-  }
-  console.error('[P2P_PANEL_INCOMPLETO] La card del panel invitado fue bloqueada porque todavía no coincide con el panel autoritativo del propietario.', details);
+    missingProjectSpaceIds: status?.missingProjectSpaceIds || []
+  });
 }
 function panelScopes() {
   return allPanelScopes().filter((panel) => {
@@ -389,49 +348,30 @@ function panelTypeDescription(panel = null) {
 }
 function renderPanelSwitcher(activePanel = activePanelScope()) {
   if (!elements.panelList || !elements.panelSwitcher) return;
-  const readyScopes = panelScopes();
-  const readyPanelIds = new Set(readyScopes.map((panel) => String(panel?.id || '').trim()).filter(Boolean));
-  const recoveringScopes = allPanelScopes()
-    .filter((panel) => !readyPanelIds.has(String(panel?.id || '').trim()) && panelNeedsAuthoritativeHydration(panel))
-    .map((panel) => ({ panel, status: portfolioHydrationStatus(panel.id) }))
-    .filter(({ panel, status }) => !status.ready && panelIsRecovering(panel, status));
-  const scopes = [
-    ...readyScopes.map((panel) => ({ panel, status: null, recovering: false })),
-    ...recoveringScopes.map(({ panel, status }) => ({ panel, status, recovering: true }))
-  ];
+  const scopes = panelScopes();
   elements.panelSwitcher.hidden = false;
   elements.panelList.replaceChildren();
-  for (const entry of scopes) {
-    const { panel, status, recovering } = entry;
+  for (const panel of scopes) {
     const card = document.createElement('article');
     card.className = 'panel-switcher-card';
     card.dataset.panelId = panel.id;
-    if (recovering) card.dataset.syncing = 'true';
     if (panel.id === activePanel?.id) card.dataset.active = 'true';
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'panel-switcher-main';
     button.dataset.panelId = panel.id;
-    button.disabled = recovering;
     button.setAttribute('aria-pressed', panel.id === activePanel?.id ? 'true' : 'false');
-    if (recovering) button.setAttribute('aria-busy', 'true');
-    const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = recovering ? '↻' : panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
+    const marker = document.createElement('span'); marker.className = 'panel-switcher-marker'; marker.setAttribute('aria-hidden', 'true'); marker.textContent = panel.type === 'shared' ? '↗' : panel.owned ? '◆' : '◇';
     const copy = document.createElement('span'); copy.className = 'panel-switcher-copy';
     const title = document.createElement('strong'); title.textContent = panelDisplayName(panel);
     const detail = document.createElement('small');
-    if (recovering) {
-      const progress = panelRecoveryProgress(status);
-      const progressLabel = progress.total > 0 ? ` · ${progress.ready}/${progress.total}` : '';
-      detail.textContent = `${t('p2p.replicaRecoveryBadge', 'Sincronizando')}${progressLabel}`;
-    } else {
-      const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
-      const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
-      detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
-    }
+    const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
+    const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
+    detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
     copy.append(title, detail); button.append(marker, copy); card.append(button);
 
-    if (!recovering && panel.type === 'portfolio' && !panel.owned && panel.space?.spaceId) {
+    if (panel.type === 'portfolio' && !panel.owned && panel.space?.spaceId) {
       const menu = contextMenuButton(
         { scope: 'panel', spaceId: panel.space.spaceId, panelId: panel.id },
         t('actions.panelMenu', 'Opciones del panel')
@@ -927,7 +867,7 @@ function resetUserScopedInterface() {
   state.activePanelId = '';
   state.pendingPanelId = '';
   state.pendingAuthoritativePanelIds.clear();
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -1249,9 +1189,10 @@ function renderDashboard() {
     const authorizationUnconfirmed = isAuthorizationUnconfirmed(data.space);
     const replicaRecoveryPending = isReplicaRecoveryPending(data.space);
     if (authorizationUnconfirmed) card.dataset.authorization = 'unconfirmed';
+    else if (replicaRecoveryPending) card.dataset.authorization = 'synchronizing';
     const header = document.createElement('div'); header.className = 'project-card-header';
     const titleWrap = document.createElement('div'); const title = document.createElement('h3'); title.textContent = data.project.name; const address = document.createElement('p'); address.textContent = data.project.address || t('project.noAddress', 'Sin dirección'); titleWrap.append(title, address);
-    if (authorizationUnconfirmed) { const recovery = document.createElement('span'); recovery.className = 'authorization-badge'; recovery.textContent = replicaRecoveryPending ? t('p2p.replicaRecoveryBadge', 'Sincronizando') : t('p2p.authorizationUnconfirmedBadge', 'Copia local'); recovery.title = replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La autorización no pudo confirmarse. La copia local se conserva en modo de solo lectura.'); titleWrap.append(recovery); }
+    if (authorizationUnconfirmed || replicaRecoveryPending) { const recovery = document.createElement('span'); recovery.className = 'authorization-badge'; recovery.textContent = replicaRecoveryPending ? t('p2p.replicaRecoveryBadge', 'Sincronizando') : t('p2p.authorizationUnconfirmedBadge', 'Copia local'); recovery.title = replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación fue aceptada y ya puedes trabajar sobre la mejor copia validada disponible. Los cambios más recientes continúan sincronizándose en segundo plano.') : t('p2p.authorizationUnconfirmed', 'La autorización no pudo confirmarse. La copia local se conserva en modo de solo lectura.'); titleWrap.append(recovery); }
     const cardSignals = document.createElement('div'); cardSignals.className = 'project-card-signals';
     cardSignals.append(replicaHealthBadge(data.space.spaceId, true));
     const members = document.createElement('span'); members.className = 'count-badge'; members.textContent = String(data.space.members?.length || 1); members.title = t('project.participants', 'Participantes'); cardSignals.append(members); header.append(titleWrap, cardSignals);
@@ -1906,7 +1847,8 @@ function renderProject() {
   elements.editProjectButton.disabled = !userCan('edit_project'); elements.addPurchaseButton.disabled = !userCan('add'); elements.addIncomeButton.disabled = !userCan('add'); elements.addProjectionButton.disabled = !userCan('projection');
   if (lifecycleLocked) [elements.editProjectButton, elements.addPurchaseButton, elements.addIncomeButton, elements.addProjectionButton].forEach((button) => { button.disabled = true; });
   if (lifecycleTransaction) setStatus(elements.projectStatus, lifecycleStatusMessage(lifecycleTransaction), 'warning');
-  else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
+  else if (authorizationUnconfirmed) setStatus(elements.projectStatus, t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
+  else if (replicaRecoveryPending) setStatus(elements.projectStatus, t('p2p.replicaRecovery', 'La invitación fue aceptada y ya puedes trabajar sobre la mejor copia validada disponible. Los cambios más recientes continúan sincronizándose en segundo plano.'), 'warning');
 }
 
 function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); renderDashboard(); renderTrash(); }
@@ -1929,7 +1871,6 @@ function applyP2PState(nextState = {}) {
       sent: Array.isArray(nextState.invitations?.sent) ? nextState.invitations.sent : []
     },
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
-    snapshotRequests: Array.isArray(nextState.snapshotRequests) ? nextState.snapshotRequests : [],
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : [],
     portfolioHydration: Array.isArray(nextState.portfolioHydration) ? nextState.portfolioHydration : []
@@ -3116,7 +3057,7 @@ async function respondInvitation(event) {
       : invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && canonicalDecision === 'accept'
         ? t('invite.portfolioAccepted', 'Acceso al panel aceptado. Los proyectos compartidos se están incorporando automáticamente.')
         : replicaPending
-          ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.')
+          ? t('invite.acceptedSyncing', 'Invitación aceptada. Ya puedes trabajar sobre la copia disponible mientras se incorporan los cambios más recientes.')
           : canonicalDecision === 'accept'
             ? t('invite.accepted', 'Invitación aceptada.')
             : t('invite.rejected', 'Invitación rechazada.');
@@ -3317,7 +3258,7 @@ window.addEventListener('p2p:space-deleted', (event) => {
   }
 });
 window.addEventListener('p2p:authorization-unconfirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.authorizationUnconfirmedDashboard', 'Se conservaron proyectos locales cuya autorización no pudo confirmarse. Permanecen disponibles en modo de solo lectura para evitar pérdida de datos.'), 'warning'); });
-window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'La invitación fue aceptada. El proyecto permanecerá en solo lectura hasta recuperar y validar su copia completa.'), 'warning'); });
+window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'El panel compartido ya está disponible con la mejor copia validada. La sincronización continuará hasta alcanzar la revisión más reciente.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-confirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryConfirmed', 'La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.'), 'success'); });
 window.addEventListener('p2p:error', () => setConnectionState('error'));
 navigator.serviceWorker?.addEventListener('message', (event) => {
@@ -3372,7 +3313,7 @@ elements.panelList?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope="panel"]');
   if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
   const button = event.target.closest('button[data-panel-id]');
-  if (!button || button.disabled || button.getAttribute('aria-busy') === 'true') return;
+  if (!button) return;
   setActivePanelId(button.dataset.panelId);
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';

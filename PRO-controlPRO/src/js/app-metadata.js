@@ -39,7 +39,7 @@
     appName: 'Semilla App Web',
     version: '1.10.12',
     build: '2026-08-05-177',
-    releasedAt: '2026-08-05T18:44:00-05:00',
+    releasedAt: '2026-08-05T19:27:39-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
