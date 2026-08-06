@@ -53,6 +53,7 @@ class TestClient {
   assertSessionContext() { return true; }
   async fenceBootstrapResponses() { return true; }
   applyCommittedControlState(state) { this.bootstrapState = { ...this.bootstrapState, spaces: state.spaces }; }
+  emitBootstrapState(source = 'bootstrap', detail = {}) { dispatch('p2p:state', { state: this.bootstrapState, source, ...detail }); return this.bootstrapState; }
   scheduleAck(sequence) { this.acks.push(sequence); }
 ${methodSource}
 }
@@ -140,8 +141,8 @@ assert.equal(module.controlCommits[0]?.spaces?.[0]?.authorizationPendingReason, 
 assert.deepEqual(
   inheritedClient.refreshCalls,
   [
-    { requestSnapshots: false },
-    { requestSnapshots: 'initial-clone', snapshotSpaceIds: ['space_inherited_1'] }
+    { requestSnapshots: false, dispatchState: false },
+    { requestSnapshots: 'initial-clone', snapshotSpaceIds: ['space_inherited_1'], dispatchState: true }
   ],
   'Una membresía heredada para la cuenta actual no solicita la clonación inicial dirigida de su proyecto.'
 );

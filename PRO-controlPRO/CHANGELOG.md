@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.14 - 2026-08-05
+
+- La aceptación local o realtime de un panel ya no publica a la interfaz los dos estados provisionales anteriores a la clonación dirigida; el panel permanece protegido, pero el diagnóstico `P2P_PANEL_INCOMPLETO` no se dispara mientras la recuperación válida está en curso.
+- El manifiesto autoritativo entregado por `memoriaBACKEND` al aceptar se fusiona y persiste antes del primer bootstrap, conservando la revisión más reciente y evitando que una respuesta tardía degrade o pierda el inventario completo de proyectos.
+- Al restaurar una sesión, la recuperación de raíces faltantes se marca antes de renderizar las cards. Si ninguna réplica puede responder, se conserva el error detallado y deduplicado; si existe una clonación activa, se evita el falso doble error observado al aceptar o recargar.
+- Se ampliaron las regresiones de invitaciones, membresías e hidratación de paneles para comprobar publicación atómica, persistencia local-first, prevención de regresión de revisiones y diagnóstico definitivo sin alterar el bloqueo de integridad.
+
 ## 1.10.11 - 2026-08-05
 
 - Corregida la regresión que ocultaba indefinidamente un panel invitado cuando sus proyectos fueron creados antes del primer panel y, por compatibilidad, se comparten mediante concesiones `accessScope=portfolio` sin `governanceSpaceId`.

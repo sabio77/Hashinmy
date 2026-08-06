@@ -251,7 +251,7 @@ const normalizeStart = clientSource.indexOf('export function normalizeSnapshotSp
 const normalizeEnd = clientSource.indexOf('\nfunction createId(', normalizeStart);
 assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart);
 const clientModuleSource = `${clientSource.slice(normalizeStart, normalizeEnd).replaceAll('export function', 'function')}
-export { normalizePortfolioHydrationManifests };`;
+export { normalizePortfolioHydrationManifests, mergePortfolioHydrationManifests };`;
 const client = await import(`data:text/javascript;base64,${Buffer.from(clientModuleSource).toString('base64')}#panel-hydration-client`);
 assert.deepEqual(client.normalizePortfolioHydrationManifests([
   { portfolioSpaceId: panelId, expectedProjectSpaceIds: ['project_2', 'project_1', 'project_2'], inventoryRevision: 7, complete: true }
@@ -263,10 +263,80 @@ assert.deepEqual(client.normalizePortfolioHydrationManifests([
   complete: true
 }]);
 
+const authoritativeMerged = client.mergePortfolioHydrationManifests([{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_stale'],
+  inventoryRevision: 7,
+  complete: false,
+  authoritative: false
+}], [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_1', 'project_2'],
+  inventoryRevision: 7,
+  complete: true
+}], { authoritative: true });
+assert.deepEqual(authoritativeMerged, [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_1', 'project_2'],
+  expectedProjectCount: 2,
+  inventoryRevision: 7,
+  complete: true,
+  authoritative: true
+}], 'La reconciliación de la invitación no sustituye un manifiesto provisional por la copia autoritativa de la misma revisión.');
+
+assert.deepEqual(client.mergePortfolioHydrationManifests(authoritativeMerged, [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_old'],
+  inventoryRevision: 6,
+  complete: true
+}], { authoritative: true }), authoritativeMerged, 'Un manifiesto tardío de menor revisión no puede degradar el inventario autoritativo ya persistido.');
+
+assert.deepEqual(client.mergePortfolioHydrationManifests(authoritativeMerged, [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_partial'],
+  inventoryRevision: 7,
+  complete: false
+}], { authoritative: true }), authoritativeMerged, 'Una comparación autoritativa incompleta de la misma revisión no puede degradar un manifiesto completo ya validado.');
+
 assert.match(clientSource, /PORTFOLIO_HYDRATION_META_KEY/);
 assert.match(clientSource, /getMeta\(PORTFOLIO_HYDRATION_META_KEY, \[\]\)/, 'El manifiesto no se recupera para uso local-first.');
 assert.match(clientSource, /metaEntries: \[\{ key: PORTFOLIO_HYDRATION_META_KEY, value: portfolioHydration \}\]/, 'El manifiesto autoritativo no participa del commit atómico del bootstrap.');
 assert.match(clientSource, /participationReconciliation\?\.portfolioHydration/, 'El cliente ignora la comparación entregada por memoriaBACKEND.');
+assert.match(clientSource, /async persistParticipationHydration\(data = \{\}, sessionContext = this\.captureSessionContext\(\)\)/, 'La aceptación no persiste el manifiesto autoritativo antes de la clonación.');
+assert.match(clientSource, /setMeta\(PORTFOLIO_HYDRATION_META_KEY, portfolioHydration\)/, 'El manifiesto entregado al aceptar no queda disponible para recargas local-first.');
+assert.match(clientSource, /mergePortfolioHydrationManifests\(/, 'La aceptación puede degradar o perder manifiestos ya persistidos.');
+
+const recoveryStart = appSource.indexOf('function activeSnapshotRequestSpaceIds()');
+const recoveryEnd = appSource.indexOf('\nfunction reportIncompleteInvitedPanel(', recoveryStart);
+assert.ok(recoveryStart >= 0 && recoveryEnd > recoveryStart, 'No se encontró la barrera transitoria de hidratación.');
+const recoveryModuleSource = `
+const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
+const state = {
+  p2pState: { snapshotRequests: [] },
+  panelHydrationGraceUntil: new Map(),
+  missingProjectRecoveryAt: new Map()
+};
+${appSource.slice(recoveryStart, recoveryEnd)}
+export { state, panelHydrationRecoveryInFlight };
+`;
+const recovery = await import(`data:text/javascript;base64,${Buffer.from(recoveryModuleSource).toString('base64')}#panel-hydration-recovery`);
+const transientStatus = { reason: 'project_roots_missing', missingProjectSpaceIds: ['project_1', 'project_2'] };
+recovery.state.panelHydrationGraceUntil.set(panelId, Date.now() + 20_000);
+assert.equal(recovery.panelHydrationRecoveryInFlight(panelId, transientStatus), true, 'La gracia posterior a aceptar no cubre las raíces que todavía se están clonando.');
+recovery.state.panelHydrationGraceUntil.clear();
+recovery.state.missingProjectRecoveryAt.set('project_1', Date.now());
+recovery.state.missingProjectRecoveryAt.set('project_2', Date.now());
+assert.equal(recovery.panelHydrationRecoveryInFlight(panelId, transientStatus), true, 'Una recuperación iniciada antes del render sigue generando un falso error de panel incompleto.');
+recovery.state.missingProjectRecoveryAt.delete('project_2');
+assert.equal(recovery.panelHydrationRecoveryInFlight(panelId, transientStatus), false, 'La recuperación de otro proyecto no puede ocultar una raíz del panel que realmente quedó sin atender.');
+recovery.state.p2pState.snapshotRequests = [
+  { spaceId: 'project_1', expiresAt: new Date(Date.now() + 60_000).toISOString() },
+  { spaceId: 'project_2', expiresAt: new Date(Date.now() + 60_000).toISOString() }
+];
+assert.equal(recovery.panelHydrationRecoveryInFlight(panelId, transientStatus), true, 'Las solicitudes de snapshot activas no suprimen el diagnóstico transitorio.');
+recovery.state.p2pState.snapshotRequests = [];
+recovery.state.missingProjectRecoveryAt.clear();
+assert.equal(recovery.panelHydrationRecoveryInFlight(panelId, transientStatus), false, 'Un panel sin gracia, snapshot ni recuperación reciente no debe ocultar su error definitivo.');
 
 assert.match(appSource, /function allPanelScopes\(\)/);
 assert.match(appSource, /function panelNeedsAuthoritativeHydration\(panel = null\)/);
@@ -277,6 +347,11 @@ assert.match(appSource, /if \(!status\.ready\) \{[\s\S]*reportIncompleteInvitedP
 assert.match(appSource, /console\.error\('\[P2P_PANEL_INCOMPLETO\]/, 'Falta el error de consola exigido para una carga parcial.');
 assert.match(appSource, /panelHydrationRecoveryInFlight\(panelId, status\)/, 'La interfaz todavía registra como error una hidratación que tiene snapshots activos.');
 assert.match(appSource, /missingSpaceIds\.every\(\(spaceId\) => requestedSpaceIds\.has\(spaceId\)\)/, 'La supresión transitoria podría ocultar paneles con proyectos que no tienen recuperación activa.');
+assert.match(appSource, /'project_roots_missing'/, 'La clonación dirigida sigue registrando como fallo real la ausencia temporal de raíces.');
+assert.match(appSource, /state\.missingProjectRecoveryAt\.get\(spaceId\)/, 'La interfaz no reconoce intentos de recuperación recientes mientras llega la réplica.');
+assert.match(appSource, /function reportUnrecoverableMissingProjectPanels\(spaceIds = \[\]\)/, 'Al suprimir estados transitorios se perdió el diagnóstico cuando de verdad no existe una fuente recuperable.');
+assert.match(appSource, /reportIncompleteInvitedPanel\(panel, status, \{ force: true \}\)/, 'El fallo definitivo de clonación no fuerza el error de integridad requerido.');
+assert.match(appSource, /if \(pendingRecoveryCount === 0\) reportUnrecoverableMissingProjectPanels\(unresolved\)/, 'Una recuperación sin fuente termina silenciosamente.');
 assert.match(appSource, /portfolioRootLoaded: status\?\.portfolioRootLoaded === true/, 'El diagnóstico no informa cuando falta la raíz administrativa del panel.');
 assert.match(appSource, /inventoryRevisionMatches: status\?\.inventoryRevisionMatches === true/, 'El diagnóstico no informa la divergencia entre el panel y su manifiesto.');
 assert.match(appSource, /projectInventoryMatches: status\?\.projectInventoryMatches === true/, 'El diagnóstico no informa si el conjunto de proyectos difiere del inventario autoritativo.');
@@ -290,5 +365,15 @@ assert.match(appSource, /if \(panelNeedsAuthoritativeHydration\(panel\)\) return
 assert.match(appSource, /state\.pendingAuthoritativePanelIds\.add\(provisionalPanelId\)/, 'Aceptar un panel no activa la barrera antes de que respondToInvitation publique el estado provisional.');
 assert.match(appSource, /panelHydrationGraceUntil\.set\(provisionalPanelId, Date\.now\(\) \+ PANEL_HYDRATION_GRACE_MS\)/, 'La aceptación no distingue una hidratación transitoria de una carga realmente incompleta.');
 assert.match(appSource, /for \(const spaceId of revokedSpaceIds\) \{[\s\S]*state\.pendingAuthoritativePanelIds\.delete\(spaceId\);[\s\S]*state\.panelHydrationGraceUntil\.delete\(spaceId\);/, 'Una revocación puede dejar una barrera o una gracia pendiente obsoleta.');
+
+const refreshProjectsStart = appSource.indexOf('async function refreshProjects()');
+const refreshProjectsEnd = appSource.indexOf('\nfunction renderPortfolioMetrics(', refreshProjectsStart);
+assert.ok(refreshProjectsStart >= 0 && refreshProjectsEnd > refreshProjectsStart, 'No se encontró refreshProjects.');
+const refreshProjectsMethod = appSource.slice(refreshProjectsStart, refreshProjectsEnd);
+assert.ok(
+  refreshProjectsMethod.indexOf('recoverMissingProjectCards(missingProjectSpaceIds)')
+    < refreshProjectsMethod.indexOf('renderDashboard();'),
+  'La interfaz renderiza el panel incompleto antes de marcar como activa su recuperación automática.'
+);
 
 console.log('OK: paneles reales y virtuales esperan inventario y raíces completas, pero una réplica autorizada puede abrirse como clon inicial mientras continúa convergiendo.');

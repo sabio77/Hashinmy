@@ -310,6 +310,39 @@ export function normalizePortfolioHydrationManifests(input = [], options = {}) {
   return [...manifests.values()].sort((left, right) => left.portfolioSpaceId.localeCompare(right.portfolioSpaceId));
 }
 
+export function mergePortfolioHydrationManifests(current = [], incoming = [], options = {}) {
+  const existing = normalizePortfolioHydrationManifests(current);
+  const candidates = normalizePortfolioHydrationManifests(incoming, options);
+  const merged = new Map(existing.map((manifest) => [manifest.portfolioSpaceId, manifest]));
+
+  for (const candidate of candidates) {
+    const previous = merged.get(candidate.portfolioSpaceId) || null;
+    if (!previous) {
+      merged.set(candidate.portfolioSpaceId, candidate);
+      continue;
+    }
+
+    const previousRevision = Math.max(0, Number(previous.inventoryRevision || 0));
+    const candidateRevision = Math.max(0, Number(candidate.inventoryRevision || 0));
+    const candidateIsAuthoritative = candidate.authoritative === true;
+    const previousIsAuthoritative = previous.authoritative === true;
+    const sameRevision = candidateRevision === previousRevision;
+    const sameAuthority = candidateIsAuthoritative === previousIsAuthoritative;
+    const candidateImprovesCompleteness = candidate.complete === true && previous.complete !== true;
+    const candidatePreservesCompleteness = candidate.complete === previous.complete;
+
+    if (
+      candidateRevision > previousRevision
+      || (sameRevision && candidateIsAuthoritative && !previousIsAuthoritative)
+      || (sameRevision && sameAuthority && (candidateImprovesCompleteness || candidatePreservesCompleteness))
+    ) {
+      merged.set(candidate.portfolioSpaceId, candidate);
+    }
+  }
+
+  return [...merged.values()].sort((left, right) => left.portfolioSpaceId.localeCompare(right.portfolioSpaceId));
+}
+
 function createId(prefix = 'id') {
   const random = window.crypto?.randomUUID?.().replace(/-/g, '') || `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   return `${prefix}_${random}`;
@@ -3797,6 +3830,34 @@ export class SemillaP2PClient {
     return true;
   }
 
+  async persistParticipationHydration(data = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const incoming = normalizePortfolioHydrationManifests(
+      data?.participationReconciliation?.portfolioHydration || data?.portfolioHydration || [],
+      { authoritative: true }
+    );
+    if (!incoming.length) return this.bootstrapState?.portfolioHydration || [];
+
+    const portfolioHydration = mergePortfolioHydrationManifests(
+      this.bootstrapState?.portfolioHydration || [],
+      incoming,
+      { authoritative: true }
+    );
+    await setMeta(PORTFOLIO_HYDRATION_META_KEY, portfolioHydration);
+    this.assertSessionContext(sessionContext);
+    this.bootstrapState = { ...(this.bootstrapState || {}), portfolioHydration };
+    return portfolioHydration;
+  }
+
+  emitBootstrapState(source = 'bootstrap', detail = {}) {
+    dispatch('p2p:state', {
+      state: this.bootstrapState,
+      source: String(source || 'bootstrap').trim().slice(0, 80),
+      ...detail
+    });
+    return this.bootstrapState;
+  }
+
   applyCommittedControlState({ spaces = [], invitations = [] } = {}, options = {}) {
     const committedSpaces = (Array.isArray(spaces) ? spaces : []).filter((space) => String(space?.spaceId || '').trim());
     const committedInvitations = (Array.isArray(invitations) ? invitations : [])
@@ -5798,14 +5859,14 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [] } = {}) {
+  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [], dispatchState = true } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
     this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
     const state = await this.fetchBootstrap(snapshotMode);
     this.assertSessionContext(sessionContext);
-    dispatch('p2p:state', { state });
+    if (dispatchState !== false) this.emitBootstrapState('bootstrap-refresh');
     return state;
   }
 
@@ -6654,7 +6715,10 @@ export class SemillaP2PClient {
         });
         await saveControlStateAtomically(provisionalControlState);
         this.assertSessionContext(sessionContext);
-        this.applyCommittedControlState(provisionalControlState, { source: 'realtime-membership-provisional' });
+        this.applyCommittedControlState(provisionalControlState, {
+          source: 'realtime-membership-provisional',
+          dispatch: false
+        });
         this.assertSessionContext(sessionContext);
       }
 
@@ -6664,7 +6728,7 @@ export class SemillaP2PClient {
       // existe un cambio local seguro que permita confirmar la cola si esa lectura
       // falla. Propagar el error conserva el cursor durable, fuerza replay y evita
       // retirar de Redis el único aviso de permisos/propiedad todavía no aplicado.
-      let state = await this.refreshBootstrap({ requestSnapshots: false });
+      let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
       this.assertSessionContext(sessionContext);
       let canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
       if (!canonicalSpace) {
@@ -6683,7 +6747,8 @@ export class SemillaP2PClient {
       ) {
         state = await this.refreshBootstrap({
           requestSnapshots: 'initial-clone',
-          snapshotSpaceIds: [event.spaceId]
+          snapshotSpaceIds: [event.spaceId],
+          dispatchState: true
         });
         this.assertSessionContext(sessionContext);
         canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
@@ -6694,6 +6759,8 @@ export class SemillaP2PClient {
             { eventId: event.eventId, spaceId: event.spaceId }
           );
         }
+      } else {
+        this.emitBootstrapState('realtime-membership-confirmed', { spaceId: String(event.spaceId || '').trim() });
       }
       dispatch('p2p:membership', { event, space: canonicalSpace });
     } else if (event.eventType?.startsWith('p2p.invitation.')) {
@@ -6710,20 +6777,26 @@ export class SemillaP2PClient {
       });
       await saveControlStateAtomically(committedControlState);
       this.assertSessionContext(sessionContext);
-      this.applyCommittedControlState(committedControlState, { source: 'realtime-invitation' });
+      this.applyCommittedControlState(committedControlState, {
+        source: 'realtime-invitation',
+        dispatch: !requiresSnapshotRecovery
+      });
       this.assertSessionContext(sessionContext);
 
       if (requiresSnapshotRecovery) {
-        let state = await this.refreshBootstrap({ requestSnapshots: false });
+        let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
         this.assertSessionContext(sessionContext);
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
         const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, cleanSpaceId, sessionContext.userId);
         if (recoverySpaceIds.length) {
           state = await this.refreshBootstrap({
             requestSnapshots: 'initial-clone',
-            snapshotSpaceIds: recoverySpaceIds
+            snapshotSpaceIds: recoverySpaceIds,
+            dispatchState: true
           });
           this.assertSessionContext(sessionContext);
+        } else {
+          this.emitBootstrapState('realtime-invitation-confirmed', { spaceId: cleanSpaceId });
         }
         const localStateRevisions = await listStateRevisions([cleanSpaceId]);
         this.assertSessionContext(sessionContext);
@@ -7065,19 +7138,29 @@ export class SemillaP2PClient {
     });
     await saveControlStateAtomically(committedControlState);
     this.assertSessionContext(sessionContext);
-    this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
+    if (canonicalDecision === 'accept') {
+      await this.persistParticipationHydration(data, sessionContext);
+      this.assertSessionContext(sessionContext);
+    }
+    this.applyCommittedControlState(committedControlState, {
+      source: 'local-invitation-response',
+      dispatch: canonicalDecision !== 'accept'
+    });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
-      let state = await this.refreshBootstrap({ requestSnapshots: false });
+      let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
       this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId, sessionContext.userId);
       if (recoverySpaceIds.length) {
         state = await this.refreshBootstrap({
           requestSnapshots: 'initial-clone',
-          snapshotSpaceIds: recoverySpaceIds
+          snapshotSpaceIds: recoverySpaceIds,
+          dispatchState: true
         });
         this.assertSessionContext(sessionContext);
+      } else {
+        this.emitBootstrapState('local-invitation-confirmed', { spaceId: acceptedSpaceId });
       }
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
       this.assertSessionContext(sessionContext);

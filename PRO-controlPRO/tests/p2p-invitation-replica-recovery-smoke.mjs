@@ -384,10 +384,12 @@ assert.match(realtimeMethod, /prepareCommittedControlState\(/, 'El evento de inv
 assert.match(realtimeMethod, /authorizationState: requiresSnapshotRecovery \? 'unconfirmed' : 'confirmed'/, 'Una aceptación remota todavía se persiste como confirmada antes del bootstrap.');
 assert.match(realtimeMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'El replay no protege una réplica que ya estaba confirmada.');
 assert.match(realtimeMethod, /await saveControlStateAtomically\(committedControlState\)/);
-assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'realtime-invitation' \}\)/);
-assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: false \}\)/, 'Una aceptación remota crea primero una concesión estricta que puede bloquear la clonación dirigida.');
+assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{[\s\S]*source: 'realtime-invitation',[\s\S]*dispatch: !requiresSnapshotRecovery[\s\S]*\}\)/, 'Una aceptación remota todavía publica el estado provisional antes de registrar la clonación dirigida.');
+assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: false, dispatchState: false \}\)/, 'Una aceptación remota todavía expone a la interfaz el bootstrap intermedio sin snapshots.');
 assert.match(realtimeMethod, /requestSnapshots: 'initial-clone'/, 'Una aceptación remota no solicita la mejor copia persistida disponible.');
 assert.match(realtimeMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación remota no dirige la recuperación al panel y sus proyectos internos.');
+assert.match(realtimeMethod, /snapshotSpaceIds: recoverySpaceIds,[\s\S]*dispatchState: true/, 'La aceptación remota no publica un único estado después de registrar la clonación dirigida.');
+assert.match(realtimeMethod, /this\.emitBootstrapState\('realtime-invitation-confirmed'/, 'La aceptación remota sin raíces pendientes no publica el estado confirmado.');
 assert.match(realtimeMethod, /acceptedInvitationSnapshotSpaceIds\(state, cleanSpaceId, sessionContext\.userId\)/, 'La aceptación remota no incluye proyectos legacy vinculados al usuario actual.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
@@ -424,8 +426,14 @@ assert.match(responseMethod, /data\.replicaPending = replicaState\.replicaPendin
 assert.match(responseMethod, /prepareCommittedControlState\(/, 'La respuesta local no prepara el estado provisional antes de persistirlo.');
 assert.match(responseMethod, /authorizationState: canonicalDecision === 'accept' \? 'unconfirmed' : 'confirmed'/, 'La aceptación local todavía obtiene permisos antes de confirmar su réplica.');
 assert.match(responseMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'La aceptación repetida puede rebajar una réplica ya confirmada.');
-assert.match(responseMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'local-invitation-response' \}\)/);
+assert.match(responseMethod, /await this\.persistParticipationHydration\(data, sessionContext\)/, 'La aceptación local no conserva el manifiesto autoritativo recibido antes del primer bootstrap.');
+assert.match(responseMethod, /this\.applyCommittedControlState\(committedControlState, \{[\s\S]*source: 'local-invitation-response',[\s\S]*dispatch: canonicalDecision !== 'accept'[\s\S]*\}\)/, 'La aceptación local todavía publica la concesión provisional antes de registrar la clonación.');
+assert.match(responseMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: false, dispatchState: false \}\)/, 'La aceptación local todavía expone el bootstrap intermedio a la interfaz.');
+assert.match(responseMethod, /snapshotSpaceIds: recoverySpaceIds,[\s\S]*dispatchState: true/, 'La aceptación local no publica el estado posterior a la clonación dirigida.');
+assert.match(responseMethod, /this\.emitBootstrapState\('local-invitation-confirmed'/, 'La aceptación local sin raíces pendientes no publica el estado confirmado.');
 
+assert.match(clientSource, /async refreshBootstrap\(\{ requestSnapshots = false, snapshotSpaceIds = \[\], dispatchState = true \} = \{\}\)/, 'El bootstrap no permite retener el estado intermedio durante una clonación dirigida.');
+assert.match(clientSource, /if \(dispatchState !== false\) this\.emitBootstrapState\('bootstrap-refresh'\)/, 'El bootstrap ignora la publicación diferida de la interfaz.');
 assert.match(clientSource, /pendingReplicaSpaceIds/, 'El bootstrap no preserva el bloqueo mientras la revisión local está atrasada.');
 assert.match(clientSource, /recoveryEligibleSpaceIds\(/, 'La recuperación excluye precisamente el proyecto aceptado que debe recibir el snapshot.');
 assert.match(clientSource, /const spaceIds = this\.recoveryEligibleSpaceIds\(\)/, 'La reconciliación posterior al snapshot no lee la revisión de los proyectos todavía bloqueados.');

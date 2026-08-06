@@ -255,12 +255,17 @@ function activeSnapshotRequestSpaceIds() {
 function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
   const cleanPanelId = String(panelId || '').trim();
   if (!cleanPanelId) return false;
+  const now = Date.now();
   const graceUntil = Number(state.panelHydrationGraceUntil.get(cleanPanelId) || 0);
-  if (graceUntil > Date.now() && [
+  if (graceUntil > now && [
     'authoritative_manifest_missing',
     'authoritative_comparison_incomplete',
+    'authoritative_comparison_stale',
     'portfolio_root_missing',
-    'project_authorization_unconfirmed'
+    'portfolio_inventory_revision_mismatch',
+    'project_authorization_unconfirmed',
+    'project_roots_missing',
+    'project_inventory_set_mismatch'
   ].includes(String(status?.reason || '').trim())) return true;
 
   const missingSpaceIds = Array.from(new Set((Array.isArray(status?.missingProjectSpaceIds)
@@ -270,12 +275,15 @@ function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
     .filter(Boolean)));
   if (!missingSpaceIds.length) return false;
   const requestedSpaceIds = activeSnapshotRequestSpaceIds();
-  return missingSpaceIds.every((spaceId) => requestedSpaceIds.has(spaceId));
+  if (missingSpaceIds.every((spaceId) => requestedSpaceIds.has(spaceId))) return true;
+  return missingSpaceIds.every((spaceId) => (
+    now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) < MISSING_PROJECT_RECOVERY_COOLDOWN_MS
+  ));
 }
-function reportIncompleteInvitedPanel(panel = null, status = {}) {
+function reportIncompleteInvitedPanel(panel = null, status = {}, options = {}) {
   const panelId = String(panel?.id || status?.panelId || '').trim();
   if (!panelId) return;
-  if (panelHydrationRecoveryInFlight(panelId, status)) {
+  if (options.force !== true && panelHydrationRecoveryInFlight(panelId, status)) {
     state.incompletePanelWarnings.delete(panelId);
     return;
   }
@@ -320,6 +328,22 @@ function reportIncompleteInvitedPanel(panel = null, status = {}) {
     missingProjectSpaceIds: status?.missingProjectSpaceIds || []
   });
 }
+function reportUnrecoverableMissingProjectPanels(spaceIds = []) {
+  const unresolvedSpaceIds = new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean));
+  if (!unresolvedSpaceIds.size) return;
+
+  for (const panel of allPanelScopes()) {
+    if (!panelNeedsAuthoritativeHydration(panel)) continue;
+    const status = portfolioHydrationStatus(panel.id);
+    if (status.ready || String(status.reason || '') !== 'project_roots_missing') continue;
+    const affectsPanel = (status.missingProjectSpaceIds || [])
+      .some((spaceId) => unresolvedSpaceIds.has(String(spaceId || '').trim()));
+    if (affectsPanel) reportIncompleteInvitedPanel(panel, status, { force: true });
+  }
+}
+
 function panelScopes() {
   return allPanelScopes().filter((panel) => {
     if (!panelNeedsAuthoritativeHydration(panel)) return true;
@@ -1031,6 +1055,7 @@ async function recoverMissingProjectCards(spaceIds = []) {
     }
     if (unresolved.length) {
       const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
+      if (pendingRecoveryCount === 0) reportUnrecoverableMissingProjectPanels(unresolved);
       setStatus(
         elements.dashboardStatus,
         pendingRecoveryCount > 0
@@ -1087,10 +1112,10 @@ async function refreshProjects() {
   }
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
   if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
+  if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
   renderDashboard();
   renderTrash();
   if (state.selectedSpaceId) renderProject();
-  if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
 function renderPortfolioMetrics(projects = activePanelProjects()) {
