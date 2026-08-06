@@ -325,6 +325,54 @@ export async function resolveRecoveryRequirement(spaceId = '', sourceStateRevisi
   return mutateRecoveryRequirements((current) => resolveRecoveryRequirementMap(current, spaceId, sourceStateRevision));
 }
 
+export async function resetInvitationCloneRecoveryState(spaceIds = []) {
+  const targetSpaceIds = new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => cleanSpaceId(spaceId))
+    .filter(Boolean));
+  if (!targetSpaceIds.size) {
+    return {
+      spaceIds: [],
+      removedSnapshotSessions: 0,
+      removedRecoveryRequirements: 0,
+      recoveryRequirements: await getRecoveryRequirements()
+    };
+  }
+
+  return withStores([STORES.snapshots, STORES.meta], 'readwrite', async (stores) => {
+    const snapshotRecords = await requestToPromise(stores[STORES.snapshots].getAll());
+    let removedSnapshotSessions = 0;
+    for (const record of snapshotRecords || []) {
+      if (!targetSpaceIds.has(snapshotRecordSpaceId(record))) continue;
+      const key = String(record?.key || '').trim();
+      if (!key) continue;
+      await requestToPromise(stores[STORES.snapshots].delete(key));
+      removedSnapshotSessions += 1;
+    }
+
+    const recoveryRecord = await requestToPromise(stores[STORES.meta].get(RECOVERY_REQUIREMENTS_META_KEY));
+    const recoveryRequirements = normalizeRecoveryRequirements(recoveryRecord?.value || {});
+    let removedRecoveryRequirements = 0;
+    for (const spaceId of targetSpaceIds) {
+      if (!Object.prototype.hasOwnProperty.call(recoveryRequirements, spaceId)) continue;
+      delete recoveryRequirements[spaceId];
+      removedRecoveryRequirements += 1;
+    }
+    if (removedRecoveryRequirements > 0) {
+      await requestToPromise(stores[STORES.meta].put({
+        key: RECOVERY_REQUIREMENTS_META_KEY,
+        value: recoveryRequirements
+      }));
+    }
+
+    return {
+      spaceIds: [...targetSpaceIds],
+      removedSnapshotSessions,
+      removedRecoveryRequirements,
+      recoveryRequirements
+    };
+  });
+}
+
 function normalizePendingSpaceCreation(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const requestId = String(input.requestId || '').trim().slice(0, 180);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.22 - 2026-08-06
+
+- Corregida la aceptación concurrente que podía devolver `409 Conflict`: memoriaBACKEND espera de forma acotada el resultado canónico o adquiere el bloqueo liberado, y el cliente conserva compatibilidad con backends anteriores recuperando la respuesta final desde un bootstrap autenticado.
+- Cada aceptación comienza con una limpieza dirigida de residuos de transporte: exclusiones temporales de fuentes, reintentos diferidos, fragmentos incompletos de snapshot, concesiones obsoletas y watermarks persistidos de recuperación. No se eliminan entidades administrativas, outbox ni datos válidos de otros espacios.
+- Tras aceptar el panel, el cliente repite la preparación sobre el inventario autoritativo recién descubierto antes de solicitar la clonación inicial, cubriendo proyectos que todavía no eran conocidos en la interfaz al pulsar **Aceptar**.
+- Se añadieron regresiones de concurrencia, compatibilidad con el `409` anterior, limpieza selectiva y preservación de datos no relacionados; la card continúa oculta hasta verificar manifiesto, permisos, raíz del panel y todas las raíces de proyecto.
+
 ## 1.10.19 - 2026-08-06
 
 - Corregida la carrera de aceptación inmediata en la que el manifiesto autoritativo recibido al vincular un panel podía ser reemplazado por un bootstrap transitorio sin comparación, dejando la card oculta aunque la invitación acabara de enviarse.

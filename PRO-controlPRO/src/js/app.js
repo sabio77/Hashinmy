@@ -118,13 +118,20 @@ const state = {
   projectFilterQuery: '',
   inviteScope: 'project',
   portfolioInviteAccepting: false,
+  portfolioInviteRetryTimer: 0,
+  portfolioInviteRetryAttempts: 0,
   accessScopeContext: 'project',
   portfolioReconciliationActive: false,
   incompletePanelWarnings: new Map(),
   panelHydrationGraceUntil: new Map(),
   panelHydrationRetryTimers: new Map(),
   panelHydrationRetryAttempts: new Map(),
-  panelCloneDiagnosticSignatures: new Map()
+  panelCloneDiagnosticSignatures: new Map(),
+  panelCloneRecoveryGeneration: 0,
+  panelClonePreparedSpaceIds: new Set(),
+  panelClonePreparationPromise: null,
+  panelCloneCleanupPromise: null,
+  invitationResponseTasks: new Map()
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
@@ -138,6 +145,9 @@ const PANEL_HYDRATION_GRACE_MS = 20 * 1000;
 const PANEL_HYDRATION_RETRY_MIN_MS = 1500;
 const PANEL_HYDRATION_RETRY_MAX_MS = 15 * 1000;
 const PANEL_HYDRATION_RETRY_MAX_ATTEMPTS = 3;
+const PORTFOLIO_INVITE_RETRY_MIN_MS = 750;
+const PORTFOLIO_INVITE_RETRY_MAX_MS = 5000;
+const PORTFOLIO_INVITE_RETRY_MAX_ATTEMPTS = 3;
 const PANEL_HYDRATION_METADATA_RETRY_REASONS = new Set([
   'authoritative_manifest_missing',
   'authoritative_comparison_incomplete',
@@ -454,6 +464,109 @@ function forgetMissingProjectRecovery(spaceIds = []) {
   if (changed) persistMissingProjectRecoveryAttempts();
   if (!state.missingProjectRecoveryQueuedSpaceIds.size) clearMissingProjectRecoveryTimer();
 }
+function invitationCloneSpaceIds(invitation = null, relatedInvitations = []) {
+  const panelId = String(
+    invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
+      ? invitation?.spaceId || ''
+      : invitation?.governanceSpaceId || ''
+  ).trim();
+  const targetSpaceIds = new Set([
+    String(invitation?.spaceId || '').trim(),
+    ...((Array.isArray(relatedInvitations) ? relatedInvitations : [])
+      .map((candidate) => String(candidate?.spaceId || '').trim()))
+  ].filter(Boolean));
+
+  if (panelId) {
+    const manifest = (Array.isArray(state.p2pState.portfolioHydration) ? state.p2pState.portfolioHydration : [])
+      .find((candidate) => String(candidate?.portfolioSpaceId || '').trim() === panelId) || null;
+    for (const spaceId of Array.isArray(manifest?.expectedProjectSpaceIds) ? manifest.expectedProjectSpaceIds : []) {
+      const cleanSpaceId = String(spaceId || '').trim();
+      if (cleanSpaceId) targetSpaceIds.add(cleanSpaceId);
+    }
+    for (const space of Array.isArray(state.p2pState.spaces) ? state.p2pState.spaces : []) {
+      if (String(space?.governanceSpaceId || '').trim() !== panelId) continue;
+      const cleanSpaceId = String(space?.spaceId || '').trim();
+      if (cleanSpaceId) targetSpaceIds.add(cleanSpaceId);
+    }
+  }
+  return { panelId, spaceIds: [...targetSpaceIds] };
+}
+function panelCloneRecoveryIsCurrent(recoveryGeneration = state.panelCloneRecoveryGeneration) {
+  return Number(recoveryGeneration) === Number(state.panelCloneRecoveryGeneration);
+}
+async function prepareInvitationCloneSpaces(spaceIds = [], options = {}) {
+  const recoveryGeneration = Number(options.recoveryGeneration ?? state.panelCloneRecoveryGeneration);
+  const requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean)));
+  if (!requestedSpaceIds.length) {
+    return { spaceIds: [], skippedSpaceIds: [], recoveryGeneration, stale: false };
+  }
+
+  const previous = state.panelClonePreparationPromise || Promise.resolve();
+  const task = previous.catch(() => null).then(async () => {
+    if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) {
+      return { spaceIds: [], skippedSpaceIds: requestedSpaceIds, recoveryGeneration, stale: true };
+    }
+    const forceReset = options.forceReset === true;
+    const pendingSpaceIds = forceReset
+      ? requestedSpaceIds
+      : requestedSpaceIds.filter((spaceId) => !state.panelClonePreparedSpaceIds.has(spaceId));
+    const skippedSpaceIds = forceReset
+      ? []
+      : requestedSpaceIds.filter((spaceId) => state.panelClonePreparedSpaceIds.has(spaceId));
+    if (!pendingSpaceIds.length) {
+      return { spaceIds: [], skippedSpaceIds, recoveryGeneration, stale: false };
+    }
+
+    forgetMissingProjectRecovery(pendingSpaceIds);
+    const targetSpaceIds = new Set(pendingSpaceIds);
+    state.p2pState = {
+      ...state.p2pState,
+      snapshotRequests: (state.p2pState.snapshotRequests || []).filter((request) => (
+        !targetSpaceIds.has(String(request?.spaceId || '').trim())
+      ))
+    };
+    const cleanup = await semillaP2P.prepareInvitationCloneRecovery(pendingSpaceIds);
+    if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) {
+      return { ...cleanup, spaceIds: pendingSpaceIds, skippedSpaceIds, recoveryGeneration, stale: true };
+    }
+    pendingSpaceIds.forEach((spaceId) => state.panelClonePreparedSpaceIds.add(spaceId));
+    return { ...cleanup, spaceIds: pendingSpaceIds, skippedSpaceIds, recoveryGeneration, stale: false };
+  });
+
+  state.panelClonePreparationPromise = task;
+  try {
+    return await task;
+  } finally {
+    if (state.panelClonePreparationPromise === task) state.panelClonePreparationPromise = null;
+  }
+}
+async function prepareInvitationCloneAttempt(invitation = null, relatedInvitations = []) {
+  const { panelId, spaceIds } = invitationCloneSpaceIds(invitation, relatedInvitations);
+  state.panelCloneRecoveryGeneration += 1;
+  const recoveryGeneration = state.panelCloneRecoveryGeneration;
+  state.panelClonePreparedSpaceIds.clear();
+  if (panelId) {
+    clearPanelHydrationRetry(panelId);
+    state.incompletePanelWarnings.delete(panelId);
+    state.pendingAuthoritativePanelIds.delete(panelId);
+    state.panelHydrationGraceUntil.delete(panelId);
+  }
+  const transportCleanup = spaceIds.length
+    ? await prepareInvitationCloneSpaces(spaceIds, { recoveryGeneration, source: 'invitation-start' })
+    : null;
+  state.panelCloneDiagnosticSignatures.clear();
+  state.renderSequence += 1;
+  reportPanelCloneDiagnostic('invitacion-preparacion-limpia', {
+    invitationId: String(invitation?.invitationId || ''),
+    panelId,
+    spaceIds,
+    transportCleanup,
+    recoveryGeneration
+  });
+  return { panelId, spaceIds, transportCleanup, recoveryGeneration };
+}
 function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
   const cleanPanelId = String(panelId || '').trim();
   if (!cleanPanelId) return false;
@@ -728,64 +841,79 @@ function failedInvitationCloneCleanupPlan(spaceIds = [], spaces = state.p2pState
     affectedSpaceIds: [...affectedSpaceIds]
   }));
 }
-async function abandonFailedInvitationClones(spaceIds = []) {
+async function abandonFailedInvitationClones(spaceIds = [], options = {}) {
+  const recoveryGeneration = Number(options.recoveryGeneration ?? state.panelCloneRecoveryGeneration);
+  if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) {
+    return { handledSpaceIds: [], revokedSpaceIds: [], failedSpaceIds: [], errors: [], stale: true };
+  }
   const plans = failedInvitationCloneCleanupPlan(spaceIds);
   if (!plans.length) return { handledSpaceIds: [], revokedSpaceIds: [], failedSpaceIds: [], errors: [] };
-  const revokedSpaceIds = new Set();
-  const handledSpaceIds = new Set();
-  const failedSpaceIds = new Set();
-  const errors = [];
+  const cleanupTask = (async () => {
+    const revokedSpaceIds = new Set();
+    const handledSpaceIds = new Set();
+    const failedSpaceIds = new Set();
+    const errors = [];
 
-  for (const plan of plans) {
-    try {
-      const result = await semillaP2P.leave(plan.targetSpaceId);
-      for (const affectedSpaceId of plan.affectedSpaceIds) handledSpaceIds.add(affectedSpaceId);
-      for (const revokedSpaceId of [
-        plan.targetSpaceId,
-        ...(Array.isArray(result?.revokedSpaceIds) ? result.revokedSpaceIds : [])
-      ]) {
-        const cleanSpaceId = String(revokedSpaceId || '').trim();
-        if (cleanSpaceId) revokedSpaceIds.add(cleanSpaceId);
+    for (const plan of plans) {
+      if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) {
+        return { handledSpaceIds: [...handledSpaceIds], revokedSpaceIds: [...revokedSpaceIds], failedSpaceIds: [...failedSpaceIds], errors, stale: true };
       }
-      state.pendingAuthoritativePanelIds.delete(plan.targetSpaceId);
-      state.panelHydrationGraceUntil.delete(plan.targetSpaceId);
-      clearPanelHydrationRetry(plan.targetSpaceId);
-      if (state.pendingPanelId === plan.targetSpaceId) state.pendingPanelId = '';
-    } catch (error) {
-      for (const affectedSpaceId of plan.affectedSpaceIds) failedSpaceIds.add(affectedSpaceId);
-      errors.push({
-        targetSpaceId: plan.targetSpaceId,
-        code: String(error?.code || ''),
-        message: String(error?.message || error || 'Error desconocido')
-      });
+      try {
+        const result = await semillaP2P.leave(plan.targetSpaceId);
+        for (const affectedSpaceId of plan.affectedSpaceIds) handledSpaceIds.add(affectedSpaceId);
+        for (const revokedSpaceId of [
+          plan.targetSpaceId,
+          ...(Array.isArray(result?.revokedSpaceIds) ? result.revokedSpaceIds : [])
+        ]) {
+          const cleanSpaceId = String(revokedSpaceId || '').trim();
+          if (cleanSpaceId) revokedSpaceIds.add(cleanSpaceId);
+        }
+        state.pendingAuthoritativePanelIds.delete(plan.targetSpaceId);
+        state.panelHydrationGraceUntil.delete(plan.targetSpaceId);
+        clearPanelHydrationRetry(plan.targetSpaceId);
+        if (state.pendingPanelId === plan.targetSpaceId) state.pendingPanelId = '';
+      } catch (error) {
+        for (const affectedSpaceId of plan.affectedSpaceIds) failedSpaceIds.add(affectedSpaceId);
+        errors.push({
+          targetSpaceId: plan.targetSpaceId,
+          code: String(error?.code || ''),
+          message: String(error?.message || error || 'Error desconocido')
+        });
+      }
     }
-  }
 
-  if (revokedSpaceIds.size) {
-    forgetMissingProjectRecovery([...new Set([...handledSpaceIds, ...revokedSpaceIds])]);
-    await applyP2PState(semillaP2P.bootstrapState);
+    if (revokedSpaceIds.size) {
+      forgetMissingProjectRecovery([...new Set([...handledSpaceIds, ...revokedSpaceIds])]);
+      await applyP2PState(semillaP2P.bootstrapState);
+    }
+    reportPanelCloneDiagnostic('recuperacion-cancelada-limite', {
+      maximumAttempts: MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS,
+      requestedSpaceIds: Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean))),
+      cleanupTargets: plans.map((plan) => plan.targetSpaceId),
+      revokedSpaceIds: [...revokedSpaceIds],
+      failedSpaceIds: [...failedSpaceIds],
+      errors
+    }, errors.length ? 'error' : 'warn');
+    if (revokedSpaceIds.size) {
+      setStatus(
+        elements.dashboardStatus,
+        t('p2p.failedCloneRemoved', 'Se retiró un acceso compartido incompleto después de tres intentos fallidos de sincronización.'),
+        'warning'
+      );
+    }
+    return {
+      handledSpaceIds: [...handledSpaceIds],
+      revokedSpaceIds: [...revokedSpaceIds],
+      failedSpaceIds: [...failedSpaceIds],
+      errors
+    };
+  })();
+  state.panelCloneCleanupPromise = cleanupTask;
+  try {
+    return await cleanupTask;
+  } finally {
+    if (state.panelCloneCleanupPromise === cleanupTask) state.panelCloneCleanupPromise = null;
   }
-  reportPanelCloneDiagnostic('recuperacion-cancelada-limite', {
-    maximumAttempts: MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS,
-    requestedSpaceIds: Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean))),
-    cleanupTargets: plans.map((plan) => plan.targetSpaceId),
-    revokedSpaceIds: [...revokedSpaceIds],
-    failedSpaceIds: [...failedSpaceIds],
-    errors
-  }, errors.length ? 'error' : 'warn');
-  if (revokedSpaceIds.size) {
-    setStatus(
-      elements.dashboardStatus,
-      t('p2p.failedCloneRemoved', 'Se retiró un acceso compartido incompleto después de tres intentos fallidos de sincronización.'),
-      'warning'
-    );
-  }
-  return {
-    handledSpaceIds: [...handledSpaceIds],
-    revokedSpaceIds: [...revokedSpaceIds],
-    failedSpaceIds: [...failedSpaceIds],
-    errors
-  };
 }
 
 function panelScopes() {
@@ -1158,7 +1286,12 @@ function setP2PBusy(value) {
   });
   elements.deviceList?.querySelectorAll('button').forEach((control) => { control.disabled = state.p2pBusy || control.dataset.deviceRetirable !== 'true'; });
   if (wasBusy && !state.p2pBusy && state.user?.userId) {
-    queueMicrotask(() => reconcilePortfolioAccess().catch(() => null));
+    queueMicrotask(() => {
+      reconcilePortfolioAccess().catch(() => null);
+      if (!autoAcceptableInheritedPortfolioInvitations().length) return;
+      clearPortfolioInviteRetry();
+      autoAcceptInheritedPortfolioInvitations({ source: 'busy-cleared' }).catch(() => false);
+    });
   }
 }
 function setConnectionState(connectionState = 'connecting') {
@@ -1395,6 +1528,8 @@ function resetUserScopedInterface() {
   state.pendingPanelId = '';
   state.pendingAuthoritativePanelIds.clear();
   state.panelHydrationGraceUntil.clear();
+  state.panelCloneRecoveryGeneration += 1;
+  state.panelClonePreparedSpaceIds.clear();
   clearAllPanelHydrationRetries();
   state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [], snapshotRequests: [] };
   state.projects.clear();
@@ -1413,6 +1548,11 @@ function resetUserScopedInterface() {
   clearMissingProjectRecoveryTimer({ clearQueue: true });
   state.incompletePanelWarnings.clear();
   state.panelCloneDiagnosticSignatures.clear();
+  if (state.portfolioInviteRetryTimer) window.clearTimeout(state.portfolioInviteRetryTimer);
+  state.portfolioInviteRetryTimer = 0;
+  state.portfolioInviteRetryAttempts = 0;
+  state.portfolioInviteAccepting = false;
+  state.invitationResponseTasks.clear();
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
   state.invitationRefreshSequence += 1;
@@ -1496,6 +1636,7 @@ function resolvedProjectData(space, entities) {
 }
 
 async function recoverMissingProjectCards(spaceIds = [], options = {}) {
+  const recoveryGeneration = state.panelCloneRecoveryGeneration;
   let requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
     .map((spaceId) => String(spaceId || '').trim())
     .filter(Boolean)));
@@ -1516,7 +1657,8 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
   if (terminalSpaceIds.length) {
     state.missingProjectRecoveryActive = true;
     try {
-      const cleanup = await abandonFailedInvitationClones(terminalSpaceIds);
+      const cleanup = await abandonFailedInvitationClones(terminalSpaceIds, { recoveryGeneration });
+      if (!panelCloneRecoveryIsCurrent(recoveryGeneration) || cleanup?.stale === true) return false;
       if (cleanup.failedSpaceIds.length) {
         scheduleMissingProjectRecovery(cleanup.failedSpaceIds, { delayMs: MISSING_PROJECT_RECOVERY_RETRY_MAX_MS });
       }
@@ -1560,29 +1702,47 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
   }
 
   state.missingProjectRecoveryActive = true;
-  candidates.forEach((spaceId) => {
-    state.missingProjectRecoveryAt.set(spaceId, now);
-    recordMissingProjectRecoveryAttempt(spaceId);
-  });
-  setStatus(
-    elements.dashboardStatus,
-    candidates.length === 1
-      ? t('p2p.missingProjectSearching', 'Buscando una copia válida del proyecto compartido…')
-      : t('p2p.missingProjectsSearching', 'Buscando copias válidas de los proyectos compartidos incompletos…'),
-    'warning'
-  );
-  reportPanelCloneDiagnostic('recuperacion-iniciada', {
-    source: String(options.source || 'automatic').trim(),
-    force: options.force === true,
-    spaceIds: candidates,
-    attempts: Object.fromEntries(candidates.map((spaceId) => [
-      spaceId,
-      Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0)
-    ]))
-  });
 
   try {
+    const transportCleanup = await prepareInvitationCloneSpaces(candidates, {
+      recoveryGeneration,
+      source: options.source || 'missing-project-recovery',
+      forceReset: true
+    });
+    if (!panelCloneRecoveryIsCurrent(recoveryGeneration) || transportCleanup?.stale === true) return false;
+
+    const attemptStartedAt = Date.now();
+    candidates.forEach((spaceId) => {
+      state.missingProjectRecoveryAt.set(spaceId, attemptStartedAt);
+      recordMissingProjectRecoveryAttempt(spaceId);
+    });
+    setStatus(
+      elements.dashboardStatus,
+      candidates.length === 1
+        ? t('p2p.missingProjectSearching', 'Buscando una copia válida del proyecto compartido…')
+        : t('p2p.missingProjectsSearching', 'Buscando copias válidas de los proyectos compartidos incompletos…'),
+      'warning'
+    );
+    reportPanelCloneDiagnostic('recuperacion-iniciada', {
+      source: String(options.source || 'automatic').trim(),
+      force: options.force === true,
+      spaceIds: candidates,
+      transportCleanup,
+      attempts: Object.fromEntries(candidates.map((spaceId) => [
+        spaceId,
+        Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0)
+      ]))
+    });
+
     const recoveryState = await semillaP2P.recoverMissingProjectRoots(candidates);
+    if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) {
+      reportPanelCloneDiagnostic('recuperacion-descartada-por-nueva-invitacion', {
+        spaceIds: candidates,
+        recoveryGeneration,
+        currentRecoveryGeneration: state.panelCloneRecoveryGeneration
+      }, 'warn');
+      return false;
+    }
     const requestedRecoverySpaceIds = new Set((recoveryState?.snapshotRequests || [])
       .map((request) => String(request?.spaceId || '').trim())
       .filter(Boolean));
@@ -1666,6 +1826,7 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
     }
     return unresolved.length === 0;
   } catch (error) {
+    if (!panelCloneRecoveryIsCurrent(recoveryGeneration)) return false;
     reportPanelCloneDiagnostic('recuperacion-error', {
       spaceIds: candidates,
       code: String(error?.code || ''),
@@ -1976,8 +2137,26 @@ function renderInvitations() {
   revealPendingInvitationIntent();
 }
 
-async function autoAcceptInheritedPortfolioInvitations() {
-  if (state.portfolioInviteAccepting || !state.user?.userId) return false;
+async function respondToInvitationOnce(invitationId = '', decision = 'accept', options = {}) {
+  const cleanInvitationId = String(invitationId || '').trim();
+  const cleanDecision = String(decision || '').trim().toLowerCase();
+  if (!cleanInvitationId) throw new Error('Falta el identificador de la invitación.');
+  const taskKey = cleanInvitationId;
+  const existing = state.invitationResponseTasks.get(taskKey);
+  if (existing) return existing;
+  const task = semillaP2P.respondToInvitation(cleanInvitationId, cleanDecision, options);
+  state.invitationResponseTasks.set(taskKey, task);
+  try {
+    return await task;
+  } finally {
+    if (state.invitationResponseTasks.get(taskKey) === task) {
+      state.invitationResponseTasks.delete(taskKey);
+    }
+  }
+}
+
+function autoAcceptableInheritedPortfolioInvitations() {
+  if (!state.user?.userId) return [];
   const portfolioAuthorizations = [];
   for (const space of portfolioSpaces()) {
     const membership = memberForUser(space, state.user.userId);
@@ -1997,22 +2176,111 @@ async function autoAcceptInheritedPortfolioInvitations() {
       authorizedInviterUserIds
     });
   }
-  if (!portfolioAuthorizations.length) return false;
-  const pending = autoAcceptablePortfolioProjectInvitations(
+  if (!portfolioAuthorizations.length) return [];
+  return autoAcceptablePortfolioProjectInvitations(
     state.p2pState.invitations?.received || [],
     portfolioAuthorizations,
     { portfolioResourceType: PORTFOLIO_RESOURCE_TYPE }
   );
-  if (!pending.length) return false;
+}
+function clearPortfolioInviteRetry(options = {}) {
+  if (state.portfolioInviteRetryTimer) window.clearTimeout(state.portfolioInviteRetryTimer);
+  state.portfolioInviteRetryTimer = 0;
+  if (options.keepAttempts !== true) state.portfolioInviteRetryAttempts = 0;
+}
+function schedulePortfolioInviteRetry(options = {}) {
+  if (!state.user?.userId || !getSessionToken()) return false;
+  if (state.portfolioInviteRetryTimer) return true;
+  const attempt = Math.max(0, Number(state.portfolioInviteRetryAttempts || 0));
+  if (attempt >= PORTFOLIO_INVITE_RETRY_MAX_ATTEMPTS) return false;
+  const delayMs = Math.max(0, Number(options.delayMs || Math.min(
+    PORTFOLIO_INVITE_RETRY_MAX_MS,
+    PORTFOLIO_INVITE_RETRY_MIN_MS * (2 ** attempt)
+  )));
+  const expectedUserId = String(state.user.userId || '').trim();
+  state.portfolioInviteRetryTimer = window.setTimeout(async () => {
+    state.portfolioInviteRetryTimer = 0;
+    if (!state.user?.userId
+      || String(state.user.userId || '').trim() !== expectedUserId
+      || !getSessionToken()) return;
+    state.portfolioInviteRetryAttempts = attempt + 1;
+    try {
+      await autoAcceptInheritedPortfolioInvitations({ source: options.source || 'scheduled-retry' });
+    } catch (error) {
+      reportPanelCloneDiagnostic('invitacion-heredada-reintento-error', {
+        attempt: attempt + 1,
+        code: String(error?.code || ''),
+        message: String(error?.message || error || 'Error desconocido')
+      }, 'error');
+      if (autoAcceptableInheritedPortfolioInvitations().length) {
+        schedulePortfolioInviteRetry({ source: options.source || 'scheduled-retry' });
+      }
+    }
+  }, delayMs);
+  reportPanelCloneDiagnostic('invitacion-heredada-reintento-programado', {
+    attempt: attempt + 1,
+    delayMs,
+    source: String(options.source || 'automatic')
+  }, 'warn');
+  return true;
+}
+async function autoAcceptInheritedPortfolioInvitations(options = {}) {
+  if (!state.user?.userId) return false;
+  if (state.portfolioInviteAccepting || state.p2pBusy) {
+    schedulePortfolioInviteRetry({ source: options.source || 'busy' });
+    return false;
+  }
+  const pending = autoAcceptableInheritedPortfolioInvitations();
+  if (!pending.length) {
+    clearPortfolioInviteRetry();
+    return false;
+  }
+
   state.portfolioInviteAccepting = true;
+  let acceptedCount = 0;
+  const failures = [];
   try {
     for (const invitation of pending) {
-      await semillaP2P.respondToInvitation(invitation.invitationId, 'accept');
+      const invitationSpaceId = String(invitation?.spaceId || '').trim();
+      try {
+        const transportCleanup = await prepareInvitationCloneSpaces(
+          invitationSpaceId ? [invitationSpaceId] : [],
+          {
+            recoveryGeneration: state.panelCloneRecoveryGeneration,
+            source: 'inherited-project-invitation'
+          }
+        );
+        if (transportCleanup?.stale === true) continue;
+        await respondToInvitationOnce(invitation.invitationId, 'accept', { prepareCloneRecovery: false });
+        acceptedCount += 1;
+      } catch (error) {
+        failures.push({
+          invitationId: String(invitation?.invitationId || ''),
+          spaceId: invitationSpaceId,
+          code: String(error?.code || ''),
+          message: String(error?.message || error || 'Error desconocido')
+        });
+      }
     }
-    applyP2PState(semillaP2P.bootstrapState);
-    return true;
+    await applyP2PState(semillaP2P.bootstrapState);
+    return acceptedCount > 0;
   } finally {
     state.portfolioInviteAccepting = false;
+    if (acceptedCount > 0) state.portfolioInviteRetryAttempts = 0;
+    const remaining = autoAcceptableInheritedPortfolioInvitations();
+    if (failures.length) {
+      reportPanelCloneDiagnostic('invitacion-heredada-aceptacion-incompleta', {
+        source: String(options.source || 'automatic'),
+        acceptedCount,
+        remainingInvitationIds: remaining.map((invitation) => String(invitation?.invitationId || '')).filter(Boolean),
+        failures
+      }, 'warn');
+    }
+    if (remaining.length) {
+      schedulePortfolioInviteRetry({ source: options.source || 'automatic' });
+    } else {
+      clearPortfolioInviteRetry();
+    }
   }
 }
 
@@ -3706,25 +3974,38 @@ async function respondInvitation(event) {
   const provisionalPanelId = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept'
     ? String(invitation?.spaceId || '').trim()
     : '';
-  if (provisionalPanelId) {
-    state.pendingPanelId = provisionalPanelId;
-    state.pendingAuthoritativePanelIds.add(provisionalPanelId);
-    state.panelHydrationGraceUntil.set(provisionalPanelId, Date.now() + PANEL_HYDRATION_GRACE_MS);
-  }
   setP2PBusy(true);
-  setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
-  reportPanelCloneDiagnostic('invitacion-respuesta-iniciada', {
-    invitationId: String(invitationId || ''),
-    decision: String(decision || ''),
-    resourceType: String(invitation?.resourceType || ''),
-    panelId: provisionalPanelId,
-    relatedInvitationIds: related.map((item) => String(item?.invitationId || '')).filter(Boolean)
-  });
+  let clonePreparation = null;
   try {
-    const result = await semillaP2P.respondToInvitation(invitationId, decision);
+    if (decision === 'accept' && state.panelCloneCleanupPromise) {
+      await state.panelCloneCleanupPromise.catch(() => null);
+    }
+    clonePreparation = decision === 'accept'
+      ? await prepareInvitationCloneAttempt(invitation, related)
+      : null;
+    if (provisionalPanelId) {
+      state.pendingPanelId = provisionalPanelId;
+      state.pendingAuthoritativePanelIds.add(provisionalPanelId);
+      state.panelHydrationGraceUntil.set(provisionalPanelId, Date.now() + PANEL_HYDRATION_GRACE_MS);
+    }
+    setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
+    reportPanelCloneDiagnostic('invitacion-respuesta-iniciada', {
+      invitationId: String(invitationId || ''),
+      decision: String(decision || ''),
+      resourceType: String(invitation?.resourceType || ''),
+      panelId: provisionalPanelId,
+      relatedInvitationIds: related.map((item) => String(item?.invitationId || '')).filter(Boolean),
+      recoveryGeneration: clonePreparation?.recoveryGeneration || state.panelCloneRecoveryGeneration,
+      resetCloneSpaceIds: clonePreparation?.spaceIds || [],
+      transportCleanup: clonePreparation?.transportCleanup || null
+    });
+    const result = await respondToInvitationOnce(invitationId, decision, { prepareCloneRecovery: decision !== 'accept' });
     const relatedResults = [];
-    for (const item of related) {
-      try { relatedResults.push(await semillaP2P.respondToInvitation(item.invitationId, decision)); }
+    const relatedInvitationsToRespond = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept'
+      ? []
+      : related;
+    for (const item of relatedInvitationsToRespond) {
+      try { relatedResults.push(await respondToInvitationOnce(item.invitationId, decision, { prepareCloneRecovery: decision !== 'accept' })); }
       catch (error) { relatedResults.push({ error }); }
     }
     const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);

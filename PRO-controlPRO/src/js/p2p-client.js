@@ -29,7 +29,8 @@ import {
   rejectOutboxOperationBatch,
   getRecoveryRequirements,
   updateRecoveryRequirements,
-  resolveRecoveryRequirement
+  resolveRecoveryRequirement,
+  resetInvitationCloneRecoveryState
 } from './p2p-storage.js';
 import { resolveCanonicalInvitationDecision } from './p2p-invitation-intent.js';
 import {
@@ -238,6 +239,37 @@ export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId =
     ...governedSpaceIds,
     ...legacyPortfolioSpaceIds
   ]);
+}
+
+export function requiredInitialCloneEntityIds(space = {}) {
+  const explicit = Array.isArray(space?.requiredSnapshotEntities)
+    ? space.requiredSnapshotEntities
+    : [];
+  const normalized = explicit.map((descriptor) => {
+    const entityType = String(descriptor?.entityType || '').trim();
+    const entityId = String(descriptor?.entityId || '').trim();
+    return entityType && entityId ? `${entityType}:${entityId}` : '';
+  }).filter(Boolean);
+  if (normalized.length) return [...new Set(normalized)].sort((left, right) => left.localeCompare(right));
+
+  const permissionProfile = String(space?.permissionProfile || '').trim().toLowerCase();
+  const resourceType = String(space?.resourceType || '').trim().toLowerCase();
+  if (permissionProfile === 'admin-project-v1' || resourceType === 'admin.project') {
+    return ['admin.project:project'];
+  }
+  return [];
+}
+
+export function missingRequiredInitialCloneEntityIds(space = {}, entities = []) {
+  const available = new Set((Array.isArray(entities) ? entities : [])
+    .filter((entity) => entity && entity.deleted !== true)
+    .map((entity) => {
+      const entityType = String(entity?.entityType || '').trim();
+      const entityId = String(entity?.entityId || '').trim();
+      return entityType && entityId ? `${entityType}:${entityId}` : '';
+    })
+    .filter(Boolean));
+  return requiredInitialCloneEntityIds(space).filter((requiredId) => !available.has(requiredId));
 }
 
 export function initialCloneCanonicalPendingEntityIds(localEntities = []) {
@@ -1277,6 +1309,73 @@ function snapshotChunksByBytes(entities = [], maxEventBytes = DEFAULT_EVENT_MAX_
   if (current.length) chunks.push(current);
   if (!chunks.length) chunks.push([]);
   return chunks;
+}
+
+export function isRecoverableInvitationResponseConflict(error = null) {
+  if (Number(error?.status || 0) !== 409) return false;
+  const code = String(error?.code || '').trim().toUpperCase();
+  const message = String(error?.message || '').trim().toLowerCase();
+  return [
+    'P2P_INVITATION_RESPONSE_IN_PROGRESS',
+    'P2P_INVITATION_LOGICAL_RESPONSE_IN_PROGRESS'
+  ].includes(code)
+    || message.includes('ya se está procesando')
+    || message.includes('solicitud equivalente ya se está procesando');
+}
+
+export function canonicalInvitationFromBootstrap(state = {}, invitationId = '') {
+  const cleanInvitationId = String(invitationId || '').trim();
+  if (!cleanInvitationId) return null;
+  const invitations = state?.invitations || {};
+  return [
+    ...(Array.isArray(invitations.received) ? invitations.received : []),
+    ...(Array.isArray(invitations.sent) ? invitations.sent : [])
+  ].find((invitation) => String(invitation?.invitationId || '').trim() === cleanInvitationId) || null;
+}
+
+export function invitationResponseBootstrapIsComplete(state = {}, invitation = null, decision = 'accept') {
+  const canonicalDecision = resolveCanonicalInvitationDecision(invitation, decision);
+  if (canonicalDecision !== 'accept') return true;
+
+  const spaceId = String(invitation?.spaceId || '').trim();
+  if (!spaceId) return false;
+  const spaces = Array.isArray(state?.spaces) ? state.spaces : [];
+  const acceptedSpace = spaces.find((space) => String(space?.spaceId || '').trim() === spaceId) || null;
+  if (!acceptedSpace) return false;
+
+  const resourceType = String(invitation?.resourceType || '').trim().toLowerCase();
+  const accessScope = String(invitation?.accessScope || '').trim().toLowerCase();
+  if (resourceType !== 'admin.portfolio' || accessScope !== 'portfolio') return true;
+
+  // La invitación queda marcada como accepted antes de que el endpoint termine de
+  // heredar atómicamente todos los proyectos del panel. Un bootstrap intermedio no
+  // puede cerrar el 409 como éxito hasta recibir el manifiesto autoritativo completo.
+  const manifest = (Array.isArray(state?.portfolioHydration) ? state.portfolioHydration : [])
+    .find((candidate) => String(candidate?.portfolioSpaceId || '').trim() === spaceId) || null;
+  if (!manifest || manifest.complete !== true || manifest.authoritative !== true) return false;
+
+  const expectedProjectSpaceIds = normalizeSnapshotSpaceIds(manifest.expectedProjectSpaceIds || []);
+  const expectedProjectCount = Math.max(0, Math.floor(Number(manifest.expectedProjectCount || 0)));
+  if (expectedProjectCount !== expectedProjectSpaceIds.length) return false;
+  const manifestInventoryRevision = Math.max(0, Math.floor(Number(manifest.inventoryRevision || 0)));
+  const portfolioInventoryRevision = Math.max(0, Math.floor(Number(acceptedSpace.projectInventoryRevision || 0)));
+  if (manifestInventoryRevision !== portfolioInventoryRevision) return false;
+
+  const availableSpaceIds = new Set(spaces
+    .map((space) => String(space?.spaceId || '').trim())
+    .filter(Boolean));
+  return expectedProjectSpaceIds.every((projectSpaceId) => availableSpaceIds.has(projectSpaceId));
+}
+
+function invitationResponseConflictDelay(attempt = 0, error = null) {
+  const normalizedAttempt = Math.max(0, Math.floor(Number(attempt || 0)));
+  const retryAfterMs = Math.max(0, Number(error?.retryAfterSeconds || 0) * 1000);
+  const backoffMs = Math.min(1500, 150 * (2 ** Math.min(4, normalizedAttempt)));
+  return Math.max(backoffMs, Math.min(3000, retryAfterMs));
+}
+
+function waitForInvitationResponseConflict(attempt = 0, error = null) {
+  return new Promise((resolve) => window.setTimeout(resolve, invitationResponseConflictDelay(attempt, error)));
 }
 
 function normalizeInvitationCollection(input = {}) {
@@ -5944,6 +6043,95 @@ export class SemillaP2PClient {
     return state;
   }
 
+  async prepareInvitationCloneRecovery(spaceIds = []) {
+    const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
+    if (!normalizedSpaceIds.length) {
+      return {
+        spaceIds: [],
+        removedSnapshotSessions: 0,
+        removedRecoveryRequirements: 0,
+        clearedRejectedSources: 0,
+        clearedInitialCloneRetries: 0,
+        clearedLocalSnapshotRequests: 0,
+        clearedQueuedSnapshotSpaceIds: 0,
+        clearedReplicaHealthSpaceIds: 0
+      };
+    }
+
+    const targetSpaceIds = new Set(normalizedSpaceIds);
+    const cleanupSessionContext = this.captureSessionContext();
+    this.assertSessionContext(cleanupSessionContext);
+    let backendCleanup = null;
+    if (globalThis.navigator?.onLine !== false && getSessionToken() && this.deviceId) {
+      try {
+        backendCleanup = (await apiPost('/api/p2p/snapshots/reset', {
+          deviceId: this.deviceId,
+          spaceIds: normalizedSpaceIds
+        }))?.cleanup || null;
+        this.assertSessionContext(cleanupSessionContext);
+      } catch (error) {
+        dispatch('p2p:invitation-clone-backend-cleanup-failed', {
+          error,
+          deviceId: this.deviceId,
+          spaceIds: normalizedSpaceIds
+        });
+        throw error;
+      }
+    }
+    let clearedRejectedSources = 0;
+    for (const spaceId of targetSpaceIds) {
+      if (!this.rejectedSnapshotSources.has(spaceId)) continue;
+      this.rejectedSnapshotSources.delete(spaceId);
+      clearedRejectedSources += 1;
+    }
+
+    let clearedInitialCloneRetries = 0;
+    for (const [requestId, pending] of this.pendingInitialCloneSnapshotRetries) {
+      if (!targetSpaceIds.has(String(pending?.spaceId || '').trim())) continue;
+      if (this.clearInitialCloneSnapshotRetry(requestId)) clearedInitialCloneRetries += 1;
+    }
+
+    let clearedLocalSnapshotRequests = 0;
+    for (const [requestId, pending] of this.pendingLocalSnapshotRequests) {
+      if (!targetSpaceIds.has(String(pending?.spaceId || '').trim())) continue;
+      this.pendingLocalSnapshotRequests.delete(requestId);
+      clearedLocalSnapshotRequests += 1;
+    }
+
+    const queuedSnapshotSpaceIds = normalizeSnapshotSpaceIds(this.nextBootstrapSnapshotSpaceIds);
+    this.nextBootstrapSnapshotSpaceIds = queuedSnapshotSpaceIds.filter((spaceId) => !targetSpaceIds.has(spaceId));
+    const clearedQueuedSnapshotSpaceIds = queuedSnapshotSpaceIds.length - this.nextBootstrapSnapshotSpaceIds.length;
+
+    let clearedReplicaHealthSpaceIds = 0;
+    for (const spaceId of targetSpaceIds) {
+      if (!this.pendingReplicaHealthSpaceIds.delete(spaceId)) continue;
+      clearedReplicaHealthSpaceIds += 1;
+    }
+
+    const storageCleanup = await resetInvitationCloneRecoveryState(normalizedSpaceIds);
+    this.recoveryRequirements = storageCleanup.recoveryRequirements || await getRecoveryRequirements();
+    this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
+    if (!this.snapshotRecoveryRequired) this.clearSnapshotRecovery();
+    this.bootstrapState = {
+      ...(this.bootstrapState || {}),
+      snapshotRequests: (this.bootstrapState?.snapshotRequests || []).filter((request) => (
+        !targetSpaceIds.has(String(request?.spaceId || '').trim())
+      ))
+    };
+
+    const result = {
+      ...storageCleanup,
+      backendCleanup,
+      clearedRejectedSources,
+      clearedInitialCloneRetries,
+      clearedLocalSnapshotRequests,
+      clearedQueuedSnapshotSpaceIds,
+      clearedReplicaHealthSpaceIds
+    };
+    dispatch('p2p:invitation-clone-recovery-prepared', result);
+    return result;
+  }
+
   async recoverMissingProjectRoots(spaceIds = []) {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
@@ -7206,10 +7394,66 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async respondToInvitation(invitationId = '', decision = 'accept') {
+  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
+    let data = null;
+    try {
+      data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
+    } catch (error) {
+      if (!isRecoverableInvitationResponseConflict(error)) throw error;
+      let conflictError = error;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await waitForInvitationResponseConflict(attempt, conflictError);
+        this.assertSessionContext(sessionContext);
+        const convergedState = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
+        this.assertSessionContext(sessionContext);
+        const invitation = canonicalInvitationFromBootstrap(convergedState, invitationId);
+        if (invitation && String(invitation.status || '').trim().toLowerCase() !== 'pending') {
+          const canonicalDecision = resolveCanonicalInvitationDecision(invitation, decision);
+          const space = canonicalDecision === 'accept'
+            ? (convergedState.spaces || []).find((candidate) => (
+              String(candidate?.spaceId || '').trim() === String(invitation.spaceId || '').trim()
+            )) || null
+            : null;
+          if (invitationResponseBootstrapIsComplete(convergedState, invitation, canonicalDecision)) {
+            data = {
+              ok: true,
+              invitation,
+              space,
+              reused: true,
+              recoveredResponseConflict: true,
+              participationReconciliation: {
+                portfolioHydration: convergedState.portfolioHydration || []
+              }
+            };
+            dispatch('p2p:invitation-response-conflict-recovered', {
+              invitationId: String(invitationId || '').trim(),
+              decision: canonicalDecision,
+              attempt: attempt + 1,
+              retriedRequest: false
+            });
+            break;
+          }
+        }
+
+        if (![1, 3, 5, 7, 9].includes(attempt)) continue;
+        try {
+          data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
+          dispatch('p2p:invitation-response-conflict-recovered', {
+            invitationId: String(invitationId || '').trim(),
+            decision: resolveCanonicalInvitationDecision(data?.invitation, decision),
+            attempt: attempt + 1,
+            retriedRequest: true
+          });
+          break;
+        } catch (retryError) {
+          if (!isRecoverableInvitationResponseConflict(retryError)) throw retryError;
+          conflictError = retryError;
+        }
+      }
+      if (!data) throw conflictError;
+    }
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
@@ -7237,6 +7481,10 @@ export class SemillaP2PClient {
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId, sessionContext.userId);
       if (recoverySpaceIds.length) {
+        if (options?.prepareCloneRecovery !== false) {
+          await this.prepareInvitationCloneRecovery(recoverySpaceIds);
+          this.assertSessionContext(sessionContext);
+        }
         state = await this.refreshBootstrap({
           requestSnapshots: 'initial-clone',
           snapshotSpaceIds: recoverySpaceIds,
@@ -8614,6 +8862,24 @@ export class SemillaP2PClient {
         allowConfirmedFallback: allowStaleSource
       }))
       .filter(Boolean));
+    const sourceSpace = (Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : [])
+      .find((space) => String(space?.spaceId || '').trim() === spaceId) || null;
+    const missingRequiredEntityIds = allowStaleSource
+      ? missingRequiredInitialCloneEntityIds(sourceSpace, entities)
+      : [];
+    if (missingRequiredEntityIds.length) {
+      const retryScheduled = this.scheduleInitialCloneSnapshotRetry(requestEvent, {
+        attempt: options.initialCloneRetryAttempt || 0
+      });
+      dispatch('p2p:snapshot-source-required-entity-missing', {
+        requestId,
+        spaceId,
+        sourceStateRevision: localStateRevision,
+        missingRequiredEntityIds,
+        retryScheduled
+      });
+      return false;
+    }
     const omittedOptimisticEntities = Math.max(0, optimisticEntityCount - entities.filter((entity) => (
       localEntities.some((localEntity) => (
         localEntity?.optimistic === true

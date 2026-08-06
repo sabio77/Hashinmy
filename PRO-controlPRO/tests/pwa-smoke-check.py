@@ -538,6 +538,7 @@ export const rejectOutboxOperationBatch=async(items,error)=>{const rollbacks=[];
 export const getRecoveryRequirements=async()=>globalThis.__recoveryRequirements || {};
 export const updateRecoveryRequirements=async({required={},retainSpaceIds=null}={})=>{const retained=new Set(Array.isArray(retainSpaceIds)?retainSpaceIds:[]); const current=globalThis.__recoveryRequirements || {}; const next={}; for(const [spaceId,revision] of Object.entries(current)){if(!Array.isArray(retainSpaceIds)||retained.has(spaceId)) next[spaceId]=Number(revision || 0);} for(const [spaceId,revision] of Object.entries(required || {})){next[spaceId]=Math.max(Number(next[spaceId] || 0),Number(revision || 0));} globalThis.__recoveryRequirements=next; return next;};
 export const resolveRecoveryRequirement=async(spaceId,sourceStateRevision)=>{const next={...(globalThis.__recoveryRequirements || {})}; if(Number(sourceStateRevision || 0)>=Number(next[spaceId] || 0)) delete next[spaceId]; globalThis.__recoveryRequirements=next; return next;};
+export const resetInvitationCloneRecoveryState=async(spaceIds=[])=>{const targets=new Set(spaceIds || []); const next={}; for(const [spaceId,revision] of Object.entries(globalThis.__recoveryRequirements || {})){if(!targets.has(spaceId)) next[spaceId]=revision;} globalThis.__recoveryRequirements=next; return {spaceIds:[...targets],removedSnapshotSessions:0,removedRecoveryRequirements:0,recoveryRequirements:next};};
 """.strip(),
             encoding="utf-8",
         )
