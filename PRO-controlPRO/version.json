@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.10.23+2026-08-06-189",
-  "version": "1.10.23",
-  "build": "2026-08-06-189",
-  "releasedAt": "2026-08-06T15:10:53-05:00",
+  "releaseId": "semilla-appweb-pwa@1.10.3+2026-08-06-167",
+  "version": "1.10.3",
+  "build": "2026-08-06-167",
+  "releasedAt": "2026-08-06T16:04:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -52,8 +52,8 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "a2aa288e6e247b36307983222cdbec9bae5cb76cee19cd0fc6bb0712ba0a10ff",
-      "bytes": 5265
+      "sha256": "63c87b195eebab35ea09ff7e88b42323015b20b3918b3e1f482a780bac437ea7",
+      "bytes": 5264
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -82,8 +82,8 @@
     },
     {
       "url": "./src/js/p2p-storage.js",
-      "sha256": "21b776fcb6321aa902befb4cf9d462007ee436e00a9724257c5fe4e2694453af",
-      "bytes": 88941
+      "sha256": "9cbff76d1f6bf5bc550f3f26932f34fd348b36985671508dbdc9885ff7f91e52",
+      "bytes": 87071
     },
     {
       "url": "./src/js/p2p-durability.js",
@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "36112a962b4f7130f924cee576cf4898434b76682897a970209f8661eab2a3dc",
-      "bytes": 417154
+      "sha256": "aedc40928d4b8c0b2f8ed64f5f595df9905a856c43ac7b7d14ef7b88e1986113",
+      "bytes": 388696
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/project-domain.js",
-      "sha256": "dc941c502397e87788a36252781c88d3f52a1c3295715b6adb53c4124b3365c1",
-      "bytes": 40541
+      "sha256": "ebd1f8743d7c84a8945bd1d13fb7007a6c5038b0f671adefd9584665bc55c7a8",
+      "bytes": 24762
     },
     {
       "url": "./src/js/device-management.js",
@@ -157,18 +157,18 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "619751d2a5d0155693e09b32769e2619002b953ce7b2d7f4b4cb17cfe29e04cf",
-      "bytes": 243248
+      "sha256": "210e604dbcb7fa85a7a79cf85c78af4555930d361cf709c3fbcf5ced6d70c1b5",
+      "bytes": 184946
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "5b384d20b67fe7cbfea6246aedcfcbe4571eb661329a4f0376fa298672866158",
+      "sha256": "56507892ff39acd311fc60b30ecab749baaec3ba849f550f3582f9cb5373972a",
       "bytes": 981
     },
     {
       "url": "./textX/app/es.json",
-      "sha256": "f27e8c9364ac74e8dfbaf7205b08f0dadcfff214ffff11cf44ab32ba4f59867f",
-      "bytes": 30377
+      "sha256": "00dd806f9e49a55193ceab4ceeebd2a4c0811b374956dfa7d2e079c7f4395660",
+      "bytes": 30624
     },
     {
       "url": "./textX/seo/es.json",
@@ -177,8 +177,8 @@
     },
     {
       "url": "./textX/app/ar.json",
-      "sha256": "d3a5e4bc2ac499ea31a9c5bf9650d62069a49c62bf00f04a8a88f4fa2483c7f4",
-      "bytes": 36692
+      "sha256": "0bb77ba8a5a490f8a9fc75b33632b79b27b58bc7b351337ea50ceaef4611502f",
+      "bytes": 36948
     },
     {
       "url": "./textX/seo/ar.json",
@@ -187,8 +187,8 @@
     },
     {
       "url": "./textX/app/en.json",
-      "sha256": "b196fdd3d4371495a7aa87289ee7630ed86d4544e5549e24295763826935589c",
-      "bytes": 28566
+      "sha256": "35ce33701e24c4ea5878cba5c9267dcf5716fac1aa3b2e3d7245f8bc52c32d8b",
+      "bytes": 28853
     },
     {
       "url": "./textX/seo/en.json",
