@@ -94,7 +94,7 @@ const state = {
   pendingPanelId: '',
   pendingAuthoritativePanelIds: new Set(),
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [], snapshotRequests: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -115,10 +115,12 @@ const state = {
   portfolioInviteAccepting: false,
   accessScopeContext: 'project',
   portfolioReconciliationActive: false,
-  incompletePanelWarnings: new Map()
+  incompletePanelWarnings: new Map(),
+  panelHydrationGraceUntil: new Map()
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
+const PANEL_HYDRATION_GRACE_MS = 20 * 1000;
 const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
 const PROJECT_RESOURCE_TYPE = 'admin.project';
 
@@ -240,9 +242,43 @@ function panelNeedsAuthoritativeHydration(panel = null) {
     pendingAuthoritativePanel: Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
   });
 }
+function activeSnapshotRequestSpaceIds() {
+  const now = Date.now();
+  return new Set((Array.isArray(state.p2pState.snapshotRequests) ? state.p2pState.snapshotRequests : [])
+    .filter((request) => {
+      const expiresAt = Date.parse(String(request?.expiresAt || ''));
+      return !Number.isFinite(expiresAt) || expiresAt > now + 1000;
+    })
+    .map((request) => String(request?.spaceId || '').trim())
+    .filter(Boolean));
+}
+function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
+  const cleanPanelId = String(panelId || '').trim();
+  if (!cleanPanelId) return false;
+  const graceUntil = Number(state.panelHydrationGraceUntil.get(cleanPanelId) || 0);
+  if (graceUntil > Date.now() && [
+    'authoritative_manifest_missing',
+    'authoritative_comparison_incomplete',
+    'portfolio_root_missing',
+    'project_authorization_unconfirmed'
+  ].includes(String(status?.reason || '').trim())) return true;
+
+  const missingSpaceIds = Array.from(new Set((Array.isArray(status?.missingProjectSpaceIds)
+    ? status.missingProjectSpaceIds
+    : [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean)));
+  if (!missingSpaceIds.length) return false;
+  const requestedSpaceIds = activeSnapshotRequestSpaceIds();
+  return missingSpaceIds.every((spaceId) => requestedSpaceIds.has(spaceId));
+}
 function reportIncompleteInvitedPanel(panel = null, status = {}) {
   const panelId = String(panel?.id || status?.panelId || '').trim();
   if (!panelId) return;
+  if (panelHydrationRecoveryInFlight(panelId, status)) {
+    state.incompletePanelWarnings.delete(panelId);
+    return;
+  }
   const signature = JSON.stringify({
     reason: status?.reason || 'unknown',
     manifestInventoryRevision: Math.max(0, Number(status?.manifestInventoryRevision || 0)),
@@ -293,6 +329,7 @@ function panelScopes() {
       return false;
     }
     state.incompletePanelWarnings.delete(panel.id);
+    state.panelHydrationGraceUntil.delete(panel.id);
     state.pendingAuthoritativePanelIds.delete(panel.id);
     return true;
   });
@@ -867,7 +904,8 @@ function resetUserScopedInterface() {
   state.activePanelId = '';
   state.pendingPanelId = '';
   state.pendingAuthoritativePanelIds.clear();
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
+  state.panelHydrationGraceUntil.clear();
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [], snapshotRequests: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -1873,7 +1911,8 @@ function applyP2PState(nextState = {}) {
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : [],
-    portfolioHydration: Array.isArray(nextState.portfolioHydration) ? nextState.portfolioHydration : []
+    portfolioHydration: Array.isArray(nextState.portfolioHydration) ? nextState.portfolioHydration : [],
+    snapshotRequests: Array.isArray(nextState.snapshotRequests) ? nextState.snapshotRequests : []
   };
   renderInvitations();
   if (elements.devicesDialog?.open) renderDevices();
@@ -3027,6 +3066,14 @@ async function respondInvitation(event) {
       portfolioResourceType: PORTFOLIO_RESOURCE_TYPE
     })
     : [];
+  const provisionalPanelId = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept'
+    ? String(invitation?.spaceId || '').trim()
+    : '';
+  if (provisionalPanelId) {
+    state.pendingPanelId = provisionalPanelId;
+    state.pendingAuthoritativePanelIds.add(provisionalPanelId);
+    state.panelHydrationGraceUntil.set(provisionalPanelId, Date.now() + PANEL_HYDRATION_GRACE_MS);
+  }
   setP2PBusy(true);
   setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
   try {
@@ -3038,6 +3085,11 @@ async function respondInvitation(event) {
     }
     const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);
     const accessRevoked = result?.accessRevoked === true;
+    if (accessRevoked && provisionalPanelId) {
+      state.pendingAuthoritativePanelIds.delete(provisionalPanelId);
+      state.panelHydrationGraceUntil.delete(provisionalPanelId);
+      if (state.pendingPanelId === provisionalPanelId) state.pendingPanelId = '';
+    }
     const replicaPending = result?.replicaPending === true || relatedResults.some((entry) => entry?.replicaPending === true);
     if (canonicalDecision === 'accept' && !accessRevoked) {
       state.pendingPanelId = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
@@ -3047,6 +3099,7 @@ async function respondInvitation(event) {
           || SHARED_PROJECTS_PANEL_ID;
       if (invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && state.pendingPanelId) {
         state.pendingAuthoritativePanelIds.add(state.pendingPanelId);
+        state.panelHydrationGraceUntil.set(state.pendingPanelId, Date.now() + PANEL_HYDRATION_GRACE_MS);
       }
     }
     await applyP2PState(semillaP2P.bootstrapState);
@@ -3063,6 +3116,11 @@ async function respondInvitation(event) {
             : t('invite.rejected', 'Invitación rechazada.');
     setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success');
   } catch (error) {
+    if (provisionalPanelId) {
+      state.pendingAuthoritativePanelIds.delete(provisionalPanelId);
+      state.panelHydrationGraceUntil.delete(provisionalPanelId);
+      if (state.pendingPanelId === provisionalPanelId) state.pendingPanelId = '';
+    }
     setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');
   } finally { setP2PBusy(false); }
 }
@@ -3211,7 +3269,10 @@ window.addEventListener('p2p:access-revoked', (event) => {
   const revokedSpaceIds = Array.from(new Set((Array.isArray(event.detail?.spaceIds) ? event.detail.spaceIds : [])
     .map((spaceId) => String(spaceId || '').trim())
     .filter(Boolean)));
-  for (const spaceId of revokedSpaceIds) state.pendingAuthoritativePanelIds.delete(spaceId);
+  for (const spaceId of revokedSpaceIds) {
+    state.pendingAuthoritativePanelIds.delete(spaceId);
+    state.panelHydrationGraceUntil.delete(spaceId);
+  }
   if (state.pendingPanelId && revokedSpaceIds.includes(state.pendingPanelId)) state.pendingPanelId = '';
   const wasSelected = Boolean(state.selectedSpaceId && revokedSpaceIds.includes(state.selectedSpaceId));
   applyP2PState(semillaP2P.bootstrapState);

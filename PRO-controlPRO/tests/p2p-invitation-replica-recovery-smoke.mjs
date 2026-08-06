@@ -434,7 +434,13 @@ assert.match(clientSource, /recoveryRequirement > localStateRevision/, 'Un water
 assert.match(clientSource, /membershipUnconfirmed/, 'El modo de recuperación no distingue una réplica atrasada de una membresía desconocida.');
 assert.match(clientSource, /isMembershipAuthorizationUnconfirmedSpace\(/, 'Las operaciones todavía usan el marcador de réplica atrasada como si fuera una membresía desconocida.');
 assert.match(clientSource, /allowStaleSource = request\.allowStaleSource === true && recoveryReason === 'initial_clone'/, 'La fuente no reconoce la concesión limitada de clonación inicial.');
-assert.match(clientSource, /sourceStateRevision > requestedStateRevision \|\| \(!allowStaleSource && sourceStateRevision !== requestedStateRevision\)/, 'La clonación inicial no conserva la barrera contra fuentes adelantadas ni el modo estricto normal.');
+assert.match(clientSource, /const sourceRevisionUnavailable = allowStaleSource\s*\? false\s*:/, 'La fuente de clonación inicial todavía se descarta cuando termina de publicar su outbox después de emitirse la concesión.');
+assert.match(clientSource, /if \(!allowStaleSource && sourceStateRevision !== requestedStateRevision\)/, 'Las recuperaciones normales dejaron de exigir coincidencia exacta con la revisión autorizada.');
+const backendSynchronizationSource = fs.readFileSync(path.resolve(root, '..', 'memoriaBACKEND', 'P2P_SINCRONIZACIONx', 'BLOQUE', 'synchronization.js'), 'utf8');
+assert.match(backendSynchronizationSource, /latestStateRevisions = await getSpaceStateRevisions\(\[spaceId\]\)/, 'memoriaBACKEND no revalida una fuente adelantada contra el watermark vigente.');
+assert.match(backendSynchronizationSource, /sourceStateRevision <= latestAuthoritativeRevision/, 'memoriaBACKEND podría aceptar una copia todavía no confirmada por el estado autoritativo.');
+assert.match(backendSynchronizationSource, /authorizedStateRevision/, 'La ampliación segura de la concesión no se conserva durante los fragmentos del snapshot.');
+assert.match(backendSynchronizationSource, /KEEPTTL: true/, 'La ampliación de la concesión puede renovar indebidamente la ventana temporal del snapshot.');
 assert.match(clientSource, /!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)[\s\S]*!this\.isSpaceReplicaRecoveryPending\(cleanSpaceId\)/, 'La réplica aceptada no puede solicitar su clave cifrada y queda bloqueada antes de aplicar el snapshot.');
 assert.match(clientSource, /confirmRecoveredReplicaAuthorization\(/, 'No existe promoción durable después de completar la réplica.');
 assert.match(clientSource, /p2p:replica-recovery-confirmed/, 'La interfaz no recibe la transición que habilita la edición.');

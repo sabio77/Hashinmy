@@ -8288,8 +8288,13 @@ export class SemillaP2PClient {
     this.recoveryRequirements = await getRecoveryRequirements();
     this.assertSessionContext(sessionContext);
     const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
+    // Una clonación inicial debe usar la mejor copia canónica disponible. La fuente
+    // puede quedar por delante de la revisión que tenía el backend al emitir la
+    // concesión (por ejemplo, después de vaciar su outbox). memoriaBACKEND vuelve a
+    // validar esa revisión contra el watermark autoritativo vigente al recibir cada
+    // fragmento, por lo que aquí solo se bloquean fuentes normales no convergentes.
     const sourceRevisionUnavailable = allowStaleSource
-      ? localStateRevision > requestedStateRevision
+      ? false
       : unresolvedRecoveryRevision || localStateRevision !== requestedStateRevision;
     if (sourceRevisionUnavailable) {
       dispatch('p2p:snapshot-source-deferred', {
@@ -8348,7 +8353,7 @@ export class SemillaP2PClient {
       Number(entity.stateRevision || entity.spaceSequence || 0)
     ), 0);
     const sourceStateRevision = Math.max(entityStateRevision, localStateRevision);
-    if (sourceStateRevision > requestedStateRevision || (!allowStaleSource && sourceStateRevision !== requestedStateRevision)) {
+    if (!allowStaleSource && sourceStateRevision !== requestedStateRevision) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,

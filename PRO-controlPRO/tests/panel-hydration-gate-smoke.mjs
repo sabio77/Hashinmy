@@ -275,6 +275,8 @@ assert.match(appSource, /projects: \[\.\.\.state\.projects\.values\(\)\]/, 'La b
 assert.match(appSource, /if \(!panelNeedsAuthoritativeHydration\(panel\)\) return true;/, 'Los paneles virtuales todavía pueden saltarse la barrera autoritativa.');
 assert.match(appSource, /if \(!status\.ready\) \{[\s\S]*reportIncompleteInvitedPanel\(panel, status\);[\s\S]*return false;/, 'La card invitada todavía se renderiza cuando faltan proyectos.');
 assert.match(appSource, /console\.error\('\[P2P_PANEL_INCOMPLETO\]/, 'Falta el error de consola exigido para una carga parcial.');
+assert.match(appSource, /panelHydrationRecoveryInFlight\(panelId, status\)/, 'La interfaz todavía registra como error una hidratación que tiene snapshots activos.');
+assert.match(appSource, /missingSpaceIds\.every\(\(spaceId\) => requestedSpaceIds\.has\(spaceId\)\)/, 'La supresión transitoria podría ocultar paneles con proyectos que no tienen recuperación activa.');
 assert.match(appSource, /portfolioRootLoaded: status\?\.portfolioRootLoaded === true/, 'El diagnóstico no informa cuando falta la raíz administrativa del panel.');
 assert.match(appSource, /inventoryRevisionMatches: status\?\.inventoryRevisionMatches === true/, 'El diagnóstico no informa la divergencia entre el panel y su manifiesto.');
 assert.match(appSource, /projectInventoryMatches: status\?\.projectInventoryMatches === true/, 'El diagnóstico no informa si el conjunto de proyectos difiere del inventario autoritativo.');
@@ -283,8 +285,10 @@ assert.match(appSource, /legacyProjectSpaceIds: status\?\.legacyProjectSpaceIds 
 assert.match(appSource, /pendingProjectAuthorizationSpaceIds: status\?\.pendingProjectAuthorizationSpaceIds \|\| \[\]/, 'El diagnóstico no informa qué réplicas siguen sin confirmación autoritativa.');
 assert.match(appSource, /recoveringProjectReplicaSpaceIds: status\?\.recoveringProjectReplicaSpaceIds \|\| \[\]/, 'El diagnóstico no distingue las réplicas autorizadas que siguen convergiendo.');
 assert.match(appSource, /portfolioHydration: Array\.isArray\(nextState\.portfolioHydration\)/, 'La interfaz descarta el manifiesto al aplicar el estado P2P.');
+assert.match(appSource, /snapshotRequests: Array\.isArray\(nextState\.snapshotRequests\)/, 'La interfaz descarta las solicitudes activas y genera falsos errores mientras llega el clon.');
 assert.match(appSource, /if \(panelNeedsAuthoritativeHydration\(panel\)\) return portfolioHydrationStatus\(cleanPanelId\)\.ready;/, 'La apertura automática no usa la misma barrera autoritativa que la card.');
-assert.match(appSource, /state\.pendingAuthoritativePanelIds\.add\(state\.pendingPanelId\)/, 'Aceptar un panel no activa la barrera antes del siguiente bootstrap.');
-assert.match(appSource, /for \(const spaceId of revokedSpaceIds\) state\.pendingAuthoritativePanelIds\.delete\(spaceId\);/, 'Una revocación puede dejar una barrera pendiente obsoleta.');
+assert.match(appSource, /state\.pendingAuthoritativePanelIds\.add\(provisionalPanelId\)/, 'Aceptar un panel no activa la barrera antes de que respondToInvitation publique el estado provisional.');
+assert.match(appSource, /panelHydrationGraceUntil\.set\(provisionalPanelId, Date\.now\(\) \+ PANEL_HYDRATION_GRACE_MS\)/, 'La aceptación no distingue una hidratación transitoria de una carga realmente incompleta.');
+assert.match(appSource, /for \(const spaceId of revokedSpaceIds\) \{[\s\S]*state\.pendingAuthoritativePanelIds\.delete\(spaceId\);[\s\S]*state\.panelHydrationGraceUntil\.delete\(spaceId\);/, 'Una revocación puede dejar una barrera o una gracia pendiente obsoleta.');
 
 console.log('OK: paneles reales y virtuales esperan inventario y raíces completas, pero una réplica autorizada puede abrirse como clon inicial mientras continúa convergiendo.');
