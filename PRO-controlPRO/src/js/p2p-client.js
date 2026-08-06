@@ -91,6 +91,9 @@ const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_REJECTION_RETRY_MS = 5 * 1000;
 const INITIAL_CLONE_SOURCE_STAGGER_MS = 1200;
+const INITIAL_CLONE_CANONICAL_RETRY_BASE_MS = 350;
+const INITIAL_CLONE_CANONICAL_RETRY_MAX_MS = 2500;
+const INITIAL_CLONE_CANONICAL_RETRY_MARGIN_MS = 1500;
 const LOCAL_CONTROL_MAX_AGE_MS = 10 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_TTL_MS = 2 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_MAX = 64;
@@ -235,6 +238,18 @@ export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId =
     ...governedSpaceIds,
     ...legacyPortfolioSpaceIds
   ]);
+}
+
+export function initialCloneCanonicalPendingEntityIds(localEntities = []) {
+  return Array.from(new Set((Array.isArray(localEntities) ? localEntities : [])
+    .filter((entity) => entity?.optimistic === true && entity?.confirmedExists !== true)
+    .map((entity) => {
+      const entityType = String(entity?.entityType || '').trim();
+      const entityId = String(entity?.entityId || '').trim();
+      return entityType && entityId ? `${entityType}:${entityId}` : '';
+    })
+    .filter(Boolean)))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 export function snapshotEntityFromLocalRecord(localEntity = null, options = {}) {
@@ -1596,6 +1611,7 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
     this.rejectedSnapshotSources = new Map();
+    this.pendingInitialCloneSnapshotRetries = new Map();
     this.user = null;
     this.eventSource = null;
     this.openPromise = null;
@@ -5841,6 +5857,7 @@ export class SemillaP2PClient {
     this.pipelineGeneration += 1;
     this.clearAtomicTransportBatchTimer();
     this.pendingAtomicEventBatches.clear();
+    this.clearInitialCloneSnapshotRetries();
     window.removeEventListener('online', this.boundOnline);
     window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
     this.unbindTabRelays();
@@ -8395,7 +8412,86 @@ export class SemillaP2PClient {
     return { sent, rejected, pending: remaining, sentOperations, rejectedOperations };
   }
 
-  async sendSnapshot(requestEvent = {}) {
+  clearInitialCloneSnapshotRetry(requestId = '') {
+    const cleanRequestId = String(requestId || '').trim();
+    const pending = cleanRequestId ? this.pendingInitialCloneSnapshotRetries.get(cleanRequestId) : null;
+    if (!pending) return false;
+    if (pending.timer) window.clearTimeout(pending.timer);
+    this.pendingInitialCloneSnapshotRetries.delete(cleanRequestId);
+    return true;
+  }
+
+  clearInitialCloneSnapshotRetries() {
+    for (const pending of this.pendingInitialCloneSnapshotRetries.values()) {
+      if (pending?.timer) window.clearTimeout(pending.timer);
+    }
+    this.pendingInitialCloneSnapshotRetries.clear();
+  }
+
+  scheduleInitialCloneSnapshotRetry(requestEvent = {}, options = {}) {
+    const request = requestEvent?.data || {};
+    const requestId = String(request?.requestId || '').trim();
+    const spaceId = String(request?.spaceId || requestEvent?.spaceId || '').trim();
+    const expiresAt = Date.parse(String(request?.expiresAt || ''));
+    if (!requestId || !spaceId || !Number.isFinite(expiresAt)) return false;
+
+    const remainingMs = expiresAt - Date.now() - INITIAL_CLONE_CANONICAL_RETRY_MARGIN_MS;
+    if (remainingMs <= 0) {
+      this.clearInitialCloneSnapshotRetry(requestId);
+      return false;
+    }
+
+    const attempt = Math.max(0, Math.floor(Number(options.attempt || 0)));
+    const delayMs = Math.min(remainingMs, Math.max(
+      100,
+      Math.min(
+        INITIAL_CLONE_CANONICAL_RETRY_MAX_MS,
+        INITIAL_CLONE_CANONICAL_RETRY_BASE_MS * (2 ** Math.min(4, attempt))
+      )
+    ));
+    const existing = this.pendingInitialCloneSnapshotRetries.get(requestId);
+    if (existing?.timer && Number(existing.dueAt || 0) <= Date.now() + delayMs) return true;
+    if (existing?.timer) window.clearTimeout(existing.timer);
+
+    const sessionContext = this.captureSessionContext();
+    const retryToken = createId('snapshot_source_retry');
+    const timer = window.setTimeout(async () => {
+      const pending = this.pendingInitialCloneSnapshotRetries.get(requestId);
+      if (!pending || pending.retryToken !== retryToken) return;
+      this.pendingInitialCloneSnapshotRetries.delete(requestId);
+      if (!this.isSessionContextCurrent(sessionContext) || !this.started || !this.realtimeLeader) return;
+      try {
+        const sent = await this.sendSnapshot(requestEvent, {
+          initialCloneRetryAttempt: attempt + 1,
+          skipInitialSourceStagger: true
+        });
+        if (sent) {
+          dispatch('p2p:snapshot-source-retry-confirmed', { requestId, spaceId, attempt: attempt + 1 });
+        }
+      } catch (error) {
+        if (this.isSessionContextChangedError(error)) return;
+        dispatch('p2p:snapshot-source-error', {
+          event: requestEvent,
+          error,
+          retryable: this.isRetryableTransportError(error),
+          deferredRetry: true
+        });
+      }
+    }, delayMs);
+
+    this.pendingInitialCloneSnapshotRetries.set(requestId, {
+      timer,
+      retryToken,
+      dueAt: Date.now() + delayMs,
+      expiresAt,
+      attempt,
+      spaceId
+    });
+    dispatch('p2p:snapshot-source-retry-scheduled', { requestId, spaceId, attempt, delayMs });
+    return true;
+  }
+
+  async sendSnapshot(requestEvent = {}, options = {}) {
     if (!this.realtimeLeader) return false;
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -8411,10 +8507,13 @@ export class SemillaP2PClient {
       .slice(0, 32);
     if (!requestDeviceId || !requestId || !spaceId || requestDeviceId === sessionContext.deviceId) return false;
     const expiresAt = Date.parse(request.expiresAt || '');
-    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
+    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) {
+      this.clearInitialCloneSnapshotRetry(requestId);
+      return false;
+    }
 
     const sourcePriority = sourceDeviceIds.indexOf(sessionContext.deviceId);
-    if (allowStaleSource && sourcePriority > 0) {
+    if (allowStaleSource && sourcePriority > 0 && options.skipInitialSourceStagger !== true) {
       await new Promise((resolve) => setTimeout(
         resolve,
         Math.min(6000, sourcePriority * INITIAL_CLONE_SOURCE_STAGGER_MS)
@@ -8470,6 +8569,22 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const optimisticEntityCount = localEntities.filter((entity) => entity?.optimistic === true).length;
     const hasOptimisticEntities = optimisticEntityCount > 0;
+    const canonicalPendingEntityIds = allowStaleSource
+      ? initialCloneCanonicalPendingEntityIds(localEntities)
+      : [];
+    if (canonicalPendingEntityIds.length) {
+      const retryScheduled = this.scheduleInitialCloneSnapshotRetry(requestEvent, {
+        attempt: options.initialCloneRetryAttempt || 0
+      });
+      dispatch('p2p:snapshot-source-canonical-pending', {
+        requestId,
+        spaceId,
+        pendingOperations: pendingForSpace.length,
+        canonicalPendingEntityIds,
+        retryScheduled
+      });
+      return false;
+    }
     if (!allowStaleSource && (pendingForSpace.length || hasOptimisticEntities)) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
@@ -8606,6 +8721,7 @@ export class SemillaP2PClient {
       }
     }, { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false });
     this.assertSessionContext(sessionContext);
+    this.clearInitialCloneSnapshotRetry(requestId);
     return true;
   }
 

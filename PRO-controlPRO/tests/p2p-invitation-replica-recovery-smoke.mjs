@@ -15,7 +15,7 @@ assert.ok(snapshotIdsStart >= 0 && snapshotIdsEnd > snapshotIdsStart, 'No se enc
 const snapshotIdsSource = clientSource.slice(snapshotIdsStart, snapshotIdsEnd)
   .replaceAll('export function', 'function');
 const snapshotIdsModule = await import(`data:text/javascript;base64,${Buffer.from(`${snapshotIdsSource}
-export { acceptedInvitationSnapshotSpaceIds, snapshotEntityFromLocalRecord, isReplicaRecoveryPendingSpace, isMembershipAuthorizationUnconfirmedSpace };`).toString('base64')}#accepted-snapshot-spaces`);
+export { acceptedInvitationSnapshotSpaceIds, initialCloneCanonicalPendingEntityIds, snapshotEntityFromLocalRecord, isReplicaRecoveryPendingSpace, isMembershipAuthorizationUnconfirmedSpace };`).toString('base64')}#accepted-snapshot-spaces`);
 assert.deepEqual(
   snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
     spaces: [
@@ -167,6 +167,12 @@ assert.equal(snapshotIdsModule.snapshotEntityFromLocalRecord({
   confirmedValue: null,
   pendingOperations: [{ operation: { operationId: 'op_new' } }]
 }, { allowConfirmedFallback: true }), null, 'Una entidad nunca confirmada se filtró dentro del snapshot canónico inicial.');
+assert.deepEqual(snapshotIdsModule.initialCloneCanonicalPendingEntityIds([
+  { entityType: 'admin.project', entityId: 'project', optimistic: true, confirmedExists: false },
+  { entityType: 'admin.purchase', entityId: 'purchase_1', optimistic: true, confirmedExists: true },
+  { entityType: 'admin.income', entityId: 'income_1', optimistic: false, confirmedExists: true },
+  { entityType: 'admin.project', entityId: 'project', optimistic: true, confirmedExists: false }
+]), ['admin.project:project'], 'La fuente no identifica la raíz recién creada que todavía no tiene versión canónica para clonar.');
 assert.equal(snapshotIdsModule.snapshotEntityFromLocalRecord({
   entityType: 'admin.project',
   entityId: 'project',
@@ -189,6 +195,21 @@ assert.match(
   clientSource,
   /p2p:snapshot-source-canonical-fallback/,
   'Falta la señal diagnóstica que distingue una clonación canónica desde una fuente con cambios pendientes.'
+);
+assert.match(
+  clientSource,
+  /canonicalPendingEntityIds[\s\S]*scheduleInitialCloneSnapshotRetry\(requestEvent/,
+  'La clonación inicial todavía puede cerrar un snapshot incompleto antes de confirmar una raíz recién creada.'
+);
+assert.match(
+  clientSource,
+  /p2p:snapshot-source-canonical-pending/,
+  'Falta el diagnóstico de la carrera entre outbox, confirmación SSE y clonación inicial.'
+);
+assert.match(
+  clientSource,
+  /clearInitialCloneSnapshotRetries\(\);/,
+  'Los reintentos diferidos de clonación no se limpian al cambiar de sesión o detener el cliente.'
 );
 
 const cleanTextStart = projectDomainSource.indexOf('export function cleanText(');

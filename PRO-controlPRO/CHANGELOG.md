@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.18 - 2026-08-06
+
+- Corregida la carrera que podía ocultar un panel recién aceptado cuando la fuente todavía conservaba la raíz de un proyecto como entidad optimista sin una versión canónica confirmada: la clonación inicial ya no cierra un snapshot parcial que contradiga el manifiesto autoritativo.
+- La fuente conserva la concesión temporal y reintenta de forma acotada mientras su propio evento SSE confirma la entidad; al completarse, envía la copia íntegra al dispositivo invitado sin relajar permisos, revisiones, cifrado ni la barrera que impide mostrar paneles incompletos.
+- Los reintentos quedan deduplicados por `requestId`, vencen con la concesión y se cancelan al detener el cliente o cambiar de cuenta. La regresión cubre una raíz nunca confirmada y conserva el fallback canónico para ediciones ya confirmadas.
+
 ## 1.10.15 - 2026-08-05
 
 - Corregida la clonación inicial de paneles invitados cuando el dispositivo del propietario conserva compras, ingresos, proyecciones o ediciones todavía pendientes en el outbox: esos cambios ya no bloquean la transferencia completa de las raíces confirmadas.
