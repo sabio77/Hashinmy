@@ -401,6 +401,12 @@ export function mergePortfolioHydrationManifests(current = [], incoming = [], op
   return [...merged.values()].sort((left, right) => left.portfolioSpaceId.localeCompare(right.portfolioSpaceId));
 }
 
+export function reconcileBootstrapPortfolioHydration(current = [], incoming = [], revokedSpaceIds = []) {
+  const revoked = new Set(normalizeSnapshotSpaceIds(revokedSpaceIds));
+  return mergePortfolioHydrationManifests(current, incoming, { authoritative: true })
+    .filter((manifest) => !revoked.has(manifest.portfolioSpaceId));
+}
+
 function createId(prefix = 'id') {
   const random = window.crypto?.randomUUID?.().replace(/-/g, '') || `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   return `${prefix}_${random}`;
@@ -5403,10 +5409,6 @@ export class SemillaP2PClient {
     try {
       this.assertSessionContext(sessionContext);
       const invitations = normalizeInvitationCollection(data.invitations || {});
-      const portfolioHydration = normalizePortfolioHydrationManifests(
-        data.participationReconciliation?.portfolioHydration || data.portfolioHydration || [],
-        { authoritative: true }
-      );
       const hasDeliveryState = data.deliveryState && Number.isFinite(Number(data.deliveryState.sequence));
       const backendDeviceSequence = hasDeliveryState ? Math.max(0, Number(data.deliveryState.sequence)) : 0;
       const cursorKey = `${CURSOR_META_PREFIX}${sessionContext.deviceId}`;
@@ -5445,13 +5447,19 @@ export class SemillaP2PClient {
           && ['waiting', 'ready'].includes(transaction.status))
         .map((transaction) => String(transaction.spaceId || '').trim())
         .filter(Boolean));
+      const revokedSpaceIds = Array.from(new Set([
+        ...(Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : []),
+        ...lifecyclePurgeSpaceIds
+      ]));
+      const portfolioHydration = reconcileBootstrapPortfolioHydration(
+        this.bootstrapState?.portfolioHydration || [],
+        data.participationReconciliation?.portfolioHydration || data.portfolioHydration || [],
+        revokedSpaceIds
+      );
       const nextBootstrapState = {
         spaces: (Array.isArray(data.spaces) ? data.spaces : [])
           .filter((space) => !lifecyclePurgeSpaceIds.has(String(space?.spaceId || '').trim())),
-        revokedSpaceIds: Array.from(new Set([
-          ...(Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : []),
-          ...lifecyclePurgeSpaceIds
-        ])),
+        revokedSpaceIds,
         invitations,
         devices: Array.isArray(data.devices) ? data.devices : [],
         stateRevisions: backendStateRevisions,

@@ -244,6 +244,7 @@ const semillaP2P = {
 };
 async function applyP2PState() { applied += 1; }
 function forgetMissingProjectRecovery(spaceIds) { forgotten.push(...spaceIds); }
+function clearPanelHydrationRetry() { return true; }
 function reportPanelCloneDiagnostic(stage, detail, level) { cleanupCalls.push({ stage, detail, level }); }
 function setStatus() {}
 function t(key, fallback) { return fallback; }

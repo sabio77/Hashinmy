@@ -122,6 +122,8 @@ const state = {
   portfolioReconciliationActive: false,
   incompletePanelWarnings: new Map(),
   panelHydrationGraceUntil: new Map(),
+  panelHydrationRetryTimers: new Map(),
+  panelHydrationRetryAttempts: new Map(),
   panelCloneDiagnosticSignatures: new Map()
 };
 
@@ -133,6 +135,18 @@ const MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS = 3;
 const MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS = 6 * 60 * 60 * 1000;
 const PANEL_CLONE_DIAGNOSTIC_DEDUP_MS = 2 * 60 * 1000;
 const PANEL_HYDRATION_GRACE_MS = 20 * 1000;
+const PANEL_HYDRATION_RETRY_MIN_MS = 1500;
+const PANEL_HYDRATION_RETRY_MAX_MS = 15 * 1000;
+const PANEL_HYDRATION_RETRY_MAX_ATTEMPTS = 3;
+const PANEL_HYDRATION_METADATA_RETRY_REASONS = new Set([
+  'authoritative_manifest_missing',
+  'authoritative_comparison_incomplete',
+  'authoritative_comparison_stale',
+  'portfolio_root_missing',
+  'portfolio_inventory_revision_mismatch',
+  'project_authorization_unconfirmed',
+  'project_inventory_set_mismatch'
+]);
 const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
 const PROJECT_RESOURCE_TYPE = 'admin.project';
 
@@ -468,6 +482,141 @@ function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
     now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) < MISSING_PROJECT_RECOVERY_COOLDOWN_MS
   ));
 }
+function clearPanelHydrationRetry(panelId = '', options = {}) {
+  const cleanPanelId = String(panelId || '').trim();
+  if (!cleanPanelId) return false;
+  const timer = state.panelHydrationRetryTimers.get(cleanPanelId);
+  if (timer) window.clearTimeout(timer);
+  const changed = state.panelHydrationRetryTimers.delete(cleanPanelId);
+  if (options.forgetAttempts !== false) state.panelHydrationRetryAttempts.delete(cleanPanelId);
+  return changed;
+}
+function clearAllPanelHydrationRetries() {
+  for (const timer of state.panelHydrationRetryTimers.values()) {
+    if (timer) window.clearTimeout(timer);
+  }
+  state.panelHydrationRetryTimers.clear();
+  state.panelHydrationRetryAttempts.clear();
+}
+function panelHydrationRetryDelay(attempt = 0) {
+  return Math.min(
+    PANEL_HYDRATION_RETRY_MAX_MS,
+    PANEL_HYDRATION_RETRY_MIN_MS * (2 ** Math.max(0, Number(attempt || 0)))
+  );
+}
+function schedulePanelHydrationRetry(panelId = '', status = {}, options = {}) {
+  const cleanPanelId = String(panelId || '').trim();
+  const reason = String(status?.reason || '').trim();
+  if (!cleanPanelId || status?.ready === true || !PANEL_HYDRATION_METADATA_RETRY_REASONS.has(reason)) {
+    if (cleanPanelId) clearPanelHydrationRetry(cleanPanelId);
+    return false;
+  }
+  if (!state.user?.userId || !getSessionToken() || navigator.onLine === false) return false;
+  if (options.resetAttempts === true) state.panelHydrationRetryAttempts.delete(cleanPanelId);
+  if (state.panelHydrationRetryTimers.has(cleanPanelId)) {
+    if (options.force !== true) return true;
+    clearPanelHydrationRetry(cleanPanelId, { forgetAttempts: false });
+  }
+  const attempts = Math.max(0, Number(state.panelHydrationRetryAttempts.get(cleanPanelId) || 0));
+  if (attempts >= PANEL_HYDRATION_RETRY_MAX_ATTEMPTS) return false;
+  const delayMs = options.force === true ? 0 : panelHydrationRetryDelay(attempts);
+  const expectedUserId = String(state.user.userId || '').trim();
+  const timer = window.setTimeout(async () => {
+    state.panelHydrationRetryTimers.delete(cleanPanelId);
+    if (
+      !state.user?.userId
+      || String(state.user.userId || '').trim() !== expectedUserId
+      || !getSessionToken()
+      || navigator.onLine === false
+    ) return;
+    const currentStatus = portfolioHydrationStatus(cleanPanelId);
+    if (currentStatus.ready === true) {
+      clearPanelHydrationRetry(cleanPanelId);
+      return;
+    }
+    if (!PANEL_HYDRATION_METADATA_RETRY_REASONS.has(String(currentStatus.reason || '').trim())) {
+      clearPanelHydrationRetry(cleanPanelId);
+      return;
+    }
+    const nextAttempt = attempts + 1;
+    state.panelHydrationRetryAttempts.set(cleanPanelId, nextAttempt);
+    reportPanelCloneDiagnostic('hidratacion-control-reintento', {
+      panelId: cleanPanelId,
+      reason: String(currentStatus.reason || ''),
+      attempt: nextAttempt,
+      maximumAttempts: PANEL_HYDRATION_RETRY_MAX_ATTEMPTS,
+      source: String(options.source || 'automatic')
+    }, 'warn');
+    try {
+      await semillaP2P.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
+      if (!state.user?.userId || String(state.user.userId || '').trim() !== expectedUserId) return;
+      await applyP2PState(semillaP2P.bootstrapState);
+      const refreshedStatus = portfolioHydrationStatus(cleanPanelId);
+      if (refreshedStatus.ready === true) {
+        clearPanelHydrationRetry(cleanPanelId);
+        state.panelHydrationGraceUntil.delete(cleanPanelId);
+        reportPanelCloneDiagnostic('hidratacion-control-completa', {
+          panelId: cleanPanelId,
+          attempts: nextAttempt
+        });
+        return;
+      }
+      if (nextAttempt >= PANEL_HYDRATION_RETRY_MAX_ATTEMPTS) {
+        reportPanelCloneDiagnostic('hidratacion-control-agotada', {
+          panelId: cleanPanelId,
+          reason: String(refreshedStatus.reason || ''),
+          attempts: nextAttempt
+        }, 'error');
+        reportIncompleteInvitedPanel({ id: cleanPanelId }, refreshedStatus, { force: true });
+        return;
+      }
+      schedulePanelHydrationRetry(cleanPanelId, refreshedStatus, {
+        source: options.source || 'automatic'
+      });
+    } catch (error) {
+      reportPanelCloneDiagnostic('hidratacion-control-error', {
+        panelId: cleanPanelId,
+        attempt: nextAttempt,
+        code: String(error?.code || ''),
+        message: String(error?.message || error || 'Error desconocido')
+      }, 'error');
+      if (nextAttempt < PANEL_HYDRATION_RETRY_MAX_ATTEMPTS) {
+        schedulePanelHydrationRetry(cleanPanelId, currentStatus, {
+          source: options.source || 'automatic'
+        });
+      } else {
+        reportIncompleteInvitedPanel({ id: cleanPanelId }, currentStatus, { force: true });
+      }
+    }
+  }, delayMs);
+  state.panelHydrationRetryTimers.set(cleanPanelId, timer);
+  return true;
+}
+function reconcileIncompletePanelHydrationRetries(options = {}) {
+  const candidatePanelIds = new Set([
+    String(state.pendingPanelId || '').trim(),
+    ...[...state.pendingAuthoritativePanelIds].map((panelId) => String(panelId || '').trim())
+  ].filter(Boolean));
+  for (const panel of allPanelScopes()) {
+    if (panelNeedsAuthoritativeHydration(panel)) candidatePanelIds.add(String(panel.id || '').trim());
+  }
+  for (const panelId of candidatePanelIds) {
+    if (!panelId) continue;
+    const status = portfolioHydrationStatus(panelId);
+    if (status.ready === true) {
+      clearPanelHydrationRetry(panelId);
+      continue;
+    }
+    if (PANEL_HYDRATION_METADATA_RETRY_REASONS.has(String(status.reason || '').trim())) {
+      schedulePanelHydrationRetry(panelId, status, options);
+    } else {
+      clearPanelHydrationRetry(panelId);
+    }
+  }
+  for (const panelId of [...state.panelHydrationRetryTimers.keys()]) {
+    if (!candidatePanelIds.has(panelId)) clearPanelHydrationRetry(panelId);
+  }
+}
 function reportIncompleteInvitedPanel(panel = null, status = {}, options = {}) {
   const panelId = String(panel?.id || status?.panelId || '').trim();
   if (!panelId) return;
@@ -600,6 +749,7 @@ async function abandonFailedInvitationClones(spaceIds = []) {
       }
       state.pendingAuthoritativePanelIds.delete(plan.targetSpaceId);
       state.panelHydrationGraceUntil.delete(plan.targetSpaceId);
+      clearPanelHydrationRetry(plan.targetSpaceId);
       if (state.pendingPanelId === plan.targetSpaceId) state.pendingPanelId = '';
     } catch (error) {
       for (const affectedSpaceId of plan.affectedSpaceIds) failedSpaceIds.add(affectedSpaceId);
@@ -649,6 +799,7 @@ function panelScopes() {
     state.incompletePanelWarnings.delete(panel.id);
     state.panelHydrationGraceUntil.delete(panel.id);
     state.pendingAuthoritativePanelIds.delete(panel.id);
+    clearPanelHydrationRetry(panel.id);
     return true;
   });
 }
@@ -1244,6 +1395,7 @@ function resetUserScopedInterface() {
   state.pendingPanelId = '';
   state.pendingAuthoritativePanelIds.clear();
   state.panelHydrationGraceUntil.clear();
+  clearAllPanelHydrationRetries();
   state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [], snapshotRequests: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
@@ -1554,6 +1706,7 @@ async function refreshProjects() {
     state.projects.has(spaceId) || !currentProjectSpaceIds.has(spaceId)
   ));
   if (completedOrRevokedRecoverySpaceIds.length) forgetMissingProjectRecovery(completedOrRevokedRecoverySpaceIds);
+  reconcileIncompletePanelHydrationRetries({ source: 'project-refresh' });
   if (
     state.pendingPanelId
     && pendingPanelIsHydrated(state.pendingPanelId)
@@ -3579,6 +3732,7 @@ async function respondInvitation(event) {
     if (accessRevoked && provisionalPanelId) {
       state.pendingAuthoritativePanelIds.delete(provisionalPanelId);
       state.panelHydrationGraceUntil.delete(provisionalPanelId);
+      clearPanelHydrationRetry(provisionalPanelId);
       if (state.pendingPanelId === provisionalPanelId) state.pendingPanelId = '';
     }
     const replicaPending = result?.replicaPending === true || relatedResults.some((entry) => entry?.replicaPending === true);
@@ -3649,6 +3803,7 @@ async function respondInvitation(event) {
     if (provisionalPanelId) {
       state.pendingAuthoritativePanelIds.delete(provisionalPanelId);
       state.panelHydrationGraceUntil.delete(provisionalPanelId);
+      clearPanelHydrationRetry(provisionalPanelId);
       if (state.pendingPanelId === provisionalPanelId) state.pendingPanelId = '';
     }
     setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');
@@ -3802,6 +3957,7 @@ window.addEventListener('p2p:access-revoked', (event) => {
   for (const spaceId of revokedSpaceIds) {
     state.pendingAuthoritativePanelIds.delete(spaceId);
     state.panelHydrationGraceUntil.delete(spaceId);
+    clearPanelHydrationRetry(spaceId);
   }
   if (state.pendingPanelId && revokedSpaceIds.includes(state.pendingPanelId)) state.pendingPanelId = '';
   const wasSelected = Boolean(state.selectedSpaceId && revokedSpaceIds.includes(state.selectedSpaceId));
@@ -4022,6 +4178,11 @@ window.addEventListener('online', () => {
   if (!state.user && getSessionToken()) queueExternalSessionSynchronization(getSessionToken());
   if (state.user) {
     reconcilePortfolioAccess().catch(() => null);
+    reconcileIncompletePanelHydrationRetries({
+      force: true,
+      resetAttempts: true,
+      source: 'online'
+    });
     const missingProjectSpaceIds = state.p2pState.spaces
       .filter((space) => space?.resourceType !== PORTFOLIO_RESOURCE_TYPE)
       .map((space) => String(space?.spaceId || '').trim())

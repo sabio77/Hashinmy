@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.19 - 2026-08-06
+
+- Corregida la carrera de aceptación inmediata en la que el manifiesto autoritativo recibido al vincular un panel podía ser reemplazado por un bootstrap transitorio sin comparación, dejando la card oculta aunque la invitación acabara de enviarse.
+- El cliente concilia el manifiesto persistido con cada bootstrap, conserva la versión completa más reciente y solo la elimina ante una revocación explícita o una purga autoritativa.
+- La interfaz reintenta de forma acotada hasta tres veces los estados de control incompletos —sin polling continuo— y vuelve a habilitar la recuperación al regresar la conexión. La card continúa bloqueada hasta verificar raíz, revisión, permisos e inventario completo de proyectos.
+- Se ampliaron las regresiones de hidratación, atomicidad y limpieza terminal para comprobar que un bootstrap vacío no borra la clonación recién aceptada y que los reintentos se cancelan al completar, revocar o cambiar de cuenta.
+
 ## 1.10.18 - 2026-08-06
 
 - Corregida la carrera que podía ocultar un panel recién aceptado cuando la fuente todavía conservaba la raíz de un proyecto como entidad optimista sin una versión canónica confirmada: la clonación inicial ya no cierra un snapshot parcial que contradiga el manifiesto autoritativo.

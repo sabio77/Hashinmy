@@ -251,7 +251,7 @@ const normalizeStart = clientSource.indexOf('export function normalizeSnapshotSp
 const normalizeEnd = clientSource.indexOf('\nfunction createId(', normalizeStart);
 assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart);
 const clientModuleSource = `${clientSource.slice(normalizeStart, normalizeEnd).replaceAll('export function', 'function')}
-export { normalizePortfolioHydrationManifests, mergePortfolioHydrationManifests };`;
+export { normalizePortfolioHydrationManifests, mergePortfolioHydrationManifests, reconcileBootstrapPortfolioHydration };`;
 const client = await import(`data:text/javascript;base64,${Buffer.from(clientModuleSource).toString('base64')}#panel-hydration-client`);
 assert.deepEqual(client.normalizePortfolioHydrationManifests([
   { portfolioSpaceId: panelId, expectedProjectSpaceIds: ['project_2', 'project_1', 'project_2'], inventoryRevision: 7, complete: true }
@@ -298,6 +298,26 @@ assert.deepEqual(client.mergePortfolioHydrationManifests(authoritativeMerged, [{
   complete: false
 }], { authoritative: true }), authoritativeMerged, 'Una comparación autoritativa incompleta de la misma revisión no puede degradar un manifiesto completo ya validado.');
 
+assert.deepEqual(
+  client.reconcileBootstrapPortfolioHydration(authoritativeMerged, [], []),
+  authoritativeMerged,
+  'Un bootstrap transitorio sin comparación no puede borrar el manifiesto que entregó la aceptación recién confirmada.'
+);
+assert.deepEqual(client.reconcileBootstrapPortfolioHydration(authoritativeMerged, [], [panelId]), [], 'Una revocación explícita debe retirar el manifiesto persistido del panel.');
+assert.deepEqual(client.reconcileBootstrapPortfolioHydration(authoritativeMerged, [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_1', 'project_2', 'project_3'],
+  inventoryRevision: 8,
+  complete: true
+}], []), [{
+  portfolioSpaceId: panelId,
+  expectedProjectSpaceIds: ['project_1', 'project_2', 'project_3'],
+  expectedProjectCount: 3,
+  inventoryRevision: 8,
+  complete: true,
+  authoritative: true
+}], 'Una comparación autoritativa más nueva debe reemplazar el manifiesto conservado.');
+
 assert.match(clientSource, /PORTFOLIO_HYDRATION_META_KEY/);
 assert.match(clientSource, /getMeta\(PORTFOLIO_HYDRATION_META_KEY, \[\]\)/, 'El manifiesto no se recupera para uso local-first.');
 assert.match(clientSource, /metaEntries: \[\{ key: PORTFOLIO_HYDRATION_META_KEY, value: portfolioHydration \}\]/, 'El manifiesto autoritativo no participa del commit atómico del bootstrap.');
@@ -305,6 +325,8 @@ assert.match(clientSource, /participationReconciliation\?\.portfolioHydration/, 
 assert.match(clientSource, /async persistParticipationHydration\(data = \{\}, sessionContext = this\.captureSessionContext\(\)\)/, 'La aceptación no persiste el manifiesto autoritativo antes de la clonación.');
 assert.match(clientSource, /setMeta\(PORTFOLIO_HYDRATION_META_KEY, portfolioHydration\)/, 'El manifiesto entregado al aceptar no queda disponible para recargas local-first.');
 assert.match(clientSource, /mergePortfolioHydrationManifests\(/, 'La aceptación puede degradar o perder manifiestos ya persistidos.');
+assert.match(clientSource, /reconcileBootstrapPortfolioHydration\(\s*this\.bootstrapState\?\.portfolioHydration \|\| \[\]/, 'El bootstrap todavía reemplaza en vez de conciliar el manifiesto recién persistido.');
+assert.match(clientSource, /reconcileBootstrapPortfolioHydration\([\s\S]*revokedSpaceIds/, 'La conciliación del bootstrap no elimina manifiestos cuando existe revocación explícita.');
 
 const recoveryStart = appSource.indexOf('function activeSnapshotRequestSpaceIds()');
 const recoveryEnd = appSource.indexOf('\nfunction reportIncompleteInvitedPanel(', recoveryStart);
@@ -365,6 +387,13 @@ assert.match(appSource, /if \(panelNeedsAuthoritativeHydration\(panel\)\) return
 assert.match(appSource, /state\.pendingAuthoritativePanelIds\.add\(provisionalPanelId\)/, 'Aceptar un panel no activa la barrera antes de que respondToInvitation publique el estado provisional.');
 assert.match(appSource, /panelHydrationGraceUntil\.set\(provisionalPanelId, Date\.now\(\) \+ PANEL_HYDRATION_GRACE_MS\)/, 'La aceptación no distingue una hidratación transitoria de una carga realmente incompleta.');
 assert.match(appSource, /for \(const spaceId of revokedSpaceIds\) \{[\s\S]*state\.pendingAuthoritativePanelIds\.delete\(spaceId\);[\s\S]*state\.panelHydrationGraceUntil\.delete\(spaceId\);/, 'Una revocación puede dejar una barrera o una gracia pendiente obsoleta.');
+
+assert.match(appSource, /const PANEL_HYDRATION_RETRY_MAX_ATTEMPTS = 3;/, 'La recuperación del control autoritativo no está limitada a tres intentos.');
+assert.match(appSource, /PANEL_HYDRATION_METADATA_RETRY_REASONS = new Set\(\[[\s\S]*'authoritative_manifest_missing'[\s\S]*'portfolio_root_missing'[\s\S]*'project_inventory_set_mismatch'/, 'Faltan estados transitorios de control en la recuperación de paneles recientes.');
+assert.match(appSource, /semillaP2P\.refreshBootstrap\(\{ requestSnapshots: false, dispatchState: false \}\)/, 'La card oculta no vuelve a solicitar el manifiesto autoritativo cuando el primer bootstrap llega incompleto.');
+assert.match(appSource, /reconcileIncompletePanelHydrationRetries\(\{ source: 'project-refresh' \}\)/, 'Las recargas y eventos P2P no reevalúan paneles ocultos por metadatos incompletos.');
+assert.match(appSource, /reconcileIncompletePanelHydrationRetries\(\{[\s\S]*force: true,[\s\S]*resetAttempts: true,[\s\S]*source: 'online'/, 'La reconexión no reactiva una recuperación agotada mientras no había conectividad.');
+assert.match(appSource, /clearPanelHydrationRetry\(spaceId\)/, 'Una revocación puede dejar reintentos autoritativos de otro acceso en ejecución.');
 
 const refreshProjectsStart = appSource.indexOf('async function refreshProjects()');
 const refreshProjectsEnd = appSource.indexOf('\nfunction renderPortfolioMetrics(', refreshProjectsStart);
