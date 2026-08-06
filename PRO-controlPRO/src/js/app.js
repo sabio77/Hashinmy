@@ -585,6 +585,27 @@ function samePermissionSet(left = [], right = []) {
   const second = [...new Set((Array.isArray(right) ? right : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))].sort();
   return first.length === second.length && first.every((value, index) => value === second[index]);
 }
+function stableCollaborationRequestId(scope = 'project', email = '', grant = {}, spaceId = '') {
+  const role = normalizeCollaborationRole(grant.role || 'member');
+  const permissions = normalizeCollaborationPermissions(grant.permissions || rolePermissions(role, [])).sort();
+  const payload = JSON.stringify([
+    P2P_APPLICATION_ID,
+    String(state.user?.userId || '').trim(),
+    String(scope || 'project').trim().toLowerCase(),
+    String(spaceId || 'new').trim(),
+    String(email || '').trim().toLowerCase(),
+    role,
+    permissions
+  ]);
+  let primary = 0x811c9dc5;
+  let secondary = 0x9e3779b9;
+  for (let index = 0; index < payload.length; index += 1) {
+    const code = payload.charCodeAt(index);
+    primary = Math.imul(primary ^ code, 0x01000193);
+    secondary = Math.imul(secondary ^ (code + index), 0x85ebca6b);
+  }
+  return `collaboration_${String(scope || 'project').replace(/[^a-z0-9_-]/gi, '').slice(0, 24)}_${(primary >>> 0).toString(36)}${(secondary >>> 0).toString(36)}`;
+}
 function memberMatchesGrant(member = null, grant = {}) {
   if (!member) return false;
   if (normalizeCollaborationRole(member.role) === 'owner') return true;
@@ -3145,6 +3166,12 @@ function openTrashDialog() {
 async function inviteAcrossPortfolio(email = '', grant = {}) {
   let portfolioSpace = primaryPortfolioSpace();
   let portfolioResult = null;
+  const portfolioRequestId = stableCollaborationRequestId(
+    'portfolio',
+    email,
+    grant,
+    portfolioSpace?.spaceId || 'new'
+  );
   if (portfolioSpace) {
     if (!spaceUserCan(portfolioSpace, 'invite')) throw new Error(t('permissions.denied', 'Tus permisos no permiten realizar esta acción.'));
     if (spaceUserCan(portfolioSpace, 'manage_access')) {
@@ -3160,7 +3187,7 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
           permissions: grant.permissions,
           role: grant.role,
           accessScope: 'portfolio',
-          requestId: createLocalId('portfolio_invite_request')
+          requestId: portfolioRequestId
         });
     }
   } else {
@@ -3169,7 +3196,7 @@ async function inviteAcrossPortfolio(email = '', grant = {}) {
       permissions: grant.permissions,
       role: grant.role,
       accessScope: 'portfolio',
-      requestId: createLocalId('portfolio_invite_request')
+      requestId: portfolioRequestId
     });
     portfolioSpace = portfolioResult?.space || null;
     if (portfolioSpace?.spaceId) setActivePanelId(portfolioSpace.spaceId);
