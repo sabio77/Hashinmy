@@ -587,6 +587,7 @@ const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.invitation.created',
   'p2p.invitation.accepted',
   'p2p.invitation.rejected',
+  'p2p.invitation.cancelled',
   'p2p.lifecycle.progress',
   'p2p.lifecycle.finalize',
   'p2p.lifecycle.remote-purge'
@@ -860,16 +861,18 @@ export function assertCanonicalControlEnvelope(event = {}) {
   const invitationSpaceId = String(invitation?.spaceId || '').trim();
   const inviterUserId = String(invitation?.inviterUserId || '').trim();
   const recipientUserId = String(invitation?.recipientUserId || '').trim();
+  const cancellationActorUserId = recipientUserId || inviterUserId;
   if (
     !isRecord(invitation)
     || !invitationId
     || invitationSpaceId !== spaceId
     || String(invitation.status || '').trim().toLowerCase() !== expectedStatus
     || !inviterUserId
-    || !recipientUserId
+    || (invitationEventAction !== 'cancelled' && !recipientUserId)
   ) invalid('invitation');
   if (invitationEventAction === 'created' && actorUserId !== inviterUserId) invalid('invitation-actor');
-  if (invitationEventAction !== 'created' && actorUserId !== recipientUserId) invalid('invitation-actor');
+  if (invitationEventAction === 'cancelled' && actorUserId !== cancellationActorUserId) invalid('invitation-actor');
+  if (!['created', 'cancelled'].includes(invitationEventAction) && actorUserId !== recipientUserId) invalid('invitation-actor');
   if (invitationEventAction === 'accepted') {
     const graph = canonicalSpaceMemberGraph(data.space, spaceId, () => invalid('invitation-accepted-space'));
     const recipient = graph.members.get(recipientUserId);
@@ -891,6 +894,8 @@ export function assertCanonicalControlEnvelope(event = {}) {
     ) invalid('invitation-accepted-space');
   } else if (invitationEventAction === 'rejected' && data.space !== null && data.space !== undefined) {
     invalid('invitation-rejected-space');
+  } else if (invitationEventAction === 'cancelled' && data.space !== null && data.space !== undefined) {
+    invalid('invitation-cancelled-space');
   }
   return event;
 }

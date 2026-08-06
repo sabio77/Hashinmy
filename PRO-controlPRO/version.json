@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.10.15+2026-08-05-180",
-  "version": "1.10.15",
-  "build": "2026-08-05-180",
-  "releasedAt": "2026-08-05T21:08:00-05:00",
+  "releaseId": "semilla-appweb-pwa@1.10.16+2026-08-05-182",
+  "version": "1.10.16",
+  "build": "2026-08-05-182",
+  "releasedAt": "2026-08-05T23:28:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -52,7 +52,7 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "fac35131df626e381840d4fdca958f068e1e219d665893cf4042165f6d1cbadb",
+      "sha256": "0789299eab36ebae85c5a3271bdd418ad8a28df911548fb98b57e830d7897326",
       "bytes": 5265
     },
     {
@@ -82,8 +82,8 @@
     },
     {
       "url": "./src/js/p2p-storage.js",
-      "sha256": "38acebd7daf7e48e1d8ccf9f54e611d5a3a2b67ee1a1a83f21fbcf0d6746c1a2",
-      "bytes": 86987
+      "sha256": "d300c380aa3a8b7006d20138aa8df4d41136139f65f7196f0fc1a7861074336d",
+      "bytes": 87175
     },
     {
       "url": "./src/js/p2p-durability.js",
@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "7d626940a06dbe797a4ace8b4428a9760392d3d55410cdcc642e4381b5797648",
-      "bytes": 401912
+      "sha256": "487a9bfcfc403007743587855f712b7ae5d0847180b9927c58752abbb8515a93",
+      "bytes": 402811
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -157,12 +157,12 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "98306cce8cb349cd6607f63810195e67fc5b9608e92eda6992324ce90104dc1e",
-      "bytes": 202103
+      "sha256": "fe28d62b7cbc48a3822ef35363f76757fdc2dc4f1185c317f59e5e38c0f47001",
+      "bytes": 211497
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "9ae059cc8d79dcc650348f37044f4cfe02f75ea4103968b43021aeee978bbf9d",
+      "sha256": "cb45bfcc4f7cea853256dd373bc8bbec88053520aeb8cbba484a58b1d81a85a6",
       "bytes": 981
     },
     {

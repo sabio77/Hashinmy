@@ -185,6 +185,14 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rej
   actorUserId: 'user_recipient_1',
   data: { invitation: invitation('rejected'), space: null }
 })).eventType, 'p2p.invitation.rejected');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+  actorUserId: 'user_recipient_1',
+  data: { invitation: invitation('cancelled'), space: null }
+})).eventType, 'p2p.invitation.cancelled');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+  actorUserId: 'user_inviter_1',
+  data: { invitation: invitation('cancelled', { recipientUserId: '' }), space: null }
+})).eventType, 'p2p.invitation.cancelled');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
   actorUserId: 'user_requester_1',
   sourceDeviceId: 'device_requester_0001',
@@ -375,6 +383,24 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'invitation-rejected-space',
   'Una invitación rechazada con un espacio adjunto siguió creando un estado local ambiguo.'
+);
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+    actorUserId: 'user_actor_1',
+    data: { invitation: invitation('cancelled', { recipientUserId: '' }), space: null }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'invitation-actor',
+  'Una cancelación huérfana con actor ajeno siguió avanzando el cursor del cliente.'
+);
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+    actorUserId: 'user_recipient_1',
+    data: { invitation: invitation('cancelled'), space }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'invitation-cancelled-space',
+  'Una invitación cancelada con espacio adjunto siguió creando un estado local ambiguo.'
 );
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
