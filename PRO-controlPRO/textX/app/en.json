@@ -119,7 +119,8 @@
     "missingProjectsRecovered": "The shared projects were recovered and are available again.",
     "missingProjectDeferred": "The incomplete shared space was hidden. It will reappear when a valid replica can recover it.",
     "missingProjectRecoveryPending": "The incomplete shared space was hidden while another replica sends a valid copy.",
-    "missingProjectsRecoveryPending": "The incomplete shared spaces were hidden while other replicas send valid copies."
+    "missingProjectsRecoveryPending": "The incomplete shared spaces were hidden while other replicas send valid copies.",
+    "failedCloneRemoved": "The incomplete shared access was removed after three failed synchronization attempts."
   },
   "replicas": {
     "healthy": "Replicas up to date",

@@ -6,12 +6,37 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appSource = fs.readFileSync(path.join(root, 'src/js/app.js'), 'utf8');
 
+const diagnosticStart = appSource.indexOf('function reportPanelCloneDiagnostic(');
+const diagnosticEnd = appSource.indexOf('\nlet externalSessionQueue', diagnosticStart);
+assert.ok(diagnosticStart >= 0 && diagnosticEnd > diagnosticStart, 'No se encontró el control de ruido diagnóstico de clonación.');
+const diagnosticModuleSource = `
+const PANEL_CLONE_DIAGNOSTIC_DEDUP_MS = 2 * 60 * 1000;
+const state = { panelCloneDiagnosticSignatures: new Map() };
+const logs = [];
+const console = {
+  info(...args) { logs.push(['info', ...args]); },
+  warn(...args) { logs.push(['warn', ...args]); },
+  error(...args) { logs.push(['error', ...args]); }
+};
+${appSource.slice(diagnosticStart, diagnosticEnd)}
+export { logs, reportPanelCloneDiagnostic };
+`;
+const diagnostics = await import(`data:text/javascript;base64,${Buffer.from(diagnosticModuleSource).toString('base64')}#panel-clone-diagnostics`);
+diagnostics.reportPanelCloneDiagnostic('recuperacion-incompleta', { spaceIds: ['project_1'], attempts: { project_1: 1 } }, 'warn');
+diagnostics.reportPanelCloneDiagnostic('recuperacion-incompleta', { spaceIds: ['project_1'], attempts: { project_1: 1 } }, 'warn');
+assert.equal(diagnostics.logs.length, 1, 'La misma recuperación incompleta llena la consola repetidamente dentro de la ventana de deduplicación.');
+diagnostics.reportPanelCloneDiagnostic('recuperacion-incompleta', { spaceIds: ['project_1'], attempts: { project_1: 2 } }, 'warn');
+assert.equal(diagnostics.logs.length, 2, 'La deduplicación ocultó un cambio real en el número de intentos.');
+
+const persistenceStart = appSource.indexOf('function missingProjectRecoveryStorageKey(');
 const activeHelperStart = appSource.indexOf('function activeSnapshotRequestSpaceIds(');
 const helperStart = appSource.indexOf('function clearMissingProjectRecoveryTimer(');
 const helperEnd = appSource.indexOf('\nfunction panelHydrationRecoveryInFlight(', helperStart);
+assert.ok(persistenceStart >= 0 && activeHelperStart > persistenceStart, 'No se encontró el contador durable de recuperaciones.');
 assert.ok(activeHelperStart >= 0 && helperStart > activeHelperStart, 'No se encontró el control de solicitudes de snapshot activas.');
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'No se encontraron los reintentos dirigidos de clonación del panel.');
 
+const persistenceSource = appSource.slice(persistenceStart, activeHelperStart);
 const activeHelperSource = appSource.slice(activeHelperStart, helperStart);
 const helperSource = appSource.slice(helperStart, helperEnd);
 const moduleSource = `
@@ -42,12 +67,14 @@ const state = {
   },
   projects: new Map(),
   missingProjectRecoveryAttempts: new Map(),
+  missingProjectRecoveryAttemptAt: new Map(),
   missingProjectRecoveryQueuedSpaceIds: new Set(),
   missingProjectRecoveryTimer: 0,
   missingProjectRecoveryDueAt: 0,
   missingProjectRecoveryAt: new Map()
 };
 function getSessionToken() { return 'session'; }
+function persistMissingProjectRecoveryAttempts() { return true; }
 async function recoverMissingProjectCards(spaceIds, options) {
   recoveryCalls.push({ spaceIds, options });
   return true;
@@ -65,6 +92,36 @@ export {
   forgetMissingProjectRecovery
 };
 `;
+
+const durableModuleSource = `
+const MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS = 6 * 60 * 60 * 1000;
+const state = {
+  user: { userId: 'guest_1' },
+  missingProjectRecoveryAttempts: new Map(),
+  missingProjectRecoveryAttemptAt: new Map()
+};
+const stored = new Map();
+const localStorage = {
+  getItem(key) { return stored.has(key) ? stored.get(key) : null; },
+  setItem(key, value) { stored.set(key, value); },
+  removeItem(key) { stored.delete(key); }
+};
+function scopedStorageKey(value) { return value; }
+${persistenceSource}
+export { state, stored, recordMissingProjectRecoveryAttempt, restoreMissingProjectRecoveryAttempts, persistMissingProjectRecoveryAttempts };
+`;
+const durable = await import(`data:text/javascript;base64,${Buffer.from(durableModuleSource).toString('base64')}#panel-clone-durable`);
+assert.equal(durable.recordMissingProjectRecoveryAttempt('project_reload'), 1);
+assert.equal(durable.recordMissingProjectRecoveryAttempt('project_reload'), 2);
+assert.equal(durable.recordMissingProjectRecoveryAttempt('project_reload'), 3);
+durable.state.missingProjectRecoveryAttempts.clear();
+durable.state.missingProjectRecoveryAttemptAt.clear();
+assert.equal(durable.restoreMissingProjectRecoveryAttempts('guest_1'), 1);
+assert.equal(
+  durable.state.missingProjectRecoveryAttempts.get('project_reload'),
+  3,
+  'Refrescar la página reinicia el límite de tres intentos y permite un ciclo infinito.'
+);
 
 const helpers = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString('base64')}#panel-clone-retry`);
 
@@ -122,10 +179,104 @@ assert.equal(helpers.state.missingProjectRecoveryAttempts.has('project_1'), fals
 assert.equal(helpers.state.missingProjectRecoveryQueuedSpaceIds.has('project_1'), false);
 assert.equal(helpers.state.missingProjectRecoveryTimer, 0, 'Una raíz recuperada dejó un reintento obsoleto activo.');
 
+const cleanupPlanStart = appSource.indexOf('function failedInvitationCloneCleanupPlan(');
+const cleanupPlanEnd = appSource.indexOf('\nasync function abandonFailedInvitationClones(', cleanupPlanStart);
+assert.ok(cleanupPlanStart >= 0 && cleanupPlanEnd > cleanupPlanStart, 'No se encontró la limpieza terminal de clonaciones invitadas.');
+const cleanupPlanModuleSource = `
+const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
+const PROJECT_RESOURCE_TYPE = 'admin.project';
+${appSource.slice(cleanupPlanStart, cleanupPlanEnd)}
+export { failedInvitationCloneCleanupPlan };
+`;
+const cleanupPlan = await import(`data:text/javascript;base64,${Buffer.from(cleanupPlanModuleSource).toString('base64')}#panel-clone-cleanup-plan`);
+const panelSpace = {
+  spaceId: 'panel_1', resourceType: 'admin.portfolio', ownerUserId: 'owner_1',
+  members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+};
+const panelProject = {
+  spaceId: 'project_panel', resourceType: 'admin.project', governanceSpaceId: 'panel_1', ownerUserId: 'owner_1',
+  members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+};
+const directProject = {
+  spaceId: 'project_direct', resourceType: 'admin.project', ownerUserId: 'owner_2',
+  members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'project' }]
+};
+const ownProject = {
+  spaceId: 'project_own', resourceType: 'admin.project', ownerUserId: 'guest_1',
+  members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'project' }]
+};
+assert.deepEqual(
+  cleanupPlan.failedInvitationCloneCleanupPlan(
+    ['project_panel', 'project_direct', 'project_own'],
+    [panelSpace, panelProject, directProject, ownProject],
+    'guest_1'
+  ),
+  [
+    { targetSpaceId: 'panel_1', affectedSpaceIds: ['project_panel'] },
+    { targetSpaceId: 'project_direct', affectedSpaceIds: ['project_direct'] }
+  ],
+  'El límite terminal no agrupa proyectos heredados por panel o intenta retirar espacios propios.'
+);
+
+const cleanupBlockEnd = appSource.indexOf('\nfunction panelScopes()', cleanupPlanStart);
+const cleanupCalls = [];
+const cleanupBlockModuleSource = `
+const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
+const PROJECT_RESOURCE_TYPE = 'admin.project';
+const MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS = 3;
+const state = {
+  user: { userId: 'guest_1' },
+  p2pState: { spaces: ${JSON.stringify([panelSpace, panelProject])} },
+  pendingAuthoritativePanelIds: new Set(['panel_1']),
+  panelHydrationGraceUntil: new Map([['panel_1', Date.now() + 1000]]),
+  pendingPanelId: 'panel_1'
+};
+const leaveCalls = [];
+const forgotten = [];
+const cleanupCalls = [];
+let applied = 0;
+const semillaP2P = {
+  bootstrapState: { spaces: [] },
+  async leave(spaceId) {
+    leaveCalls.push(spaceId);
+    return { revokedSpaceIds: ['panel_1', 'project_panel'] };
+  }
+};
+async function applyP2PState() { applied += 1; }
+function forgetMissingProjectRecovery(spaceIds) { forgotten.push(...spaceIds); }
+function reportPanelCloneDiagnostic(stage, detail, level) { cleanupCalls.push({ stage, detail, level }); }
+function setStatus() {}
+function t(key, fallback) { return fallback; }
+const elements = { dashboardStatus: null };
+${appSource.slice(cleanupPlanStart, cleanupBlockEnd)}
+function appliedValue() { return applied; }
+export { abandonFailedInvitationClones, leaveCalls, forgotten, cleanupCalls, state, appliedValue };
+`;
+const cleanupBlock = await import(`data:text/javascript;base64,${Buffer.from(cleanupBlockModuleSource).toString('base64')}#panel-clone-cleanup-block`);
+const cleanupResult = await cleanupBlock.abandonFailedInvitationClones(['project_panel']);
+assert.deepEqual(cleanupBlock.leaveCalls, ['panel_1'], 'La autolimpieza del proyecto heredado no abandona el panel como una sola operación autoritativa.');
+assert.deepEqual(cleanupResult.revokedSpaceIds, ['panel_1', 'project_panel']);
+assert.equal(cleanupBlock.appliedValue(), 1, 'La interfaz no aplica el estado posterior a la revocación terminal.');
+assert.equal(cleanupBlock.state.pendingPanelId, '', 'El panel fallido permanece seleccionado después de retirarlo.');
+assert.equal(cleanupBlock.cleanupCalls.at(-1)?.stage, 'recuperacion-cancelada-limite');
+
 const recoveryStart = appSource.indexOf('async function recoverMissingProjectCards(');
 const recoveryEnd = appSource.indexOf('\nasync function refreshProjects()', recoveryStart);
 assert.ok(recoveryStart >= 0 && recoveryEnd > recoveryStart, 'No se encontró la recuperación de raíces faltantes.');
 const recoverySource = appSource.slice(recoveryStart, recoveryEnd);
+assert.match(appSource, /const MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS = 3;/, 'El límite terminal debe ser exactamente de tres intentos.');
+assert.match(
+  recoverySource,
+  /Number\(state\.missingProjectRecoveryAttempts\.get\(spaceId\) \|\| 0\) >= MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS/,
+  'La recuperación no corta el cuarto intento después de tres ciclos fallidos.'
+);
+assert.match(
+  recoverySource,
+  /await abandonFailedInvitationClones\(terminalSpaceIds\)/,
+  'Al superar el límite no se retira la participación incompleta del panel o proyecto invitado.'
+);
+assert.match(appSource, /await semillaP2P\.leave\(plan\.targetSpaceId\)/, 'La limpieza terminal no usa la revocación autoritativa y dejaría solicitudes montadas en backend.');
+assert.match(appSource, /recuperacion-cancelada-limite/, 'Falta el error estructurado que confirma la autolimpieza terminal.');
 assert.match(
   recoverySource,
   /const activeRequestSpaceIds = activeSnapshotRequestSpaceIds\(\);/,
@@ -174,6 +325,7 @@ for (const stage of [
   'recuperacion-ya-en-curso',
   'recuperacion-bootstrap-evaluado',
   'recuperacion-incompleta',
+  'recuperacion-cancelada-limite',
   'snapshot-completo',
   'snapshot-incompleto',
   'reporte-replica-diferido'
@@ -186,4 +338,4 @@ assert.match(
   'La consola no distingue por proyecto si llegó el espacio, la raíz y la revisión autoritativa.'
 );
 
-console.log('OK: un panel invitado incompleto reintenta su clonación dirigida hasta recuperar todas las raíces, sin duplicar solicitudes activas.');
+console.log('OK: la clonación invitada conserva tres intentos entre recargas, evita solicitudes superpuestas y retira autoritativamente el panel o proyecto que no logra vincularse.');

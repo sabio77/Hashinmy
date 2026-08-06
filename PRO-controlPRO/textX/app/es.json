@@ -119,7 +119,8 @@
     "missingProjectsRecovered": "Los proyectos compartidos fueron recuperados y volvieron a estar disponibles.",
     "missingProjectDeferred": "El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.",
     "missingProjectRecoveryPending": "El espacio compartido incompleto se ocultó mientras otra réplica envía una copia válida.",
-    "missingProjectsRecoveryPending": "Los espacios compartidos incompletos se ocultaron mientras otras réplicas envían copias válidas."
+    "missingProjectsRecoveryPending": "Los espacios compartidos incompletos se ocultaron mientras otras réplicas envían copias válidas.",
+    "failedCloneRemoved": "Se retiró el acceso compartido incompleto después de tres intentos fallidos de sincronización."
   },
   "replicas": {
     "healthy": "Réplicas al día",

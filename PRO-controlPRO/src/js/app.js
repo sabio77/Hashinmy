@@ -111,6 +111,7 @@ const state = {
   missingProjectRecoveryActive: false,
   missingProjectRecoveryAt: new Map(),
   missingProjectRecoveryAttempts: new Map(),
+  missingProjectRecoveryAttemptAt: new Map(),
   missingProjectRecoveryQueuedSpaceIds: new Set(),
   missingProjectRecoveryTimer: 0,
   missingProjectRecoveryDueAt: 0,
@@ -120,23 +121,43 @@ const state = {
   accessScopeContext: 'project',
   portfolioReconciliationActive: false,
   incompletePanelWarnings: new Map(),
-  panelHydrationGraceUntil: new Map()
+  panelHydrationGraceUntil: new Map(),
+  panelCloneDiagnosticSignatures: new Map()
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
 const MISSING_PROJECT_RECOVERY_RETRY_MIN_MS = 15 * 1000;
 const MISSING_PROJECT_RECOVERY_RETRY_MAX_MS = 2 * 60 * 1000;
 const MISSING_PROJECT_RECOVERY_RETRY_MARGIN_MS = 1500;
+const MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS = 3;
+const MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS = 6 * 60 * 60 * 1000;
+const PANEL_CLONE_DIAGNOSTIC_DEDUP_MS = 2 * 60 * 1000;
 const PANEL_HYDRATION_GRACE_MS = 20 * 1000;
 const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
 const PROJECT_RESOURCE_TYPE = 'admin.project';
 
 function reportPanelCloneDiagnostic(stage = '', detail = {}, level = 'info') {
   const method = ['error', 'warn', 'info'].includes(level) ? level : 'info';
+  const cleanStage = String(stage || 'estado').trim();
   const payload = detail && typeof detail === 'object' && !Array.isArray(detail)
     ? detail
     : { detail };
-  console[method](`[P2P_CLON_PANEL] ${String(stage || 'estado').trim()}`, {
+  if (['recuperacion-ya-en-curso', 'recuperacion-incompleta'].includes(cleanStage)) {
+    let signature = '';
+    try { signature = `${cleanStage}:${JSON.stringify(payload)}`; } catch {}
+    if (signature) {
+      const now = Date.now();
+      const lastReportedAt = Number(state.panelCloneDiagnosticSignatures.get(signature) || 0);
+      if (now - lastReportedAt < PANEL_CLONE_DIAGNOSTIC_DEDUP_MS) return;
+      state.panelCloneDiagnosticSignatures.set(signature, now);
+      for (const [storedSignature, reportedAt] of state.panelCloneDiagnosticSignatures.entries()) {
+        if (now - Number(reportedAt || 0) > PANEL_CLONE_DIAGNOSTIC_DEDUP_MS * 2) {
+          state.panelCloneDiagnosticSignatures.delete(storedSignature);
+        }
+      }
+    }
+  }
+  console[method](`[P2P_CLON_PANEL] ${cleanStage}`, {
     timestamp: new Date().toISOString(),
     ...payload
   });
@@ -260,6 +281,79 @@ function panelNeedsAuthoritativeHydration(panel = null) {
     pendingAuthoritativePanel: Boolean(panelId && state.pendingAuthoritativePanelIds.has(panelId))
   });
 }
+function missingProjectRecoveryStorageKey(userId = state.user?.userId || '') {
+  const cleanUserId = String(userId || '').trim().slice(0, 140);
+  return cleanUserId ? scopedStorageKey(`p2p_missing_project_recovery:${cleanUserId}`) : '';
+}
+function persistMissingProjectRecoveryAttempts() {
+  const storageKey = missingProjectRecoveryStorageKey();
+  if (!storageKey) return false;
+  const now = Date.now();
+  const attempts = {};
+  for (const [spaceId, rawCount] of state.missingProjectRecoveryAttempts.entries()) {
+    const cleanSpaceId = String(spaceId || '').trim().slice(0, 140);
+    const count = Math.max(0, Math.floor(Number(rawCount || 0)));
+    const lastAttemptAt = Math.max(0, Number(state.missingProjectRecoveryAttemptAt.get(cleanSpaceId) || 0));
+    if (!cleanSpaceId || count <= 0 || !lastAttemptAt || now - lastAttemptAt > MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS) {
+      if (cleanSpaceId) {
+        state.missingProjectRecoveryAttempts.delete(cleanSpaceId);
+        state.missingProjectRecoveryAttemptAt.delete(cleanSpaceId);
+      }
+      continue;
+    }
+    attempts[cleanSpaceId] = { count, lastAttemptAt };
+  }
+  try {
+    if (Object.keys(attempts).length) {
+      localStorage.setItem(storageKey, JSON.stringify({ version: 1, updatedAt: now, attempts }));
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function restoreMissingProjectRecoveryAttempts(userId = state.user?.userId || '') {
+  state.missingProjectRecoveryAttempts.clear();
+  state.missingProjectRecoveryAttemptAt.clear();
+  const storageKey = missingProjectRecoveryStorageKey(userId);
+  if (!storageKey) return 0;
+  const now = Date.now();
+  try {
+    const document = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    const attempts = document?.attempts && typeof document.attempts === 'object' && !Array.isArray(document.attempts)
+      ? document.attempts
+      : {};
+    for (const [spaceId, entry] of Object.entries(attempts).slice(0, 1000)) {
+      const cleanSpaceId = String(spaceId || '').trim().slice(0, 140);
+      const count = Math.max(0, Math.floor(Number(entry?.count || 0)));
+      const lastAttemptAt = Math.max(0, Number(entry?.lastAttemptAt || 0));
+      if (!cleanSpaceId || count <= 0 || !lastAttemptAt || now - lastAttemptAt > MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS) continue;
+      state.missingProjectRecoveryAttempts.set(cleanSpaceId, count);
+      state.missingProjectRecoveryAttemptAt.set(cleanSpaceId, lastAttemptAt);
+    }
+    persistMissingProjectRecoveryAttempts();
+  } catch {
+    try { localStorage.removeItem(storageKey); } catch {}
+  }
+  return state.missingProjectRecoveryAttempts.size;
+}
+function recordMissingProjectRecoveryAttempt(spaceId = '') {
+  const cleanSpaceId = String(spaceId || '').trim().slice(0, 140);
+  if (!cleanSpaceId) return 0;
+  const now = Date.now();
+  const lastAttemptAt = Number(state.missingProjectRecoveryAttemptAt.get(cleanSpaceId) || 0);
+  const previous = now - lastAttemptAt <= MISSING_PROJECT_RECOVERY_ATTEMPT_TTL_MS
+    ? Math.max(0, Number(state.missingProjectRecoveryAttempts.get(cleanSpaceId) || 0))
+    : 0;
+  const next = previous + 1;
+  state.missingProjectRecoveryAttempts.set(cleanSpaceId, next);
+  state.missingProjectRecoveryAttemptAt.set(cleanSpaceId, now);
+  persistMissingProjectRecoveryAttempts();
+  return next;
+}
+
 function activeSnapshotRequestSpaceIds() {
   const now = Date.now();
   return new Set((Array.isArray(state.p2pState.snapshotRequests) ? state.p2pState.snapshotRequests : [])
@@ -334,13 +428,16 @@ function scheduleMissingProjectRecovery(spaceIds = [], options = {}) {
   return true;
 }
 function forgetMissingProjectRecovery(spaceIds = []) {
+  let changed = false;
   for (const spaceId of Array.isArray(spaceIds) ? spaceIds : []) {
     const cleanSpaceId = String(spaceId || '').trim();
     if (!cleanSpaceId) continue;
+    changed = state.missingProjectRecoveryAttempts.delete(cleanSpaceId) || changed;
+    changed = state.missingProjectRecoveryAttemptAt.delete(cleanSpaceId) || changed;
     state.missingProjectRecoveryAt.delete(cleanSpaceId);
-    state.missingProjectRecoveryAttempts.delete(cleanSpaceId);
     state.missingProjectRecoveryQueuedSpaceIds.delete(cleanSpaceId);
   }
+  if (changed) persistMissingProjectRecoveryAttempts();
   if (!state.missingProjectRecoveryQueuedSpaceIds.size) clearMissingProjectRecoveryTimer();
 }
 function panelHydrationRecoveryInFlight(panelId = '', status = {}) {
@@ -433,6 +530,112 @@ function reportUnrecoverableMissingProjectPanels(spaceIds = []) {
       .some((spaceId) => unresolvedSpaceIds.has(String(spaceId || '').trim()));
     if (affectsPanel) reportIncompleteInvitedPanel(panel, status, { force: true });
   }
+}
+
+function failedInvitationCloneCleanupPlan(spaceIds = [], spaces = state.p2pState.spaces, currentUserId = state.user?.userId || '') {
+  const cleanUserId = String(currentUserId || '').trim();
+  if (!cleanUserId) return [];
+  const availableSpaces = Array.isArray(spaces) ? spaces : [];
+  const byId = new Map(availableSpaces
+    .map((space) => [String(space?.spaceId || '').trim(), space])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const plans = new Map();
+  for (const candidateId of Array.isArray(spaceIds) ? spaceIds : []) {
+    const spaceId = String(candidateId || '').trim();
+    const space = byId.get(spaceId) || null;
+    if (!space || String(space.ownerUserId || '').trim() === cleanUserId) continue;
+    const member = (Array.isArray(space.members) ? space.members : [])
+      .find((candidate) => String(candidate?.userId || '').trim() === cleanUserId) || null;
+    if (!member || !Array.isArray(member.permissions) || !member.permissions.includes('read')) continue;
+
+    let targetSpace = space;
+    if (String(space.resourceType || '').trim() === PROJECT_RESOURCE_TYPE
+      && String(member.accessScope || '').trim().toLowerCase() === 'portfolio') {
+      const governanceSpaceId = String(space.governanceSpaceId || '').trim();
+      const explicitPortfolio = governanceSpaceId ? byId.get(governanceSpaceId) || null : null;
+      const legacyPortfolios = governanceSpaceId ? [] : availableSpaces.filter((candidate) => {
+        if (String(candidate?.resourceType || '').trim() !== PORTFOLIO_RESOURCE_TYPE) return false;
+        if (String(candidate?.ownerUserId || '').trim() !== String(space.ownerUserId || '').trim()) return false;
+        const portfolioMember = (Array.isArray(candidate?.members) ? candidate.members : [])
+          .find((entry) => String(entry?.userId || '').trim() === cleanUserId) || null;
+        return Array.isArray(portfolioMember?.permissions) && portfolioMember.permissions.includes('read');
+      });
+      const portfolio = explicitPortfolio || (legacyPortfolios.length === 1 ? legacyPortfolios[0] : null);
+      const portfolioMember = (Array.isArray(portfolio?.members) ? portfolio.members : [])
+        .find((candidate) => String(candidate?.userId || '').trim() === cleanUserId) || null;
+      if (portfolio
+        && String(portfolio.ownerUserId || '').trim() !== cleanUserId
+        && Array.isArray(portfolioMember?.permissions)
+        && portfolioMember.permissions.includes('read')) targetSpace = portfolio;
+    }
+
+    const targetSpaceId = String(targetSpace?.spaceId || '').trim();
+    if (!targetSpaceId) continue;
+    if (!plans.has(targetSpaceId)) plans.set(targetSpaceId, new Set());
+    plans.get(targetSpaceId).add(spaceId);
+  }
+  return [...plans.entries()].map(([targetSpaceId, affectedSpaceIds]) => ({
+    targetSpaceId,
+    affectedSpaceIds: [...affectedSpaceIds]
+  }));
+}
+async function abandonFailedInvitationClones(spaceIds = []) {
+  const plans = failedInvitationCloneCleanupPlan(spaceIds);
+  if (!plans.length) return { handledSpaceIds: [], revokedSpaceIds: [], failedSpaceIds: [], errors: [] };
+  const revokedSpaceIds = new Set();
+  const handledSpaceIds = new Set();
+  const failedSpaceIds = new Set();
+  const errors = [];
+
+  for (const plan of plans) {
+    try {
+      const result = await semillaP2P.leave(plan.targetSpaceId);
+      for (const affectedSpaceId of plan.affectedSpaceIds) handledSpaceIds.add(affectedSpaceId);
+      for (const revokedSpaceId of [
+        plan.targetSpaceId,
+        ...(Array.isArray(result?.revokedSpaceIds) ? result.revokedSpaceIds : [])
+      ]) {
+        const cleanSpaceId = String(revokedSpaceId || '').trim();
+        if (cleanSpaceId) revokedSpaceIds.add(cleanSpaceId);
+      }
+      state.pendingAuthoritativePanelIds.delete(plan.targetSpaceId);
+      state.panelHydrationGraceUntil.delete(plan.targetSpaceId);
+      if (state.pendingPanelId === plan.targetSpaceId) state.pendingPanelId = '';
+    } catch (error) {
+      for (const affectedSpaceId of plan.affectedSpaceIds) failedSpaceIds.add(affectedSpaceId);
+      errors.push({
+        targetSpaceId: plan.targetSpaceId,
+        code: String(error?.code || ''),
+        message: String(error?.message || error || 'Error desconocido')
+      });
+    }
+  }
+
+  if (revokedSpaceIds.size) {
+    forgetMissingProjectRecovery([...new Set([...handledSpaceIds, ...revokedSpaceIds])]);
+    await applyP2PState(semillaP2P.bootstrapState);
+  }
+  reportPanelCloneDiagnostic('recuperacion-cancelada-limite', {
+    maximumAttempts: MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS,
+    requestedSpaceIds: Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean))),
+    cleanupTargets: plans.map((plan) => plan.targetSpaceId),
+    revokedSpaceIds: [...revokedSpaceIds],
+    failedSpaceIds: [...failedSpaceIds],
+    errors
+  }, errors.length ? 'error' : 'warn');
+  if (revokedSpaceIds.size) {
+    setStatus(
+      elements.dashboardStatus,
+      t('p2p.failedCloneRemoved', 'Se retiró un acceso compartido incompleto después de tres intentos fallidos de sincronización.'),
+      'warning'
+    );
+  }
+  return {
+    handledSpaceIds: [...handledSpaceIds],
+    revokedSpaceIds: [...revokedSpaceIds],
+    failedSpaceIds: [...failedSpaceIds],
+    errors
+  };
 }
 
 function panelScopes() {
@@ -1053,9 +1256,11 @@ function resetUserScopedInterface() {
   state.missingProjectRecoveryActive = false;
   state.missingProjectRecoveryAt.clear();
   state.missingProjectRecoveryAttempts.clear();
+  state.missingProjectRecoveryAttemptAt.clear();
   state.missingProjectRecoveryQueuedSpaceIds.clear();
   clearMissingProjectRecoveryTimer({ clearQueue: true });
   state.incompletePanelWarnings.clear();
+  state.panelCloneDiagnosticSignatures.clear();
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
   state.invitationRefreshSequence += 1;
@@ -1084,6 +1289,7 @@ function showAuth(message = '') {
 
 function showWorkspace(user = {}, options = {}) {
   state.user = user;
+  restoreMissingProjectRecoveryAttempts(user.userId);
   state.activePanelId = getCachedActivePanelId(user.userId);
   if (options.persist !== false) setCachedUser(user);
   elements.authCard?.classList.add('hidden');
@@ -1138,7 +1344,7 @@ function resolvedProjectData(space, entities) {
 }
 
 async function recoverMissingProjectCards(spaceIds = [], options = {}) {
-  const requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
+  let requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
     .map((spaceId) => String(spaceId || '').trim())
     .filter(Boolean)));
   if (!requestedSpaceIds.length || !state.user || !getSessionToken()) return false;
@@ -1150,6 +1356,24 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
     ? state.p2pState.snapshotRequests
     : [];
   const activeRequestSpaceIds = activeSnapshotRequestSpaceIds();
+  const terminalSpaceIds = requestedSpaceIds.filter((spaceId) => (
+    !activeRequestSpaceIds.has(spaceId)
+    && Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0) >= MISSING_PROJECT_RECOVERY_MAX_ATTEMPTS
+    && failedInvitationCloneCleanupPlan([spaceId]).length > 0
+  ));
+  if (terminalSpaceIds.length) {
+    state.missingProjectRecoveryActive = true;
+    try {
+      const cleanup = await abandonFailedInvitationClones(terminalSpaceIds);
+      if (cleanup.failedSpaceIds.length) {
+        scheduleMissingProjectRecovery(cleanup.failedSpaceIds, { delayMs: MISSING_PROJECT_RECOVERY_RETRY_MAX_MS });
+      }
+    } finally {
+      state.missingProjectRecoveryActive = false;
+    }
+    requestedSpaceIds = requestedSpaceIds.filter((spaceId) => !terminalSpaceIds.includes(spaceId));
+    if (!requestedSpaceIds.length) return false;
+  }
   const alreadyRecoveringSpaceIds = requestedSpaceIds.filter((spaceId) => activeRequestSpaceIds.has(spaceId));
   if (alreadyRecoveringSpaceIds.length) {
     scheduleMissingProjectRecovery(alreadyRecoveringSpaceIds, { snapshotRequests });
@@ -1186,10 +1410,7 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
   state.missingProjectRecoveryActive = true;
   candidates.forEach((spaceId) => {
     state.missingProjectRecoveryAt.set(spaceId, now);
-    state.missingProjectRecoveryAttempts.set(
-      spaceId,
-      Math.max(0, Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0)) + 1
-    );
+    recordMissingProjectRecoveryAttempt(spaceId);
   });
   setStatus(
     elements.dashboardStatus,
@@ -1259,7 +1480,11 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
       reportPanelCloneDiagnostic('recuperacion-incompleta', {
         unresolvedSpaceIds: unresolved,
         pendingSnapshotSpaceIds: unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)),
-        withoutSnapshotSourceSpaceIds: unresolved.filter((spaceId) => !requestedRecoverySpaceIds.has(spaceId))
+        withoutSnapshotSourceSpaceIds: unresolved.filter((spaceId) => !requestedRecoverySpaceIds.has(spaceId)),
+        attempts: Object.fromEntries(unresolved.map((spaceId) => [
+          spaceId,
+          Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0)
+        ]))
       }, 'warn');
       if (pendingRecoveryCount === 0) reportUnrecoverableMissingProjectPanels(unresolved);
       scheduleMissingProjectRecovery(unresolved, {
@@ -1324,6 +1549,11 @@ async function refreshProjects() {
     .filter(([, data]) => !data.project.loaded && !isAuthorizationUnconfirmed(data.space))
     .map(([spaceId]) => spaceId);
   state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
+  const currentProjectSpaceIds = new Set(spaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean));
+  const completedOrRevokedRecoverySpaceIds = [...state.missingProjectRecoveryAttempts.keys()].filter((spaceId) => (
+    state.projects.has(spaceId) || !currentProjectSpaceIds.has(spaceId)
+  ));
+  if (completedOrRevokedRecoverySpaceIds.length) forgetMissingProjectRecovery(completedOrRevokedRecoverySpaceIds);
   if (
     state.pendingPanelId
     && pendingPanelIsHydrated(state.pendingPanelId)
