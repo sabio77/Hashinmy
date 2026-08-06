@@ -131,6 +131,17 @@ const PANEL_HYDRATION_GRACE_MS = 20 * 1000;
 const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
 const PROJECT_RESOURCE_TYPE = 'admin.project';
 
+function reportPanelCloneDiagnostic(stage = '', detail = {}, level = 'info') {
+  const method = ['error', 'warn', 'info'].includes(level) ? level : 'info';
+  const payload = detail && typeof detail === 'object' && !Array.isArray(detail)
+    ? detail
+    : { detail };
+  console[method](`[P2P_CLON_PANEL] ${String(stage || 'estado').trim()}`, {
+    timestamp: new Date().toISOString(),
+    ...payload
+  });
+}
+
 let externalSessionQueue = Promise.resolve();
 
 const byId = (id) => document.getElementById(id);
@@ -1145,6 +1156,15 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
       : t('p2p.missingProjectsSearching', 'Buscando copias válidas de los proyectos compartidos incompletos…'),
     'warning'
   );
+  reportPanelCloneDiagnostic('recuperacion-iniciada', {
+    source: String(options.source || 'automatic').trim(),
+    force: options.force === true,
+    spaceIds: candidates,
+    attempts: Object.fromEntries(candidates.map((spaceId) => [
+      spaceId,
+      Number(state.missingProjectRecoveryAttempts.get(spaceId) || 0)
+    ]))
+  });
 
   try {
     const recoveryState = await semillaP2P.recoverMissingProjectRoots(candidates);
@@ -1155,16 +1175,50 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
       ? recoveryState.spaces
       : state.p2pState.spaces;
     const unresolved = [];
+    const projectRootChecks = [];
     for (const spaceId of candidates) {
       const space = recoverySpaces.find((candidate) => candidate?.spaceId === spaceId) || null;
-      if (!space) continue;
+      if (!space) {
+        unresolved.push(spaceId);
+        projectRootChecks.push({ spaceId, spaceLoaded: false, entityCount: 0, projectRootLoaded: false });
+        continue;
+      }
       const entities = await semillaP2P.listEntities(spaceId).catch(() => []);
-      if (!projectRecord(space, entities).loaded) unresolved.push(spaceId);
+      const root = projectRecord(space, entities);
+      projectRootChecks.push({
+        spaceId,
+        spaceLoaded: true,
+        entityCount: entities.length,
+        projectRootLoaded: root.loaded === true,
+        authorizationState: String(space.authorizationState || 'confirmed'),
+        authorizationPendingReason: String(space.authorizationPendingReason || ''),
+        localStateRevision: Object.prototype.hasOwnProperty.call(recoveryState?.localStateRevisions || {}, spaceId)
+          ? Math.max(0, Number(recoveryState.localStateRevisions[spaceId] || 0))
+          : null,
+        backendStateRevision: Math.max(0, Number(recoveryState?.stateRevisions?.[spaceId] || 0))
+      });
+      if (!root.loaded) unresolved.push(spaceId);
     }
+    reportPanelCloneDiagnostic('recuperacion-bootstrap-evaluado', {
+      requestedSpaceIds: candidates,
+      snapshotRequests: (recoveryState?.snapshotRequests || []).map((request) => ({
+        requestId: String(request?.requestId || ''),
+        spaceId: String(request?.spaceId || ''),
+        reason: String(request?.reason || ''),
+        sourceDeviceIds: Array.isArray(request?.sourceDeviceIds) ? request.sourceDeviceIds : [],
+        expiresAt: String(request?.expiresAt || '')
+      })),
+      projectRootChecks
+    }, unresolved.length ? 'warn' : 'info');
     const resolved = candidates.filter((spaceId) => !unresolved.includes(spaceId));
     if (resolved.length) forgetMissingProjectRecovery(resolved);
     if (unresolved.length) {
       const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
+      reportPanelCloneDiagnostic('recuperacion-incompleta', {
+        unresolvedSpaceIds: unresolved,
+        pendingSnapshotSpaceIds: unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)),
+        withoutSnapshotSourceSpaceIds: unresolved.filter((spaceId) => !requestedRecoverySpaceIds.has(spaceId))
+      }, 'warn');
       if (pendingRecoveryCount === 0) reportUnrecoverableMissingProjectPanels(unresolved);
       scheduleMissingProjectRecovery(unresolved, {
         snapshotRequests: recoveryState?.snapshotRequests || []
@@ -1181,6 +1235,7 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
         'warning'
       );
     } else {
+      reportPanelCloneDiagnostic('recuperacion-completa', { resolvedSpaceIds: candidates });
       setStatus(
         elements.dashboardStatus,
         candidates.length === 1
@@ -1192,6 +1247,11 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
     }
     return unresolved.length === 0;
   } catch (error) {
+    reportPanelCloneDiagnostic('recuperacion-error', {
+      spaceIds: candidates,
+      code: String(error?.code || ''),
+      message: String(error?.message || error || 'Error desconocido')
+    }, 'error');
     scheduleMissingProjectRecovery(candidates);
     setStatus(
       elements.dashboardStatus,
@@ -3222,6 +3282,13 @@ async function respondInvitation(event) {
   }
   setP2PBusy(true);
   setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
+  reportPanelCloneDiagnostic('invitacion-respuesta-iniciada', {
+    invitationId: String(invitationId || ''),
+    decision: String(decision || ''),
+    resourceType: String(invitation?.resourceType || ''),
+    panelId: provisionalPanelId,
+    relatedInvitationIds: related.map((item) => String(item?.invitationId || '')).filter(Boolean)
+  });
   try {
     const result = await semillaP2P.respondToInvitation(invitationId, decision);
     const relatedResults = [];
@@ -3249,6 +3316,39 @@ async function respondInvitation(event) {
       }
     }
     await applyP2PState(semillaP2P.bootstrapState);
+    const acceptedPanelId = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
+      ? String(invitation?.spaceId || '').trim()
+      : '';
+    const hydrationStatus = acceptedPanelId ? portfolioHydrationStatus(acceptedPanelId) : null;
+    reportPanelCloneDiagnostic('invitacion-respuesta-aplicada', {
+      invitationId: String(invitationId || ''),
+      canonicalDecision,
+      accessRevoked,
+      replicaPending,
+      panelId: acceptedPanelId,
+      panelHydration: hydrationStatus ? {
+        ready: hydrationStatus.ready === true,
+        reason: String(hydrationStatus.reason || ''),
+        comparisonComplete: hydrationStatus.comparisonComplete === true,
+        comparisonAuthoritative: hydrationStatus.comparisonAuthoritative === true,
+        expectedProjectSpaceIds: hydrationStatus.expectedProjectSpaceIds || [],
+        loadedProjectSpaceIds: hydrationStatus.loadedProjectSpaceIds || [],
+        missingProjectSpaceIds: hydrationStatus.missingProjectSpaceIds || [],
+        pendingProjectAuthorizationSpaceIds: hydrationStatus.pendingProjectAuthorizationSpaceIds || [],
+        recoveringProjectReplicaSpaceIds: hydrationStatus.recoveringProjectReplicaSpaceIds || []
+      } : null,
+      snapshotRequests: (state.p2pState.snapshotRequests || []).map((request) => ({
+        requestId: String(request?.requestId || ''),
+        spaceId: String(request?.spaceId || ''),
+        reason: String(request?.reason || ''),
+        sourceDeviceIds: Array.isArray(request?.sourceDeviceIds) ? request.sourceDeviceIds : [],
+        expiresAt: String(request?.expiresAt || '')
+      })),
+      relatedFailures: relatedResults.filter((entry) => entry?.error).map((entry) => ({
+        code: String(entry.error?.code || ''),
+        message: String(entry.error?.message || entry.error || '')
+      }))
+    }, hydrationStatus && !hydrationStatus.ready ? 'warn' : 'info');
     showDashboard();
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = accessRevoked
@@ -3262,6 +3362,12 @@ async function respondInvitation(event) {
             : t('invite.rejected', 'Invitación rechazada.');
     setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success');
   } catch (error) {
+    reportPanelCloneDiagnostic('invitacion-respuesta-error', {
+      invitationId: String(invitationId || ''),
+      panelId: provisionalPanelId,
+      code: String(error?.code || ''),
+      message: String(error?.message || error || 'Error desconocido')
+    }, 'error');
     if (provisionalPanelId) {
       state.pendingAuthoritativePanelIds.delete(provisionalPanelId);
       state.panelHydrationGraceUntil.delete(provisionalPanelId);
@@ -3467,6 +3573,71 @@ window.addEventListener('p2p:space-deleted', (event) => {
 window.addEventListener('p2p:authorization-unconfirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.authorizationUnconfirmedDashboard', 'Se conservaron proyectos locales cuya autorización no pudo confirmarse. Permanecen disponibles en modo de solo lectura para evitar pérdida de datos.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'El panel compartido ya está disponible con la mejor copia validada. La sincronización continuará hasta alcanzar la revisión más reciente.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-confirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryConfirmed', 'La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.'), 'success'); });
+window.addEventListener('p2p:replica-report-deferred', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('reporte-replica-diferido', {
+    stage: String(detail.stage || ''),
+    deviceId: String(detail.deviceId || ''),
+    spaceIds: Array.isArray(detail.spaceIds) ? detail.spaceIds : [],
+    reason: detail.reason || null,
+    appliedStateRevisions: detail.appliedStateRevisions || {},
+    replicaRevisionHints: detail.replicaRevisionHints || {},
+    errorCode: String(detail.error?.code || ''),
+    errorMessage: String(detail.error?.message || '')
+  }, 'warn');
+});
+window.addEventListener('p2p:snapshot-complete', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('snapshot-completo', {
+    spaceId: String(detail.event?.spaceId || ''),
+    sourceDeviceId: String(detail.event?.sourceDeviceId || ''),
+    sourceStateRevision: Math.max(0, Number(
+      detail.result?.sourceStateRevision
+      || detail.event?.operation?.payload?.sourceStateRevision
+      || 0
+    )),
+    deferredReplay: detail.deferredReplay === true,
+    recoveryRequirements: detail.recoveryRequirements || {}
+  });
+});
+window.addEventListener('p2p:snapshot-incomplete', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('snapshot-incompleto', {
+    spaceId: String(detail.event?.spaceId || ''),
+    sourceDeviceId: String(detail.event?.sourceDeviceId || ''),
+    reason: String(detail.result?.reason || ''),
+    sourceRejected: detail.sourceRejected === true,
+    excludedDeviceIds: Array.isArray(detail.excludedDeviceIds) ? detail.excludedDeviceIds : []
+  }, 'warn');
+});
+window.addEventListener('p2p:snapshot-source-error', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('fuente-snapshot-error', {
+    spaceId: String(detail.event?.spaceId || ''),
+    requestId: String(detail.event?.data?.requestId || ''),
+    code: String(detail.error?.code || ''),
+    message: String(detail.error?.message || detail.error || '')
+  }, 'error');
+});
+window.addEventListener('p2p:snapshot-source-deferred', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('fuente-snapshot-diferida', {
+    spaceId: String(detail.spaceId || detail.event?.spaceId || ''),
+    requestId: String(detail.requestId || detail.event?.data?.requestId || ''),
+    reason: String(detail.reason || ''),
+    sourceStateRevision: Math.max(0, Number(detail.sourceStateRevision || 0)),
+    requestedStateRevision: Math.max(0, Number(detail.requestedStateRevision || 0))
+  }, 'warn');
+});
+window.addEventListener('p2p:bootstrap-deferred', (event) => {
+  const detail = event.detail || {};
+  reportPanelCloneDiagnostic('bootstrap-diferido', {
+    stage: String(detail.stage || ''),
+    invitationId: String(detail.invitationId || ''),
+    code: String(detail.error?.code || ''),
+    message: String(detail.error?.message || detail.error || '')
+  }, 'warn');
+});
 window.addEventListener('p2p:error', () => setConnectionState('error'));
 navigator.serviceWorker?.addEventListener('message', (event) => {
   const invitationId = invitationIntentFromServiceWorkerMessage(event.data || {});

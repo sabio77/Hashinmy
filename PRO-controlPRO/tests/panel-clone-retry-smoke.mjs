@@ -129,5 +129,23 @@ assert.match(
   /window\.addEventListener\('online',[\s\S]*recoverMissingProjectCards\(missingProjectSpaceIds, \{ force: true, source: 'online' \}\)/,
   'El retorno de internet no reactiva de inmediato las clonaciones pendientes.'
 );
+assert.match(appSource, /function reportPanelCloneDiagnostic\(/, 'Falta el canal estructurado de diagnóstico para la clonación del panel.');
+for (const stage of [
+  'invitacion-respuesta-iniciada',
+  'invitacion-respuesta-aplicada',
+  'recuperacion-iniciada',
+  'recuperacion-bootstrap-evaluado',
+  'recuperacion-incompleta',
+  'snapshot-completo',
+  'snapshot-incompleto',
+  'reporte-replica-diferido'
+]) {
+  assert.match(appSource, new RegExp(stage), `Falta la traza de clonación ${stage}.`);
+}
+assert.match(
+  recoverySource,
+  /projectRootChecks[\s\S]*projectRootLoaded[\s\S]*backendStateRevision/,
+  'La consola no distingue por proyecto si llegó el espacio, la raíz y la revisión autoritativa.'
+);
 
 console.log('OK: un panel invitado incompleto reintenta su clonación dirigida hasta recuperar todas las raíces, sin duplicar solicitudes activas.');

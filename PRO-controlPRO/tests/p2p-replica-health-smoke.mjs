@@ -49,6 +49,12 @@ assert.match(clientSource, /pendingAckReplicaSpaceIds/, 'El ACK no conserva los 
 assert.match(clientSource, /appliedStateRevisions\s*=\s*await listStateRevisions\(replicaSpaceIds\)/, 'El ACK no lee las revisiones realmente persistidas antes de declarar cobertura.');
 assert.match(clientSource, /appliedStateRevisions[\s\S]*apiPost\('\/api\/p2p\/events\/ack'/, 'El ACK no envía la declaración de estado aplicado al backend.');
 assert.match(clientSource, /replicaRevisionHints \|\| ackResult\.replicaRevisions/, 'El cliente no trata las revisiones del relay como hints compatibles.');
+assert.match(
+  clientSource,
+  /ackResult\.replicaReportDeferred === true[\s\S]*dispatch\('p2p:replica-report-deferred'/,
+  'Un rechazo de telemetría del backend no llega a la consola del navegador con su contexto causal.'
+);
+assert.match(appSource, /window\.addEventListener\('p2p:replica-report-deferred'/, 'La interfaz no registra el reporte de réplica diferido.');
 assert.match(clientSource, /replayed > 0\) this\.scheduleReplicaHealthRefresh\(\[event\.spaceId\]\)/, 'La reproducción de eventos cifrados diferidos no renueva la cobertura después de aplicarlos.');
 assert.match(appSource, /replica-health-badge/, 'La interfaz no muestra el estado de las réplicas.');
 assert.match(appSource, /event\.detail\?\.replicaHealthOnly === true/, 'La interfaz no separa cobertura de la carga funcional.');

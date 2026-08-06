@@ -5434,6 +5434,7 @@ export class SemillaP2PClient {
         invitations,
         devices: Array.isArray(data.devices) ? data.devices : [],
         stateRevisions: backendStateRevisions,
+        localStateRevisions: { ...localStateRevisions },
         deliveryState: data.deliveryState && typeof data.deliveryState === 'object' ? data.deliveryState : { sequence: 0 },
         snapshotRequests: Array.isArray(data.snapshotRequests) ? data.snapshotRequests : [],
         replicaHealth: normalizeReplicaHealthMap(data.replicaHealth || {}),
@@ -6989,6 +6990,16 @@ export class SemillaP2PClient {
           ]));
           if (refreshSpaceIds.length && (localReplicaReadDeferred || ackResult.replicaReportDeferred === true)) {
             for (const spaceId of refreshSpaceIds) this.pendingReplicaHealthSpaceIds.add(spaceId);
+          }
+          if (ackResult.replicaReportDeferred === true) {
+            dispatch('p2p:replica-report-deferred', {
+              deviceId: sessionContext.deviceId,
+              spaceIds: refreshSpaceIds,
+              stage: 'backend-ack-report',
+              reason: ackResult.replicaReportDeferredReason || null,
+              appliedStateRevisions,
+              replicaRevisionHints
+            });
           }
           this.scheduleReplicaHealthRefresh(refreshSpaceIds);
           if (ackResult.lifecycleReconciliationDeferred === true && this.realtimeLeader) {
