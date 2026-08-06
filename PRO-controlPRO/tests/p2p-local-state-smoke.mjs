@@ -58,6 +58,31 @@ const terminalSnapshotCleanup = planSnapshotSessionCleanup([
 if (terminalSnapshotCleanup.length !== 1 || terminalSnapshotCleanup[0] !== 'current-0') {
   throw new Error('Un snapshot terminalmente incompleto no libera únicamente sus propios fragmentos.');
 }
+const concurrentSnapshotCleanup = planSnapshotSessionCleanup([
+  { key: 'request-a-0', snapshotKey: 'space_a|request_a|device_1', spaceId: 'space_a', createdAtMs: snapshotCleanupNow - 1000 },
+  { key: 'request-b-0', snapshotKey: 'space_a|request_b|device_2', spaceId: 'space_a', createdAtMs: snapshotCleanupNow - 1000 },
+  { key: 'expired-same-space', snapshotKey: 'space_a|request_expired|device_3', spaceId: 'space_a', createdAtMs: snapshotCleanupNow - 700000 }
+], {
+  currentSnapshotKey: 'space_a|request_b|device_2',
+  spaceId: 'space_a',
+  nowMs: snapshotCleanupNow,
+  maxAgeMs: 300000
+});
+if (concurrentSnapshotCleanup.length !== 1 || concurrentSnapshotCleanup[0] !== 'expired-same-space') {
+  throw new Error('La limpieza periódica eliminó fragmentos todavía válidos de otra solicitud concurrente.');
+}
+const stageSnapshotStart = source.indexOf('async function stageSnapshotChunk(');
+const stageSnapshotEnd = source.indexOf('\nasync function finalizeSnapshot(', stageSnapshotStart);
+const stageSnapshotSource = source.slice(stageSnapshotStart, stageSnapshotEnd);
+if (stageSnapshotStart < 0 || stageSnapshotEnd <= stageSnapshotStart) {
+  throw new Error('No se encontró el ensamblador de fragmentos de snapshot.');
+}
+if (/removeOtherSessions\s*:/.test(stageSnapshotSource)) {
+  throw new Error('El primer fragmento todavía elimina sesiones concurrentes válidas del mismo espacio.');
+}
+if (!/forceSweep\s*:\s*chunkIndex === 0/.test(stageSnapshotSource)) {
+  throw new Error('El primer fragmento dejó de ejecutar la limpieza segura de sesiones expiradas.');
+}
 
 function requestResult(factory) {
   const request = {};

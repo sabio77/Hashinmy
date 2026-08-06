@@ -6,10 +6,13 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appSource = fs.readFileSync(path.join(root, 'src/js/app.js'), 'utf8');
 
+const activeHelperStart = appSource.indexOf('function activeSnapshotRequestSpaceIds(');
 const helperStart = appSource.indexOf('function clearMissingProjectRecoveryTimer(');
 const helperEnd = appSource.indexOf('\nfunction panelHydrationRecoveryInFlight(', helperStart);
+assert.ok(activeHelperStart >= 0 && helperStart > activeHelperStart, 'No se encontró el control de solicitudes de snapshot activas.');
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'No se encontraron los reintentos dirigidos de clonación del panel.');
 
+const activeHelperSource = appSource.slice(activeHelperStart, helperStart);
 const helperSource = appSource.slice(helperStart, helperEnd);
 const moduleSource = `
 const MISSING_PROJECT_RECOVERY_RETRY_MIN_MS = 15 * 1000;
@@ -49,12 +52,14 @@ async function recoverMissingProjectCards(spaceIds, options) {
   recoveryCalls.push({ spaceIds, options });
   return true;
 }
+${activeHelperSource}
 ${helperSource}
 export {
   state,
   timers,
   clearedTimers,
   recoveryCalls,
+  activeSnapshotRequestSpaceIds,
   missingProjectRecoveryDelay,
   scheduleMissingProjectRecovery,
   forgetMissingProjectRecovery
@@ -62,6 +67,18 @@ export {
 `;
 
 const helpers = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString('base64')}#panel-clone-retry`);
+
+const activeExpiresAt = new Date(Date.now() + 60_000).toISOString();
+helpers.state.p2pState.snapshotRequests = [
+  { requestId: 'request_active', spaceId: 'project_1', expiresAt: activeExpiresAt },
+  { requestId: 'request_expired', spaceId: 'project_expired', expiresAt: new Date(Date.now() - 60_000).toISOString() }
+];
+assert.deepEqual(
+  [...helpers.activeSnapshotRequestSpaceIds()],
+  ['project_1'],
+  'Una concesión de snapshot vigente no se distingue de una solicitud vencida.'
+);
+helpers.state.p2pState.snapshotRequests = [];
 
 helpers.state.missingProjectRecoveryAttempts.set('project_1', 1);
 assert.equal(
@@ -111,6 +128,21 @@ assert.ok(recoveryStart >= 0 && recoveryEnd > recoveryStart, 'No se encontró la
 const recoverySource = appSource.slice(recoveryStart, recoveryEnd);
 assert.match(
   recoverySource,
+  /const activeRequestSpaceIds = activeSnapshotRequestSpaceIds\(\);/,
+  'La recuperación no consulta las concesiones de snapshot que ya están activas.'
+);
+assert.match(
+  recoverySource,
+  /const requestableSpaceIds = requestedSpaceIds\.filter\(\(spaceId\) => !activeRequestSpaceIds\.has\(spaceId\)\);/,
+  'Una raíz con snapshot en curso todavía puede volver a solicitarse de forma superpuesta.'
+);
+assert.match(
+  recoverySource,
+  /scheduleMissingProjectRecovery\(alreadyRecoveringSpaceIds, \{ snapshotRequests \}\);/,
+  'Las raíces con una concesión activa no conservan un reintento posterior al vencimiento.'
+);
+assert.match(
+  recoverySource,
   /const recoverySpaces = Array\.isArray\(recoveryState\?\.spaces\)[\s\S]*?: state\.p2pState\.spaces;/,
   'La validación posterior a bootstrap todavía consulta únicamente el estado visual anterior.'
 );
@@ -126,6 +158,11 @@ assert.match(
 );
 assert.match(
   appSource,
+  /const missingProjectSpaceIds = entries[\s\S]*!data\.project\.loaded && !isAuthorizationUnconfirmed\(data\.space\)/,
+  'Una copia revocada o de autorización desconocida todavía dispara recuperaciones infinitas.'
+);
+assert.match(
+  appSource,
   /window\.addEventListener\('online',[\s\S]*recoverMissingProjectCards\(missingProjectSpaceIds, \{ force: true, source: 'online' \}\)/,
   'El retorno de internet no reactiva de inmediato las clonaciones pendientes.'
 );
@@ -134,6 +171,7 @@ for (const stage of [
   'invitacion-respuesta-iniciada',
   'invitacion-respuesta-aplicada',
   'recuperacion-iniciada',
+  'recuperacion-ya-en-curso',
   'recuperacion-bootstrap-evaluado',
   'recuperacion-incompleta',
   'snapshot-completo',

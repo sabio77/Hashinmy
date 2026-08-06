@@ -1490,7 +1490,9 @@ async function stageSnapshotChunk(event = {}) {
   await cleanupSnapshotSessions({
     currentSnapshotKey: snapshotKey,
     spaceId: String(event.spaceId || '').trim(),
-    removeOtherSessions: chunkIndex === 0,
+    // Una misma raíz puede tener solicitudes concurrentes o reemitidas desde
+    // distintas réplicas. El primer fragmento de una sesión nunca debe borrar
+    // fragmentos todavía válidos de otra sesión del mismo espacio.
     forceSweep: chunkIndex === 0
   }).catch(() => 0);
   const key = `${snapshotKey}|${String(chunkIndex).padStart(8, '0')}`;

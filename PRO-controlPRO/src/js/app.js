@@ -1125,17 +1125,38 @@ async function recoverMissingProjectCards(spaceIds = [], options = {}) {
     requestedSpaceIds.forEach((spaceId) => state.missingProjectRecoveryQueuedSpaceIds.add(spaceId));
     return false;
   }
+  const snapshotRequests = Array.isArray(state.p2pState.snapshotRequests)
+    ? state.p2pState.snapshotRequests
+    : [];
+  const activeRequestSpaceIds = activeSnapshotRequestSpaceIds();
+  const alreadyRecoveringSpaceIds = requestedSpaceIds.filter((spaceId) => activeRequestSpaceIds.has(spaceId));
+  if (alreadyRecoveringSpaceIds.length) {
+    scheduleMissingProjectRecovery(alreadyRecoveringSpaceIds, { snapshotRequests });
+    reportPanelCloneDiagnostic('recuperacion-ya-en-curso', {
+      source: String(options.source || 'automatic').trim(),
+      spaceIds: alreadyRecoveringSpaceIds,
+      snapshotRequests: snapshotRequests
+        .filter((request) => alreadyRecoveringSpaceIds.includes(String(request?.spaceId || '').trim()))
+        .map((request) => ({
+          requestId: String(request?.requestId || ''),
+          spaceId: String(request?.spaceId || ''),
+          expiresAt: String(request?.expiresAt || '')
+        }))
+    });
+  }
+  const requestableSpaceIds = requestedSpaceIds.filter((spaceId) => !activeRequestSpaceIds.has(spaceId));
+  if (!requestableSpaceIds.length) return false;
   const now = Date.now();
-  const candidates = requestedSpaceIds.filter((spaceId) => (
+  const candidates = requestableSpaceIds.filter((spaceId) => (
     options.force === true
     || now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) >= MISSING_PROJECT_RECOVERY_COOLDOWN_MS
   ));
   if (!candidates.length) {
-    const nextAllowedAt = requestedSpaceIds.reduce((earliest, spaceId) => {
+    const nextAllowedAt = requestableSpaceIds.reduce((earliest, spaceId) => {
       const candidate = Number(state.missingProjectRecoveryAt.get(spaceId) || 0) + MISSING_PROJECT_RECOVERY_COOLDOWN_MS;
       return earliest ? Math.min(earliest, candidate) : candidate;
     }, 0);
-    scheduleMissingProjectRecovery(requestedSpaceIds, {
+    scheduleMissingProjectRecovery(requestableSpaceIds, {
       delayMs: Math.max(5000, nextAllowedAt - now + MISSING_PROJECT_RECOVERY_RETRY_MARGIN_MS)
     });
     return false;
@@ -1279,7 +1300,7 @@ async function refreshProjects() {
   }));
   if (renderSequence !== state.renderSequence) return;
   const missingProjectSpaceIds = entries
-    .filter(([, data]) => !data.project.loaded)
+    .filter(([, data]) => !data.project.loaded && !isAuthorizationUnconfirmed(data.space))
     .map(([spaceId]) => spaceId);
   state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
   if (
