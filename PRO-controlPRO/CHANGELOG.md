@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.15 - 2026-08-05
+
+- Corregida la clonación inicial de paneles invitados cuando el dispositivo del propietario conserva compras, ingresos, proyecciones o ediciones todavía pendientes en el outbox: esos cambios ya no bloquean la transferencia completa de las raíces confirmadas.
+- La fuente construye el snapshot desde el estado canónico confirmado que IndexedDB conserva junto a cada proyección optimista; las entidades nunca confirmadas se omiten y convergen después mediante el flujo P2P normal, sin publicar datos provisionales como autoritativos.
+- Las recuperaciones ordinarias mantienen la validación estricta anterior. Se añadió una regresión que reproduce una raíz de proyecto confirmada con una edición optimista pendiente y verifica que el invitado reciba la mejor copia válida disponible.
+
 ## 1.10.14 - 2026-08-05
 
 - La aceptación local o realtime de un panel ya no publica a la interfaz los dos estados provisionales anteriores a la clonación dirigida; el panel permanece protegido, pero el diagnóstico `P2P_PANEL_INCOMPLETO` no se dispara mientras la recuperación válida está en curso.

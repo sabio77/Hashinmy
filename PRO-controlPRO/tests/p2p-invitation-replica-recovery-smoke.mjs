@@ -15,7 +15,7 @@ assert.ok(snapshotIdsStart >= 0 && snapshotIdsEnd > snapshotIdsStart, 'No se enc
 const snapshotIdsSource = clientSource.slice(snapshotIdsStart, snapshotIdsEnd)
   .replaceAll('export function', 'function');
 const snapshotIdsModule = await import(`data:text/javascript;base64,${Buffer.from(`${snapshotIdsSource}
-export { acceptedInvitationSnapshotSpaceIds, isReplicaRecoveryPendingSpace, isMembershipAuthorizationUnconfirmedSpace };`).toString('base64')}#accepted-snapshot-spaces`);
+export { acceptedInvitationSnapshotSpaceIds, snapshotEntityFromLocalRecord, isReplicaRecoveryPendingSpace, isMembershipAuthorizationUnconfirmedSpace };`).toString('base64')}#accepted-snapshot-spaces`);
 assert.deepEqual(
   snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
     spaces: [
@@ -126,6 +126,70 @@ assert.equal(snapshotIdsModule.isMembershipAuthorizationUnconfirmedSpace({
   authorizationState: 'unconfirmed',
   authorizationPendingReason: 'membership_unconfirmed'
 }), true, 'Una membresía realmente desconocida dejó de permanecer bloqueada.');
+
+const canonicalFallbackEntity = snapshotIdsModule.snapshotEntityFromLocalRecord({
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Edición todavía pendiente' },
+  deleted: false,
+  operationId: 'op_pending',
+  operationType: 'entity.patch',
+  stateRevision: 8,
+  spaceSequence: 8,
+  optimistic: true,
+  confirmedExists: true,
+  confirmedValue: { name: 'Proyecto confirmado' },
+  confirmedDeleted: false,
+  confirmedOperationId: 'op_confirmed',
+  confirmedOperationType: 'entity.put',
+  confirmedStateRevision: 7,
+  confirmedSpaceSequence: 7,
+  confirmedUpdatedAt: '2026-08-05T20:00:00.000Z',
+  pendingOperations: [{ operation: { operationId: 'op_pending' } }]
+}, { allowConfirmedFallback: true });
+assert.deepEqual(canonicalFallbackEntity, {
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Proyecto confirmado' },
+  deleted: false,
+  operationId: 'op_confirmed',
+  operationType: 'entity.put',
+  spaceSequence: 7,
+  stateRevision: 7,
+  updatedAt: '2026-08-05T20:00:00.000Z'
+}, 'La clonación inicial no usa la versión canónica cuando la interfaz conserva una edición optimista pendiente.');
+assert.equal(snapshotIdsModule.snapshotEntityFromLocalRecord({
+  entityType: 'admin.purchase',
+  entityId: 'purchase_new',
+  value: { amount: 100 },
+  optimistic: true,
+  confirmedExists: false,
+  confirmedValue: null,
+  pendingOperations: [{ operation: { operationId: 'op_new' } }]
+}, { allowConfirmedFallback: true }), null, 'Una entidad nunca confirmada se filtró dentro del snapshot canónico inicial.');
+assert.equal(snapshotIdsModule.snapshotEntityFromLocalRecord({
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Pendiente' },
+  optimistic: true,
+  confirmedExists: true,
+  confirmedValue: { name: 'Confirmado' }
+}), null, 'Una recuperación ordinaria reutilizó estado pendiente sin habilitar explícitamente la clonación inicial.');
+assert.match(
+  clientSource,
+  /if \(!allowStaleSource && \(pendingForSpace\.length \|\| hasOptimisticEntities\)\)/,
+  'Los cambios pendientes todavía bloquean también la clonación inicial.'
+);
+assert.match(
+  clientSource,
+  /snapshotEntityFromLocalRecord\(entity, \{[\s\S]*allowConfirmedFallback: allowStaleSource/,
+  'El snapshot inicial no convierte registros optimistas a su estado canónico confirmado.'
+);
+assert.match(
+  clientSource,
+  /p2p:snapshot-source-canonical-fallback/,
+  'Falta la señal diagnóstica que distingue una clonación canónica desde una fuente con cambios pendientes.'
+);
 
 const cleanTextStart = projectDomainSource.indexOf('export function cleanText(');
 const cleanTextEnd = projectDomainSource.indexOf('\nexport function localDateValue', cleanTextStart);

@@ -237,6 +237,49 @@ export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId =
   ]);
 }
 
+export function snapshotEntityFromLocalRecord(localEntity = null, options = {}) {
+  if (!localEntity || typeof localEntity !== 'object' || Array.isArray(localEntity)) return null;
+  const entityType = String(localEntity.entityType || '').trim();
+  const entityId = String(localEntity.entityId || '').trim();
+  if (!entityType || !entityId) return null;
+
+  const optimistic = localEntity.optimistic === true;
+  const confirmedFallbackAllowed = options.allowConfirmedFallback === true;
+  const hasConfirmedSchema = Object.prototype.hasOwnProperty.call(localEntity, 'confirmedExists');
+  const useConfirmedState = optimistic && confirmedFallbackAllowed && hasConfirmedSchema;
+  if (optimistic && !useConfirmedState) return null;
+  if (useConfirmedState && localEntity.confirmedExists !== true) return null;
+
+  const deleted = useConfirmedState
+    ? localEntity.confirmedDeleted === true
+    : localEntity.deleted === true;
+  const stateRevision = Math.max(0, Number(useConfirmedState
+    ? localEntity.confirmedStateRevision || localEntity.confirmedSpaceSequence || 0
+    : localEntity.stateRevision || localEntity.spaceSequence || 0));
+  const spaceSequence = Math.max(0, Number(useConfirmedState
+    ? localEntity.confirmedSpaceSequence || stateRevision
+    : localEntity.spaceSequence || stateRevision));
+  const operationType = String(useConfirmedState
+    ? localEntity.confirmedOperationType || ''
+    : localEntity.operationType || '').trim() || (deleted ? 'entity.delete' : 'entity.put');
+
+  return {
+    entityType,
+    entityId,
+    value: useConfirmedState ? localEntity.confirmedValue : localEntity.value,
+    deleted,
+    operationId: String(useConfirmedState
+      ? localEntity.confirmedOperationId || ''
+      : localEntity.operationId || '').trim(),
+    operationType,
+    spaceSequence,
+    stateRevision,
+    updatedAt: String(useConfirmedState
+      ? localEntity.confirmedUpdatedAt || ''
+      : localEntity.updatedAt || '').trim()
+  };
+}
+
 export function isReplicaRecoveryPendingSpace(space = null) {
   return Boolean(
     space
@@ -8409,28 +8452,46 @@ export class SemillaP2PClient {
 
     const localEntities = await listEntities(spaceId);
     this.assertSessionContext(sessionContext);
-    const hasOptimisticEntities = localEntities.some((entity) => entity?.optimistic === true);
-    if (pendingForSpace.length || hasOptimisticEntities) {
+    const optimisticEntityCount = localEntities.filter((entity) => entity?.optimistic === true).length;
+    const hasOptimisticEntities = optimisticEntityCount > 0;
+    if (!allowStaleSource && (pendingForSpace.length || hasOptimisticEntities)) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,
         pendingOperations: pendingForSpace.length,
-        optimisticEntities: localEntities.filter((entity) => entity?.optimistic === true).length
+        optimisticEntities: optimisticEntityCount
       });
       return false;
     }
 
-    const entities = sortSnapshotEntities(localEntities.map((entity) => ({
-      entityType: entity.entityType,
-      entityId: entity.entityId,
-      value: entity.value,
-      deleted: Boolean(entity.deleted),
-      operationId: entity.operationId,
-      operationType: entity.operationType || (entity.deleted ? 'entity.delete' : 'entity.put'),
-      spaceSequence: Number(entity.spaceSequence || 0),
-      stateRevision: Number(entity.stateRevision || entity.spaceSequence || 0),
-      updatedAt: entity.updatedAt || ''
-    })));
+    // La clonación inicial no debe quedar bloqueada por una compra o edición que
+    // todavía esté en el outbox. Cada registro de IndexedDB conserva en paralelo
+    // su versión confirmada y su proyección optimista; enviamos únicamente la
+    // versión canónica disponible y dejamos que las operaciones pendientes lleguen
+    // después por el flujo normal. Las recuperaciones ordinarias mantienen la
+    // exigencia estricta anterior y nunca construyen snapshots con estado pendiente.
+    const entities = sortSnapshotEntities(localEntities
+      .map((entity) => snapshotEntityFromLocalRecord(entity, {
+        allowConfirmedFallback: allowStaleSource
+      }))
+      .filter(Boolean));
+    const omittedOptimisticEntities = Math.max(0, optimisticEntityCount - entities.filter((entity) => (
+      localEntities.some((localEntity) => (
+        localEntity?.optimistic === true
+        && String(localEntity?.entityType || '').trim() === entity.entityType
+        && String(localEntity?.entityId || '').trim() === entity.entityId
+      ))
+    )).length);
+    if (allowStaleSource && (pendingForSpace.length || optimisticEntityCount > 0)) {
+      dispatch('p2p:snapshot-source-canonical-fallback', {
+        requestId,
+        spaceId,
+        pendingOperations: pendingForSpace.length,
+        optimisticEntities: optimisticEntityCount,
+        omittedOptimisticEntities,
+        canonicalEntities: entities.length
+      });
+    }
     const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
       maximum,
       Number(entity.stateRevision || entity.spaceSequence || 0)
