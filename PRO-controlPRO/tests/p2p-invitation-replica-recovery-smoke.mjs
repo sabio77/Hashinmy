@@ -26,7 +26,7 @@ assert.deepEqual(
       { spaceId: 'project_4', governanceSpaceId: 'portfolio_1' },
       { spaceId: 'project_other', governanceSpaceId: 'portfolio_2' }
     ]
-  }, 'portfolio_1'),
+  }, 'portfolio_1', 'guest_1'),
   ['portfolio_1', 'project_1', 'project_2', 'project_3', 'project_4'],
   'Aceptar un panel no dirige la recuperación a sus proyectos gobernados.'
 );
@@ -34,6 +34,85 @@ assert.deepEqual(
   snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({ spaces: [{ spaceId: 'project_1' }] }, 'project_1'),
   ['project_1'],
   'Aceptar un proyecto individual no conserva su raíz como objetivo de snapshot.'
+);
+
+assert.deepEqual(
+  snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
+    spaces: [
+      {
+        spaceId: 'portfolio_legacy',
+        resourceType: 'admin.portfolio',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      },
+      {
+        spaceId: 'project_legacy_1',
+        resourceType: 'admin.project',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      },
+      {
+        spaceId: 'project_legacy_2',
+        resourceType: 'admin.project',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      }
+    ],
+    portfolioHydration: [{
+      portfolioSpaceId: 'portfolio_legacy',
+      expectedProjectSpaceIds: [],
+      complete: true,
+      authoritative: true
+    }]
+  }, 'portfolio_legacy', 'guest_1'),
+  ['portfolio_legacy', 'project_legacy_1', 'project_legacy_2'],
+  'Aceptar un panel legacy debe clonar también las raíces compartidas por accessScope=portfolio aunque el manifiesto administrado esté vacío.'
+);
+
+assert.deepEqual(
+  snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
+    spaces: [
+      {
+        spaceId: 'portfolio_legacy',
+        resourceType: 'admin.portfolio',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      },
+      {
+        spaceId: 'portfolio_2',
+        resourceType: 'admin.portfolio',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      },
+      {
+        spaceId: 'project_legacy_ambiguous',
+        resourceType: 'admin.project',
+        ownerUserId: 'owner_1',
+        members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+      }
+    ]
+  }, 'portfolio_legacy', 'guest_1'),
+  ['portfolio_legacy'],
+  'Una raíz legacy ambigua no puede clonarse automáticamente entre dos paneles legibles del mismo propietario.'
+);
+
+assert.deepEqual(
+  snapshotIdsModule.acceptedInvitationSnapshotSpaceIds({
+    spaces: [{
+      spaceId: 'portfolio_manifest',
+      resourceType: 'admin.portfolio',
+      ownerUserId: 'owner_1',
+      members: [{ userId: 'guest_1', permissions: ['read'], accessScope: 'portfolio' }]
+    }],
+    portfolioHydration: [{
+      portfolioSpaceId: 'portfolio_manifest',
+      expectedProjectSpaceIds: ['project_manifest_2', 'project_manifest_1'],
+      complete: true,
+      authoritative: true
+    }]
+  }, 'portfolio_manifest', 'guest_1'),
+  ['portfolio_manifest', 'project_manifest_2', 'project_manifest_1'],
+  'La clonación inicial debe usar también el inventario autoritativo aunque las altas de proyecto aún no aparezcan ordenadas en spaces.'
 );
 assert.equal(snapshotIdsModule.isReplicaRecoveryPendingSpace({
   authorizationState: 'unconfirmed',
@@ -309,6 +388,7 @@ assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControl
 assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: false \}\)/, 'Una aceptación remota crea primero una concesión estricta que puede bloquear la clonación dirigida.');
 assert.match(realtimeMethod, /requestSnapshots: 'initial-clone'/, 'Una aceptación remota no solicita la mejor copia persistida disponible.');
 assert.match(realtimeMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación remota no dirige la recuperación al panel y sus proyectos internos.');
+assert.match(realtimeMethod, /acceptedInvitationSnapshotSpaceIds\(state, cleanSpaceId, sessionContext\.userId\)/, 'La aceptación remota no incluye proyectos legacy vinculados al usuario actual.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
 assert.match(realtimeMethod, /allowReplicaPending: true/, 'La aceptación remota bloquearía la cola antes de recibir el snapshot que debe completarla.');
@@ -333,6 +413,7 @@ const responseMethod = clientSource.slice(responseStart, responseEnd);
 assert.match(responseMethod, /canonicalDecision === 'accept'/);
 assert.match(responseMethod, /requestSnapshots: 'initial-clone'/, 'El dispositivo que acepta no solicita una clonación inicial dirigida.');
 assert.match(responseMethod, /snapshotSpaceIds: recoverySpaceIds/, 'La aceptación local no dirige el snapshot a los proyectos internos del panel.');
+assert.match(responseMethod, /acceptedInvitationSnapshotSpaceIds\(state, acceptedSpaceId, sessionContext\.userId\)/, 'La aceptación local no incluye proyectos legacy vinculados al usuario actual.');
 assert.match(responseMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación local no confirma su réplica contra el bootstrap autoritativo.');
 assert.match(responseMethod, /P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED/, 'La aceptación local no distingue una réplica todavía no confirmada.');
 assert.match(responseMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación local ignora el watermark de recuperación local.');
@@ -383,5 +464,12 @@ const appResponseStart = appSource.indexOf('async function respondInvitation(eve
 const appResponseEnd = appSource.indexOf('\nfunction renderLocalNetworkStatus', appResponseStart);
 const appResponseMethod = appSource.slice(appResponseStart, appResponseEnd);
 assert.match(appResponseMethod, /await applyP2PState\(semillaP2P\.bootstrapState\);[\s\S]*showDashboard\(\);/, 'El panel se muestra antes de terminar de cargar sus proyectos internos.');
+
+const missingRootsMethodStart = clientSource.indexOf('  async recoverMissingProjectRoots(');
+const missingRootsMethodEnd = clientSource.indexOf('\n  async recoverOnline()', missingRootsMethodStart);
+assert.ok(missingRootsMethodStart >= 0 && missingRootsMethodEnd > missingRootsMethodStart, 'No se encontró la recuperación explícita de raíces faltantes.');
+const missingRootsMethod = clientSource.slice(missingRootsMethodStart, missingRootsMethodEnd);
+assert.match(missingRootsMethod, /requestSnapshots: 'initial-clone'/, 'La recuperación tardía de una raíz faltante debe aceptar la mejor copia disponible y converger después.');
+assert.doesNotMatch(missingRootsMethod, /requestSnapshots: 'force'/, 'La recuperación de una raíz ausente no debe exigir una fuente ya actualizada antes de permitir el clon inicial.');
 
 console.log('OK: una invitación aceptada obtiene una clonación inicial dirigida, conserva bloqueadas las membresías desconocidas y permite trabajar sobre la mejor copia validada mientras converge.');

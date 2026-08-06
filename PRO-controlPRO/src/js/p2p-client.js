@@ -183,13 +183,58 @@ export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
     .slice(0, limit);
 }
 
-export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId = '') {
+export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId = '', currentUserId = '') {
   const parentSpaceId = String(acceptedSpaceId || '').trim().slice(0, 140);
+  const cleanUserId = String(currentUserId || '').trim().slice(0, 140);
   if (!parentSpaceId) return [];
-  const governedSpaceIds = (Array.isArray(state?.spaces) ? state.spaces : [])
+
+  const spaces = Array.isArray(state?.spaces) ? state.spaces : [];
+  const parentSpace = spaces.find((space) => String(space?.spaceId || '').trim() === parentSpaceId) || null;
+  const governedSpaceIds = spaces
     .filter((space) => String(space?.governanceSpaceId || '').trim() === parentSpaceId)
     .map((space) => space?.spaceId);
-  return normalizeSnapshotSpaceIds([parentSpaceId, ...governedSpaceIds]);
+  const manifestSpaceIds = (Array.isArray(state?.portfolioHydration) ? state.portfolioHydration : [])
+    .filter((manifest) => String(manifest?.portfolioSpaceId || '').trim() === parentSpaceId)
+    .flatMap((manifest) => Array.isArray(manifest?.expectedProjectSpaceIds)
+      ? manifest.expectedProjectSpaceIds
+      : []);
+
+  const parentOwnerUserId = String(parentSpace?.ownerUserId || '').trim();
+  const readableOwnerPortfolioIds = cleanUserId && parentOwnerUserId
+    ? spaces
+      .filter((space) => {
+        if (String(space?.resourceType || '').trim() !== 'admin.portfolio') return false;
+        if (String(space?.ownerUserId || '').trim() !== parentOwnerUserId) return false;
+        const membership = (Array.isArray(space?.members) ? space.members : [])
+          .find((member) => String(member?.userId || '').trim() === cleanUserId) || null;
+        return Array.isArray(membership?.permissions) && membership.permissions.includes('read');
+      })
+      .map((space) => String(space?.spaceId || '').trim())
+      .filter(Boolean)
+    : [];
+  const legacyPortfolioSpaceIds = parentSpace?.resourceType === 'admin.portfolio'
+    && readableOwnerPortfolioIds.length === 1
+    && readableOwnerPortfolioIds[0] === parentSpaceId
+    ? spaces
+      .filter((space) => {
+        if (String(space?.resourceType || '').trim() !== 'admin.project') return false;
+        if (String(space?.governanceSpaceId || '').trim()) return false;
+        if (String(space?.ownerUserId || '').trim() !== parentOwnerUserId) return false;
+        const membership = (Array.isArray(space?.members) ? space.members : [])
+          .find((member) => String(member?.userId || '').trim() === cleanUserId) || null;
+        return String(membership?.accessScope || '').trim().toLowerCase() === 'portfolio'
+          && Array.isArray(membership?.permissions)
+          && membership.permissions.includes('read');
+      })
+      .map((space) => space?.spaceId)
+    : [];
+
+  return normalizeSnapshotSpaceIds([
+    parentSpaceId,
+    ...manifestSpaceIds,
+    ...governedSpaceIds,
+    ...legacyPortfolioSpaceIds
+  ]);
 }
 
 export function isReplicaRecoveryPendingSpace(space = null) {
@@ -5768,7 +5813,7 @@ export class SemillaP2PClient {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
     return this.refreshBootstrap({
-      requestSnapshots: 'force',
+      requestSnapshots: 'initial-clone',
       snapshotSpaceIds: normalizedSpaceIds
     });
   }
@@ -6672,7 +6717,7 @@ export class SemillaP2PClient {
         let state = await this.refreshBootstrap({ requestSnapshots: false });
         this.assertSessionContext(sessionContext);
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
-        const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, cleanSpaceId);
+        const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, cleanSpaceId, sessionContext.userId);
         if (recoverySpaceIds.length) {
           state = await this.refreshBootstrap({
             requestSnapshots: 'initial-clone',
@@ -7026,7 +7071,7 @@ export class SemillaP2PClient {
       let state = await this.refreshBootstrap({ requestSnapshots: false });
       this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
-      const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId);
+      const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId, sessionContext.userId);
       if (recoverySpaceIds.length) {
         state = await this.refreshBootstrap({
           requestSnapshots: 'initial-clone',
