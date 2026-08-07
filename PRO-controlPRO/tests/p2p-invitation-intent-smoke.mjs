@@ -42,6 +42,7 @@ assert.equal(findPendingInvitation(invitations, 'missing'), null);
 
 assert.equal(resolveCanonicalInvitationDecision({ status: 'accepted' }, 'reject'), 'accept');
 assert.equal(resolveCanonicalInvitationDecision({ status: 'rejected' }, 'accept'), 'reject');
+assert.equal(resolveCanonicalInvitationDecision({ status: 'cancelled' }, 'accept'), 'reject');
 assert.equal(resolveCanonicalInvitationDecision({ status: 'pending' }, 'reject'), 'reject');
 assert.equal(resolveCanonicalInvitationDecision({}, 'accept'), 'accept');
 

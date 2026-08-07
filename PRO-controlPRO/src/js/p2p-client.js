@@ -29,8 +29,7 @@ import {
   rejectOutboxOperationBatch,
   getRecoveryRequirements,
   updateRecoveryRequirements,
-  resolveRecoveryRequirement,
-  resetInvitationCloneRecoveryState
+  resolveRecoveryRequirement
 } from './p2p-storage.js';
 import { resolveCanonicalInvitationDecision } from './p2p-invitation-intent.js';
 import {
@@ -91,10 +90,6 @@ const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_REJECTION_RETRY_MS = 5 * 1000;
-const INITIAL_CLONE_SOURCE_STAGGER_MS = 1200;
-const INITIAL_CLONE_CANONICAL_RETRY_BASE_MS = 350;
-const INITIAL_CLONE_CANONICAL_RETRY_MAX_MS = 2500;
-const INITIAL_CLONE_CANONICAL_RETRY_MARGIN_MS = 1500;
 const LOCAL_CONTROL_MAX_AGE_MS = 10 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_TTL_MS = 2 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_MAX = 64;
@@ -107,7 +102,6 @@ const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pSinLifecycleTombstones';
 const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 128;
 const LIFECYCLE_RECEIPT_META_KEY = 'p2pLifecycleReceipts';
-const PORTFOLIO_HYDRATION_META_KEY = 'p2pPortfolioHydrationManifests';
 const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const LIFECYCLE_RECEIPT_MAX = 256;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
@@ -185,258 +179,6 @@ export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
     .map((value) => String(value || '').trim().slice(0, 140))
     .filter(Boolean)))
     .slice(0, limit);
-}
-
-export function acceptedInvitationSnapshotSpaceIds(state = {}, acceptedSpaceId = '', currentUserId = '') {
-  const parentSpaceId = String(acceptedSpaceId || '').trim().slice(0, 140);
-  const cleanUserId = String(currentUserId || '').trim().slice(0, 140);
-  if (!parentSpaceId) return [];
-
-  const spaces = Array.isArray(state?.spaces) ? state.spaces : [];
-  const parentSpace = spaces.find((space) => String(space?.spaceId || '').trim() === parentSpaceId) || null;
-  const governedSpaceIds = spaces
-    .filter((space) => String(space?.governanceSpaceId || '').trim() === parentSpaceId)
-    .map((space) => space?.spaceId);
-  const manifestSpaceIds = (Array.isArray(state?.portfolioHydration) ? state.portfolioHydration : [])
-    .filter((manifest) => String(manifest?.portfolioSpaceId || '').trim() === parentSpaceId)
-    .flatMap((manifest) => Array.isArray(manifest?.expectedProjectSpaceIds)
-      ? manifest.expectedProjectSpaceIds
-      : []);
-
-  const parentOwnerUserId = String(parentSpace?.ownerUserId || '').trim();
-  const readableOwnerPortfolioIds = cleanUserId && parentOwnerUserId
-    ? spaces
-      .filter((space) => {
-        if (String(space?.resourceType || '').trim() !== 'admin.portfolio') return false;
-        if (String(space?.ownerUserId || '').trim() !== parentOwnerUserId) return false;
-        const membership = (Array.isArray(space?.members) ? space.members : [])
-          .find((member) => String(member?.userId || '').trim() === cleanUserId) || null;
-        return Array.isArray(membership?.permissions) && membership.permissions.includes('read');
-      })
-      .map((space) => String(space?.spaceId || '').trim())
-      .filter(Boolean)
-    : [];
-  const legacyPortfolioSpaceIds = parentSpace?.resourceType === 'admin.portfolio'
-    && readableOwnerPortfolioIds.length === 1
-    && readableOwnerPortfolioIds[0] === parentSpaceId
-    ? spaces
-      .filter((space) => {
-        if (String(space?.resourceType || '').trim() !== 'admin.project') return false;
-        if (String(space?.governanceSpaceId || '').trim()) return false;
-        if (String(space?.ownerUserId || '').trim() !== parentOwnerUserId) return false;
-        const membership = (Array.isArray(space?.members) ? space.members : [])
-          .find((member) => String(member?.userId || '').trim() === cleanUserId) || null;
-        return String(membership?.accessScope || '').trim().toLowerCase() === 'portfolio'
-          && Array.isArray(membership?.permissions)
-          && membership.permissions.includes('read');
-      })
-      .map((space) => space?.spaceId)
-    : [];
-
-  return normalizeSnapshotSpaceIds([
-    parentSpaceId,
-    ...manifestSpaceIds,
-    ...governedSpaceIds,
-    ...legacyPortfolioSpaceIds
-  ]);
-}
-
-export function requiredInitialCloneEntityIds(space = {}) {
-  const explicit = Array.isArray(space?.requiredSnapshotEntities)
-    ? space.requiredSnapshotEntities
-    : [];
-  const normalized = explicit.map((descriptor) => {
-    const entityType = String(descriptor?.entityType || '').trim();
-    const entityId = String(descriptor?.entityId || '').trim();
-    return entityType && entityId ? `${entityType}:${entityId}` : '';
-  }).filter(Boolean);
-  if (normalized.length) return [...new Set(normalized)].sort((left, right) => left.localeCompare(right));
-
-  const permissionProfile = String(space?.permissionProfile || '').trim().toLowerCase();
-  const resourceType = String(space?.resourceType || '').trim().toLowerCase();
-  if (permissionProfile === 'admin-project-v1' || resourceType === 'admin.project') {
-    return ['admin.project:project'];
-  }
-  return [];
-}
-
-export function missingRequiredInitialCloneEntityIds(space = {}, entities = []) {
-  const available = new Set((Array.isArray(entities) ? entities : [])
-    .filter((entity) => entity && entity.deleted !== true)
-    .map((entity) => {
-      const entityType = String(entity?.entityType || '').trim();
-      const entityId = String(entity?.entityId || '').trim();
-      return entityType && entityId ? `${entityType}:${entityId}` : '';
-    })
-    .filter(Boolean));
-  return requiredInitialCloneEntityIds(space).filter((requiredId) => !available.has(requiredId));
-}
-
-export function initialCloneCanonicalPendingEntityIds(localEntities = []) {
-  return Array.from(new Set((Array.isArray(localEntities) ? localEntities : [])
-    .filter((entity) => entity?.optimistic === true && entity?.confirmedExists !== true)
-    .map((entity) => {
-      const entityType = String(entity?.entityType || '').trim();
-      const entityId = String(entity?.entityId || '').trim();
-      return entityType && entityId ? `${entityType}:${entityId}` : '';
-    })
-    .filter(Boolean)))
-    .sort((left, right) => left.localeCompare(right));
-}
-
-export function snapshotEntityFromLocalRecord(localEntity = null, options = {}) {
-  if (!localEntity || typeof localEntity !== 'object' || Array.isArray(localEntity)) return null;
-  const entityType = String(localEntity.entityType || '').trim();
-  const entityId = String(localEntity.entityId || '').trim();
-  if (!entityType || !entityId) return null;
-
-  const optimistic = localEntity.optimistic === true;
-  const confirmedFallbackAllowed = options.allowConfirmedFallback === true;
-  const hasConfirmedSchema = Object.prototype.hasOwnProperty.call(localEntity, 'confirmedExists');
-  const useConfirmedState = optimistic && confirmedFallbackAllowed && hasConfirmedSchema;
-  if (optimistic && !useConfirmedState) return null;
-  if (useConfirmedState && localEntity.confirmedExists !== true) return null;
-
-  const deleted = useConfirmedState
-    ? localEntity.confirmedDeleted === true
-    : localEntity.deleted === true;
-  const stateRevision = Math.max(0, Number(useConfirmedState
-    ? localEntity.confirmedStateRevision || localEntity.confirmedSpaceSequence || 0
-    : localEntity.stateRevision || localEntity.spaceSequence || 0));
-  const spaceSequence = Math.max(0, Number(useConfirmedState
-    ? localEntity.confirmedSpaceSequence || stateRevision
-    : localEntity.spaceSequence || stateRevision));
-  const operationType = String(useConfirmedState
-    ? localEntity.confirmedOperationType || ''
-    : localEntity.operationType || '').trim() || (deleted ? 'entity.delete' : 'entity.put');
-
-  return {
-    entityType,
-    entityId,
-    value: useConfirmedState ? localEntity.confirmedValue : localEntity.value,
-    deleted,
-    operationId: String(useConfirmedState
-      ? localEntity.confirmedOperationId || ''
-      : localEntity.operationId || '').trim(),
-    operationType,
-    spaceSequence,
-    stateRevision,
-    updatedAt: String(useConfirmedState
-      ? localEntity.confirmedUpdatedAt || ''
-      : localEntity.updatedAt || '').trim()
-  };
-}
-
-export function isReplicaRecoveryPendingSpace(space = null) {
-  return Boolean(
-    space
-    && space.authorizationState === 'unconfirmed'
-    && String(space.authorizationPendingReason || '').trim() === 'replica_recovery'
-  );
-}
-
-export function isMembershipAuthorizationUnconfirmedSpace(space = null) {
-  return Boolean(
-    space
-    && space.authorizationState === 'unconfirmed'
-    && !isReplicaRecoveryPendingSpace(space)
-  );
-}
-
-export function invitedReplicaRecoverySpaceIds(input = {}) {
-  const userId = String(input.userId || '').trim();
-  const backendStateRevisions = input.backendStateRevisions && typeof input.backendStateRevisions === 'object'
-    ? input.backendStateRevisions
-    : {};
-  const localStateRevisions = input.localStateRevisions && typeof input.localStateRevisions === 'object'
-    ? input.localStateRevisions
-    : {};
-  const recoveryRequirements = input.recoveryRequirements && typeof input.recoveryRequirements === 'object'
-    ? input.recoveryRequirements
-    : {};
-  if (!userId) return [];
-  return Array.from(new Set((Array.isArray(input.spaces) ? input.spaces : [])
-    .filter((space) => {
-      const spaceId = String(space?.spaceId || '').trim();
-      if (!spaceId || String(space?.ownerUserId || '').trim() === userId) return false;
-      const member = (Array.isArray(space?.members) ? space.members : [])
-        .find((candidate) => String(candidate?.userId || '').trim() === userId) || null;
-      if (!Array.isArray(member?.permissions) || !member.permissions.includes('read')) return false;
-      const backendStateRevision = Math.max(0, Number(backendStateRevisions?.[spaceId] || 0));
-      const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
-      const recoveryRequirement = Math.max(0, Number(recoveryRequirements?.[spaceId] || 0));
-      return backendStateRevision > localStateRevision || recoveryRequirement > localStateRevision;
-    })
-    .map((space) => String(space?.spaceId || '').trim())
-    .filter(Boolean)))
-    .sort((left, right) => left.localeCompare(right));
-}
-
-export function normalizePortfolioHydrationManifests(input = [], options = {}) {
-  const manifests = new Map();
-  const overrideAuthority = Object.prototype.hasOwnProperty.call(options, 'authoritative')
-    ? options.authoritative === true
-    : null;
-  for (const candidate of Array.isArray(input) ? input : []) {
-    const portfolioSpaceId = String(candidate?.portfolioSpaceId || '').trim().slice(0, 140);
-    if (!portfolioSpaceId || !Array.isArray(candidate?.expectedProjectSpaceIds)) continue;
-    const expectedProjectSpaceIds = Array.from(new Set(candidate.expectedProjectSpaceIds
-      .map((spaceId) => String(spaceId || '').trim().slice(0, 140))
-      .filter(Boolean)))
-      .sort((left, right) => left.localeCompare(right));
-    const manifest = {
-      portfolioSpaceId,
-      expectedProjectSpaceIds,
-      expectedProjectCount: expectedProjectSpaceIds.length,
-      inventoryRevision: Math.max(0, Math.floor(Number(candidate?.inventoryRevision || 0))),
-      complete: candidate?.complete === true
-    };
-    if (overrideAuthority !== null) manifest.authoritative = overrideAuthority;
-    else if (Object.prototype.hasOwnProperty.call(candidate || {}, 'authoritative')) {
-      manifest.authoritative = candidate?.authoritative === true;
-    }
-    manifests.set(portfolioSpaceId, manifest);
-  }
-  return [...manifests.values()].sort((left, right) => left.portfolioSpaceId.localeCompare(right.portfolioSpaceId));
-}
-
-export function mergePortfolioHydrationManifests(current = [], incoming = [], options = {}) {
-  const existing = normalizePortfolioHydrationManifests(current);
-  const candidates = normalizePortfolioHydrationManifests(incoming, options);
-  const merged = new Map(existing.map((manifest) => [manifest.portfolioSpaceId, manifest]));
-
-  for (const candidate of candidates) {
-    const previous = merged.get(candidate.portfolioSpaceId) || null;
-    if (!previous) {
-      merged.set(candidate.portfolioSpaceId, candidate);
-      continue;
-    }
-
-    const previousRevision = Math.max(0, Number(previous.inventoryRevision || 0));
-    const candidateRevision = Math.max(0, Number(candidate.inventoryRevision || 0));
-    const candidateIsAuthoritative = candidate.authoritative === true;
-    const previousIsAuthoritative = previous.authoritative === true;
-    const sameRevision = candidateRevision === previousRevision;
-    const sameAuthority = candidateIsAuthoritative === previousIsAuthoritative;
-    const candidateImprovesCompleteness = candidate.complete === true && previous.complete !== true;
-    const candidatePreservesCompleteness = candidate.complete === previous.complete;
-
-    if (
-      candidateRevision > previousRevision
-      || (sameRevision && candidateIsAuthoritative && !previousIsAuthoritative)
-      || (sameRevision && sameAuthority && (candidateImprovesCompleteness || candidatePreservesCompleteness))
-    ) {
-      merged.set(candidate.portfolioSpaceId, candidate);
-    }
-  }
-
-  return [...merged.values()].sort((left, right) => left.portfolioSpaceId.localeCompare(right.portfolioSpaceId));
-}
-
-export function reconcileBootstrapPortfolioHydration(current = [], incoming = [], revokedSpaceIds = []) {
-  const revoked = new Set(normalizeSnapshotSpaceIds(revokedSpaceIds));
-  return mergePortfolioHydrationManifests(current, incoming, { authoritative: true })
-    .filter((manifest) => !revoked.has(manifest.portfolioSpaceId));
 }
 
 function createId(prefix = 'id') {
@@ -704,6 +446,61 @@ function canonicalSpaceMemberGraph(space = {}, expectedSpaceId = '', invalid = (
   return { ownerUserId, members };
 }
 
+export function mergeParticipationRootManifest(spaces = [], participationRoots = [], userId = '') {
+  const cleanUserId = String(userId || '').trim();
+  const canonicalSpaces = (Array.isArray(spaces) ? spaces : [])
+    .filter((space) => String(space?.spaceId || '').trim());
+  const existingIds = new Set(canonicalSpaces.map((space) => String(space.spaceId).trim()));
+  const portfolioById = new Map();
+
+  const invalidManifest = (detail = {}) => {
+    throw realtimeProtocolError(
+      'El backend entregó un manifiesto mínimo de participación inconsistente.',
+      'P2P_PARTICIPATION_ROOT_MANIFEST_INVALID',
+      detail
+    );
+  };
+
+  for (const space of canonicalSpaces) {
+    const spaceId = String(space?.spaceId || '').trim();
+    if (String(space?.resourceType || '').trim().toLowerCase() !== 'admin.portfolio') continue;
+    const graph = canonicalSpaceMemberGraph(space, spaceId, () => invalidManifest({ spaceId, reason: 'portfolio_graph' }));
+    const member = graph.members.get(cleanUserId);
+    if (!cleanUserId || !member || member.accessScope !== 'portfolio' || !member.permissions.includes('read')) continue;
+    portfolioById.set(spaceId, { space, graph });
+  }
+
+  const roots = [];
+  const rootSpaceIds = [];
+  for (const root of Array.isArray(participationRoots) ? participationRoots : []) {
+    const spaceId = String(root?.spaceId || '').trim();
+    const governanceSpaceId = String(root?.governanceSpaceId || '').trim();
+    if (!spaceId || existingIds.has(spaceId)) continue;
+    const portfolio = portfolioById.get(governanceSpaceId);
+    if (
+      String(root?.resourceType || '').trim().toLowerCase() !== 'admin.project'
+      || !governanceSpaceId
+      || !portfolio
+      || String(root?.ownerUserId || '').trim() !== String(portfolio.space?.ownerUserId || '').trim()
+    ) {
+      invalidManifest({ spaceId, governanceSpaceId, reason: 'project_governance' });
+    }
+    const graph = canonicalSpaceMemberGraph(root, spaceId, () => invalidManifest({ spaceId, reason: 'project_graph' }));
+    const member = graph.members.get(cleanUserId);
+    if (!member || member.accessScope !== 'portfolio' || !member.permissions.includes('read')) {
+      invalidManifest({ spaceId, governanceSpaceId, reason: 'viewer_grant' });
+    }
+    existingIds.add(spaceId);
+    roots.push(root);
+    rootSpaceIds.push(spaceId);
+  }
+
+  return {
+    spaces: [...canonicalSpaces, ...roots],
+    rootSpaceIds
+  };
+}
+
 export function assertCanonicalControlEnvelope(event = {}) {
   const eventId = String(event.eventId || '').trim();
   const eventType = String(event.eventType || '').trim();
@@ -757,36 +554,15 @@ export function assertCanonicalControlEnvelope(event = {}) {
     const requestDeviceId = String(data.requestDeviceId || '').trim();
     const requestUserId = String(data.requestUserId || '').trim();
     const dataSpaceId = String(data.spaceId || '').trim();
-    const recoveryReason = String(data.reason || '').trim().toLowerCase();
-    const localStateRevision = data.localStateRevision;
-    const currentStateRevision = data.currentStateRevision;
-    const allowStaleSource = data.allowStaleSource === true;
-    const sourceDeviceIds = Array.isArray(data.sourceDeviceIds)
-      ? data.sourceDeviceIds.map((deviceId) => String(deviceId || '').trim()).filter(Boolean)
-      : [];
-    const hasStateGap = isSafeRevision(currentStateRevision, { positive: true })
-      && currentStateRevision > localStateRevision;
-    const isDirectedForcedRecovery = recoveryReason === 'forced'
-      && isSafeRevision(currentStateRevision)
-      && currentStateRevision === localStateRevision;
-    const isInitialClone = recoveryReason === 'initial_clone'
-      && allowStaleSource
-      && isSafeRevision(currentStateRevision)
-      && currentStateRevision >= localStateRevision;
-    const recoveryWindowValid = recoveryReason === 'initial_clone'
-      ? isInitialClone
-      : hasStateGap || isDirectedForcedRecovery;
     if (
       !sourceDeviceId
       || !requestId
       || requestDeviceId !== sourceDeviceId
       || requestUserId !== actorUserId
       || dataSpaceId !== spaceId
-      || !isSafeRevision(localStateRevision)
-      || !['forced', 'new_device', 'state_gap', 'initial_clone'].includes(recoveryReason)
-      || sourceDeviceIds.length > 32
-      || sourceDeviceIds.some((deviceId, index) => sourceDeviceIds.indexOf(deviceId) !== index)
-      || !recoveryWindowValid
+      || !isSafeRevision(data.localStateRevision)
+      || !isSafeRevision(data.currentStateRevision, { positive: true })
+      || data.currentStateRevision <= data.localStateRevision
     ) invalid('snapshot-request');
     return event;
   }
@@ -802,12 +578,24 @@ export function assertCanonicalControlEnvelope(event = {}) {
   if (eventType === 'p2p.membership.revoked') {
     const revokedUserId = String(data.revokedUserId || '').trim();
     const hasSelfRemoval = Object.prototype.hasOwnProperty.call(data, 'selfRemoval');
+    const hasSuperseded = Object.prototype.hasOwnProperty.call(data, 'superseded');
+    const retainedSpaceIds = Object.prototype.hasOwnProperty.call(data, 'retainedSpaceIds')
+      ? data.retainedSpaceIds
+      : [];
+    const invalidRetainedSpaceIds = !Array.isArray(retainedSpaceIds)
+      || retainedSpaceIds.length > 10000
+      || retainedSpaceIds.some((retainedSpaceId) => {
+        const cleanRetainedSpaceId = String(retainedSpaceId || '').trim();
+        return !cleanRetainedSpaceId || cleanRetainedSpaceId.length > 140;
+      });
     if (
       String(data.spaceId || '').trim() !== spaceId
       || !revokedUserId
       || (hasSelfRemoval && typeof data.selfRemoval !== 'boolean')
+      || (hasSuperseded && typeof data.superseded !== 'boolean')
       || (data.selfRemoval === true && actorUserId !== revokedUserId)
       || (data.selfRemoval === false && actorUserId === revokedUserId)
+      || invalidRetainedSpaceIds
     ) invalid('membership-revoked');
     return event;
   }
@@ -914,18 +702,16 @@ export function assertCanonicalControlEnvelope(event = {}) {
   const invitationSpaceId = String(invitation?.spaceId || '').trim();
   const inviterUserId = String(invitation?.inviterUserId || '').trim();
   const recipientUserId = String(invitation?.recipientUserId || '').trim();
-  const cancellationActorUserId = recipientUserId || inviterUserId;
   if (
     !isRecord(invitation)
     || !invitationId
     || invitationSpaceId !== spaceId
     || String(invitation.status || '').trim().toLowerCase() !== expectedStatus
     || !inviterUserId
-    || (invitationEventAction !== 'cancelled' && !recipientUserId)
+    || !recipientUserId
   ) invalid('invitation');
-  if (invitationEventAction === 'created' && actorUserId !== inviterUserId) invalid('invitation-actor');
-  if (invitationEventAction === 'cancelled' && actorUserId !== cancellationActorUserId) invalid('invitation-actor');
-  if (!['created', 'cancelled'].includes(invitationEventAction) && actorUserId !== recipientUserId) invalid('invitation-actor');
+  if (['created', 'cancelled'].includes(invitationEventAction) && actorUserId !== inviterUserId) invalid('invitation-actor');
+  if (['accepted', 'rejected'].includes(invitationEventAction) && actorUserId !== recipientUserId) invalid('invitation-actor');
   if (invitationEventAction === 'accepted') {
     const graph = canonicalSpaceMemberGraph(data.space, spaceId, () => invalid('invitation-accepted-space'));
     const recipient = graph.members.get(recipientUserId);
@@ -945,10 +731,8 @@ export function assertCanonicalControlEnvelope(event = {}) {
       || recipient.accessScope !== invitationAccessScope
       || !samePermissionSet(recipient.permissions, invitationPermissions)
     ) invalid('invitation-accepted-space');
-  } else if (invitationEventAction === 'rejected' && data.space !== null && data.space !== undefined) {
-    invalid('invitation-rejected-space');
-  } else if (invitationEventAction === 'cancelled' && data.space !== null && data.space !== undefined) {
-    invalid('invitation-cancelled-space');
+  } else if (['rejected', 'cancelled'].includes(invitationEventAction) && data.space !== null && data.space !== undefined) {
+    invalid(`invitation-${invitationEventAction}-space`);
   }
   return event;
 }
@@ -1311,73 +1095,6 @@ function snapshotChunksByBytes(entities = [], maxEventBytes = DEFAULT_EVENT_MAX_
   return chunks;
 }
 
-export function isRecoverableInvitationResponseConflict(error = null) {
-  if (Number(error?.status || 0) !== 409) return false;
-  const code = String(error?.code || '').trim().toUpperCase();
-  const message = String(error?.message || '').trim().toLowerCase();
-  return [
-    'P2P_INVITATION_RESPONSE_IN_PROGRESS',
-    'P2P_INVITATION_LOGICAL_RESPONSE_IN_PROGRESS'
-  ].includes(code)
-    || message.includes('ya se está procesando')
-    || message.includes('solicitud equivalente ya se está procesando');
-}
-
-export function canonicalInvitationFromBootstrap(state = {}, invitationId = '') {
-  const cleanInvitationId = String(invitationId || '').trim();
-  if (!cleanInvitationId) return null;
-  const invitations = state?.invitations || {};
-  return [
-    ...(Array.isArray(invitations.received) ? invitations.received : []),
-    ...(Array.isArray(invitations.sent) ? invitations.sent : [])
-  ].find((invitation) => String(invitation?.invitationId || '').trim() === cleanInvitationId) || null;
-}
-
-export function invitationResponseBootstrapIsComplete(state = {}, invitation = null, decision = 'accept') {
-  const canonicalDecision = resolveCanonicalInvitationDecision(invitation, decision);
-  if (canonicalDecision !== 'accept') return true;
-
-  const spaceId = String(invitation?.spaceId || '').trim();
-  if (!spaceId) return false;
-  const spaces = Array.isArray(state?.spaces) ? state.spaces : [];
-  const acceptedSpace = spaces.find((space) => String(space?.spaceId || '').trim() === spaceId) || null;
-  if (!acceptedSpace) return false;
-
-  const resourceType = String(invitation?.resourceType || '').trim().toLowerCase();
-  const accessScope = String(invitation?.accessScope || '').trim().toLowerCase();
-  if (resourceType !== 'admin.portfolio' || accessScope !== 'portfolio') return true;
-
-  // La invitación queda marcada como accepted antes de que el endpoint termine de
-  // heredar atómicamente todos los proyectos del panel. Un bootstrap intermedio no
-  // puede cerrar el 409 como éxito hasta recibir el manifiesto autoritativo completo.
-  const manifest = (Array.isArray(state?.portfolioHydration) ? state.portfolioHydration : [])
-    .find((candidate) => String(candidate?.portfolioSpaceId || '').trim() === spaceId) || null;
-  if (!manifest || manifest.complete !== true || manifest.authoritative !== true) return false;
-
-  const expectedProjectSpaceIds = normalizeSnapshotSpaceIds(manifest.expectedProjectSpaceIds || []);
-  const expectedProjectCount = Math.max(0, Math.floor(Number(manifest.expectedProjectCount || 0)));
-  if (expectedProjectCount !== expectedProjectSpaceIds.length) return false;
-  const manifestInventoryRevision = Math.max(0, Math.floor(Number(manifest.inventoryRevision || 0)));
-  const portfolioInventoryRevision = Math.max(0, Math.floor(Number(acceptedSpace.projectInventoryRevision || 0)));
-  if (manifestInventoryRevision !== portfolioInventoryRevision) return false;
-
-  const availableSpaceIds = new Set(spaces
-    .map((space) => String(space?.spaceId || '').trim())
-    .filter(Boolean));
-  return expectedProjectSpaceIds.every((projectSpaceId) => availableSpaceIds.has(projectSpaceId));
-}
-
-function invitationResponseConflictDelay(attempt = 0, error = null) {
-  const normalizedAttempt = Math.max(0, Math.floor(Number(attempt || 0)));
-  const retryAfterMs = Math.max(0, Number(error?.retryAfterSeconds || 0) * 1000);
-  const backoffMs = Math.min(1500, 150 * (2 ** Math.min(4, normalizedAttempt)));
-  return Math.max(backoffMs, Math.min(3000, retryAfterMs));
-}
-
-function waitForInvitationResponseConflict(attempt = 0, error = null) {
-  return new Promise((resolve) => window.setTimeout(resolve, invitationResponseConflictDelay(attempt, error)));
-}
-
 function normalizeInvitationCollection(input = {}) {
   return {
     received: Array.isArray(input.received) ? input.received : [],
@@ -1456,9 +1173,20 @@ export function prepareCommittedControlState({ spaces = [], invitations = [] } =
         prepared.authorizationUnconfirmedAt = String(
           space.authorizationUnconfirmedAt || current?.authorizationUnconfirmedAt || unconfirmedAt
         ).trim();
+        if (prepared.authorizationPendingReason === 'replica_recovery') {
+          prepared.replicaBootstrapMode = 'minimal';
+          prepared.replicaStaleAt = String(
+            space.replicaStaleAt
+            || current?.replicaStaleAt
+            || prepared.authorizationUnconfirmedAt
+          ).trim();
+        }
       } else {
         delete prepared.authorizationPendingReason;
         delete prepared.authorizationUnconfirmedAt;
+        delete prepared.replicaBootstrapMode;
+        delete prepared.replicaStaleAt;
+        delete prepared.replicaRefreshRequestedAt;
       }
       return prepared;
     });
@@ -1716,7 +1444,6 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
     this.rejectedSnapshotSources = new Map();
-    this.pendingInitialCloneSnapshotRetries = new Map();
     this.user = null;
     this.eventSource = null;
     this.openPromise = null;
@@ -1733,6 +1460,7 @@ export class SemillaP2PClient {
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds = new Set();
     this.pendingAckReplicaSpaceIds = new Set();
+    this.minimalReplicaRecoveryBySpace = new Map();
     this.snapshotRecoveryTimer = 0;
     this.snapshotRecoveryDueAt = 0;
     this.snapshotRecoveryRequired = false;
@@ -1767,7 +1495,7 @@ export class SemillaP2PClient {
       snapshotMaxChunks: this.snapshotMaxChunks,
       snapshotSessionTtlSeconds: this.snapshotGrantTtlSeconds + 120
     });
-    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, replicaHealth: {}, lifecycleTransactions: [], portfolioHydration: [] };
+    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, replicaHealth: {}, lifecycleTransactions: [] };
     this.tabCoordinator = new P2PTabCoordinator();
     this.tabCoordinationReady = false;
     this.realtimeLeader = true;
@@ -2491,7 +2219,7 @@ export class SemillaP2PClient {
   eligibleLocalLifecyclePeers(spaceId = '') {
     const cleanSpaceId = String(spaceId || '').trim();
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId) || null;
-    if (!space || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')) return [];
+    if (!space || space.authorizationState === 'unconfirmed') return [];
     const members = new Map((space.members || []).map((member) => [String(member.userId || '').trim(), member]));
     const seen = new Set();
     const peers = [];
@@ -2550,7 +2278,7 @@ export class SemillaP2PClient {
     const operationId = String(outboxItem.operationId || outboxItem.localLifecycle?.operationId || '').trim();
     if (!['trash', 'purge'].includes(action) || !spaceId || !operationId) return { delivered: 0, transaction: null };
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
-    if (!space || space.ownerUserId !== sessionContext.userId || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')) return { delivered: 0, transaction: null };
+    if (!space || space.ownerUserId !== sessionContext.userId || space.authorizationState === 'unconfirmed') return { delivered: 0, transaction: null };
 
     const transactionId = String(outboxItem.localLifecycle?.transactionId || `local_lifecycle_${operationId}`).trim();
     const previousCompleted = Array.isArray(outboxItem.localLifecycle?.completedDeviceIds) ? outboxItem.localLifecycle.completedDeviceIds : [];
@@ -2677,7 +2405,7 @@ export class SemillaP2PClient {
     const target = (entry.targets || []).find((candidate) => String(candidate.deviceId || '').trim() === deviceId && String(candidate.userId || '').trim() === userId);
     const { space, member, permissions } = this.memberPermissionsForUser(entry.spaceId, userId);
     if (
-      !target || !space || !member || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery') || !permissions.includes('read')
+      !target || !space || !member || space.authorizationState === 'unconfirmed' || !permissions.includes('read')
       || String(payload.action || '').trim() !== String(entry.action || '').trim()
       || String(payload.spaceId || '').trim() !== String(entry.spaceId || '').trim()
       || String(payload.operationId || '').trim() !== String(entry.operationId || '').trim()
@@ -2716,7 +2444,7 @@ export class SemillaP2PClient {
       .map((membership) => String(membership.spaceId || '').trim())
       .filter((spaceId) => {
         const { space, member, permissions } = this.memberPermissionsForUser(spaceId, sessionContext.userId);
-        return Boolean(space && member && !(space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery') && permissions.includes('read'));
+        return Boolean(space && member && space.authorizationState !== 'unconfirmed' && permissions.includes('read'));
       });
     const stateRevisions = await listStateRevisions(readableSpaceIds);
     this.assertSessionContext(sessionContext);
@@ -2755,7 +2483,7 @@ export class SemillaP2PClient {
         if (
           !space
           || !member
-          || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')
+          || space.authorizationState === 'unconfirmed'
           || !permissions.includes('read')
           || !localSnapshotSourceAllowed(space, capabilityPayload.userId, sessionContext.userId)
         ) continue;
@@ -2810,7 +2538,7 @@ export class SemillaP2PClient {
         || !capabilityMembership?.permissions?.includes('read')
         || !space
         || !member
-        || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')
+        || space.authorizationState === 'unconfirmed'
         || !permissions.includes('read')
         || !localSnapshotSourceAllowed(space, sessionContext.userId, capabilityPayload.userId)
       ) {
@@ -2858,7 +2586,7 @@ export class SemillaP2PClient {
       const sourceMember = (space?.members || []).find((candidate) => candidate?.userId === capabilityPayload.userId) || null;
       const localStateAuthorized = Boolean(
         space
-        && !(space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')
+        && space.authorizationState !== 'unconfirmed'
         && space.ownerUserId === capabilityPayload.userId
         && sourceMember?.role === 'owner'
         && member
@@ -3032,7 +2760,7 @@ export class SemillaP2PClient {
       || !capabilityMembership?.permissions?.includes('read')
       || !space
       || !member
-      || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')
+      || space.authorizationState === 'unconfirmed'
       || !permissions.includes('read')
       || !localSnapshotSourceAllowed(space, capabilityPayload.userId, sessionContext.userId)
     ) {
@@ -3203,7 +2931,7 @@ export class SemillaP2PClient {
 
   localOperationAuthorized(spaceId = '', operation = {}, peer = {}) {
     const { space, member } = this.memberPermissionsForUser(spaceId, peer?.userId);
-    if (!space || !member || (space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery')) return false;
+    if (!space || !member || space.authorizationState === 'unconfirmed') return false;
     return memberAllowsDurableOperation(space, member, operation, { actorUserId: peer?.userId || '' });
   }
 
@@ -3999,34 +3727,6 @@ export class SemillaP2PClient {
     return true;
   }
 
-  async persistParticipationHydration(data = {}, sessionContext = this.captureSessionContext()) {
-    this.assertSessionContext(sessionContext);
-    const incoming = normalizePortfolioHydrationManifests(
-      data?.participationReconciliation?.portfolioHydration || data?.portfolioHydration || [],
-      { authoritative: true }
-    );
-    if (!incoming.length) return this.bootstrapState?.portfolioHydration || [];
-
-    const portfolioHydration = mergePortfolioHydrationManifests(
-      this.bootstrapState?.portfolioHydration || [],
-      incoming,
-      { authoritative: true }
-    );
-    await setMeta(PORTFOLIO_HYDRATION_META_KEY, portfolioHydration);
-    this.assertSessionContext(sessionContext);
-    this.bootstrapState = { ...(this.bootstrapState || {}), portfolioHydration };
-    return portfolioHydration;
-  }
-
-  emitBootstrapState(source = 'bootstrap', detail = {}) {
-    dispatch('p2p:state', {
-      state: this.bootstrapState,
-      source: String(source || 'bootstrap').trim().slice(0, 80),
-      ...detail
-    });
-    return this.bootstrapState;
-  }
-
   applyCommittedControlState({ spaces = [], invitations = [] } = {}, options = {}) {
     const committedSpaces = (Array.isArray(spaces) ? spaces : []).filter((space) => String(space?.spaceId || '').trim());
     const committedInvitations = (Array.isArray(invitations) ? invitations : [])
@@ -4038,6 +3738,9 @@ export class SemillaP2PClient {
       if (authorizationState === 'confirmed') {
         delete committedSpace.authorizationPendingReason;
         delete committedSpace.authorizationUnconfirmedAt;
+        delete committedSpace.replicaBootstrapMode;
+        delete committedSpace.replicaStaleAt;
+        delete committedSpace.replicaRefreshRequestedAt;
       } else {
         committedSpace.authorizationPendingReason = String(
           committedSpace.authorizationPendingReason || 'replica_recovery'
@@ -4045,6 +3748,12 @@ export class SemillaP2PClient {
         committedSpace.authorizationUnconfirmedAt = String(
           committedSpace.authorizationUnconfirmedAt || new Date().toISOString()
         ).trim();
+        if (committedSpace.authorizationPendingReason === 'replica_recovery') {
+          committedSpace.replicaBootstrapMode = 'minimal';
+          committedSpace.replicaStaleAt = String(
+            committedSpace.replicaStaleAt || committedSpace.authorizationUnconfirmedAt
+          ).trim();
+        }
       }
       this.rememberAuthoritativeSpace(committedSpace);
     }
@@ -4618,13 +4327,17 @@ export class SemillaP2PClient {
   isSpaceAuthorizationUnconfirmed(spaceId = '') {
     const cleanSpaceId = String(spaceId || '').trim();
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId);
-    return Boolean(space && space.authorizationState === 'unconfirmed' && space.authorizationPendingReason !== 'replica_recovery');
+    return Boolean(space && space.authorizationState === 'unconfirmed');
   }
 
   isSpaceReplicaRecoveryPending(spaceId = '') {
     const cleanSpaceId = String(spaceId || '').trim();
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId);
-    return isReplicaRecoveryPendingSpace(space);
+    return Boolean(
+      space
+      && space.authorizationState === 'unconfirmed'
+      && space.authorizationPendingReason === 'replica_recovery'
+    );
   }
 
   isSpaceAuthorizationConfirmed(spaceId = '') {
@@ -4636,7 +4349,7 @@ export class SemillaP2PClient {
   assertSpaceAuthorizationConfirmed(spaceId = '') {
     const cleanSpaceId = String(spaceId || '').trim();
     if (this.isSpaceAuthorizationConfirmed(cleanSpaceId)) return true;
-    const error = new Error('La copia local se conservó, pero el backend todavía no puede confirmar la membresía. El proyecto permanecerá en solo lectura hasta restablecer su autorización.');
+    const error = new Error('La copia local se conservó, pero el backend todavía no puede confirmar la membresía. El proyecto permanece en modo de recuperación y no enviará cambios hasta restablecer su autorización.');
     error.code = 'P2P_AUTHORIZATION_UNCONFIRMED';
     error.status = 409;
     error.spaceId = cleanSpaceId;
@@ -5242,7 +4955,7 @@ export class SemillaP2PClient {
     const userId = String(this.user?.userId || '').trim();
     if (!userId) return [];
     return (Array.isArray(spaces) ? spaces : []).filter((space) => {
-      if ((space?.authorizationState === 'unconfirmed' && space?.authorizationPendingReason !== 'replica_recovery')) return false;
+      if (space?.authorizationState === 'unconfirmed') return false;
       const member = (space?.members || []).find((candidate) => candidate?.userId === userId);
       return Boolean(member && Array.isArray(member.permissions) && member.permissions.includes('read'));
     }).map((space) => String(space.spaceId || '').trim()).filter(Boolean);
@@ -5318,6 +5031,9 @@ export class SemillaP2PClient {
     const confirmed = { ...current, authorizationState: 'confirmed' };
     delete confirmed.authorizationPendingReason;
     delete confirmed.authorizationUnconfirmedAt;
+    delete confirmed.replicaBootstrapMode;
+    delete confirmed.replicaStaleAt;
+    delete confirmed.replicaRefreshRequestedAt;
     await saveSpaces([confirmed]);
     this.assertSessionContext(sessionContext);
     this.rememberAuthoritativeSpace(confirmed);
@@ -5472,11 +5188,7 @@ export class SemillaP2PClient {
 
   async loadLocalBootstrap(user = {}, sessionContext = this.captureSessionContext()) {
     this.assertSessionContext(sessionContext);
-    const [spaces, allInvitations, storedPortfolioHydration] = await Promise.all([
-      listSpaces(),
-      listInvitations(),
-      getMeta(PORTFOLIO_HYDRATION_META_KEY, [])
-    ]);
+    const [spaces, allInvitations] = await Promise.all([listSpaces(), listInvitations()]);
     this.assertSessionContext(sessionContext);
     await this.loadLocalCapabilityState(sessionContext);
     this.assertSessionContext(sessionContext);
@@ -5490,16 +5202,7 @@ export class SemillaP2PClient {
       }
       if (invitation.inviterUserId === userId) invitations.sent.push(invitation);
     }
-    return {
-      spaces: spaces || [],
-      invitations,
-      devices: [],
-      snapshotRequests: [],
-      replicaHealth: {},
-      lifecycleTransactions: [],
-      portfolioHydration: normalizePortfolioHydrationManifests(storedPortfolioHydration, { authoritative: false }),
-      localOnly: true
-    };
+    return { spaces: spaces || [], invitations, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], localOnly: true };
   }
 
   async applyBootstrapData(data = {}, context = {}) {
@@ -5526,13 +5229,29 @@ export class SemillaP2PClient {
       const localStateRevisions = context.localStateRevisions && typeof context.localStateRevisions === 'object'
         ? context.localStateRevisions
         : {};
-      const pendingReplicaSpaceIds = invitedReplicaRecoverySpaceIds({
-        spaces: data.spaces,
-        userId: sessionContext.userId,
-        backendStateRevisions,
-        localStateRevisions,
-        recoveryRequirements: this.recoveryRequirements
-      });
+      const participationRootMerge = mergeParticipationRootManifest(
+        Array.isArray(data.spaces) ? data.spaces : [],
+        Array.isArray(data.participationRoots) ? data.participationRoots : [],
+        sessionContext.userId
+      );
+      const authoritativeSpaces = participationRootMerge.spaces;
+      const participationRootSpaceIds = new Set(participationRootMerge.rootSpaceIds);
+      const provisionalReplicaSpaceIds = new Set((this.bootstrapState?.spaces || [])
+        .filter((space) => space?.authorizationState === 'unconfirmed'
+          && space?.authorizationPendingReason === 'replica_recovery')
+        .map((space) => String(space?.spaceId || '').trim())
+        .filter(Boolean));
+      const pendingReplicaSpaceIds = authoritativeSpaces
+        .map((space) => String(space?.spaceId || '').trim())
+        .filter((spaceId) => {
+          if (!spaceId) return false;
+          if (participationRootSpaceIds.has(spaceId)) return true;
+          if (!provisionalReplicaSpaceIds.has(spaceId)) return false;
+          const backendStateRevision = Math.max(0, Number(backendStateRevisions?.[spaceId] || 0));
+          const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
+          const recoveryRequirement = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
+          return backendStateRevision > localStateRevision || recoveryRequirement > localStateRevision;
+        });
       if (Object.prototype.hasOwnProperty.call(data, 'localCapabilityAuthority')) {
         await this.persistLocalCapabilityState(data.localCapabilityAuthority, data.localCapability, sessionContext);
         this.assertSessionContext(sessionContext);
@@ -5546,28 +5265,36 @@ export class SemillaP2PClient {
           && ['waiting', 'ready'].includes(transaction.status))
         .map((transaction) => String(transaction.spaceId || '').trim())
         .filter(Boolean));
-      const revokedSpaceIds = Array.from(new Set([
+      const revokedSpaceIds = new Set([
         ...(Array.isArray(data.revokedSpaceIds) ? data.revokedSpaceIds : []),
         ...lifecyclePurgeSpaceIds
-      ]));
-      const portfolioHydration = reconcileBootstrapPortfolioHydration(
-        this.bootstrapState?.portfolioHydration || [],
-        data.participationReconciliation?.portfolioHydration || data.portfolioHydration || [],
-        revokedSpaceIds
-      );
+      ].map((spaceId) => String(spaceId || '').trim()).filter(Boolean));
+      const authoritativeSpaceIds = new Set(authoritativeSpaces
+        .map((space) => String(space?.spaceId || '').trim())
+        .filter(Boolean));
+      for (const localSpace of Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : []) {
+        const localSpaceId = String(localSpace?.spaceId || '').trim();
+        const governanceSpaceId = String(localSpace?.governanceSpaceId || '').trim();
+        if (
+          localSpaceId
+          && governanceSpaceId
+          && revokedSpaceIds.has(governanceSpaceId)
+          && !authoritativeSpaceIds.has(localSpaceId)
+        ) {
+          revokedSpaceIds.add(localSpaceId);
+        }
+      }
       const nextBootstrapState = {
-        spaces: (Array.isArray(data.spaces) ? data.spaces : [])
+        spaces: authoritativeSpaces
           .filter((space) => !lifecyclePurgeSpaceIds.has(String(space?.spaceId || '').trim())),
-        revokedSpaceIds,
+        revokedSpaceIds: [...revokedSpaceIds],
         invitations,
         devices: Array.isArray(data.devices) ? data.devices : [],
         stateRevisions: backendStateRevisions,
-        localStateRevisions: { ...localStateRevisions },
         deliveryState: data.deliveryState && typeof data.deliveryState === 'object' ? data.deliveryState : { sequence: 0 },
         snapshotRequests: Array.isArray(data.snapshotRequests) ? data.snapshotRequests : [],
         replicaHealth: normalizeReplicaHealthMap(data.replicaHealth || {}),
         lifecycleTransactions,
-        portfolioHydration,
         localOnly: false
       };
       const spaceReplacement = await replaceBootstrapControlState(
@@ -5575,8 +5302,7 @@ export class SemillaP2PClient {
         [...invitations.received, ...invitations.sent],
         {
           revokedSpaceIds: nextBootstrapState.revokedSpaceIds,
-          pendingReplicaSpaceIds,
-          metaEntries: [{ key: PORTFOLIO_HYDRATION_META_KEY, value: portfolioHydration }]
+          pendingReplicaSpaceIds
         }
       );
       this.assertSessionContext(sessionContext);
@@ -5626,7 +5352,7 @@ export class SemillaP2PClient {
         });
       }
       for (const space of this.bootstrapState.spaces) {
-        if ((space?.authorizationState === 'unconfirmed' && space?.authorizationPendingReason !== 'replica_recovery')) continue;
+        if (space?.authorizationState === 'unconfirmed') continue;
         if (Math.max(0, Number(space?.encryptionVersion || 0)) < 1) continue;
         await this.ensureCurrentSpaceKey(space.spaceId).catch((error) => {
           dispatch('p2p:crypto-locked', { spaceId: space.spaceId, error });
@@ -5821,6 +5547,7 @@ export class SemillaP2PClient {
     this.ackPromise = null;
     this.ackRetryCount = 0;
     this.pendingReplicaHealthSpaceIds.clear();
+    this.minimalReplicaRecoveryBySpace.clear();
     this.rejectedKeyEnvelopeSources.clear();
     this.clearRejectedKeyEnvelopeRetryTimers();
     this.rejectedSnapshotSources.clear();
@@ -5964,7 +5691,6 @@ export class SemillaP2PClient {
     this.pipelineGeneration += 1;
     this.clearAtomicTransportBatchTimer();
     this.pendingAtomicEventBatches.clear();
-    this.clearInitialCloneSnapshotRetries();
     window.removeEventListener('online', this.boundOnline);
     window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
     this.unbindTabRelays();
@@ -5982,6 +5708,7 @@ export class SemillaP2PClient {
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds.clear();
     this.pendingAckReplicaSpaceIds.clear();
+    this.minimalReplicaRecoveryBySpace.clear();
     this.ackGeneration += 1;
     this.ackPromise = null;
     this.ackRetryCount = 0;
@@ -6032,113 +5759,107 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [], dispatchState = true } = {}) {
+  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [] } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
     this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
     const state = await this.fetchBootstrap(snapshotMode);
     this.assertSessionContext(sessionContext);
-    if (dispatchState !== false) this.emitBootstrapState('bootstrap-refresh');
+    dispatch('p2p:state', { state });
     return state;
-  }
-
-  async prepareInvitationCloneRecovery(spaceIds = []) {
-    const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
-    if (!normalizedSpaceIds.length) {
-      return {
-        spaceIds: [],
-        removedSnapshotSessions: 0,
-        removedRecoveryRequirements: 0,
-        clearedRejectedSources: 0,
-        clearedInitialCloneRetries: 0,
-        clearedLocalSnapshotRequests: 0,
-        clearedQueuedSnapshotSpaceIds: 0,
-        clearedReplicaHealthSpaceIds: 0
-      };
-    }
-
-    const targetSpaceIds = new Set(normalizedSpaceIds);
-    const cleanupSessionContext = this.captureSessionContext();
-    this.assertSessionContext(cleanupSessionContext);
-    let backendCleanup = null;
-    if (globalThis.navigator?.onLine !== false && getSessionToken() && this.deviceId) {
-      try {
-        backendCleanup = (await apiPost('/api/p2p/snapshots/reset', {
-          deviceId: this.deviceId,
-          spaceIds: normalizedSpaceIds
-        }))?.cleanup || null;
-        this.assertSessionContext(cleanupSessionContext);
-      } catch (error) {
-        dispatch('p2p:invitation-clone-backend-cleanup-failed', {
-          error,
-          deviceId: this.deviceId,
-          spaceIds: normalizedSpaceIds
-        });
-        throw error;
-      }
-    }
-    let clearedRejectedSources = 0;
-    for (const spaceId of targetSpaceIds) {
-      if (!this.rejectedSnapshotSources.has(spaceId)) continue;
-      this.rejectedSnapshotSources.delete(spaceId);
-      clearedRejectedSources += 1;
-    }
-
-    let clearedInitialCloneRetries = 0;
-    for (const [requestId, pending] of this.pendingInitialCloneSnapshotRetries) {
-      if (!targetSpaceIds.has(String(pending?.spaceId || '').trim())) continue;
-      if (this.clearInitialCloneSnapshotRetry(requestId)) clearedInitialCloneRetries += 1;
-    }
-
-    let clearedLocalSnapshotRequests = 0;
-    for (const [requestId, pending] of this.pendingLocalSnapshotRequests) {
-      if (!targetSpaceIds.has(String(pending?.spaceId || '').trim())) continue;
-      this.pendingLocalSnapshotRequests.delete(requestId);
-      clearedLocalSnapshotRequests += 1;
-    }
-
-    const queuedSnapshotSpaceIds = normalizeSnapshotSpaceIds(this.nextBootstrapSnapshotSpaceIds);
-    this.nextBootstrapSnapshotSpaceIds = queuedSnapshotSpaceIds.filter((spaceId) => !targetSpaceIds.has(spaceId));
-    const clearedQueuedSnapshotSpaceIds = queuedSnapshotSpaceIds.length - this.nextBootstrapSnapshotSpaceIds.length;
-
-    let clearedReplicaHealthSpaceIds = 0;
-    for (const spaceId of targetSpaceIds) {
-      if (!this.pendingReplicaHealthSpaceIds.delete(spaceId)) continue;
-      clearedReplicaHealthSpaceIds += 1;
-    }
-
-    const storageCleanup = await resetInvitationCloneRecoveryState(normalizedSpaceIds);
-    this.recoveryRequirements = storageCleanup.recoveryRequirements || await getRecoveryRequirements();
-    this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
-    if (!this.snapshotRecoveryRequired) this.clearSnapshotRecovery();
-    this.bootstrapState = {
-      ...(this.bootstrapState || {}),
-      snapshotRequests: (this.bootstrapState?.snapshotRequests || []).filter((request) => (
-        !targetSpaceIds.has(String(request?.spaceId || '').trim())
-      ))
-    };
-
-    const result = {
-      ...storageCleanup,
-      backendCleanup,
-      clearedRejectedSources,
-      clearedInitialCloneRetries,
-      clearedLocalSnapshotRequests,
-      clearedQueuedSnapshotSpaceIds,
-      clearedReplicaHealthSpaceIds
-    };
-    dispatch('p2p:invitation-clone-recovery-prepared', result);
-    return result;
   }
 
   async recoverMissingProjectRoots(spaceIds = []) {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
     return this.refreshBootstrap({
-      requestSnapshots: 'initial-clone',
+      requestSnapshots: 'force',
       snapshotSpaceIds: normalizedSpaceIds
     });
+  }
+
+  scheduleMinimalReplicaRecovery(spaceId = '', options = {}) {
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId || !this.started || this.manualClose) return Promise.resolve(null);
+    const existing = this.minimalReplicaRecoveryBySpace.get(cleanSpaceId);
+    if (existing) return existing;
+
+    const sessionContext = this.captureSessionContext();
+    const invitationId = String(options.invitationId || '').trim();
+    const eventId = String(options.eventId || '').trim();
+    const source = String(options.source || 'minimal-replica').trim().slice(0, 80);
+    const recoveryCode = String(options.code || 'P2P_MINIMAL_REPLICA_UNCONFIRMED').trim().slice(0, 100);
+    const recoveryMessage = String(
+      options.message || 'El acceso fue reconocido, pero el estado compartido todavía no terminó de actualizarse.'
+    ).trim().slice(0, 500);
+    const requestedAt = new Date().toISOString();
+    const provisional = (this.bootstrapState.spaces || [])
+      .find((space) => String(space?.spaceId || '').trim() === cleanSpaceId) || null;
+    if (provisional?.authorizationPendingReason === 'replica_recovery') {
+      const remembered = {
+        ...provisional,
+        replicaBootstrapMode: 'minimal',
+        replicaStaleAt: String(provisional.replicaStaleAt || provisional.authorizationUnconfirmedAt || requestedAt).trim(),
+        replicaRefreshRequestedAt: requestedAt
+      };
+      this.rememberAuthoritativeSpace(remembered);
+      saveSpaces([remembered]).catch(() => null);
+      dispatch('p2p:state', { state: this.bootstrapState, source: 'minimal-replica-control' });
+    }
+
+    const task = Promise.resolve().then(async () => {
+      this.assertSessionContext(sessionContext);
+      const state = await this.refreshBootstrap({
+        requestSnapshots: 'force',
+        snapshotSpaceIds: [cleanSpaceId]
+      });
+      this.assertSessionContext(sessionContext);
+      const localStateRevisions = await listStateRevisions([cleanSpaceId]);
+      this.assertSessionContext(sessionContext);
+      const replicaState = assertAcceptedInvitationReplicaState(state, cleanSpaceId, {
+        code: recoveryCode,
+        message: recoveryMessage,
+        invitationId,
+        eventId,
+        localStateRevision: localStateRevisions?.[cleanSpaceId],
+        recoveryRequirements: this.recoveryRequirements,
+        allowReplicaPending: true
+      });
+      if (replicaState.replicaPending) {
+        dispatch('p2p:replica-recovery-pending', {
+          spaceIds: [cleanSpaceId],
+          invitationId,
+          eventId,
+          source,
+          replicaStaleAt: replicaState.space?.replicaStaleAt || requestedAt
+        });
+      }
+      if (replicaState.space && Math.max(0, Number(replicaState.space.encryptionVersion || 0)) >= 1) {
+        await this.requestSpaceKey(cleanSpaceId, '', { force: true }).catch(() => false);
+        this.assertSessionContext(sessionContext);
+      }
+      return replicaState;
+    }).catch((error) => {
+      if (!this.isSessionContextChangedError(error)) {
+        dispatch('p2p:bootstrap-deferred', {
+          error,
+          stage: 'minimal-replica-background-recovery',
+          invitationId,
+          eventId,
+          spaceId: cleanSpaceId,
+          source
+        });
+        this.scheduleServerRecovery(error, 'minimal-replica-background-recovery');
+      }
+      return null;
+    }).finally(() => {
+      if (this.minimalReplicaRecoveryBySpace.get(cleanSpaceId) === task) {
+        this.minimalReplicaRecoveryBySpace.delete(cleanSpaceId);
+      }
+    });
+    this.minimalReplicaRecoveryBySpace.set(cleanSpaceId, task);
+    return task;
   }
 
   async recoverOnline() {
@@ -6505,15 +6226,8 @@ export class SemillaP2PClient {
         });
         await this.reconcileSnapshotRecovery(sessionContext);
         this.assertSessionContext(sessionContext);
-        const authorizationPromoted = await this.confirmRecoveredReplicaAuthorization(event.spaceId, sessionContext);
+        await this.confirmRecoveredReplicaAuthorization(event.spaceId, sessionContext);
         this.assertSessionContext(sessionContext);
-        if (!authorizationPromoted) {
-          dispatch('p2p:state', {
-            state: this.bootstrapState,
-            source: 'snapshot-complete',
-            spaceId: String(event.spaceId || '').trim()
-          });
-        }
       }
     } else {
       if (event.operation?.type === 'snapshot.chunk'
@@ -6924,20 +6638,47 @@ export class SemillaP2PClient {
       await this.fenceBootstrapResponses(sessionContext);
       const revokedUserId = String(event.data?.revokedUserId || '').trim();
       const currentUserId = String(this.user?.userId || '').trim();
-      if (revokedUserId && revokedUserId === currentUserId && event.spaceId) {
-        const purge = await purgeLocalSpace(event.spaceId);
-        await purgeSpaceCrypto(event.spaceId).catch(() => null);
-        this.assertSessionContext(sessionContext);
-        this.removeSpaceFromBootstrapState(event.spaceId);
+      if (revokedUserId && revokedUserId === currentUserId && event.spaceId && event.data?.superseded === true) {
+        dispatch('p2p:access-revocation-superseded', {
+          spaceId: String(event.spaceId || '').trim(),
+          event
+        });
+      } else if (revokedUserId && revokedUserId === currentUserId && event.spaceId) {
+        const revokedSpaceId = String(event.spaceId || '').trim();
+        const retainedSpaceIds = new Set((Array.isArray(event.data?.retainedSpaceIds) ? event.data.retainedSpaceIds : [])
+          .map((spaceId) => String(spaceId || '').trim())
+          .filter(Boolean));
+        const knownSpaces = Array.isArray(this.bootstrapState.spaces) ? this.bootstrapState.spaces : [];
+        const revokedSpace = knownSpaces.find((space) => String(space?.spaceId || '').trim() === revokedSpaceId) || null;
+        const revokedSpaceIds = new Set([revokedSpaceId]);
+        if (String(revokedSpace?.resourceType || '').trim().toLowerCase() === 'admin.portfolio') {
+          for (const space of knownSpaces) {
+            if (String(space?.governanceSpaceId || '').trim() !== revokedSpaceId) continue;
+            const currentMember = (Array.isArray(space?.members) ? space.members : [])
+              .find((member) => String(member?.userId || '').trim() === currentUserId) || null;
+            if (String(currentMember?.accessScope || 'project').trim().toLowerCase() !== 'portfolio') continue;
+            const childSpaceId = String(space?.spaceId || '').trim();
+            if (childSpaceId && !retainedSpaceIds.has(childSpaceId)) revokedSpaceIds.add(childSpaceId);
+          }
+        }
+        const purges = [];
+        for (const spaceId of revokedSpaceIds) {
+          const purge = await purgeLocalSpace(spaceId);
+          await purgeSpaceCrypto(spaceId).catch(() => null);
+          this.assertSessionContext(sessionContext);
+          this.removeSpaceFromBootstrapState(spaceId);
+          purges.push({ spaceId, purge });
+        }
         this.recoveryRequirements = await updateRecoveryRequirements({
           retainSpaceIds: this.readableSpaceIds()
         });
         this.assertSessionContext(sessionContext);
         this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
         dispatch('p2p:access-revoked', {
-          spaceIds: [event.spaceId],
+          spaceIds: [...revokedSpaceIds],
           source: 'realtime',
-          purge,
+          purge: purges.find((entry) => entry.spaceId === revokedSpaceId)?.purge || null,
+          purges,
           event
         });
       }
@@ -6948,83 +6689,69 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
     } else if (event.eventType === 'p2p.membership.changed') {
       await this.fenceBootstrapResponses(sessionContext);
-      const targetUserId = String(event.data?.targetUserId || '').trim();
+      const cleanSpaceId = String(event.spaceId || event.data?.space?.spaceId || '').trim();
       const currentUserId = String(this.user?.userId || '').trim();
       const transportedSpace = event.data?.space && typeof event.data.space === 'object'
         ? event.data.space
         : null;
-      const transportedMembership = (transportedSpace?.members || [])
-        .find((member) => member?.userId === currentUserId) || null;
-      const grantsCurrentUserRead = Boolean(
-        transportedSpace
-        && targetUserId
-        && targetUserId === currentUserId
-        && Array.isArray(transportedMembership?.permissions)
-        && transportedMembership.permissions.includes('read')
+      const existingSpace = (this.bootstrapState.spaces || [])
+        .find((space) => String(space?.spaceId || '').trim() === cleanSpaceId) || null;
+      const transportedMember = (Array.isArray(transportedSpace?.members) ? transportedSpace.members : [])
+        .find((member) => String(member?.userId || '').trim() === currentUserId) || null;
+      const newlyRecognizedReplica = Boolean(
+        cleanSpaceId
+        && currentUserId
+        && transportedSpace
+        && transportedMember
+        && !existingSpace
       );
 
-      // Una alta heredada puede llegar antes de que exista cualquier entidad del
-      // proyecto en IndexedDB. Persistimos primero una frontera provisional para que
-      // ninguna interfaz pueda considerar completa la réplica mientras bootstrap,
-      // replay o snapshot todavía están alcanzando la revisión autoritativa.
-      if (grantsCurrentUserRead) {
-        const provisionalControlState = prepareCommittedControlState({
+      if (newlyRecognizedReplica) {
+        // La herencia de un panel puede incorporar muchos proyectos mediante eventos
+        // de membresía. Persistimos únicamente su grafo de control y permisos para que
+        // la interfaz los reconozca de inmediato; cada réplica durable se recupera por
+        // el mismo canal de snapshots/operaciones, dirigida y sin bloquear el ACK.
+        const committedControlState = prepareCommittedControlState({
           spaces: [transportedSpace],
           invitations: []
         }, {
           authorizationState: 'unconfirmed',
           currentSpaces: this.bootstrapState.spaces || []
         });
-        await saveControlStateAtomically(provisionalControlState);
+        await saveControlStateAtomically(committedControlState);
         this.assertSessionContext(sessionContext);
-        this.applyCommittedControlState(provisionalControlState, {
-          source: 'realtime-membership-provisional',
-          dispatch: false
+        this.applyCommittedControlState(committedControlState, { source: 'realtime-membership-minimal' });
+        this.assertSessionContext(sessionContext);
+        const provisionalSpace = committedControlState.spaces.find((space) => (
+          String(space?.spaceId || '').trim() === cleanSpaceId
+        )) || transportedSpace;
+        this.scheduleMinimalReplicaRecovery(cleanSpaceId, {
+          eventId: event.eventId,
+          source: 'realtime-membership-inherited',
+          code: 'P2P_INHERITED_MEMBERSHIP_REPLICA_UNCONFIRMED',
+          message: 'El proyecto heredado del panel fue reconocido, pero su réplica todavía se está actualizando.'
         });
-        this.assertSessionContext(sessionContext);
-      }
-
-      // El evento contiene un grafo canónico, pero la autorización vigente se toma
-      // siempre del bootstrap autoritativo. A diferencia de una revocación dirigida
-      // (que purga antes) o una invitación (que persiste su documento antes), aquí no
-      // existe un cambio local seguro que permita confirmar la cola si esa lectura
-      // falla. Propagar el error conserva el cursor durable, fuerza replay y evita
-      // retirar de Redis el único aviso de permisos/propiedad todavía no aplicado.
-      let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
-      this.assertSessionContext(sessionContext);
-      let canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
-      if (!canonicalSpace) {
-        throw realtimeProtocolError(
-          'El bootstrap autoritativo no confirmó el proyecto afectado por el cambio de membresía.',
-          'P2P_REALTIME_MEMBERSHIP_STATE_MISSING',
-          { eventId: event.eventId, spaceId: event.spaceId }
-        );
-      }
-      const currentMembership = (canonicalSpace.members || []).find((member) => member?.userId === currentUserId) || null;
-      if (
-        targetUserId
-        && targetUserId === currentUserId
-        && Array.isArray(currentMembership?.permissions)
-        && currentMembership.permissions.includes('read')
-      ) {
-        state = await this.refreshBootstrap({
-          requestSnapshots: 'initial-clone',
-          snapshotSpaceIds: [event.spaceId],
-          dispatchState: true
+        dispatch('p2p:membership', {
+          event,
+          space: provisionalSpace,
+          replicaPending: true,
+          minimalBootstrap: true
         });
+      } else {
+        // Para permisos, propiedad o membresías ya conocidas se conserva la frontera
+        // estricta: el ACK solo avanza después del bootstrap autoritativo.
+        const state = await this.refreshBootstrap({ requestSnapshots: false });
         this.assertSessionContext(sessionContext);
-        canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === event.spaceId) || null;
+        const canonicalSpace = (state?.spaces || []).find((space) => space?.spaceId === cleanSpaceId) || null;
         if (!canonicalSpace) {
           throw realtimeProtocolError(
-            'La recuperación dirigida no confirmó el proyecto incorporado por el cambio de membresía.',
-            'P2P_REALTIME_MEMBERSHIP_RECOVERY_STATE_MISSING',
-            { eventId: event.eventId, spaceId: event.spaceId }
+            'El bootstrap autoritativo no confirmó el proyecto afectado por el cambio de membresía.',
+            'P2P_REALTIME_MEMBERSHIP_STATE_MISSING',
+            { eventId: event.eventId, spaceId: cleanSpaceId }
           );
         }
-      } else {
-        this.emitBootstrapState('realtime-membership-confirmed', { spaceId: String(event.spaceId || '').trim() });
+        dispatch('p2p:membership', { event, space: canonicalSpace });
       }
-      dispatch('p2p:membership', { event, space: canonicalSpace });
     } else if (event.eventType?.startsWith('p2p.invitation.')) {
       await this.fenceBootstrapResponses(sessionContext);
       const invitation = event.data?.invitation;
@@ -7039,44 +6766,32 @@ export class SemillaP2PClient {
       });
       await saveControlStateAtomically(committedControlState);
       this.assertSessionContext(sessionContext);
-      this.applyCommittedControlState(committedControlState, {
-        source: 'realtime-invitation',
-        dispatch: !requiresSnapshotRecovery
-      });
+      this.applyCommittedControlState(committedControlState, { source: 'realtime-invitation' });
       this.assertSessionContext(sessionContext);
 
       if (requiresSnapshotRecovery) {
-        let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
-        this.assertSessionContext(sessionContext);
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
-        const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, cleanSpaceId, sessionContext.userId);
-        if (recoverySpaceIds.length) {
-          state = await this.refreshBootstrap({
-            requestSnapshots: 'initial-clone',
-            snapshotSpaceIds: recoverySpaceIds,
-            dispatchState: true
-          });
-          this.assertSessionContext(sessionContext);
-        } else {
-          this.emitBootstrapState('realtime-invitation-confirmed', { spaceId: cleanSpaceId });
-        }
-        const localStateRevisions = await listStateRevisions([cleanSpaceId]);
-        this.assertSessionContext(sessionContext);
-        const replicaState = assertAcceptedInvitationReplicaState(state, cleanSpaceId, {
-          code: 'P2P_REALTIME_INVITATION_REPLICA_UNCONFIRMED',
-          message: 'El bootstrap autoritativo no confirmó la membresía necesaria después de aceptar la invitación.',
-          invitationId: invitation?.invitationId,
-          eventId: event.eventId,
-          localStateRevision: localStateRevisions?.[cleanSpaceId],
-          recoveryRequirements: this.recoveryRequirements,
-          allowReplicaPending: true
-        });
-        if (replicaState.replicaPending) {
-          dispatch('p2p:replica-recovery-pending', {
-            spaceIds: [cleanSpaceId],
+        const currentUserId = String(this.user?.userId || '').trim();
+        const acceptedByCurrentUser = Boolean(
+          currentUserId
+          && String(invitation?.recipientUserId || '').trim() === currentUserId
+        );
+        if (acceptedByCurrentUser) {
+          this.scheduleMinimalReplicaRecovery(cleanSpaceId, {
             invitationId: invitation?.invitationId,
             source: 'realtime-invitation'
           });
+        } else {
+          await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+            if (this.isSessionContextChangedError(error)) throw error;
+            dispatch('p2p:bootstrap-deferred', {
+              error,
+              stage: 'realtime-invitation-membership',
+              invitationId: String(invitation?.invitationId || '').trim()
+            });
+            return this.bootstrapState;
+          });
+          this.assertSessionContext(sessionContext);
         }
       } else {
         await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
@@ -7096,7 +6811,9 @@ export class SemillaP2PClient {
         space,
         replicaPending: requiresSnapshotRecovery
           ? this.isSpaceReplicaRecoveryPending(String(space?.spaceId || event.spaceId || '').trim())
-          : false
+          : false,
+        minimalBootstrap: requiresSnapshotRecovery
+          && String(invitation?.recipientUserId || '').trim() === String(this.user?.userId || '').trim()
       });
     } else {
       dispatch('p2p:event', { event });
@@ -7208,16 +6925,6 @@ export class SemillaP2PClient {
           ]));
           if (refreshSpaceIds.length && (localReplicaReadDeferred || ackResult.replicaReportDeferred === true)) {
             for (const spaceId of refreshSpaceIds) this.pendingReplicaHealthSpaceIds.add(spaceId);
-          }
-          if (ackResult.replicaReportDeferred === true) {
-            dispatch('p2p:replica-report-deferred', {
-              deviceId: sessionContext.deviceId,
-              spaceIds: refreshSpaceIds,
-              stage: 'backend-ack-report',
-              reason: ackResult.replicaReportDeferredReason || null,
-              appliedStateRevisions,
-              replicaRevisionHints
-            });
           }
           this.scheduleReplicaHealthRefresh(refreshSpaceIds);
           if (ackResult.lifecycleReconciliationDeferred === true && this.realtimeLeader) {
@@ -7394,71 +7101,22 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {
+  async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    let data = null;
-    try {
-      data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
-    } catch (error) {
-      if (!isRecoverableInvitationResponseConflict(error)) throw error;
-      let conflictError = error;
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        await waitForInvitationResponseConflict(attempt, conflictError);
-        this.assertSessionContext(sessionContext);
-        const convergedState = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
-        this.assertSessionContext(sessionContext);
-        const invitation = canonicalInvitationFromBootstrap(convergedState, invitationId);
-        if (invitation && String(invitation.status || '').trim().toLowerCase() !== 'pending') {
-          const canonicalDecision = resolveCanonicalInvitationDecision(invitation, decision);
-          const space = canonicalDecision === 'accept'
-            ? (convergedState.spaces || []).find((candidate) => (
-              String(candidate?.spaceId || '').trim() === String(invitation.spaceId || '').trim()
-            )) || null
-            : null;
-          if (invitationResponseBootstrapIsComplete(convergedState, invitation, canonicalDecision)) {
-            data = {
-              ok: true,
-              invitation,
-              space,
-              reused: true,
-              recoveredResponseConflict: true,
-              participationReconciliation: {
-                portfolioHydration: convergedState.portfolioHydration || []
-              }
-            };
-            dispatch('p2p:invitation-response-conflict-recovered', {
-              invitationId: String(invitationId || '').trim(),
-              decision: canonicalDecision,
-              attempt: attempt + 1,
-              retriedRequest: false
-            });
-            break;
-          }
-        }
-
-        if (![1, 3, 5, 7, 9].includes(attempt)) continue;
-        try {
-          data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
-          dispatch('p2p:invitation-response-conflict-recovered', {
-            invitationId: String(invitationId || '').trim(),
-            decision: resolveCanonicalInvitationDecision(data?.invitation, decision),
-            attempt: attempt + 1,
-            retriedRequest: true
-          });
-          break;
-        } catch (retryError) {
-          if (!isRecoverableInvitationResponseConflict(retryError)) throw retryError;
-          conflictError = retryError;
-        }
-      }
-      if (!data) throw conflictError;
-    }
+    const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
+    const invitationControlMerge = canonicalDecision === 'accept'
+      ? mergeParticipationRootManifest(
+        data.space ? [data.space] : [],
+        Array.isArray(data.participationRoots) ? data.participationRoots : [],
+        sessionContext.userId
+      )
+      : { spaces: data.space ? [data.space] : [], rootSpaceIds: [] };
     const committedControlState = prepareCommittedControlState({
-      spaces: data.space ? [data.space] : [],
+      spaces: invitationControlMerge.spaces,
       invitations: data.invitation ? [data.invitation] : []
     }, {
       authorizationState: canonicalDecision === 'accept' ? 'unconfirmed' : 'confirmed',
@@ -7466,51 +7124,29 @@ export class SemillaP2PClient {
     });
     await saveControlStateAtomically(committedControlState);
     this.assertSessionContext(sessionContext);
-    if (canonicalDecision === 'accept') {
-      await this.persistParticipationHydration(data, sessionContext);
-      this.assertSessionContext(sessionContext);
-    }
-    this.applyCommittedControlState(committedControlState, {
-      source: 'local-invitation-response',
-      dispatch: canonicalDecision !== 'accept'
-    });
+    this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
-      let state = await this.refreshBootstrap({ requestSnapshots: false, dispatchState: false });
-      this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
-      const recoverySpaceIds = acceptedInvitationSnapshotSpaceIds(state, acceptedSpaceId, sessionContext.userId);
-      if (recoverySpaceIds.length) {
-        if (options?.prepareCloneRecovery !== false) {
-          await this.prepareInvitationCloneRecovery(recoverySpaceIds);
-          this.assertSessionContext(sessionContext);
-        }
-        state = await this.refreshBootstrap({
-          requestSnapshots: 'initial-clone',
-          snapshotSpaceIds: recoverySpaceIds,
-          dispatchState: true
-        });
-        this.assertSessionContext(sessionContext);
-      } else {
-        this.emitBootstrapState('local-invitation-confirmed', { spaceId: acceptedSpaceId });
+      const provisionalSpace = committedControlState.spaces.find((space) => (
+        String(space?.spaceId || '').trim() === acceptedSpaceId
+      )) || data.space || null;
+      const participationRootIds = new Set(invitationControlMerge.rootSpaceIds || []);
+      data.space = provisionalSpace;
+      data.participationRoots = committedControlState.spaces.filter((space) => (
+        participationRootIds.has(String(space?.spaceId || '').trim())
+      ));
+      data.accessRevoked = false;
+      data.replicaPending = Boolean(provisionalSpace);
+      data.minimalBootstrap = Boolean(provisionalSpace);
+      data.replicaStaleAt = provisionalSpace?.replicaStaleAt || provisionalSpace?.authorizationUnconfirmedAt || '';
+      this.scheduleMinimalReplicaRecovery(acceptedSpaceId, {
+        invitationId: data.invitation?.invitationId,
+        source: 'local-invitation-response'
+      });
+      if (provisionalSpace && Math.max(0, Number(provisionalSpace.encryptionVersion || 0)) >= 1) {
+        this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
       }
-      const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
-      this.assertSessionContext(sessionContext);
-      const replicaState = assertAcceptedInvitationReplicaState(
-        state,
-        acceptedSpaceId,
-        {
-          code: 'P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED',
-          message: 'La invitación fue aceptada, pero el backend todavía no confirmó la membresía de este dispositivo.',
-          invitationId: data.invitation?.invitationId,
-          localStateRevision: localStateRevisions?.[acceptedSpaceId],
-          recoveryRequirements: this.recoveryRequirements,
-          allowReplicaPending: true
-        }
-      );
-      data.space = replicaState.space || null;
-      data.accessRevoked = replicaState.explicitlyRevoked;
-      data.replicaPending = replicaState.replicaPending;
     } else {
       await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
@@ -7523,10 +7159,6 @@ export class SemillaP2PClient {
       });
     }
     this.assertSessionContext(sessionContext);
-    if (canonicalDecision === 'accept' && data.space && Math.max(0, Number(data.space.encryptionVersion || 0)) >= 1) {
-      await this.requestSpaceKey(data.space.spaceId, '', { force: true }).catch(() => false);
-      this.assertSessionContext(sessionContext);
-    }
     return data;
   }
 
@@ -7694,22 +7326,24 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async revoke(spaceId = '', userId = '') {
+  async revoke(spaceId = '', userId = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
     const cleanUserId = String(userId || '').trim();
     if (!cleanSpaceId || !cleanUserId) throw new Error('Falta el espacio o el participante cuyo acceso deseas revocar.');
+    const directGrantOnly = options.directGrantOnly === true;
     this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
-    const data = await apiPost('/api/p2p/access/revoke', { spaceId: cleanSpaceId, userId: cleanUserId });
+    const data = await apiPost('/api/p2p/access/revoke', { spaceId: cleanSpaceId, userId: cleanUserId, ...(directGrantOnly ? { directGrantOnly: true } : {}) });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     await this.refreshBootstrap({ requestSnapshots: false });
     this.assertSessionContext(sessionContext);
-    const rotationSpaceIds = [...new Set([
+    const rotationCandidates = [
       ...(Array.isArray(data.rotationSpaceIds) ? data.rotationSpaceIds : []),
-      cleanSpaceId
-    ].map((candidate) => String(candidate || '').trim()).filter(Boolean))]
+      ...(!directGrantOnly ? [cleanSpaceId] : [])
+    ];
+    const rotationSpaceIds = [...new Set(rotationCandidates.map((candidate) => String(candidate || '').trim()).filter(Boolean))]
       .filter((candidate) => this.spaceRequiresEncryption(candidate));
     const rotations = [];
     for (const rotationSpaceId of rotationSpaceIds) {
@@ -8668,86 +8302,7 @@ export class SemillaP2PClient {
     return { sent, rejected, pending: remaining, sentOperations, rejectedOperations };
   }
 
-  clearInitialCloneSnapshotRetry(requestId = '') {
-    const cleanRequestId = String(requestId || '').trim();
-    const pending = cleanRequestId ? this.pendingInitialCloneSnapshotRetries.get(cleanRequestId) : null;
-    if (!pending) return false;
-    if (pending.timer) window.clearTimeout(pending.timer);
-    this.pendingInitialCloneSnapshotRetries.delete(cleanRequestId);
-    return true;
-  }
-
-  clearInitialCloneSnapshotRetries() {
-    for (const pending of this.pendingInitialCloneSnapshotRetries.values()) {
-      if (pending?.timer) window.clearTimeout(pending.timer);
-    }
-    this.pendingInitialCloneSnapshotRetries.clear();
-  }
-
-  scheduleInitialCloneSnapshotRetry(requestEvent = {}, options = {}) {
-    const request = requestEvent?.data || {};
-    const requestId = String(request?.requestId || '').trim();
-    const spaceId = String(request?.spaceId || requestEvent?.spaceId || '').trim();
-    const expiresAt = Date.parse(String(request?.expiresAt || ''));
-    if (!requestId || !spaceId || !Number.isFinite(expiresAt)) return false;
-
-    const remainingMs = expiresAt - Date.now() - INITIAL_CLONE_CANONICAL_RETRY_MARGIN_MS;
-    if (remainingMs <= 0) {
-      this.clearInitialCloneSnapshotRetry(requestId);
-      return false;
-    }
-
-    const attempt = Math.max(0, Math.floor(Number(options.attempt || 0)));
-    const delayMs = Math.min(remainingMs, Math.max(
-      100,
-      Math.min(
-        INITIAL_CLONE_CANONICAL_RETRY_MAX_MS,
-        INITIAL_CLONE_CANONICAL_RETRY_BASE_MS * (2 ** Math.min(4, attempt))
-      )
-    ));
-    const existing = this.pendingInitialCloneSnapshotRetries.get(requestId);
-    if (existing?.timer && Number(existing.dueAt || 0) <= Date.now() + delayMs) return true;
-    if (existing?.timer) window.clearTimeout(existing.timer);
-
-    const sessionContext = this.captureSessionContext();
-    const retryToken = createId('snapshot_source_retry');
-    const timer = window.setTimeout(async () => {
-      const pending = this.pendingInitialCloneSnapshotRetries.get(requestId);
-      if (!pending || pending.retryToken !== retryToken) return;
-      this.pendingInitialCloneSnapshotRetries.delete(requestId);
-      if (!this.isSessionContextCurrent(sessionContext) || !this.started || !this.realtimeLeader) return;
-      try {
-        const sent = await this.sendSnapshot(requestEvent, {
-          initialCloneRetryAttempt: attempt + 1,
-          skipInitialSourceStagger: true
-        });
-        if (sent) {
-          dispatch('p2p:snapshot-source-retry-confirmed', { requestId, spaceId, attempt: attempt + 1 });
-        }
-      } catch (error) {
-        if (this.isSessionContextChangedError(error)) return;
-        dispatch('p2p:snapshot-source-error', {
-          event: requestEvent,
-          error,
-          retryable: this.isRetryableTransportError(error),
-          deferredRetry: true
-        });
-      }
-    }, delayMs);
-
-    this.pendingInitialCloneSnapshotRetries.set(requestId, {
-      timer,
-      retryToken,
-      dueAt: Date.now() + delayMs,
-      expiresAt,
-      attempt,
-      spaceId
-    });
-    dispatch('p2p:snapshot-source-retry-scheduled', { requestId, spaceId, attempt, delayMs });
-    return true;
-  }
-
-  async sendSnapshot(requestEvent = {}, options = {}) {
+  async sendSnapshot(requestEvent = {}) {
     if (!this.realtimeLeader) return false;
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -8755,28 +8310,9 @@ export class SemillaP2PClient {
     const requestDeviceId = String(request.requestDeviceId || '').trim();
     const requestId = String(request.requestId || '').trim();
     const spaceId = String(request.spaceId || requestEvent.spaceId || '').trim();
-    const recoveryReason = String(request.reason || '').trim().toLowerCase();
-    const allowStaleSource = request.allowStaleSource === true && recoveryReason === 'initial_clone';
-    const sourceDeviceIds = Array.from(new Set((Array.isArray(request.sourceDeviceIds) ? request.sourceDeviceIds : [])
-      .map((deviceId) => String(deviceId || '').trim().slice(0, 180))
-      .filter(Boolean)))
-      .slice(0, 32);
     if (!requestDeviceId || !requestId || !spaceId || requestDeviceId === sessionContext.deviceId) return false;
     const expiresAt = Date.parse(request.expiresAt || '');
-    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) {
-      this.clearInitialCloneSnapshotRetry(requestId);
-      return false;
-    }
-
-    const sourcePriority = sourceDeviceIds.indexOf(sessionContext.deviceId);
-    if (allowStaleSource && sourcePriority > 0 && options.skipInitialSourceStagger !== true) {
-      await new Promise((resolve) => setTimeout(
-        resolve,
-        Math.min(6000, sourcePriority * INITIAL_CLONE_SOURCE_STAGGER_MS)
-      ));
-      this.assertSessionContext(sessionContext);
-      if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
-    }
+    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
 
     const localStateRevisions = await listStateRevisions([spaceId]);
     this.assertSessionContext(sessionContext);
@@ -8785,22 +8321,14 @@ export class SemillaP2PClient {
     this.recoveryRequirements = await getRecoveryRequirements();
     this.assertSessionContext(sessionContext);
     const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
-    // Una clonación inicial debe usar la mejor copia canónica disponible. La fuente
-    // puede quedar por delante de la revisión que tenía el backend al emitir la
-    // concesión (por ejemplo, después de vaciar su outbox). memoriaBACKEND vuelve a
-    // validar esa revisión contra el watermark autoritativo vigente al recibir cada
-    // fragmento, por lo que aquí solo se bloquean fuentes normales no convergentes.
-    const sourceRevisionUnavailable = allowStaleSource
-      ? false
-      : unresolvedRecoveryRevision || localStateRevision !== requestedStateRevision;
-    if (sourceRevisionUnavailable) {
+    if (unresolvedRecoveryRevision || localStateRevision !== requestedStateRevision) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,
         localStateRevision,
         requestedStateRevision,
         unresolvedRecoveryRevision,
-        reason: !allowStaleSource && unresolvedRecoveryRevision
+        reason: unresolvedRecoveryRevision
           ? 'source_recovery_pending'
           : localStateRevision < requestedStateRevision
             ? 'source_revision_behind'
@@ -8823,97 +8351,33 @@ export class SemillaP2PClient {
 
     const localEntities = await listEntities(spaceId);
     this.assertSessionContext(sessionContext);
-    const optimisticEntityCount = localEntities.filter((entity) => entity?.optimistic === true).length;
-    const hasOptimisticEntities = optimisticEntityCount > 0;
-    const canonicalPendingEntityIds = allowStaleSource
-      ? initialCloneCanonicalPendingEntityIds(localEntities)
-      : [];
-    if (canonicalPendingEntityIds.length) {
-      const retryScheduled = this.scheduleInitialCloneSnapshotRetry(requestEvent, {
-        attempt: options.initialCloneRetryAttempt || 0
-      });
-      dispatch('p2p:snapshot-source-canonical-pending', {
-        requestId,
-        spaceId,
-        pendingOperations: pendingForSpace.length,
-        canonicalPendingEntityIds,
-        retryScheduled
-      });
-      return false;
-    }
-    if (!allowStaleSource && (pendingForSpace.length || hasOptimisticEntities)) {
+    const hasOptimisticEntities = localEntities.some((entity) => entity?.optimistic === true);
+    if (pendingForSpace.length || hasOptimisticEntities) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,
         pendingOperations: pendingForSpace.length,
-        optimisticEntities: optimisticEntityCount
+        optimisticEntities: localEntities.filter((entity) => entity?.optimistic === true).length
       });
       return false;
     }
 
-    // La clonación inicial no debe quedar bloqueada por una compra o edición que
-    // todavía esté en el outbox. Cada registro de IndexedDB conserva en paralelo
-    // su versión confirmada y su proyección optimista; enviamos únicamente la
-    // versión canónica disponible y dejamos que las operaciones pendientes lleguen
-    // después por el flujo normal. Las recuperaciones ordinarias mantienen la
-    // exigencia estricta anterior y nunca construyen snapshots con estado pendiente.
-    const entities = sortSnapshotEntities(localEntities
-      .map((entity) => snapshotEntityFromLocalRecord(entity, {
-        allowConfirmedFallback: allowStaleSource
-      }))
-      .filter(Boolean));
-    const sourceSpace = (Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : [])
-      .find((space) => String(space?.spaceId || '').trim() === spaceId) || null;
-    const missingRequiredEntityIds = allowStaleSource
-      ? missingRequiredInitialCloneEntityIds(sourceSpace, entities)
-      : [];
-    if (missingRequiredEntityIds.length) {
-      const retryScheduled = this.scheduleInitialCloneSnapshotRetry(requestEvent, {
-        attempt: options.initialCloneRetryAttempt || 0
-      });
-      dispatch('p2p:snapshot-source-required-entity-missing', {
-        requestId,
-        spaceId,
-        sourceStateRevision: localStateRevision,
-        missingRequiredEntityIds,
-        retryScheduled
-      });
-      return false;
-    }
-    const omittedOptimisticEntities = Math.max(0, optimisticEntityCount - entities.filter((entity) => (
-      localEntities.some((localEntity) => (
-        localEntity?.optimistic === true
-        && String(localEntity?.entityType || '').trim() === entity.entityType
-        && String(localEntity?.entityId || '').trim() === entity.entityId
-      ))
-    )).length);
-    if (allowStaleSource && (pendingForSpace.length || optimisticEntityCount > 0)) {
-      dispatch('p2p:snapshot-source-canonical-fallback', {
-        requestId,
-        spaceId,
-        pendingOperations: pendingForSpace.length,
-        optimisticEntities: optimisticEntityCount,
-        omittedOptimisticEntities,
-        canonicalEntities: entities.length
-      });
-    }
+    const entities = sortSnapshotEntities(localEntities.map((entity) => ({
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      value: entity.value,
+      deleted: Boolean(entity.deleted),
+      operationId: entity.operationId,
+      operationType: entity.operationType || (entity.deleted ? 'entity.delete' : 'entity.put'),
+      spaceSequence: Number(entity.spaceSequence || 0),
+      stateRevision: Number(entity.stateRevision || entity.spaceSequence || 0),
+      updatedAt: entity.updatedAt || ''
+    })));
     const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
       maximum,
       Number(entity.stateRevision || entity.spaceSequence || 0)
     ), 0);
     const sourceStateRevision = Math.max(entityStateRevision, localStateRevision);
-    if (!allowStaleSource && sourceStateRevision !== requestedStateRevision) {
-      dispatch('p2p:snapshot-source-deferred', {
-        requestId,
-        spaceId,
-        sourceStateRevision,
-        requestedStateRevision,
-        reason: sourceStateRevision < requestedStateRevision
-          ? 'source_revision_behind'
-          : 'source_revision_advanced'
-      });
-      return false;
-    }
     const snapshotDigest = await sha256Hex(JSON.stringify(entities));
     this.assertSessionContext(sessionContext);
     let transportEntities = entities;
@@ -8995,7 +8459,6 @@ export class SemillaP2PClient {
       }
     }, { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false });
     this.assertSessionContext(sessionContext);
-    this.clearInitialCloneSnapshotRetry(requestId);
     return true;
   }
 

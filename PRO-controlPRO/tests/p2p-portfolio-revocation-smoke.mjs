@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'src/js/p2p-client.js'), 'utf8');
-const methodMatch = source.match(/async revoke\(spaceId = '', userId = ''\) \{[\s\S]*?\n  \}\n\n  async updatePermissions/);
+const methodMatch = source.match(/async revoke\(spaceId = '', userId = '', options = \{\}\) \{[\s\S]*?\n  \}\n\n  async updatePermissions/);
+assert.match(source, /invalidRetainedSpaceIds/, 'El contrato realtime debe validar la lista de accesos directos retenidos antes de usarla para impedir purgas.');
 assert.ok(methodMatch, 'Debe existir el flujo cliente reutilizable de revocación.');
 const method = methodMatch[0];
 
 assert.match(method, /Array\.isArray\(data\.rotationSpaceIds\)/, 'La PWA debe consumir todos los espacios que el backend ordena rotar.');
-assert.match(method, /new Set\(\[[\s\S]*?data\.rotationSpaceIds[\s\S]*?cleanSpaceId/, 'La rotación debe deduplicar la cascada e incluir el espacio solicitado.');
+assert.match(method, /const directGrantOnly = options\.directGrantOnly === true/, 'El flujo debe distinguir una revocación efectiva de una limpieza de grant directo.');
+assert.match(method, /const rotationCandidates = \[[\s\S]*?data\.rotationSpaceIds[\s\S]*?\.\.\.\(!directGrantOnly \? \[cleanSpaceId\] : \[\]\)/, 'La revocación efectiva debe incluir el espacio solicitado, mientras una limpieza de grant directo no debe forzar rotación.');
+assert.match(method, /new Set\(rotationCandidates/, 'La rotación debe deduplicar la cascada antes de procesarla.');
 assert.match(method, /for \(const rotationSpaceId of rotationSpaceIds\)/, 'Cada proyecto revocado del panel debe procesar su propia rotación.');
 assert.match(method, /ensureCurrentSpaceKey\(rotationSpaceId, \{ requireAuthority: true \}\)/, 'Cada rotación debe exigir autoridad vigente después de refrescar el bootstrap.');
 assert.match(method, /dispatch\('p2p:key-rotation-pending', \{ spaceId: rotationSpaceId, error \}\)/, 'Un fallo de una rotación debe señalar exactamente el espacio pendiente.');
@@ -32,4 +35,17 @@ assert.match(leaveMethod, /removeSpaceFromBootstrapState\(revokedSpaceId\)/, 'To
 assert.match(leaveMethod, /updateRecoveryRequirements\(\{[\s\S]*?retainSpaceIds: this\.readableSpaceIds\(\)/, 'Los requisitos de recuperación deben descartar espacios que dejaron de ser legibles.');
 assert.match(leaveMethod, /dispatch\('p2p:access-revoked', \{[\s\S]*?spaceIds: revokedSpaceIds/, 'Las demás pestañas y la interfaz deben recibir la lista completa de espacios retirados.');
 
-console.log('OK: la revocación de panel rota de forma independiente todas las claves afectadas y conserva un resultado agregado fiable.');
+const realtimeStart = source.indexOf("    } else if (event.eventType === 'p2p.membership.revoked') {");
+const realtimeEnd = source.indexOf("    } else if (event.eventType === 'p2p.membership.changed') {", realtimeStart);
+assert.ok(realtimeStart >= 0 && realtimeEnd > realtimeStart, 'Debe existir la revocación realtime reutilizable.');
+const realtimeRevocation = source.slice(realtimeStart, realtimeEnd);
+assert.match(realtimeRevocation, /resourceType[^\n]*admin\.portfolio/, 'La revocación realtime debe reconocer cuando la raíz retirada es un panel.');
+assert.match(realtimeRevocation, /governanceSpaceId[^\n]*revokedSpaceId/, 'La revocación del panel debe identificar proyectos hijos ya conocidos localmente.');
+assert.match(realtimeRevocation, /currentMember\?\.accessScope[^\n]*portfolio/, 'La cascada local solo debe purgar membresías heredadas y conservar accesos directos vigentes al mismo proyecto.');
+assert.match(realtimeRevocation, /retainedSpaceIds/, 'La revocación realtime debe respetar la lista autoritativa de proyectos cuyo acceso directo sigue vigente.');
+assert.match(realtimeRevocation, /!retainedSpaceIds\.has\(childSpaceId\)/, 'Un proyecto restaurado a grant directo no debe purgarse por una vista local obsoleta que todavía lo marque como heredado.');
+assert.match(realtimeRevocation, /for \(const spaceId of revokedSpaceIds\)/, 'La purga realtime debe abarcar la raíz y todos sus proyectos hijos heredados conocidos.');
+assert.match(realtimeRevocation, /purgeLocalSpace\(spaceId\)[\s\S]*?purgeSpaceCrypto\(spaceId\)/, 'La cascada realtime debe retirar datos y claves antes de refrescar el bootstrap.');
+assert.match(realtimeRevocation, /spaceIds: \[\.\.\.revokedSpaceIds\]/, 'La interfaz debe recibir inmediatamente la cascada completa que pudo inferirse localmente.');
+
+console.log('OK: la revocación de panel rota claves, cerca reaceptaciones concurrentes y purga en tiempo real la cascada conocida.');

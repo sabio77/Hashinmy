@@ -14,6 +14,8 @@ assert.match(appSource, /const PERSONAL_PANEL_ID = '__personal_panel__'/, 'El pa
 assert.match(appSource, /const SHARED_PROJECTS_PANEL_ID = '__shared_projects_panel__'/, 'Las invitaciones individuales deben agruparse sin mezclarse con el panel personal.');
 assert.match(appSource, /function panelScopes\(\)/, 'La clasificación de paneles debe estar centralizada.');
 assert.match(appSource, /buildProjectPanelScopes\(\{/, 'La clasificación debe usar el modelo puro que separa paneles virtuales por propietario.');
+assert.match(appSource, /function projectBelongsToPortfolio\(data = null, portfolioSpace = null\)[\s\S]*?governanceSpaceId[\s\S]*?return governanceSpaceId === portfolioSpaceId/, 'La relación autoritativa governanceSpaceId debe prevalecer sobre metadatos replicados o el propietario.');
+assert.match(appSource, /function portfolioForProjectSpace\(space = null\)[\s\S]*?portfolioSpaceById\(space\?\.governanceSpaceId \|\| data\?\.project\?\.portfolioSpaceId/, 'Las acciones de acceso deben resolver primero el panel gobernante autoritativo del proyecto.');
 assert.match(appSource, /\['shared', 'shared-portfolio'\]\.includes/, 'Los paneles virtuales de proyectos individuales no deben habilitar acciones de panel completo.');
 assert.match(appSource, /const allProjects = panelProjects[\s\S]*?\.filter\(\(item\) => !item\.project\.isTrashed\)/, 'El dashboard debe filtrar únicamente los proyectos del panel activo.');
 assert.match(appSource, /const ordered = \[\.\.\.activePanelProjects\(\)\]/, 'La papelera también debe respetar el panel activo.');

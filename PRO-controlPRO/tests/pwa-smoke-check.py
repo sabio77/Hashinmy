@@ -69,6 +69,7 @@ REQUIRED_FILES = [
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
     "tests/project-domain-smoke.mjs",
+    "tests/panel-actions-ui-smoke.mjs",
     "tests/p2p-trash-lifecycle-smoke.mjs",
     "_headers",
 ]
@@ -405,6 +406,21 @@ def assert_project_domain() -> None:
         fail(f"Falló el dominio administrativo: {result.stderr.strip() or result.stdout.strip()}")
 
 
+def assert_panel_actions() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba del menú y participantes de panel.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "panel-actions-ui-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló el menú o la gestión de participantes del panel: {result.stderr.strip() or result.stdout.strip()}")
+
+
 def assert_invitation_notification_intent() -> None:
     node = shutil.which("node")
     if not node:
@@ -538,7 +554,6 @@ export const rejectOutboxOperationBatch=async(items,error)=>{const rollbacks=[];
 export const getRecoveryRequirements=async()=>globalThis.__recoveryRequirements || {};
 export const updateRecoveryRequirements=async({required={},retainSpaceIds=null}={})=>{const retained=new Set(Array.isArray(retainSpaceIds)?retainSpaceIds:[]); const current=globalThis.__recoveryRequirements || {}; const next={}; for(const [spaceId,revision] of Object.entries(current)){if(!Array.isArray(retainSpaceIds)||retained.has(spaceId)) next[spaceId]=Number(revision || 0);} for(const [spaceId,revision] of Object.entries(required || {})){next[spaceId]=Math.max(Number(next[spaceId] || 0),Number(revision || 0));} globalThis.__recoveryRequirements=next; return next;};
 export const resolveRecoveryRequirement=async(spaceId,sourceStateRevision)=>{const next={...(globalThis.__recoveryRequirements || {})}; if(Number(sourceStateRevision || 0)>=Number(next[spaceId] || 0)) delete next[spaceId]; globalThis.__recoveryRequirements=next; return next;};
-export const resetInvitationCloneRecoveryState=async(spaceIds=[])=>{const targets=new Set(spaceIds || []); const next={}; for(const [spaceId,revision] of Object.entries(globalThis.__recoveryRequirements || {})){if(!targets.has(spaceId)) next[spaceId]=revision;} globalThis.__recoveryRequirements=next; return {spaceIds:[...targets],removedSnapshotSessions:0,removedRecoveryRequirements:0,recoveryRequirements:next};};
 """.strip(),
             encoding="utf-8",
         )
@@ -598,7 +613,6 @@ await client.handleEvent({
     requestDeviceId: 'dev_target_000001',
     requestUserId: 'user_target_000001',
     spaceId: 'space_1',
-    reason: 'state_gap',
     localStateRevision: 1,
     currentStateRevision: 2
   }
@@ -650,50 +664,6 @@ const blockedByOptimistic = await client.sendSnapshot(safeRequest);
 if (blockedByOptimistic !== false || publishCalls !== 0) {
   throw new Error('Una entidad optimista huérfana fue incluida en un snapshot.');
 }
-
-globalThis.__outbox = [{ operationId: 'op_pending_clone', spaceId: 'space_1' }];
-globalThis.__entities = [{
-  entityType: 'note', entityId: '1', value: { text: 'edición pendiente' },
-  operationId: 'op_pending_clone', operationType: 'entity.patch',
-  stateRevision: 6, spaceSequence: 6, optimistic: true,
-  confirmedExists: true,
-  confirmedValue: { text: 'copia confirmada' },
-  confirmedDeleted: false,
-  confirmedOperationId: 'op_confirmed_clone',
-  confirmedOperationType: 'entity.put',
-  confirmedStateRevision: 5,
-  confirmedSpaceSequence: 5,
-  confirmedUpdatedAt: '2026-08-05T20:00:00.000Z'
-}];
-globalThis.__stateRevisions = { space_1: 5 };
-const sentInitialClone = await client.sendSnapshot({
-  data: {
-    ...safeRequest.data,
-    requestId: 'snapshot_initial_clone_pending',
-    reason: 'initial_clone',
-    allowStaleSource: true,
-    currentStateRevision: 5
-  }
-});
-if (sentInitialClone !== true || publishCalls !== 2) {
-  throw new Error('La clonación inicial quedó bloqueada por una edición local pendiente.');
-}
-const initialCloneEntity = publishedOperations.at(-2)?.payload?.entities?.[0];
-if (
-  initialCloneEntity?.value?.text !== 'copia confirmada'
-  || initialCloneEntity?.operationId !== 'op_confirmed_clone'
-  || initialCloneEntity?.operationType !== 'entity.put'
-  || initialCloneEntity?.stateRevision !== 5
-) {
-  throw new Error('La clonación inicial publicó la proyección optimista en lugar de la copia canónica confirmada.');
-}
-if (!dispatched.some((event) => event.type === 'p2p:snapshot-source-canonical-fallback')) {
-  throw new Error('No se informó el uso de la copia canónica durante la clonación inicial.');
-}
-
-publishCalls = 0;
-publishedOperations.length = 0;
-globalThis.__outbox = [];
 
 globalThis.__entities = [{
   entityType: 'note', entityId: '1', value: { text: 'confirmado' },
@@ -1356,6 +1326,7 @@ def main() -> None:
     assert_multitab_coordination()
     assert_session_isolation()
     assert_project_domain()
+    assert_panel_actions()
     assert_trash_lifecycle()
     assert_invitation_notification_intent()
     assert_control_mutation_atomicity()
@@ -1445,7 +1416,7 @@ def main() -> None:
     config = (ROOT / "src/js/config.js").read_text(encoding="utf-8")
     manager = (ROOT / "src/js/pwa-update-manager.js").read_text(encoding="utf-8")
     p2p_client = (ROOT / "src/js/p2p-client.js").read_text(encoding="utf-8")
-    for required in ["enqueueEvent(payload)", "this.eventPipeline", "this.eventPipelineBlocked", "Math.max(this.lastProcessedSequence, sequence)", "stateRevisions", "snapshotChunksByBytes", "replaceBootstrapControlState", "saveControlStateAtomically", "snapshotRecoveryRequired", "reconcileSnapshotRecovery", "p2p:snapshot-source-error", "p2p:snapshot-source-deferred", "pendingForSpace", "hasOptimisticEntities", "queueWhenOffline: false", "request.expiresAt", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "publishBatch", "publish-batch", "revertRejectedOutboxBatch", "abortBatchOnFailure", "P2P_BATCH_CANCELLED", "rejectOutboxOperation", "p2p:operation-reverted", "isPermanentOutboxRejection", "orderedSourceConfirmation", "normalizePublishDeliveryIntent", "P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN", "includeSourceDevice: deliveryIntent.includeSourceDevice", "'entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'", "snapshotEntityFromLocalRecord", "confirmedOperationType", "purgeLocalSpace", "p2p.membership.revoked", "p2p.space.deleted", "async deleteSpace(", "'/api/p2p/access/delete'", "async leave(", "async revoke(", "async updatePermissions(", "async transfer(", "requestId: String(options.requestId || options.clientRequestId || '').trim()", "async createSpace(options = {})", "error.p2pQueued = true", "normalizeDeleteReferenceGuards", "referenceGuards: normalizedReferenceGuards", "pendingAtomicEventBatches", "collectAtomicTransportBatch", "handleEventBatch", "applyDecryptedOperationEventBatch", "event-batch-assembly"]:
+    for required in ["enqueueEvent(payload)", "this.eventPipeline", "this.eventPipelineBlocked", "Math.max(this.lastProcessedSequence, sequence)", "stateRevisions", "snapshotChunksByBytes", "replaceBootstrapControlState", "saveControlStateAtomically", "snapshotRecoveryRequired", "reconcileSnapshotRecovery", "p2p:snapshot-source-error", "p2p:snapshot-source-deferred", "pendingForSpace", "hasOptimisticEntities", "queueWhenOffline: false", "request.expiresAt", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "publishBatch", "publish-batch", "revertRejectedOutboxBatch", "abortBatchOnFailure", "P2P_BATCH_CANCELLED", "rejectOutboxOperation", "p2p:operation-reverted", "isPermanentOutboxRejection", "orderedSourceConfirmation", "normalizePublishDeliveryIntent", "P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN", "includeSourceDevice: deliveryIntent.includeSourceDevice", "'entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'", "operationType: entity.operationType", "purgeLocalSpace", "p2p.membership.revoked", "p2p.space.deleted", "async deleteSpace(", "'/api/p2p/access/delete'", "async leave(", "async revoke(", "async updatePermissions(", "async transfer(", "requestId: String(options.requestId || options.clientRequestId || '').trim()", "async createSpace(options = {})", "error.p2pQueued = true", "normalizeDeleteReferenceGuards", "referenceGuards: normalizedReferenceGuards", "pendingAtomicEventBatches", "collectAtomicTransportBatch", "handleEventBatch", "applyDecryptedOperationEventBatch", "event-batch-assembly"]:
         if required not in p2p_client:
             fail(f"src/js/p2p-client.js perdió la tubería secuencial o el cursor monótono: {required}")
     if "this.handleEvent(payload)" in p2p_client:

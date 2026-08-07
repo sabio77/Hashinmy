@@ -27,7 +27,7 @@ export function invitationIntentFromServiceWorkerMessage(message = {}) {
 export function resolveCanonicalInvitationDecision(invitation = {}, requestedDecision = '') {
   const status = String(invitation?.status || '').trim().toLowerCase();
   if (status === 'accepted') return 'accept';
-  if (status === 'rejected') return 'reject';
+  if (status === 'rejected' || status === 'cancelled') return 'reject';
   const requested = String(requestedDecision || '').trim().toLowerCase();
   return requested === 'reject' ? 'reject' : 'accept';
 }

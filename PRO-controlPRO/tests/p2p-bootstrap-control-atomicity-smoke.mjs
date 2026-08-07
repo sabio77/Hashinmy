@@ -20,12 +20,9 @@ assert.match(
 assert.match(storageMethod, /await replaceSpacesInStores\(stores, spaces, options\)/);
 assert.match(storageMethod, /stores\[STORES\.invitations\]\.clear\(\)/);
 assert.match(storageMethod, /stores\[STORES\.invitations\]\.put\(invitation\)/);
-assert.match(storageMethod, /normalizedMetaEntries/, 'El manifiesto de hidratación no se prepara dentro del commit de control.');
-assert.match(storageMethod, /stores\[STORES\.meta\]\.put\(entry\)/, 'El manifiesto de hidratación no se guarda atómicamente con espacios e invitaciones.');
 
 assert.match(clientSource, /replaceBootstrapControlState,/);
 assert.doesNotMatch(clientSource, /replaceSpaces\(this\.bootstrapState\.spaces[\s\S]*replaceInvitations/);
-assert.match(clientSource, /metaEntries: \[\{ key: PORTFOLIO_HYDRATION_META_KEY, value: portfolioHydration \}\]/);
 
 const applyStart = clientSource.indexOf('  async applyBootstrapData(data = {}, context = {})');
 const applyEnd = clientSource.indexOf('\n  mergeReplicaHealth(', applyStart);
@@ -34,7 +31,6 @@ const applyMethod = clientSource.slice(applyStart, applyEnd);
 
 const applyHarness = `
 const CURSOR_META_PREFIX = 'deliveryCursor:';
-const PORTFOLIO_HYDRATION_META_KEY = 'p2pPortfolioHydrationManifests';
 let replaceFailure = null;
 let recoveryFailure = null;
 function normalizeInvitationCollection(value = {}) {
@@ -44,14 +40,7 @@ function normalizeInvitationCollection(value = {}) {
   };
 }
 function normalizeReplicaHealthMap(value = {}) { return value; }
-function normalizePortfolioHydrationManifests(value = []) { return Array.isArray(value) ? value : []; }
-function reconcileBootstrapPortfolioHydration(current = [], incoming = [], revokedSpaceIds = []) {
-  const revoked = new Set(Array.isArray(revokedSpaceIds) ? revokedSpaceIds : []);
-  const byPanel = new Map((Array.isArray(current) ? current : []).map((manifest) => [manifest.portfolioSpaceId, manifest]));
-  for (const manifest of Array.isArray(incoming) ? incoming : []) byPanel.set(manifest.portfolioSpaceId, { ...manifest, authoritative: true });
-  return [...byPanel.values()].filter((manifest) => !revoked.has(manifest.portfolioSpaceId));
-}
-function invitedReplicaRecoverySpaceIds() { return []; }
+function mergeParticipationRootManifest(spaces = []) { return { spaces, rootSpaceIds: [] }; }
 async function getMeta() { return 0; }
 async function setMeta() { return true; }
 async function replaceBootstrapControlState(spaces, invitations) {
@@ -60,19 +49,11 @@ async function replaceBootstrapControlState(spaces, invitations) {
 }
 async function purgeSpaceCrypto() { return true; }
 function dispatch() {}
-function configureP2PStorageLimits() {}
 class TestClient {
   constructor() {
-    this.bootstrapState = {
-      marker: 'old',
-      spaces: [{ spaceId: 'old' }],
-      portfolioHydration: [{ portfolioSpaceId: 'portfolio_atomic', inventoryRevision: 4, complete: true, authoritative: true }]
-    };
+    this.bootstrapState = { marker: 'old', spaces: [{ spaceId: 'old' }] };
     this.eventMaxBytes = 20000;
     this.entityMaxBytes = 10000;
-    this.snapshotMaxBytes = 10000;
-    this.snapshotTransferMaxBytes = 20000;
-    this.snapshotMaxChunks = 10;
     this.snapshotGrantTtlSeconds = 30;
     this.lastProcessedSequence = 0;
     this.lastAcceptedStreamSequence = 0;
@@ -86,7 +67,6 @@ class TestClient {
   snapshotRecoveryDelay() { return 0; }
   scheduleSnapshotRecovery() {}
   clearSnapshotRecovery() {}
-  scheduleLifecycleFinalizationObserver() {}
 ${applyMethod}
 }
 function setReplaceFailure(error) { replaceFailure = error; }
@@ -119,23 +99,6 @@ const applyModule = await import(`data:text/javascript;base64,${Buffer.from(appl
   assert.equal(client.bootstrapState.spaces[0].spaceId, 'new');
   assert.equal(client.bootstrapState.spaces[0].durable, true);
   assert.equal(client.eventMaxBytes, 65536);
-}
-
-{
-  const client = new applyModule.TestClient();
-  applyModule.setReplaceFailure(null);
-  applyModule.setRecoveryFailure(null);
-  await client.applyBootstrapData({
-    spaces: [{ spaceId: 'portfolio_atomic', resourceType: 'admin.portfolio', encryptionVersion: 0 }],
-    invitations: {},
-    portfolioHydration: []
-  });
-  assert.deepEqual(client.bootstrapState.portfolioHydration, [{
-    portfolioSpaceId: 'portfolio_atomic',
-    inventoryRevision: 4,
-    complete: true,
-    authoritative: true
-  }], 'Un bootstrap vacío borró el manifiesto autoritativo persistido durante la aceptación.');
 }
 
 const fetchStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false)');
