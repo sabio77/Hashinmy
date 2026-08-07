@@ -1,11 +1,75 @@
 # Changelog
 
-## 1.10.3 - 2026-08-06
+## 1.10.22 - 2026-08-06
 
-- Aceptar una invitación ya no espera un snapshot completo: persiste de inmediato el espacio mínimo autorizado, lo marca como réplica obsoleta y devuelve el control a la interfaz.
-- La recuperación queda dirigida, deduplicada por proyecto y en segundo plano; las invitaciones directas y los proyectos heredados al aceptar un panel montan primero su grafo mínimo, mientras los participantes existentes conservan la confirmación autoritativa normal.
-- Los proyectos aún sin entidad raíz permanecen visibles como cards compactas de sincronización, sin métricas falsas ni acciones habilitadas, y se completan mediante el flujo P2P existente antes de permitir edición.
-- Se añadieron regresiones para el bootstrap mínimo, la marca temporal obsoleta, la ausencia de espera síncrona y la visibilidad del proyecto pendiente en español, inglés y árabe.
+- Corregida la aceptación concurrente que podía devolver `409 Conflict`: memoriaBACKEND espera de forma acotada el resultado canónico o adquiere el bloqueo liberado, y el cliente conserva compatibilidad con backends anteriores recuperando la respuesta final desde un bootstrap autenticado.
+- Cada aceptación comienza con una limpieza dirigida de residuos de transporte: exclusiones temporales de fuentes, reintentos diferidos, fragmentos incompletos de snapshot, concesiones obsoletas y watermarks persistidos de recuperación. No se eliminan entidades administrativas, outbox ni datos válidos de otros espacios.
+- Tras aceptar el panel, el cliente repite la preparación sobre el inventario autoritativo recién descubierto antes de solicitar la clonación inicial, cubriendo proyectos que todavía no eran conocidos en la interfaz al pulsar **Aceptar**.
+- Se añadieron regresiones de concurrencia, compatibilidad con el `409` anterior, limpieza selectiva y preservación de datos no relacionados; la card continúa oculta hasta verificar manifiesto, permisos, raíz del panel y todas las raíces de proyecto.
+
+## 1.10.19 - 2026-08-06
+
+- Corregida la carrera de aceptación inmediata en la que el manifiesto autoritativo recibido al vincular un panel podía ser reemplazado por un bootstrap transitorio sin comparación, dejando la card oculta aunque la invitación acabara de enviarse.
+- El cliente concilia el manifiesto persistido con cada bootstrap, conserva la versión completa más reciente y solo la elimina ante una revocación explícita o una purga autoritativa.
+- La interfaz reintenta de forma acotada hasta tres veces los estados de control incompletos —sin polling continuo— y vuelve a habilitar la recuperación al regresar la conexión. La card continúa bloqueada hasta verificar raíz, revisión, permisos e inventario completo de proyectos.
+- Se ampliaron las regresiones de hidratación, atomicidad y limpieza terminal para comprobar que un bootstrap vacío no borra la clonación recién aceptada y que los reintentos se cancelan al completar, revocar o cambiar de cuenta.
+
+## 1.10.18 - 2026-08-06
+
+- Corregida la carrera que podía ocultar un panel recién aceptado cuando la fuente todavía conservaba la raíz de un proyecto como entidad optimista sin una versión canónica confirmada: la clonación inicial ya no cierra un snapshot parcial que contradiga el manifiesto autoritativo.
+- La fuente conserva la concesión temporal y reintenta de forma acotada mientras su propio evento SSE confirma la entidad; al completarse, envía la copia íntegra al dispositivo invitado sin relajar permisos, revisiones, cifrado ni la barrera que impide mostrar paneles incompletos.
+- Los reintentos quedan deduplicados por `requestId`, vencen con la concesión y se cancelan al detener el cliente o cambiar de cuenta. La regresión cubre una raíz nunca confirmada y conserva el fallback canónico para ediciones ya confirmadas.
+
+## 1.10.15 - 2026-08-05
+
+- Corregida la clonación inicial de paneles invitados cuando el dispositivo del propietario conserva compras, ingresos, proyecciones o ediciones todavía pendientes en el outbox: esos cambios ya no bloquean la transferencia completa de las raíces confirmadas.
+- La fuente construye el snapshot desde el estado canónico confirmado que IndexedDB conserva junto a cada proyección optimista; las entidades nunca confirmadas se omiten y convergen después mediante el flujo P2P normal, sin publicar datos provisionales como autoritativos.
+- Las recuperaciones ordinarias mantienen la validación estricta anterior. Se añadió una regresión que reproduce una raíz de proyecto confirmada con una edición optimista pendiente y verifica que el invitado reciba la mejor copia válida disponible.
+
+## 1.10.14 - 2026-08-05
+
+- La aceptación local o realtime de un panel ya no publica a la interfaz los dos estados provisionales anteriores a la clonación dirigida; el panel permanece protegido, pero el diagnóstico `P2P_PANEL_INCOMPLETO` no se dispara mientras la recuperación válida está en curso.
+- El manifiesto autoritativo entregado por `memoriaBACKEND` al aceptar se fusiona y persiste antes del primer bootstrap, conservando la revisión más reciente y evitando que una respuesta tardía degrade o pierda el inventario completo de proyectos.
+- Al restaurar una sesión, la recuperación de raíces faltantes se marca antes de renderizar las cards. Si ninguna réplica puede responder, se conserva el error detallado y deduplicado; si existe una clonación activa, se evita el falso doble error observado al aceptar o recargar.
+- Se ampliaron las regresiones de invitaciones, membresías e hidratación de paneles para comprobar publicación atómica, persistencia local-first, prevención de regresión de revisiones y diagnóstico definitivo sin alterar el bloqueo de integridad.
+
+## 1.10.11 - 2026-08-05
+
+- Corregida la regresión que ocultaba indefinidamente un panel invitado cuando sus proyectos fueron creados antes del primer panel y, por compatibilidad, se comparten mediante concesiones `accessScope=portfolio` sin `governanceSpaceId`.
+- La comparación autoritativa continúa siendo exacta para proyectos administrados; los proyectos legacy solo se aceptan como complemento cuando memoriaBACKEND confirma lectura, alcance de panel, mismo propietario y una asociación única o persistida con el panel correcto.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` distingue ahora `legacyProjectSpaceIds`, y las regresiones cubren paneles con tres proyectos históricos, réplica pendiente y varios paneles del mismo propietario sin permitir cruces ambiguos.
+
+## 1.10.10 - 2026-08-05
+
+- La card de un panel invitado exige ahora igualdad exacta entre el inventario autoritativo del propietario y los proyectos autorizados en el plano de control; ya no basta con haber cargado todos los esperados si existe además una raíz sobrante o desactualizada.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` informa los `spaceId` autoritativos, los presentes en control, los inesperados y los ausentes, manteniendo la card oculta hasta eliminar cualquier divergencia.
+- Se añadió una regresión que reproduce un panel con todos los proyectos correctos más un proyecto residual y confirma que no puede mostrarse ni activarse.
+
+## 1.10.7 - 2026-08-05
+
+- La card de un panel invitado ya no considera suficiente que exista la entidad raíz de cada proyecto: exige que todos los espacios esperados hayan salido del estado provisional de recuperación y conserven permiso de lectura confirmado.
+- Las altas heredadas por un panel persisten una frontera `replica_recovery` antes del primer bootstrap, evitando que compras, ingresos o proyecciones parciales aparezcan mientras replay o snapshot todavía alcanzan la revisión autoritativa.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` identifica las réplicas pendientes de autorización por `spaceId`, y las regresiones cubren raíces presentes con contenido aún no confirmado sin alterar invitaciones individuales ni paneles vacíos válidos.
+
+## 1.10.6 - 2026-08-05
+
+- Cerrada la ventana de hidratación en la que el primer proyecto recibido podía crear una card virtual `shared-portfolio` y eludir la barrera aplicada únicamente al espacio administrativo `portfolio`.
+- Una invitación global aceptada queda registrada como pendiente desde antes del siguiente bootstrap; su card no aparece hasta recibir el manifiesto autoritativo, la raíz administrativa autorizada y todas las raíces de proyecto esperadas.
+- Las invitaciones individuales de proyecto conservan su comportamiento: pueden usar un panel virtual sin exigir un manifiesto global que no les corresponde.
+- El diagnóstico `P2P_PANEL_INCOMPLETO` informa también si falta la raíz del panel; una revocación limpia barreras pendientes obsoletas y la regresión cubre panel virtual parcial, panel real completo y proyecto compartido individual.
+
+## 1.10.4 - 2026-08-05
+
+- Cerrada la condición residual por la que un panel aceptado podía activarse apenas aparecía su espacio administrativo, antes de que IndexedDB terminara de hidratar las raíces de todos los proyectos autorizados.
+- La interfaz conserva el panel como pendiente hasta que estén disponibles todas sus cards gobernadas o heredadas; los paneles realmente vacíos continúan abriéndose de inmediato.
+- Los eventos de membresía heredada dirigidos a la cuenta actual fuerzan ahora un snapshot específico del proyecto antes de confirmar el ACK, cubriendo incorporaciones tardías o reparadas por bootstrap sin ampliar el acceso a otros espacios.
+- Se ampliaron las regresiones de aceptación, hidratación y membresía para impedir paneles internos vacíos, cruces entre propietarios o confirmaciones realtime antes de recuperar la réplica.
+
+## 1.10.3 - 2026-08-05
+
+- Corregido el panel compartido que podía mostrar 0 proyectos inmediatamente después de aceptar una invitación global, aunque las réplicas ya hubieran llegado y quedado guardadas en IndexedDB.
+- La finalización de un snapshot recibido desde memoriaBACKEND notifica ahora el nuevo estado a la interfaz cuando no hubo una promoción de autorización que ya hubiese emitido esa señal, evitando eventos duplicados.
+- Se añadieron regresiones de refresco y una prueba Playwright con dos cuentas aisladas, roles Gerente, Administrador, Individual y personalizados, y paneles con 0, 1, 2 y 5 proyectos con compras, ingresos y proyecciones.
 
 ## 1.10.2 - 2026-08-05
 

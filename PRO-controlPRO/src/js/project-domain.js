@@ -451,6 +451,291 @@ export function sharedOwnerPanelId(ownerUserId = '') {
   return normalizedOwnerUserId ? `__shared_owner_panel__:${normalizedOwnerUserId}` : '';
 }
 
+/**
+ * Una réplica en recuperación ya tiene una membresía autoritativa concedida por
+ * memoriaBACKEND. El estado provisional únicamente indica que su contenido
+ * local todavía puede estar detrás de la revisión más reciente.
+ *
+ * Mantener esta distinción evita convertir una copia válida, recibida al aceptar
+ * una invitación, en un falso bloqueo de autorización. Las membresías realmente
+ * desconocidas continúan cerradas hasta que el backend las confirme.
+ */
+export function isReplicaRecoveryPendingSpace(space = null) {
+  return Boolean(
+    space
+    && space.authorizationState === 'unconfirmed'
+    && cleanText(space.authorizationPendingReason || '', 60) === 'replica_recovery'
+  );
+}
+
+export function isMembershipAuthorizationUnconfirmed(space = null) {
+  return Boolean(
+    space
+    && space.authorizationState === 'unconfirmed'
+    && !isReplicaRecoveryPendingSpace(space)
+  );
+}
+
+/**
+ * Determina si una card de panel invitado debe permanecer detrás de la
+ * comparación autoritativa del inventario completo.
+ *
+ * Los proyectos de una invitación individual también se agrupan en un panel
+ * virtual `shared-portfolio`, por lo que ese tipo por sí solo no demuestra que
+ * exista una invitación global. La barrera solo se activa cuando memoriaBACKEND
+ * ya entregó un manifiesto del panel o cuando la aceptación local de ese panel
+ * todavía está pendiente de completar su hidratación.
+ */
+export function panelRequiresAuthoritativeHydration(input = {}) {
+  const panel = input.panel && typeof input.panel === 'object' ? input.panel : {};
+  const panelId = cleanText(panel.id || input.panelId || '', 220);
+  const panelType = cleanText(panel.type || input.panelType || '', 40).toLowerCase();
+  if (!panelId || panel.owned === true) return false;
+  if (panelType === 'portfolio') return true;
+  if (panelType !== 'shared-portfolio') return false;
+
+  const manifests = Array.isArray(input.portfolioHydration) ? input.portfolioHydration : [];
+  const hasAuthoritativeManifest = manifests.some((candidate) => (
+    cleanText(candidate?.portfolioSpaceId || '', 140) === panelId
+  ));
+  return input.pendingAuthoritativePanel === true || hasAuthoritativeManifest;
+}
+
+/**
+ * Identifica los espacios de proyecto que deben estar hidratados antes de
+ * abrir automáticamente un panel recién aceptado.
+ *
+ * El plano de control puede confirmar el panel y sus membresías antes de que
+ * IndexedDB reciba las raíces de cada proyecto. Mantener esta selección en el
+ * dominio evita presentar un panel aparentemente vacío durante esa ventana y
+ * conserva el aislamiento entre paneles, propietarios y aplicaciones.
+ */
+export function pendingPanelExpectedProjectSpaceIds(input = {}) {
+  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const panelId = cleanText(input.panelId || '', 220);
+  const currentUserId = cleanText(input.currentUserId || '', 140);
+  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
+  const projectResourceType = cleanText(input.projectResourceType || PROJECT_ENTITY_TYPE, 80) || PROJECT_ENTITY_TYPE;
+  const personalPanelId = cleanText(input.personalPanelId || '__personal_panel__', 220) || '__personal_panel__';
+  const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
+  if (!panelId || !currentUserId || panelId === personalPanelId) return [];
+
+  const readableProjects = spaces.filter((space) => (
+    cleanText(space?.resourceType || '', 80) === projectResourceType
+    && Boolean(cleanText(space?.spaceId || '', 140))
+    && hasPermission(space, currentUserId, 'read')
+  ));
+  const portfolioSpace = spaces.find((space) => (
+    cleanText(space?.resourceType || '', 80) === portfolioResourceType
+    && cleanText(space?.spaceId || '', 140) === panelId
+  )) || null;
+
+  let candidates = [];
+  if (portfolioSpace) {
+    const ownerUserId = cleanText(portfolioSpace.ownerUserId || '', 140);
+    candidates = readableProjects.filter((space) => {
+      const governanceSpaceId = cleanText(space?.governanceSpaceId || '', 140);
+      if (governanceSpaceId) return governanceSpaceId === panelId;
+      const member = memberForUser(space, currentUserId);
+      return Boolean(
+        ownerUserId
+        && cleanText(space?.ownerUserId || '', 140) === ownerUserId
+        && String(member?.accessScope || '').trim().toLowerCase() === 'portfolio'
+      );
+    });
+  } else if (panelId.startsWith('__shared_owner_panel__:')) {
+    candidates = readableProjects.filter((space) => sharedOwnerPanelId(space?.ownerUserId || '') === panelId);
+  } else if (panelId === sharedProjectsPanelId) {
+    candidates = readableProjects.filter((space) => (
+      cleanText(space?.ownerUserId || '', 140) !== currentUserId
+      && !cleanText(space?.governanceSpaceId || '', 140)
+      && !sharedOwnerPanelId(space?.ownerUserId || '')
+    ));
+  } else {
+    // Un invitado puede recibir proyectos de un portfolio sin ser miembro del
+    // espacio administrativo. En ese caso el panel es virtual y usa como id el
+    // governanceSpaceId de los proyectos autorizados.
+    candidates = readableProjects.filter((space) => cleanText(space?.governanceSpaceId || '', 140) === panelId);
+  }
+
+  return Array.from(new Set(candidates
+    .map((space) => cleanText(space?.spaceId || '', 140))
+    .filter(Boolean)))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Verifica que un panel invitado tenga una comparación autoritativa contra el
+ * panel del propietario y que cada proyecto esperado tenga su réplica autorizada
+ * y materializada hasta la revisión autoritativa antes de mostrar su card.
+ */
+export function invitedPortfolioHydrationStatus(input = {}) {
+  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
+  const projects = Array.isArray(input.projects) ? input.projects : [];
+  const panelId = cleanText(input.panelId || '', 220);
+  const currentUserId = cleanText(input.currentUserId || '', 140);
+  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
+  const projectResourceType = cleanText(input.projectResourceType || PROJECT_ENTITY_TYPE, 80) || PROJECT_ENTITY_TYPE;
+  const loadedProjectSpaceIds = new Set((Array.isArray(input.loadedProjectSpaceIds)
+    ? input.loadedProjectSpaceIds
+    : [])
+    .map((spaceId) => cleanText(spaceId || '', 140))
+    .filter(Boolean));
+  const manifests = Array.isArray(input.portfolioHydration) ? input.portfolioHydration : [];
+  const manifest = manifests.find((candidate) => (
+    cleanText(candidate?.portfolioSpaceId || '', 140) === panelId
+  )) || null;
+  const controlExpectedSpaceIds = pendingPanelExpectedProjectSpaceIds(input);
+  const manifestExpectedSpaceIds = Array.from(new Set(Array.isArray(manifest?.expectedProjectSpaceIds)
+    ? manifest.expectedProjectSpaceIds
+      .map((spaceId) => cleanText(spaceId || '', 140))
+      .filter(Boolean)
+    : []))
+    .sort((left, right) => left.localeCompare(right));
+  const authoritativeProjectSpaceIdSet = new Set(manifestExpectedSpaceIds);
+  const controlProjectSpaceIdSet = new Set(controlExpectedSpaceIds);
+  const projectSpacesById = new Map(spaces
+    .filter((space) => cleanText(space?.resourceType || '', 80) === projectResourceType)
+    .map((space) => [cleanText(space?.spaceId || '', 140), space])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const projectDataBySpaceId = new Map(projects
+    .map((data) => [cleanText(data?.space?.spaceId || '', 140), data])
+    .filter(([spaceId]) => Boolean(spaceId)));
+  const portfolioSpace = spaces.find((space) => (
+    cleanText(space?.resourceType || '', 80) === portfolioResourceType
+    && cleanText(space?.spaceId || '', 140) === panelId
+    && !isMembershipAuthorizationUnconfirmed(space)
+  )) || null;
+  const portfolioOwnerUserId = cleanText(portfolioSpace?.ownerUserId || '', 140);
+  const readableOwnerPortfolioIds = Array.from(new Set(spaces
+    .filter((space) => (
+      cleanText(space?.resourceType || '', 80) === portfolioResourceType
+      && cleanText(space?.ownerUserId || '', 140) === portfolioOwnerUserId
+      && !isMembershipAuthorizationUnconfirmed(space)
+      && currentUserId
+      && hasPermission(space, currentUserId, 'read')
+    ))
+    .map((space) => cleanText(space?.spaceId || '', 140))
+    .filter(Boolean)));
+  const legacyProjectSpaceIds = controlExpectedSpaceIds.filter((spaceId) => {
+    if (authoritativeProjectSpaceIdSet.has(spaceId) || !portfolioOwnerUserId) return false;
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    if (!projectSpace
+      || cleanText(projectSpace?.governanceSpaceId || '', 140)
+      || cleanText(projectSpace?.ownerUserId || '', 140) !== portfolioOwnerUserId) return false;
+    const member = memberForUser(projectSpace, currentUserId);
+    if (String(member?.accessScope || '').trim().toLowerCase() !== 'portfolio'
+      || !hasPermission(projectSpace, currentUserId, 'read')) return false;
+
+    const persistedPortfolioSpaceId = cleanText(
+      projectDataBySpaceId.get(spaceId)?.project?.portfolioSpaceId || '',
+      140
+    );
+    if (persistedPortfolioSpaceId) return persistedPortfolioSpaceId === panelId;
+
+    // Los proyectos creados antes del primer panel no conservaban governanceSpaceId
+    // ni portfolioSpaceId. En ese formato histórico solo es seguro asociarlos cuando
+    // el propietario tiene un único panel legible para esta cuenta. La membresía con
+    // accessScope=portfolio sigue siendo una concesión autoritativa de memoriaBACKEND.
+    return readableOwnerPortfolioIds.length === 1 && readableOwnerPortfolioIds[0] === panelId;
+  });
+  const legacyProjectSpaceIdSet = new Set(legacyProjectSpaceIds);
+  const unexpectedProjectSpaceIds = controlExpectedSpaceIds
+    .filter((spaceId) => !authoritativeProjectSpaceIdSet.has(spaceId) && !legacyProjectSpaceIdSet.has(spaceId));
+  const absentControlProjectSpaceIds = manifestExpectedSpaceIds
+    .filter((spaceId) => !controlProjectSpaceIdSet.has(spaceId));
+  const projectInventoryMatches = Boolean(manifest)
+    && unexpectedProjectSpaceIds.length === 0
+    && absentControlProjectSpaceIds.length === 0;
+  const expectedProjectSpaceIds = Array.from(new Set([
+    ...manifestExpectedSpaceIds,
+    ...legacyProjectSpaceIds,
+    ...unexpectedProjectSpaceIds
+  ])).sort((left, right) => left.localeCompare(right));
+  const pendingProjectAuthorizationSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    return !projectSpace
+      || isMembershipAuthorizationUnconfirmed(projectSpace)
+      || !currentUserId
+      || !hasPermission(projectSpace, currentUserId, 'read');
+  });
+  const pendingProjectAuthorizationSpaceIdSet = new Set(pendingProjectAuthorizationSpaceIds);
+  const recoveringProjectReplicaSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
+    const projectSpace = projectSpacesById.get(spaceId) || null;
+    return Boolean(
+      projectSpace
+      && isReplicaRecoveryPendingSpace(projectSpace)
+      && currentUserId
+      && hasPermission(projectSpace, currentUserId, 'read')
+    );
+  });
+  const missingProjectSpaceIds = expectedProjectSpaceIds
+    .filter((spaceId) => !loadedProjectSpaceIds.has(spaceId));
+  const comparisonComplete = manifest?.complete === true;
+  const comparisonAuthoritative = Boolean(manifest && manifest?.authoritative !== false);
+  const portfolioRootLoaded = Boolean(
+    portfolioSpace
+    && currentUserId
+    && hasPermission(portfolioSpace, currentUserId, 'read')
+  );
+  const manifestInventoryRevision = Math.max(0, Math.floor(Number(manifest?.inventoryRevision || 0)));
+  const portfolioInventoryRevision = Math.max(0, Math.floor(Number(portfolioSpace?.projectInventoryRevision || 0)));
+  const inventoryRevisionMatches = Boolean(manifest) && manifestInventoryRevision === portfolioInventoryRevision;
+  const portfolioReplicaRecoveryPending = isReplicaRecoveryPendingSpace(portfolioSpace);
+  return {
+    panelId,
+    ready: Boolean(
+      panelId
+      && comparisonComplete
+      && comparisonAuthoritative
+      && portfolioRootLoaded
+      && inventoryRevisionMatches
+      && projectInventoryMatches
+      && pendingProjectAuthorizationSpaceIds.length === 0
+      && missingProjectSpaceIds.length === 0
+    ),
+    comparisonComplete,
+    comparisonAuthoritative,
+    portfolioRootLoaded,
+    manifestInventoryRevision,
+    portfolioInventoryRevision,
+    inventoryRevisionMatches,
+    projectInventoryMatches,
+    authoritativeProjectSpaceIds: manifestExpectedSpaceIds,
+    legacyProjectSpaceIds,
+    controlProjectSpaceIds: controlExpectedSpaceIds,
+    unexpectedProjectSpaceIds,
+    absentControlProjectSpaceIds,
+    expectedProjectSpaceIds,
+    authorizedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => !pendingProjectAuthorizationSpaceIdSet.has(spaceId)),
+    pendingProjectAuthorizationSpaceIds,
+    recoveringProjectReplicaSpaceIds,
+    portfolioReplicaRecoveryPending,
+    synchronizing: portfolioReplicaRecoveryPending || recoveringProjectReplicaSpaceIds.length > 0,
+    loadedProjectSpaceIds: expectedProjectSpaceIds.filter((spaceId) => loadedProjectSpaceIds.has(spaceId)),
+    missingProjectSpaceIds,
+    reason: !manifest
+      ? 'authoritative_manifest_missing'
+      : !comparisonComplete
+        ? 'authoritative_comparison_incomplete'
+        : !comparisonAuthoritative
+          ? 'authoritative_comparison_stale'
+          : !portfolioRootLoaded
+            ? 'portfolio_root_missing'
+            : !inventoryRevisionMatches
+              ? 'portfolio_inventory_revision_mismatch'
+              : pendingProjectAuthorizationSpaceIds.length
+                ? 'project_authorization_unconfirmed'
+                : missingProjectSpaceIds.length
+                  ? 'project_roots_missing'
+                  : !projectInventoryMatches
+                    ? 'project_inventory_set_mismatch'
+                    : portfolioReplicaRecoveryPending || recoveringProjectReplicaSpaceIds.length
+                      ? 'ready_replica_recovery'
+                      : 'ready'
+  };
+}
+
 function projectOwnerProfile(data = {}) {
   const ownerUserId = cleanText(data?.space?.ownerUserId || '', 140);
   if (!ownerUserId) return null;
@@ -460,6 +745,39 @@ function projectOwnerProfile(data = {}) {
 
 function projectPortfolioId(data = {}) {
   return cleanText(data?.space?.governanceSpaceId || data?.project?.portfolioSpaceId || '', 140);
+}
+
+/**
+ * Devuelve únicamente proyectos administrativos anteriores a la creación del
+ * panel que todavía no quedaron gobernados por ese portfolio en el backend.
+ *
+ * Estos espacios deben recibir una concesión explícita al enviar la primera
+ * invitación global; los proyectos nuevos, que sí tienen governanceSpaceId,
+ * continúan heredando participantes exclusivamente desde memoriaBACKEND.
+ */
+export function legacyPortfolioProjectsForInvitation(projects = [], portfolioSpace = {}) {
+  const portfolioSpaceId = cleanText(portfolioSpace?.spaceId || '', 140);
+  const portfolioOwnerUserId = cleanText(portfolioSpace?.ownerUserId || '', 140);
+  if (!portfolioSpaceId || !portfolioOwnerUserId) return [];
+
+  return (Array.isArray(projects) ? projects : []).filter((data) => {
+    const projectSpaceId = cleanText(data?.space?.spaceId || '', 140);
+    if (!projectSpaceId || data?.space?.resourceType !== PROJECT_ENTITY_TYPE) return false;
+    if (isMembershipAuthorizationUnconfirmed(data?.space)) return false;
+
+    const projectOwnerUserId = cleanText(
+      data?.space?.ownerUserId || data?.project?.portfolioOwnerUserId || '',
+      140
+    );
+    if (projectOwnerUserId !== portfolioOwnerUserId) return false;
+
+    const backendGovernanceSpaceId = cleanText(data?.space?.governanceSpaceId || '', 140);
+    if (backendGovernanceSpaceId === portfolioSpaceId) return false;
+    if (backendGovernanceSpaceId) return false;
+
+    const persistedPortfolioSpaceId = cleanText(data?.project?.portfolioSpaceId || '', 140);
+    return !persistedPortfolioSpaceId || persistedPortfolioSpaceId === portfolioSpaceId;
+  });
 }
 
 /**
@@ -482,7 +800,7 @@ export function buildProjectPanelScopes(input = {}) {
   const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
 
   const scopes = spaces
-    .filter((space) => space?.resourceType === portfolioResourceType && space?.authorizationState !== 'unconfirmed')
+    .filter((space) => space?.resourceType === portfolioResourceType && !isMembershipAuthorizationUnconfirmed(space))
     .map((space) => ({
       id: cleanText(space?.spaceId || '', 140),
       type: 'portfolio',

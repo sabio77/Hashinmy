@@ -37,5 +37,8 @@ jobs:
       - name: Validate snapshot byte budgets
         run: node tests/p2p-snapshot-budget-smoke.mjs
 
+      - name: Validate invited panel canonical clone fallback
+        run: node tests/p2p-invitation-replica-recovery-smoke.mjs
+
       - name: Validate poisoned encrypted payload recovery
         run: node tests/p2p-poisoned-payload-recovery-smoke.mjs

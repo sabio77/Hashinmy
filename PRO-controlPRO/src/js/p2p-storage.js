@@ -325,6 +325,54 @@ export async function resolveRecoveryRequirement(spaceId = '', sourceStateRevisi
   return mutateRecoveryRequirements((current) => resolveRecoveryRequirementMap(current, spaceId, sourceStateRevision));
 }
 
+export async function resetInvitationCloneRecoveryState(spaceIds = []) {
+  const targetSpaceIds = new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => cleanSpaceId(spaceId))
+    .filter(Boolean));
+  if (!targetSpaceIds.size) {
+    return {
+      spaceIds: [],
+      removedSnapshotSessions: 0,
+      removedRecoveryRequirements: 0,
+      recoveryRequirements: await getRecoveryRequirements()
+    };
+  }
+
+  return withStores([STORES.snapshots, STORES.meta], 'readwrite', async (stores) => {
+    const snapshotRecords = await requestToPromise(stores[STORES.snapshots].getAll());
+    let removedSnapshotSessions = 0;
+    for (const record of snapshotRecords || []) {
+      if (!targetSpaceIds.has(snapshotRecordSpaceId(record))) continue;
+      const key = String(record?.key || '').trim();
+      if (!key) continue;
+      await requestToPromise(stores[STORES.snapshots].delete(key));
+      removedSnapshotSessions += 1;
+    }
+
+    const recoveryRecord = await requestToPromise(stores[STORES.meta].get(RECOVERY_REQUIREMENTS_META_KEY));
+    const recoveryRequirements = normalizeRecoveryRequirements(recoveryRecord?.value || {});
+    let removedRecoveryRequirements = 0;
+    for (const spaceId of targetSpaceIds) {
+      if (!Object.prototype.hasOwnProperty.call(recoveryRequirements, spaceId)) continue;
+      delete recoveryRequirements[spaceId];
+      removedRecoveryRequirements += 1;
+    }
+    if (removedRecoveryRequirements > 0) {
+      await requestToPromise(stores[STORES.meta].put({
+        key: RECOVERY_REQUIREMENTS_META_KEY,
+        value: recoveryRequirements
+      }));
+    }
+
+    return {
+      spaceIds: [...targetSpaceIds],
+      removedSnapshotSessions,
+      removedRecoveryRequirements,
+      recoveryRequirements
+    };
+  });
+}
+
 function normalizePendingSpaceCreation(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const requestId = String(input.requestId || '').trim().slice(0, 180);
@@ -473,25 +521,18 @@ export function planSpaceReconciliation(
     const spaceId = cleanSpaceId(space.spaceId);
     const existing = existingBySpaceId.get(spaceId) || null;
     if (pendingReplicaSet.has(spaceId)) {
-      const authorizationUnconfirmedAt = existing?.authorizationUnconfirmedAt
-        || space.authorizationUnconfirmedAt
-        || new Date().toISOString();
       return {
         ...space,
         authorizationState: 'unconfirmed',
         authorizationPendingReason: 'replica_recovery',
-        authorizationUnconfirmedAt,
-        replicaBootstrapMode: 'minimal',
-        replicaStaleAt: existing?.replicaStaleAt || space.replicaStaleAt || authorizationUnconfirmedAt,
-        replicaRefreshRequestedAt: existing?.replicaRefreshRequestedAt || space.replicaRefreshRequestedAt || ''
+        authorizationUnconfirmedAt: existing?.authorizationUnconfirmedAt
+          || space.authorizationUnconfirmedAt
+          || new Date().toISOString()
       };
     }
     const confirmed = { ...space, authorizationState: 'confirmed' };
     delete confirmed.authorizationPendingReason;
     delete confirmed.authorizationUnconfirmedAt;
-    delete confirmed.replicaBootstrapMode;
-    delete confirmed.replicaStaleAt;
-    delete confirmed.replicaRefreshRequestedAt;
     return confirmed;
   });
   return {
@@ -620,6 +661,9 @@ export async function replaceSpaces(spaces = [], options = {}) {
 export async function replaceBootstrapControlState(spaces = [], invitations = [], options = {}) {
   const normalizedInvitations = (Array.isArray(invitations) ? invitations : [])
     .filter((invitation) => String(invitation?.invitationId || '').trim());
+  const normalizedMetaEntries = (Array.isArray(options.metaEntries) ? options.metaEntries : [])
+    .map((entry) => ({ key: String(entry?.key || '').trim(), value: entry?.value }))
+    .filter((entry) => entry.key);
   return withStores(
     [STORES.spaces, STORES.invitations, STORES.entities, STORES.outbox, STORES.snapshots, STORES.meta],
     'readwrite',
@@ -628,6 +672,9 @@ export async function replaceBootstrapControlState(spaces = [], invitations = []
       await requestToPromise(stores[STORES.invitations].clear());
       for (const invitation of normalizedInvitations) {
         await requestToPromise(stores[STORES.invitations].put(invitation));
+      }
+      for (const entry of normalizedMetaEntries) {
+        await requestToPromise(stores[STORES.meta].put(entry));
       }
       return {
         ...spaceReplacement,
@@ -1491,7 +1538,9 @@ async function stageSnapshotChunk(event = {}) {
   await cleanupSnapshotSessions({
     currentSnapshotKey: snapshotKey,
     spaceId: String(event.spaceId || '').trim(),
-    removeOtherSessions: chunkIndex === 0,
+    // Una misma raíz puede tener solicitudes concurrentes o reemitidas desde
+    // distintas réplicas. El primer fragmento de una sesión nunca debe borrar
+    // fragmentos todavía válidos de otra sesión del mismo espacio.
     forceSweep: chunkIndex === 0
   }).catch(() => 0);
   const key = `${snapshotKey}|${String(chunkIndex).padStart(8, '0')}`;

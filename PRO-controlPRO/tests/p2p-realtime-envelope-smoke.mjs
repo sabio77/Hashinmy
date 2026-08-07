@@ -185,6 +185,14 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rej
   actorUserId: 'user_recipient_1',
   data: { invitation: invitation('rejected'), space: null }
 })).eventType, 'p2p.invitation.rejected');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+  actorUserId: 'user_recipient_1',
+  data: { invitation: invitation('cancelled'), space: null }
+})).eventType, 'p2p.invitation.cancelled');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+  actorUserId: 'user_inviter_1',
+  data: { invitation: invitation('cancelled', { recipientUserId: '' }), space: null }
+})).eventType, 'p2p.invitation.cancelled');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
   actorUserId: 'user_requester_1',
   sourceDeviceId: 'device_requester_0001',
@@ -218,8 +226,22 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
     requestDeviceId: 'device_requester_0001',
     requestUserId: 'user_requester_1',
     spaceId: 'space_control_1',
+    reason: 'state_gap',
     localStateRevision: 4,
     currentStateRevision: 5
+  }
+})).eventType, 'p2p.snapshot.request');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    requestId: 'snapshot_request_forced_empty_root',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    spaceId: 'space_control_1',
+    reason: 'forced',
+    localStateRevision: 0,
+    currentStateRevision: 0
   }
 })).eventType, 'p2p.snapshot.request');
 
@@ -363,6 +385,24 @@ assert.throws(
   'Una invitación rechazada con un espacio adjunto siguió creando un estado local ambiguo.'
 );
 assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+    actorUserId: 'user_actor_1',
+    data: { invitation: invitation('cancelled', { recipientUserId: '' }), space: null }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'invitation-actor',
+  'Una cancelación huérfana con actor ajeno siguió avanzando el cursor del cliente.'
+);
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
+    actorUserId: 'user_recipient_1',
+    data: { invitation: invitation('cancelled'), space }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'invitation-cancelled-space',
+  'Una invitación cancelada con espacio adjunto siguió creando un estado local ambiguo.'
+);
+assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
     actorUserId: 'user_requester_1',
     sourceDeviceId: 'device_requester_0001',
@@ -380,6 +420,40 @@ assert.throws(
     && error.reason === 'key-request',
   'Una solicitud de clave con identidad de dispositivo contradictoria siguió siendo aceptada.'
 );
+assert.doesNotThrow(() => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    requestId: 'snapshot_initial_clone_ok',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    spaceId: 'space_control_1',
+    reason: 'initial_clone',
+    localStateRevision: 0,
+    currentStateRevision: 5,
+    allowStaleSource: true,
+    sourceDeviceIds: ['device_owner_000001']
+  }
+})), 'El cliente rechazó una clonación inicial explícita y acotada emitida por memoriaBACKEND.');
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+    actorUserId: 'user_requester_1',
+    sourceDeviceId: 'device_requester_0001',
+    data: {
+      requestId: 'snapshot_initial_clone_unbounded',
+      requestDeviceId: 'device_requester_0001',
+      requestUserId: 'user_requester_1',
+      spaceId: 'space_control_1',
+      reason: 'initial_clone',
+      localStateRevision: 0,
+      currentStateRevision: 5,
+      allowStaleSource: false
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'snapshot-request',
+  'El cliente aceptó una clonación inicial sin permiso explícito para usar una fuente anterior.'
+);
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
     actorUserId: 'user_requester_1',
@@ -389,6 +463,7 @@ assert.throws(
       requestDeviceId: 'device_requester_0001',
       requestUserId: 'user_requester_1',
       spaceId: 'space_control_1',
+      reason: 'state_gap',
       localStateRevision: 5,
       currentStateRevision: 5
     }
