@@ -55,6 +55,12 @@ assert.match(eventListener, /P2P_REALTIME_EVENT_INVALID_JSON/);
 assert.match(eventListener, /this\.abortRealtimeForReplay\(/);
 assert.match(eventListener, /'event-parse'/);
 assert.match(eventListener, /'event-envelope'/);
+assert.match(eventListener, /buildRejectedControlRecoveryGap\(payload, error\)/);
+assert.match(eventListener, /let payload = null;/);
+assert.match(eventListener, /payload = JSON\.parse\(event\.data \|\| '\{\}'\)/);
+assert.match(eventListener, /source\.close\(\)/);
+assert.match(eventListener, /recovering: true/);
+assert.match(eventListener, /this\.enqueueEvent\(recoveryGap\)/);
 assert.doesNotMatch(
   eventListener,
   /dispatch\('p2p:error', \{ error, stage: 'event-parse' \}\)/,
@@ -70,4 +76,4 @@ assert.match(gapListener, /this\.abortRealtimeForReplay\(/);
 assert.match(gapListener, /'delivery-gap-parse'/);
 assert.match(gapListener, /'delivery-gap-envelope'/);
 
-console.log('OK: un payload SSE inválido bloquea la tubería, limpia lotes parciales y fuerza replay desde el último cursor durable sin confirmar el evento omitido.');
+console.log('OK: JSON SSE inválido fuerza replay estricto y un control legado canónico-incompleto se aísla como brecha recuperable sin crear un bucle de reconexión.');

@@ -14,7 +14,7 @@ const helperSource = source
   .slice(helperStart, helperEnd)
   .replaceAll('export function ', 'function ');
 
-const harness = `${helperSource}\nexport { assertCanonicalOperationEnvelope, assertCanonicalControlEnvelope, assertRealtimeEventEnvelope, assertRealtimeSequenceContinuity };`;
+const harness = `${helperSource}\nexport { assertCanonicalOperationEnvelope, assertCanonicalControlEnvelope, assertRealtimeEventEnvelope, buildRejectedControlRecoveryGap, assertRealtimeSequenceContinuity };`;
 const module = await import(`data:text/javascript;base64,${Buffer.from(harness).toString('base64')}`);
 
 const event = (deviceSequence, overrides = {}) => ({
@@ -137,6 +137,30 @@ assert.equal(module.assertRealtimeEventEnvelope({
   cursorResetRequired: true,
   resetToSequence: 3
 }, { gap: true }).resetToSequence, 3);
+
+let rejectedLegacyControl = null;
+const legacyRevocation = controlEvent('p2p.membership.revoked', {
+  deviceSequence: 18,
+  deliverySequence: 2018,
+  data: { spaceId: 'space_control_1' }
+});
+try {
+  module.assertRealtimeEventEnvelope(legacyRevocation);
+} catch (error) {
+  rejectedLegacyControl = error;
+}
+assert.equal(rejectedLegacyControl?.code, 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE');
+const legacyRecoveryGap = module.buildRejectedControlRecoveryGap(legacyRevocation, rejectedLegacyControl);
+assert.equal(legacyRecoveryGap?.eventType, 'p2p.delivery.gap');
+assert.equal(legacyRecoveryGap?.currentSequence, 18);
+assert.equal(legacyRecoveryGap?.reason, 'invalid_control_envelope');
+assert.equal(legacyRecoveryGap?.cursorResetRequired, false);
+assert.equal(legacyRecoveryGap?.poisonedReason, 'membership-revoked');
+assert.equal(
+  module.buildRejectedControlRecoveryGap(legacyRevocation, new Error('otro fallo')),
+  null,
+  'Una falla no canónica no debe convertirse en una brecha que avance el cursor.'
+);
 
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
   actorUserId: 'user_owner_1',

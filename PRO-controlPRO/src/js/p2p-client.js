@@ -862,6 +862,31 @@ export function assertRealtimeEventEnvelope(event = {}, options = {}) {
   return event;
 }
 
+export function buildRejectedControlRecoveryGap(event = {}, error = null) {
+  if (String(error?.code || '') !== 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE') return null;
+
+  const eventType = String(event?.eventType || '').trim();
+  const currentSequence = eventCursorSequence(event);
+  if (!CANONICAL_CONTROL_EVENT_TYPES.has(eventType) || !currentSequence) return null;
+
+  return {
+    eventId: `gap_recovery_${currentSequence}_${eventType.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)}`,
+    eventType: 'p2p.delivery.gap',
+    currentSequence,
+    oldestAvailableSequence: currentSequence,
+    gap: true,
+    cursorResetRequired: false,
+    resetToSequence: 0,
+    missingFromSequence: currentSequence,
+    missingToSequence: currentSequence,
+    reason: 'invalid_control_envelope',
+    poisonedEventId: String(event?.eventId || '').trim(),
+    poisonedEventType: eventType,
+    poisonedReason: String(error?.reason || '').trim(),
+    createdAt: new Date().toISOString()
+  };
+}
+
 export function assertRealtimeSequenceContinuity(events = [], lastProcessedSequence = 0) {
   const ordered = Array.isArray(events) ? events : [];
   const lastSequence = Number(lastProcessedSequence || 0);
@@ -5977,11 +6002,37 @@ export class SemillaP2PClient {
           source.close();
           return;
         }
+        let payload = null;
         try {
-          const payload = JSON.parse(event.data || '{}');
+          payload = JSON.parse(event.data || '{}');
           assertRealtimeEventEnvelope(payload);
           this.enqueueEvent(payload).catch(() => null);
         } catch (error) {
+          const recoveryGap = buildRejectedControlRecoveryGap(payload, error);
+          if (recoveryGap) {
+            console.warn('[SemillaP2P] Se aisló un evento de control obsoleto y se recuperará desde el estado autoritativo.', {
+              eventType: recoveryGap.poisonedEventType,
+              reason: recoveryGap.poisonedReason,
+              deviceSequence: recoveryGap.currentSequence
+            });
+            source.close();
+            if (this.eventSource === source) this.eventSource = null;
+            dispatch('p2p:connection', {
+              state: 'connecting',
+              deviceId: sessionContext.deviceId,
+              recovering: true
+            });
+            this.enqueueEvent(recoveryGap).then(() => {
+              if (
+                this.started
+                && !this.manualClose
+                && this.realtimeLeader
+                && this.isSessionContextCurrent(sessionContext)
+              ) this.scheduleReconnect();
+            }).catch(() => null);
+            return;
+          }
+
           console.error('[SemillaP2P] No se pudo interpretar el evento:', error);
           const protocolError = String(error?.code || '').startsWith('P2P_REALTIME_')
             ? error
