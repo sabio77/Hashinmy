@@ -95,8 +95,98 @@ const acceptedPortfolioPanels = buildProjectPanelScopes({
 assert.equal(acceptedPortfolioPanels.filter((panel) => panel.id === 'portfolio_a').length, 1, 'Aceptar el panel completo debe reutilizar la misma identidad y no duplicar el panel virtual.');
 assert.equal(acceptedPortfolioPanels.find((panel) => panel.id === 'portfolio_a')?.type, 'portfolio', 'La membresía real del panel debe sustituir transparentemente la vista virtual.');
 
+const portfolioHeadA = {
+  portfolioSpaceId: 'portfolio_a',
+  projectCount: 2,
+  managedSpaceIds: ['project_a_1', 'project_a_2'],
+  revisionCode: 'Habc123',
+  replicaRevisionCode: 'Pabc123',
+  stateRevisions: { portfolio_a: 4, project_a_1: 8, project_a_2: 6 }
+};
+const fullyLoadedPortfolioProjects = authorizedProjects.slice(0, 2).map((entry) => ({
+  ...entry,
+  space: { ...entry.space, authorizationState: 'confirmed' },
+  project: { ...entry.project, loaded: true }
+}));
+const readyPortfolioPanels = buildProjectPanelScopes({
+  spaces: [{
+    spaceId: 'portfolio_a',
+    resourceType: 'admin.portfolio',
+    ownerUserId: 'owner_a',
+    authorizationState: 'confirmed',
+    members: [sharedOwnerA, { userId: 'guest', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+  }],
+  projects: fullyLoadedPortfolioProjects,
+  portfolioHeads: { portfolio_a: portfolioHeadA },
+  currentUserId: 'guest'
+});
+const readyPortfolioPanel = readyPortfolioPanels.find((panel) => panel.id === 'portfolio_a');
+assert.equal(readyPortfolioPanel?.syncComplete, true, 'El panel invitado solo debe quedar listo cuando la cabeza autoritativa, la membresía y todos sus proyectos están completos.');
+assert.equal(readyPortfolioPanel?.panelRevisionCode, 'Habc123', 'La interfaz debe conservar el código alfanumérico de última actualización del panel.');
+assert.deepEqual(readyPortfolioPanel?.expectedProjectSpaceIds, ['project_a_1', 'project_a_2'], 'La cabeza del panel debe definir el conjunto exacto de proyectos esperados.');
+
+const deferredHeadPortfolioPanels = buildProjectPanelScopes({
+  spaces: [{
+    spaceId: 'portfolio_a',
+    resourceType: 'admin.portfolio',
+    ownerUserId: 'owner_a',
+    authorizationState: 'confirmed',
+    members: [sharedOwnerA, { userId: 'guest', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+  }],
+  projects: fullyLoadedPortfolioProjects,
+  portfolioHeads: { portfolio_a: { ...portfolioHeadA, syncDeferred: true } },
+  currentUserId: 'guest'
+});
+assert.equal(
+  deferredHeadPortfolioPanels.find((panel) => panel.id === 'portfolio_a')?.syncComplete,
+  false,
+  'Una cabeza conservada solo para recuperación no debe presentar un panel invitado como sincronizado.'
+);
+
+const incompletePortfolioPanels = buildProjectPanelScopes({
+  spaces: [{
+    spaceId: 'portfolio_a',
+    resourceType: 'admin.portfolio',
+    ownerUserId: 'owner_a',
+    authorizationState: 'confirmed',
+    members: [sharedOwnerA, { userId: 'guest', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+  }],
+  projects: fullyLoadedPortfolioProjects.map((entry) => entry.space.spaceId === 'project_a_2'
+    ? { ...entry, space: { ...entry.space, authorizationState: 'unconfirmed' }, project: { ...entry.project, loaded: false } }
+    : entry),
+  portfolioHeads: { portfolio_a: portfolioHeadA },
+  currentUserId: 'guest'
+});
+const incompletePortfolioPanel = incompletePortfolioPanels.find((panel) => panel.id === 'portfolio_a');
+assert.equal(incompletePortfolioPanel?.syncComplete, false, 'Un solo proyecto incompleto debe bloquear la presentación del panel completo.');
+assert.deepEqual(incompletePortfolioPanel?.staleProjectSpaceIds, ['project_a_2'], 'El panel debe identificar exactamente qué proyecto necesita recuperar la réplica actual.');
+
+const provisionalPortfolioPanels = buildProjectPanelScopes({
+  spaces: [{
+    spaceId: 'portfolio_a',
+    resourceType: 'admin.portfolio',
+    ownerUserId: 'owner_a',
+    authorizationState: 'unconfirmed',
+    members: [sharedOwnerA, { userId: 'guest', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+  }],
+  projects: fullyLoadedPortfolioProjects,
+  portfolioHeads: { portfolio_a: portfolioHeadA },
+  currentUserId: 'guest'
+});
+const provisionalPortfolioPanel = provisionalPortfolioPanels.find((panel) => panel.id === 'portfolio_a');
+assert.equal(provisionalPortfolioPanel?.type, 'shared-portfolio', 'Mientras la membresía del panel siga provisional, sus proyectos no deben simular una membresía ya confirmada.');
+assert.equal(provisionalPortfolioPanel?.syncComplete, false, 'La cabeza conocida no debe hacer visible el panel hasta confirmar también su autorización local.');
+
 const missingProject = projectRecord({ spaceId: 'space_missing', title: 'Espacio compartido' }, []);
 assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe identificarse como incompleto.');
+
+const partialProject = projectRecord({ spaceId: 'space_partial', title: 'Espacio compartido' }, [{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { description: 'Raíz parcial sin nombre' }
+}]);
+assert.equal(partialProject.loaded, false, 'Una entidad raíz parcial no debe habilitar una card como si el snapshot estuviera completo.');
+assert.notEqual(partialProject.name, 'Espacio compartido', 'El título técnico del espacio no debe aparecer como nombre de un proyecto incompleto.');
 
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);
@@ -327,8 +417,11 @@ assert.equal(appSource.includes('const today = localDateValue()'), true, 'El for
 assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false, 'La interfaz no debe volver a derivar fechas administrativas desde UTC.');
 assert.equal(appSource.includes('Math.abs(record.varianceAmount || 0)'), false, 'Math.abs no admite BigInt y no debe reaparecer en la ruta de renderizado monetario.');
 assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, data]) => data.project.loaded))'), false, 'La interfaz no debe volver a ocultar espacios autorizados mientras llega su proyecto raíz.');
-assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica después de montar su card mínima.');
-assert.equal(appSource.includes('state.projects = new Map(entries)'), true, 'Los espacios incompletos no deben ocultarse mientras llega la actualización inicial.');
+assert.equal(appSource.includes('recoverMissingProjectCards(recoverySpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica aunque permanezcan ocultos durante la carga inicial.');
+assert.equal(appSource.includes('state.projects = new Map(entries)'), true, 'Los espacios incompletos deben conservarse internamente para poder recuperar su réplica sin inventar datos visuales.');
+assert.equal(appSource.includes(".filter((item) => item.project.loaded === true && !item.project.isTrashed)"), true, 'El dashboard no debe renderizar cards con información mínima o métricas desconocidas.');
+assert.equal(appSource.includes('function isIncompleteInvitedPortfolio(panel = null)'), true, 'Los paneles completos invitados deben tener una compuerta de presentación autoritativa.');
+assert.equal(appSource.includes('portfolioHeads: state.p2pState.portfolioHeads'), true, 'La interfaz debe comparar el panel recibido contra la cabeza alfanumérica publicada por memoriaBACKEND.');
 assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFilter)'), true, 'La lista debe aplicar el filtro local sin consultar memoriaBACKEND.');
 assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');
 assert.equal(appSource.includes("const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio'"), true, 'La invitación global debe usar un espacio de cartera aislado de los proyectos.');

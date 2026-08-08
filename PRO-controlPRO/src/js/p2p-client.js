@@ -181,6 +181,20 @@ export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
     .slice(0, limit);
 }
 
+export function normalizePreferredSnapshotSourceUsers(input = {}, allowedSpaceIds = []) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const allowed = new Set(normalizeSnapshotSpaceIds(allowedSpaceIds));
+  const result = {};
+  for (const [rawSpaceId, rawUserId] of Object.entries(input)) {
+    if (Object.keys(result).length >= 1000) break;
+    const spaceId = String(rawSpaceId || '').trim().slice(0, 140);
+    const userId = String(rawUserId || '').trim().slice(0, 140);
+    if (!spaceId || !userId || (allowed.size && !allowed.has(spaceId))) continue;
+    result[spaceId] = userId;
+  }
+  return result;
+}
+
 function createId(prefix = 'id') {
   const random = window.crypto?.randomUUID?.().replace(/-/g, '') || `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   return `${prefix}_${random}`;
@@ -499,6 +513,51 @@ export function mergeParticipationRootManifest(spaces = [], participationRoots =
     spaces: [...canonicalSpaces, ...roots],
     rootSpaceIds
   };
+}
+
+export function mergePortfolioHeadsWithDeferredManifest(
+  incomingHeads = {},
+  previousHeads = {},
+  participationRootManifest = {},
+  spaces = []
+) {
+  const incoming = incomingHeads && typeof incomingHeads === 'object' && !Array.isArray(incomingHeads)
+    ? incomingHeads
+    : {};
+  const previous = previousHeads && typeof previousHeads === 'object' && !Array.isArray(previousHeads)
+    ? previousHeads
+    : {};
+  const portfolioSpaceIds = new Set((Array.isArray(spaces) ? spaces : [])
+    .filter((space) => String(space?.resourceType || '').trim().toLowerCase() === 'admin.portfolio')
+    .map((space) => String(space?.spaceId || '').trim().slice(0, 140))
+    .filter(Boolean));
+  const explicitPendingIds = Array.isArray(participationRootManifest?.pendingPortfolioSpaceIds)
+    ? participationRootManifest.pendingPortfolioSpaceIds
+    : [];
+  const pendingIds = new Set(explicitPendingIds
+    .map((spaceId) => String(spaceId || '').trim().slice(0, 140))
+    .filter((spaceId) => spaceId && portfolioSpaceIds.has(spaceId)));
+
+  // Toda membresía real de panel debe tener una cabeza de versión. Si el backend no pudo
+  // construirla en este bootstrap, tratarla como diferida evita que la UI confunda las
+  // raíces mínimas con proyectos completos aun cuando el manifiesto de error sea antiguo.
+  for (const portfolioSpaceId of portfolioSpaceIds) {
+    if (!Object.prototype.hasOwnProperty.call(incoming, portfolioSpaceId)) pendingIds.add(portfolioSpaceId);
+  }
+
+  const merged = {};
+  for (const [portfolioSpaceId, rawHead] of Object.entries(incoming)) {
+    if (!rawHead || typeof rawHead !== 'object' || Array.isArray(rawHead)) continue;
+    merged[portfolioSpaceId] = { ...rawHead, syncDeferred: false };
+  }
+  for (const portfolioSpaceId of pendingIds) {
+    if (merged[portfolioSpaceId]) continue;
+    const previousHead = previous?.[portfolioSpaceId];
+    merged[portfolioSpaceId] = previousHead && typeof previousHead === 'object' && !Array.isArray(previousHead)
+      ? { ...previousHead, portfolioSpaceId, syncDeferred: true }
+      : { portfolioSpaceId, managedSpaceIds: [], stateRevisions: {}, syncDeferred: true };
+  }
+  return merged;
 }
 
 export function assertCanonicalControlEnvelope(event = {}) {
@@ -1023,6 +1082,18 @@ function sortSnapshotEntities(entities = []) {
   });
 }
 
+export function hasCanonicalProjectRootEntity(entities = []) {
+  return (Array.isArray(entities) ? entities : []).some((entity) => (
+    String(entity?.entityType || '').trim() === 'admin.project'
+    && String(entity?.entityId || '').trim() === 'project'
+    && entity?.deleted !== true
+    && entity?.value
+    && typeof entity.value === 'object'
+    && !Array.isArray(entity.value)
+    && Boolean(String(entity.value.name || '').trim())
+  ));
+}
+
 export function canonicalLocalSnapshotEntities(records = []) {
   const entities = [];
   for (const record of Array.isArray(records) ? records : []) {
@@ -1502,6 +1573,8 @@ export class SemillaP2PClient {
     this.bootstrapMinimumApplicableSequence = 0;
     this.bootstrapApplyQueue = Promise.resolve();
     this.nextBootstrapSnapshotSpaceIds = [];
+    this.nextBootstrapPreferredSnapshotSourceUserIdsBySpace = {};
+    this.nextBootstrapPreferredSnapshotSourceInvitationId = '';
     this.stopPromise = null;
     this.identityRecoveryPromise = null;
     this.identityRecoveryGeneration = 0;
@@ -1520,7 +1593,7 @@ export class SemillaP2PClient {
       snapshotMaxChunks: this.snapshotMaxChunks,
       snapshotSessionTtlSeconds: this.snapshotGrantTtlSeconds + 120
     });
-    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, replicaHealth: {}, lifecycleTransactions: [] };
+    this.bootstrapState = { spaces: [], invitations: { received: [], sent: [] }, portfolioHeads: {}, stateRevisions: {}, replicaHealth: {}, lifecycleTransactions: [] };
     this.tabCoordinator = new P2PTabCoordinator();
     this.tabCoordinationReady = false;
     this.realtimeLeader = true;
@@ -3736,6 +3809,10 @@ export class SemillaP2PClient {
         received: invitations.received.filter((invitation) => invitation?.spaceId !== cleanSpaceId),
         sent: invitations.sent.filter((invitation) => invitation?.spaceId !== cleanSpaceId)
       },
+      portfolioHeads: Object.fromEntries(Object.entries(this.bootstrapState?.portfolioHeads || {})
+        .filter(([portfolioSpaceId]) => portfolioSpaceId !== cleanSpaceId)),
+      stateRevisions: Object.fromEntries(Object.entries(this.bootstrapState?.stateRevisions || {})
+        .filter(([spaceId]) => spaceId !== cleanSpaceId)),
       replicaHealth: Object.fromEntries(Object.entries(this.bootstrapState?.replicaHealth || {})
         .filter(([spaceId]) => spaceId !== cleanSpaceId)),
       lifecycleTransactions: (Array.isArray(this.bootstrapState?.lifecycleTransactions)
@@ -4379,6 +4456,12 @@ export class SemillaP2PClient {
     error.status = 409;
     error.spaceId = cleanSpaceId;
     throw error;
+  }
+
+  isAdminProjectSpace(spaceId = '') {
+    const cleanSpaceId = String(spaceId || '').trim();
+    const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId);
+    return String(space?.resourceType || '').trim().toLowerCase() === 'admin.project';
   }
 
   spaceRequiresEncryption(spaceId = '') {
@@ -5227,7 +5310,7 @@ export class SemillaP2PClient {
       }
       if (invitation.inviterUserId === userId) invitations.sent.push(invitation);
     }
-    return { spaces: spaces || [], invitations, devices: [], snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], localOnly: true };
+    return { spaces: spaces || [], invitations, devices: [], portfolioHeads: {}, stateRevisions: {}, snapshotRequests: [], replicaHealth: {}, lifecycleTransactions: [], localOnly: true };
   }
 
   async applyBootstrapData(data = {}, context = {}) {
@@ -5309,12 +5392,20 @@ export class SemillaP2PClient {
           revokedSpaceIds.add(localSpaceId);
         }
       }
+      const nextSpaces = authoritativeSpaces
+        .filter((space) => !lifecyclePurgeSpaceIds.has(String(space?.spaceId || '').trim()));
+      const nextPortfolioHeads = mergePortfolioHeadsWithDeferredManifest(
+        data.portfolioHeads,
+        this.bootstrapState?.portfolioHeads,
+        data.participationRootManifest,
+        nextSpaces
+      );
       const nextBootstrapState = {
-        spaces: authoritativeSpaces
-          .filter((space) => !lifecyclePurgeSpaceIds.has(String(space?.spaceId || '').trim())),
+        spaces: nextSpaces,
         revokedSpaceIds: [...revokedSpaceIds],
         invitations,
         devices: Array.isArray(data.devices) ? data.devices : [],
+        portfolioHeads: nextPortfolioHeads,
         stateRevisions: backendStateRevisions,
         deliveryState: data.deliveryState && typeof data.deliveryState === 'object' ? data.deliveryState : { sequence: 0 },
         snapshotRequests: Array.isArray(data.snapshotRequests) ? data.snapshotRequests : [],
@@ -5496,9 +5587,25 @@ export class SemillaP2PClient {
         .map((value) => String(value || '').trim())
         .filter(Boolean)
     )).slice(0, 1_000);
+    const preferredSnapshotSourceUserIdsBySpace = {};
+    const preferredSnapshotSourceInvitationId = String(this.nextBootstrapPreferredSnapshotSourceInvitationId || '').trim().slice(0, 160);
+    const allowedPreferredSpaceIds = new Set(snapshotSpaceIds);
+    const pendingPreferredSources = this.nextBootstrapPreferredSnapshotSourceUserIdsBySpace;
+    if (pendingPreferredSources && typeof pendingPreferredSources === 'object' && !Array.isArray(pendingPreferredSources)) {
+      for (const [rawSpaceId, rawUserId] of Object.entries(pendingPreferredSources)) {
+        if (Object.keys(preferredSnapshotSourceUserIdsBySpace).length >= 1_000) break;
+        const spaceId = String(rawSpaceId || '').trim().slice(0, 140);
+        const userId = String(rawUserId || '').trim().slice(0, 140);
+        if (!spaceId || !userId || (allowedPreferredSpaceIds.size && !allowedPreferredSpaceIds.has(spaceId))) continue;
+        preferredSnapshotSourceUserIdsBySpace[spaceId] = userId;
+      }
+    }
     // Consumir antes del primer await evita que dos bootstrap concurrentes
-    // compartan accidentalmente los objetivos de recuperación.
+    // compartan accidentalmente los objetivos de recuperación o la preferencia
+    // de fuente certificada de otro panel.
     this.nextBootstrapSnapshotSpaceIds = [];
+    this.nextBootstrapPreferredSnapshotSourceUserIdsBySpace = {};
+    this.nextBootstrapPreferredSnapshotSourceInvitationId = '';
     const localSpaces = await listSpaces();
     this.assertSessionContext(sessionContext);
     const stateRevisions = await listStateRevisions(localSpaces.map((space) => space.spaceId));
@@ -5516,7 +5623,13 @@ export class SemillaP2PClient {
       lifecycleReceipts,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
         ? {}
-        : this.snapshotSourceExclusionsBySpace()
+        : this.snapshotSourceExclusionsBySpace(),
+      preferredSnapshotSourceUserIdsBySpace: requestSnapshots === false
+        ? {}
+        : preferredSnapshotSourceUserIdsBySpace,
+      preferredSnapshotSourceInvitationId: requestSnapshots === false
+        ? ''
+        : preferredSnapshotSourceInvitationId
     });
     this.assertSessionContext(sessionContext);
 
@@ -5784,23 +5897,64 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [] } = {}) {
+  async refreshBootstrap({
+    requestSnapshots = false,
+    snapshotSpaceIds = [],
+    preferredSnapshotSourceUserIdsBySpace = {},
+    preferredSnapshotSourceInvitationId = ''
+  } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
     this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
+    this.nextBootstrapPreferredSnapshotSourceUserIdsBySpace = normalizePreferredSnapshotSourceUsers(
+      preferredSnapshotSourceUserIdsBySpace,
+      this.nextBootstrapSnapshotSpaceIds
+    );
+    this.nextBootstrapPreferredSnapshotSourceInvitationId = String(preferredSnapshotSourceInvitationId || '').trim().slice(0, 160);
     const state = await this.fetchBootstrap(snapshotMode);
     this.assertSessionContext(sessionContext);
     dispatch('p2p:state', { state });
     return state;
   }
 
-  async recoverMissingProjectRoots(spaceIds = []) {
+  async primeReplicaRecoveryKeys(spaceIds = [], sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const encryptedSpaceIds = normalizeSnapshotSpaceIds(spaceIds).filter((spaceId) => (
+      this.spaceRequiresEncryption(spaceId) && this.canReadSpace(spaceId)
+    ));
+    if (!encryptedSpaceIds.length) return [];
+
+    const results = new Array(encryptedSpaceIds.length);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(4, encryptedSpaceIds.length) }, async () => {
+      while (cursor < encryptedSpaceIds.length) {
+        const index = cursor;
+        cursor += 1;
+        const spaceId = encryptedSpaceIds[index];
+        this.assertSessionContext(sessionContext);
+        const requested = await this.requestSpaceKey(spaceId, '', { force: true }).catch((error) => {
+          if (this.isSessionContextChangedError(error)) throw error;
+          dispatch('p2p:key-recovery-deferred', { spaceId, error, source: 'replica-recovery-prime' });
+          return false;
+        });
+        this.assertSessionContext(sessionContext);
+        results[index] = { spaceId, requested: Boolean(requested) };
+      }
+    });
+    await Promise.all(workers);
+    this.assertSessionContext(sessionContext);
+    return results.filter(Boolean);
+  }
+
+  async recoverMissingProjectRoots(spaceIds = [], options = {}) {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
     return this.refreshBootstrap({
       requestSnapshots: 'force',
-      snapshotSpaceIds: normalizedSpaceIds
+      snapshotSpaceIds: normalizedSpaceIds,
+      preferredSnapshotSourceUserIdsBySpace: options.preferredSnapshotSourceUserIdsBySpace || {},
+      preferredSnapshotSourceInvitationId: options.preferredSnapshotSourceInvitationId || ''
     });
   }
 
@@ -5835,10 +5989,15 @@ export class SemillaP2PClient {
 
     const task = Promise.resolve().then(async () => {
       this.assertSessionContext(sessionContext);
+      const keyPrimePromise = provisional && Math.max(0, Number(provisional.encryptionVersion || 0)) >= 1
+        ? this.primeReplicaRecoveryKeys([cleanSpaceId], sessionContext)
+        : Promise.resolve([]);
       const state = await this.refreshBootstrap({
         requestSnapshots: 'force',
         snapshotSpaceIds: [cleanSpaceId]
       });
+      this.assertSessionContext(sessionContext);
+      await keyPrimePromise;
       this.assertSessionContext(sessionContext);
       const localStateRevisions = await listStateRevisions([cleanSpaceId]);
       this.assertSessionContext(sessionContext);
@@ -6261,6 +6420,29 @@ export class SemillaP2PClient {
           { replace: true }
         );
       } else {
+        let canonicalProjectRootMissing = false;
+        if (this.isAdminProjectSpace(event.spaceId)) {
+          const recoveredProjectRoot = await getEntity(event.spaceId, 'admin.project', 'project');
+          this.assertSessionContext(sessionContext);
+          canonicalProjectRootMissing = !hasCanonicalProjectRootEntity([recoveredProjectRoot]);
+        }
+        if (canonicalProjectRootMissing) {
+          const rejectedResult = {
+            ...applyResult,
+            snapshotIncomplete: true,
+            reason: 'canonical_project_root_missing'
+          };
+          const excludedDeviceIds = this.rememberRejectedSnapshotSource(event.spaceId, event.sourceDeviceId);
+          dispatch('p2p:snapshot-incomplete', {
+            event,
+            result: rejectedResult,
+            sourceRejected: true,
+            excludedDeviceIds
+          });
+          this.snapshotRecoveryRequired = true;
+          this.scheduleSnapshotRecovery(SNAPSHOT_REJECTION_RETRY_MS, { replace: true });
+          return rejectedResult;
+        }
         this.forgetRejectedSnapshotSource(event.spaceId, event.sourceDeviceId);
         const sourceStateRevision = Math.max(0, Number(
           applyResult?.sourceStateRevision
@@ -7035,6 +7217,65 @@ export class SemillaP2PClient {
     }, delay);
   }
 
+  async buildPortfolioSnapshotSourceClaim(spaceId = '', sessionContext = this.captureSessionContext()) {
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId || !this.deviceId) return null;
+    this.assertSessionContext(sessionContext);
+    const head = this.bootstrapState?.portfolioHeads?.[cleanSpaceId];
+    if (!head
+      || String(head.portfolioSpaceId || '').trim() !== cleanSpaceId
+      || !String(head.replicaRevisionCode || '').trim()
+      || !head.stateRevisions
+      || typeof head.stateRevisions !== 'object'
+      || Array.isArray(head.stateRevisions)) return null;
+
+    const spaceIds = normalizeSnapshotSpaceIds([cleanSpaceId, ...(Array.isArray(head.managedSpaceIds) ? head.managedSpaceIds : [])]);
+    const expectedEntries = Object.entries(head.stateRevisions || {})
+      .map(([spaceId, revision]) => [String(spaceId || '').trim(), Math.max(0, Number(revision || 0))])
+      .filter(([spaceId, revision]) => spaceId && Number.isSafeInteger(revision));
+    if (!spaceIds.length || expectedEntries.length !== spaceIds.length) return null;
+    const expectedBySpace = Object.fromEntries(expectedEntries);
+    if (spaceIds.some((candidateSpaceId) => !Object.prototype.hasOwnProperty.call(expectedBySpace, candidateSpaceId))) return null;
+
+    const [localStateRevisions, localSpaces, pendingOutbox] = await Promise.all([
+      listStateRevisions(spaceIds),
+      listSpaces(),
+      listOutbox()
+    ]);
+    this.assertSessionContext(sessionContext);
+    if (spaceIds.some((candidateSpaceId) => (
+      Math.max(0, Number(localStateRevisions?.[candidateSpaceId] || 0)) !== expectedBySpace[candidateSpaceId]
+      || Math.max(0, Number(this.recoveryRequirements?.[candidateSpaceId] || 0)) > 0
+    ))) return null;
+
+    const localSpaceById = new Map((Array.isArray(localSpaces) ? localSpaces : [])
+      .map((space) => [String(space?.spaceId || '').trim(), space]));
+    if (spaceIds.some((candidateSpaceId) => {
+      const localSpace = localSpaceById.get(candidateSpaceId);
+      return !localSpace
+        || localSpace.authorizationPendingReason === 'replica_recovery'
+        || Boolean(localSpace.authorizationUnconfirmedAt)
+        || Boolean(localSpace.replicaStaleAt);
+    })) return null;
+
+    const spaceIdSet = new Set(spaceIds);
+    if ((Array.isArray(pendingOutbox) ? pendingOutbox : []).some((item) => spaceIdSet.has(String(item?.spaceId || '').trim()))) {
+      return null;
+    }
+
+    for (const projectSpaceId of spaceIds.filter((candidateSpaceId) => candidateSpaceId !== cleanSpaceId)) {
+      const entities = await listEntities(projectSpaceId);
+      this.assertSessionContext(sessionContext);
+      if (!hasCanonicalProjectRootEntity(entities)) return null;
+    }
+
+    return {
+      deviceId: this.deviceId,
+      panelRevisionCode: String(head.replicaRevisionCode || '').trim(),
+      stateRevisions: Object.fromEntries(spaceIds.map((candidateSpaceId) => [candidateSpaceId, expectedBySpace[candidateSpaceId]]))
+    };
+  }
+
   async createSpace(options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -7095,22 +7336,37 @@ export class SemillaP2PClient {
     return data;
   }
 
+
   async invite(email = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const requestedSpaceId = String(options.spaceId || '').trim();
+    const requestedAccessScope = String(options.accessScope || 'project').trim().toLowerCase();
+    if (requestedSpaceId && requestedAccessScope === 'portfolio') {
+      // La invitación debe certificar contra la cabeza autoritativa del panel del
+      // mismo instante, no contra un bootstrap anterior que pudo quedar en caché.
+      await this.refreshBootstrap({ requestSnapshots: false });
+      this.assertSessionContext(sessionContext);
+    }
     if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
     if (requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1) {
       await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true });
     }
+    const snapshotSourceClaim = requestedSpaceId
+      && requestedAccessScope === 'portfolio'
+      && String(existingSpace?.resourceType || '').trim().toLowerCase() === 'admin.portfolio'
+      ? await this.buildPortfolioSnapshotSourceClaim(requestedSpaceId, sessionContext)
+      : null;
+    this.assertSessionContext(sessionContext);
     const data = await apiPost('/api/p2p/invitations/create', {
       email,
       spaceId: options.spaceId || '',
       resourceType: options.resourceType || 'generic',
       permissions: options.permissions || ['read', 'write'],
       role: String(options.role || 'member').trim().toLowerCase(),
-      accessScope: String(options.accessScope || 'project').trim().toLowerCase(),
+      accessScope: requestedAccessScope,
+      snapshotSourceClaim,
       requestId: String(options.requestId || options.clientRequestId || '').trim()
     });
     this.assertSessionContext(sessionContext);
@@ -7159,6 +7415,8 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
+    const portfolioInvitation = String(data.invitation?.resourceType || '').trim().toLowerCase() === 'admin.portfolio'
+      && String(data.invitation?.accessScope || '').trim().toLowerCase() === 'portfolio';
     const invitationControlMerge = canonicalDecision === 'accept'
       ? mergeParticipationRootManifest(
         data.space ? [data.space] : [],
@@ -7175,7 +7433,10 @@ export class SemillaP2PClient {
     });
     await saveControlStateAtomically(committedControlState);
     this.assertSessionContext(sessionContext);
-    this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
+    this.applyCommittedControlState(committedControlState, {
+      source: 'local-invitation-response',
+      dispatch: !(canonicalDecision === 'accept' && portfolioInvitation)
+    });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
@@ -7191,10 +7452,103 @@ export class SemillaP2PClient {
       data.replicaPending = Boolean(provisionalSpace);
       data.minimalBootstrap = Boolean(provisionalSpace);
       data.replicaStaleAt = provisionalSpace?.replicaStaleAt || provisionalSpace?.authorizationUnconfirmedAt || '';
-      this.scheduleMinimalReplicaRecovery(acceptedSpaceId, {
-        invitationId: data.invitation?.invitationId,
-        source: 'local-invitation-response'
-      });
+
+      const portfolioHead = data.portfolioHead && typeof data.portfolioHead === 'object'
+        ? data.portfolioHead
+        : null;
+      if (portfolioInvitation) {
+        const responsePortfolioSpaceId = String(portfolioHead?.portfolioSpaceId || acceptedSpaceId || '').trim();
+        const responseManifest = {
+          ...(data.participationRootManifest && typeof data.participationRootManifest === 'object'
+            ? data.participationRootManifest
+            : {}),
+          pendingPortfolioSpaceIds: portfolioHead?.revisionCode
+            ? (Array.isArray(data.participationRootManifest?.pendingPortfolioSpaceIds)
+              ? data.participationRootManifest.pendingPortfolioSpaceIds
+              : [])
+            : Array.from(new Set([
+              ...(Array.isArray(data.participationRootManifest?.pendingPortfolioSpaceIds)
+                ? data.participationRootManifest.pendingPortfolioSpaceIds
+                : []),
+              responsePortfolioSpaceId
+            ].filter(Boolean)))
+        };
+        const responseHeads = mergePortfolioHeadsWithDeferredManifest(
+          portfolioHead?.portfolioSpaceId && portfolioHead?.revisionCode
+            ? { [portfolioHead.portfolioSpaceId]: portfolioHead }
+            : {},
+          this.bootstrapState?.portfolioHeads,
+          responseManifest,
+          committedControlState.spaces
+        );
+        this.bootstrapState = {
+          ...(this.bootstrapState || {}),
+          portfolioHeads: {
+            ...(this.bootstrapState?.portfolioHeads || {}),
+            ...responseHeads
+          },
+          stateRevisions: {
+            ...(this.bootstrapState?.stateRevisions || {}),
+            ...(portfolioHead?.stateRevisions || {})
+          }
+        };
+      } else if (portfolioHead?.portfolioSpaceId && portfolioHead?.revisionCode) {
+        this.bootstrapState = {
+          ...(this.bootstrapState || {}),
+          portfolioHeads: {
+            ...(this.bootstrapState?.portfolioHeads || {}),
+            [portfolioHead.portfolioSpaceId]: { ...portfolioHead, syncDeferred: false }
+          },
+          stateRevisions: {
+            ...(this.bootstrapState?.stateRevisions || {}),
+            ...(portfolioHead.stateRevisions || {})
+          }
+        };
+      }
+
+      if (portfolioInvitation) {
+        // La cabeza del panel se incorpora antes de publicar el estado mínimo.
+        // Así ninguna renderización intermedia puede confundir raíces obsoletas con proyectos listos.
+        dispatch('p2p:state', { state: this.bootstrapState, source: 'local-invitation-response' });
+        const recoverySpaceIds = normalizeSnapshotSpaceIds([acceptedSpaceId, ...participationRootIds]);
+        const currentReplicaRevisionCode = String(portfolioHead?.replicaRevisionCode || '').trim();
+        const preferredUserId = String(data.preferredSnapshotSourceUserId || data.invitation?.inviterUserId || '').trim();
+        const preferredRevisionCode = String(data.preferredSnapshotPanelRevisionCode || currentReplicaRevisionCode).trim();
+        const preferredSnapshotSourceUserIdsBySpace = {};
+        if (preferredUserId && currentReplicaRevisionCode && preferredRevisionCode === currentReplicaRevisionCode) {
+          for (const spaceId of recoverySpaceIds) preferredSnapshotSourceUserIdsBySpace[spaceId] = preferredUserId;
+        }
+        const preferredSnapshotSourceInvitationId = String(
+          data.preferredSnapshotSourceInvitationId || invitationId || ''
+        ).trim();
+        Promise.resolve().then(async () => {
+          const keyPrimePromise = this.primeReplicaRecoveryKeys(recoverySpaceIds, sessionContext);
+          const recoveryPromise = this.recoverMissingProjectRoots(recoverySpaceIds, {
+            preferredSnapshotSourceUserIdsBySpace,
+            preferredSnapshotSourceInvitationId
+          });
+          const [keyPrimeResult, recoveryResult] = await Promise.allSettled([keyPrimePromise, recoveryPromise]);
+          this.assertSessionContext(sessionContext);
+          if (keyPrimeResult.status === 'rejected' && this.isSessionContextChangedError(keyPrimeResult.reason)) {
+            throw keyPrimeResult.reason;
+          }
+          if (recoveryResult.status === 'rejected') throw recoveryResult.reason;
+          return recoveryResult.value;
+        }).catch((error) => {
+          if (this.isSessionContextChangedError(error)) return;
+          dispatch('p2p:bootstrap-deferred', {
+            error,
+            stage: 'portfolio-invitation-replica-recovery',
+            invitationId: String(data.invitation?.invitationId || '').trim(),
+            spaceIds: recoverySpaceIds
+          });
+        });
+      } else {
+        this.scheduleMinimalReplicaRecovery(acceptedSpaceId, {
+          invitationId: data.invitation?.invitationId,
+          source: 'local-invitation-response'
+        });
+      }
       if (provisionalSpace && Math.max(0, Number(provisionalSpace.encryptionVersion || 0)) >= 1) {
         this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
       }

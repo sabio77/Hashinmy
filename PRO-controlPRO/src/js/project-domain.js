@@ -290,11 +290,16 @@ export function projectRecord(space = {}, entities = []) {
     && !candidate.deleted
   ));
   const value = activeEntityValue(entity) || {};
+  const canonicalName = cleanText(value.name || '', 120);
+  const loaded = Boolean(entity && canonicalName);
   return {
     spaceId: space.spaceId || '',
     ownerUserId: space.ownerUserId || '',
     members: Array.isArray(space.members) ? space.members : [],
-    name: cleanText(value.name || space.title || 'Proyecto sin nombre', 120),
+    // Un root mínimo o una entidad parcial nunca se presenta como proyecto cargado.
+    // Evita mostrar el título técnico "Espacio compartido" con métricas 0 mientras
+    // el snapshot real todavía está en tránsito.
+    name: canonicalName || 'Proyecto sin nombre',
     description: cleanText(value.description || '', 900),
     address: cleanText(value.address || '', 240),
     initialBudget: moneyValue(value.initialBudget),
@@ -304,7 +309,7 @@ export function projectRecord(space = {}, entities = []) {
     trashedBy: cleanText(value.trashedBy || '', 180),
     restoredAt: cleanText(value.restoredAt || '', 60),
     isTrashed: isTrashedValue(value),
-    loaded: Boolean(entity),
+    loaded,
     _entity: entity || null
   };
 }
@@ -480,6 +485,13 @@ export function buildProjectPanelScopes(input = {}) {
   const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
   const personalPanelId = cleanText(input.personalPanelId || '__personal_panel__', 220) || '__personal_panel__';
   const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
+  const portfolioHeads = input.portfolioHeads && typeof input.portfolioHeads === 'object' && !Array.isArray(input.portfolioHeads)
+    ? input.portfolioHeads
+    : {};
+  const portfolioSpacesById = new Map(spaces
+    .filter((space) => space?.resourceType === portfolioResourceType)
+    .map((space) => [cleanText(space?.spaceId || '', 140), space])
+    .filter(([spaceId]) => spaceId));
 
   const scopes = spaces
     .filter((space) => space?.resourceType === portfolioResourceType && space?.authorizationState !== 'unconfirmed')
@@ -548,7 +560,7 @@ export function buildProjectPanelScopes(input = {}) {
     }
 
     const ownerScope = resolveActualOwnerScope(ownerUserId);
-    if (!portfolioId && ownerScope) {
+    if (!portfolioId && ownerScope && (ownerScope.owned || !portfolioHeads?.[ownerScope.id])) {
       ownerScope.projects.push(data);
       continue;
     }
@@ -584,6 +596,63 @@ export function buildProjectPanelScopes(input = {}) {
       owned: false,
       projects: ungroupedSharedProjects
     });
+  }
+
+  for (const scope of scopes) {
+    const rawHead = portfolioHeads?.[scope.id];
+    const head = rawHead && typeof rawHead === 'object' && !Array.isArray(rawHead) ? rawHead : null;
+    scope.portfolioHead = head;
+    scope.panelRevisionCode = cleanText(head?.revisionCode || '', 180);
+    scope.replicaRevisionCode = cleanText(head?.replicaRevisionCode || '', 180);
+    scope.expectedProjectSpaceIds = [];
+    scope.missingProjectSpaceIds = [];
+    scope.staleProjectSpaceIds = [];
+    scope.unexpectedProjectSpaceIds = [];
+    scope.syncComplete = true;
+    if (!head) continue;
+
+    const expectedProjectSpaceIds = Array.from(new Set((Array.isArray(head.managedSpaceIds) ? head.managedSpaceIds : [])
+      .map((spaceId) => cleanText(spaceId || '', 140))
+      .filter(Boolean)));
+    const expectedProjectSet = new Set(expectedProjectSpaceIds);
+    const projectBySpaceId = new Map(scope.projects
+      .map((data) => [cleanText(data?.space?.spaceId || '', 140), data])
+      .filter(([spaceId]) => spaceId));
+    const panelSpace = portfolioSpacesById.get(scope.id) || scope.space || null;
+    const stateRevisions = head.stateRevisions && typeof head.stateRevisions === 'object' && !Array.isArray(head.stateRevisions)
+      ? head.stateRevisions
+      : {};
+    const requiredRevisionSpaceIds = [scope.id, ...expectedProjectSpaceIds];
+    const revisionVectorComplete = requiredRevisionSpaceIds.every((spaceId) => (
+      Object.prototype.hasOwnProperty.call(stateRevisions, spaceId)
+      && Number.isFinite(Number(stateRevisions[spaceId]))
+      && Number(stateRevisions[spaceId]) >= 0
+    ));
+    const projectCount = Math.max(0, Math.floor(Number(head.projectCount || 0)));
+    const headMatchesPanel = head.syncDeferred !== true
+      && cleanText(head.portfolioSpaceId || '', 140) === scope.id
+      && Boolean(scope.replicaRevisionCode)
+      && projectCount === expectedProjectSpaceIds.length
+      && revisionVectorComplete;
+    const panelAuthorizationConfirmed = Boolean(panelSpace && panelSpace.authorizationState !== 'unconfirmed');
+    const missingProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => !projectBySpaceId.has(spaceId));
+    const staleProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
+      const data = projectBySpaceId.get(spaceId);
+      return Boolean(data) && (data?.project?.loaded !== true || data?.space?.authorizationState === 'unconfirmed');
+    });
+    const unexpectedProjectSpaceIds = [...projectBySpaceId.keys()].filter((spaceId) => !expectedProjectSet.has(spaceId));
+
+    scope.expectedProjectSpaceIds = expectedProjectSpaceIds;
+    scope.missingProjectSpaceIds = missingProjectSpaceIds;
+    scope.staleProjectSpaceIds = staleProjectSpaceIds;
+    scope.unexpectedProjectSpaceIds = unexpectedProjectSpaceIds;
+    scope.syncComplete = Boolean(
+      headMatchesPanel
+      && panelAuthorizationConfirmed
+      && missingProjectSpaceIds.length === 0
+      && staleProjectSpaceIds.length === 0
+      && unexpectedProjectSpaceIds.length === 0
+    );
   }
 
   return scopes.sort((left, right) => {

@@ -41,6 +41,9 @@ function normalizeInvitationCollection(value = {}) {
 }
 function normalizeReplicaHealthMap(value = {}) { return value; }
 function mergeParticipationRootManifest(spaces = []) { return { spaces, rootSpaceIds: [] }; }
+function mergePortfolioHeadsWithDeferredManifest(incomingHeads = {}) {
+  return incomingHeads && typeof incomingHeads === 'object' && !Array.isArray(incomingHeads) ? incomingHeads : {};
+}
 async function getMeta() { return 0; }
 async function setMeta() { return true; }
 async function replaceBootstrapControlState(spaces, invitations) {

@@ -87,7 +87,7 @@ const state = {
   activePanelId: '',
   pendingPanelId: '',
   renderSequence: 0,
-  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
+  p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], portfolioHeads: {}, stateRevisions: {}, replicaHealth: {}, lifecycleTransactions: [] },
   projects: new Map(),
   pendingProjectCreation: null,
   editingRecord: null,
@@ -210,16 +210,28 @@ function portfolioOwnerProfile(portfolioSpace = null) {
   const ownerUserId = String(portfolioSpace?.ownerUserId || '').trim();
   return (portfolioSpace?.members || []).find((member) => String(member?.userId || '').trim() === ownerUserId)?.profile || null;
 }
-function panelScopes() {
+function allPanelScopes() {
   return buildProjectPanelScopes({
     spaces: state.p2pState.spaces,
     projects: [...state.projects.values()],
+    portfolioHeads: state.p2pState.portfolioHeads,
     currentUserId: state.user?.userId || '',
     activePanelId: state.activePanelId,
     portfolioResourceType: PORTFOLIO_RESOURCE_TYPE,
     personalPanelId: PERSONAL_PANEL_ID,
     sharedProjectsPanelId: SHARED_PROJECTS_PANEL_ID
   });
+}
+function isIncompleteInvitedPortfolio(panel = null) {
+  if (!panel || panel.owned) return false;
+  if (panel.type === 'portfolio') return !panel.portfolioHead || panel.syncComplete !== true;
+  return Boolean(panel.portfolioHead && panel.syncComplete !== true);
+}
+function panelScopes() {
+  return allPanelScopes().filter((panel) => !isIncompleteInvitedPortfolio(panel));
+}
+function incompleteInvitedPortfolioPanels() {
+  return allPanelScopes().filter((panel) => isIncompleteInvitedPortfolio(panel));
 }
 function activePanelScope() {
   const scopes = panelScopes();
@@ -264,7 +276,7 @@ function renderPanelSwitcher(activePanel = activePanelScope()) {
     const copy = document.createElement('span'); copy.className = 'panel-switcher-copy';
     const title = document.createElement('strong'); title.textContent = panelDisplayName(panel);
     const detail = document.createElement('small');
-    const projectCount = panel.projects.filter((data) => !data.project.isTrashed).length;
+    const projectCount = panel.projects.filter((data) => data.project.loaded === true && !data.project.isTrashed).length;
     const countLabel = t(projectCount === 1 ? 'dashboard.panelProjectCountOne' : 'dashboard.panelProjectCountMany', projectCount === 1 ? '{count} proyecto' : '{count} proyectos').replace('{count}', String(projectCount));
     detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
     copy.append(title, detail); button.append(marker, copy); card.append(button);
@@ -662,7 +674,7 @@ function resetUserScopedInterface() {
   state.selectedSpaceId = '';
   state.activePanelId = '';
   state.pendingPanelId = '';
-  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
+  state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], portfolioHeads: {}, stateRevisions: {}, replicaHealth: {}, lifecycleTransactions: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
   state.editingRecord = null;
@@ -781,9 +793,12 @@ async function recoverMissingProjectCards(spaceIds = []) {
     const unresolved = [];
     for (const spaceId of candidates) {
       const space = state.p2pState.spaces.find((candidate) => candidate?.spaceId === spaceId) || null;
-      if (!space) continue;
+      if (!space) {
+        unresolved.push(spaceId);
+        continue;
+      }
       const entities = await semillaP2P.listEntities(spaceId).catch(() => []);
-      if (!projectRecord(space, entities).loaded) unresolved.push(spaceId);
+      if (!projectRecord(space, entities).loaded || isAuthorizationUnconfirmed(space)) unresolved.push(spaceId);
     }
     if (unresolved.length) {
       const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
@@ -791,11 +806,11 @@ async function recoverMissingProjectCards(spaceIds = []) {
         elements.dashboardStatus,
         pendingRecoveryCount > 0
           ? pendingRecoveryCount === 1
-            ? t('p2p.missingProjectRecoveryPending', 'El proyecto compartido ya aparece con información mínima mientras otra réplica completa la actualización.')
-            : t('p2p.missingProjectsRecoveryPending', 'Los proyectos compartidos ya aparecen con información mínima mientras otras réplicas completan la actualización.')
+            ? t('p2p.missingProjectRecoveryPending', 'El proyecto compartido se mostrará cuando la réplica local coincida con la versión actual.')
+            : t('p2p.missingProjectsRecoveryPending', 'Los proyectos compartidos se mostrarán cuando sus réplicas locales coincidan con la versión actual.')
           : unresolved.length === 1
-            ? t('p2p.missingProjectHidden', 'El proyecto compartido permanece visible con información mínima; se actualizará cuando una réplica válida esté disponible.')
-            : t('p2p.missingProjectsHidden', 'Los proyectos compartidos permanecen visibles con información mínima y se actualizarán cuando haya réplicas válidas disponibles.'),
+            ? t('p2p.missingProjectHidden', 'El proyecto compartido permanecerá oculto hasta que una réplica válida complete su información.')
+            : t('p2p.missingProjectsHidden', 'Los proyectos compartidos permanecerán ocultos hasta que réplicas válidas completen su información.'),
         'warning'
       );
     } else {
@@ -811,7 +826,7 @@ async function recoverMissingProjectCards(spaceIds = []) {
   } catch (error) {
     setStatus(
       elements.dashboardStatus,
-      error?.message || t('p2p.missingProjectDeferred', 'El proyecto compartido permanece visible con información mínima y completará sus datos cuando una réplica válida pueda sincronizarlo.'),
+      error?.message || t('p2p.missingProjectDeferred', 'El proyecto compartido permanecerá oculto hasta que una réplica válida pueda sincronizarlo por completo.'),
       'warning'
     );
     return false;
@@ -829,9 +844,18 @@ async function refreshProjects() {
   }));
   if (renderSequence !== state.renderSequence) return;
   const missingProjectSpaceIds = entries
-    .filter(([, data]) => !data.project.loaded)
+    .filter(([, data]) => !data.project.loaded || isAuthorizationUnconfirmed(data.space))
     .map(([spaceId]) => spaceId);
   state.projects = new Map(entries);
+  const incompletePanels = incompleteInvitedPortfolioPanels();
+  const panelRecoverySpaceIds = incompletePanels.flatMap((panel) => [
+    ...(!panel.portfolioHead || panel.portfolioHead?.syncDeferred === true
+      ? [String(panel.space?.spaceId || panel.id || '').trim()]
+      : []),
+    ...(panel.missingProjectSpaceIds || []),
+    ...(panel.staleProjectSpaceIds || [])
+  ].filter(Boolean));
+  const recoverySpaceIds = Array.from(new Set([...missingProjectSpaceIds, ...panelRecoverySpaceIds]));
   if (state.pendingPanelId && panelScopes().some((panel) => panel.id === state.pendingPanelId)) {
     setActivePanelId(state.pendingPanelId);
     state.pendingPanelId = '';
@@ -841,12 +865,21 @@ async function refreshProjects() {
   renderDashboard();
   renderTrash();
   if (state.selectedSpaceId) renderProject();
-  if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
+  if (incompletePanels.length) {
+    setStatus(
+      elements.dashboardStatus,
+      incompletePanels.length === 1
+        ? t('p2p.panelSyncPending', 'El panel compartido se está sincronizando y aparecerá cuando todos sus proyectos correspondan a la versión actual.')
+        : t('p2p.panelsSyncPending', 'Los paneles compartidos se están sincronizando y aparecerán cuando todos sus proyectos correspondan a la versión actual.'),
+      'warning'
+    );
+  }
+  if (recoverySpaceIds.length) recoverMissingProjectCards(recoverySpaceIds).catch(() => null);
 }
 
 function renderPortfolioMetrics(projects = activePanelProjects()) {
   elements.portfolioMetrics.replaceChildren();
-  projects = (Array.isArray(projects) ? projects : []).filter((item) => !item.project.isTrashed);
+  projects = (Array.isArray(projects) ? projects : []).filter((item) => item.project.loaded === true && !item.project.isTrashed);
   const totalCapital = sumMoneyValues(projects, (item) => item.metrics.totalCapital);
   const totalPurchases = sumMoneyValues(projects, (item) => item.metrics.totalPurchases);
   const available = sumMoneyValues(projects, (item) => item.metrics.availableCapital);
@@ -939,8 +972,9 @@ function renderDashboard() {
   if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = sharedOnlyPanel || Boolean(portfolioSpace && !canInvitePortfolio);
   if (elements.newProjectButton) elements.newProjectButton.hidden = !canCreatePortfolioProject(portfolioSpace);
   elements.projectList.replaceChildren();
+  const pendingProjects = panelProjects.filter((item) => item.project.loaded !== true && !item.project.isTrashed);
   const allProjects = panelProjects
-    .filter((item) => !item.project.isTrashed)
+    .filter((item) => item.project.loaded === true && !item.project.isTrashed)
     .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
   const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
   const projects = normalizedFilter
@@ -960,6 +994,10 @@ function renderDashboard() {
   }
   if (!allProjects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
+    if (pendingProjects.length) {
+      empty.innerHTML = `<strong>${t('p2p.pendingProjectsTitle', 'Sincronizando proyectos compartidos')}</strong><p>${t('p2p.pendingProjectsDescription', 'Los proyectos aparecerán cuando la copia local complete y valide la versión actual.')}</p>`;
+      elements.projectList.append(empty); return;
+    }
     const emptyDescription = canCreatePortfolioProject(portfolioSpace)
       ? t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')
       : t('dashboard.emptyRestrictedDescription', 'Aún no hay proyectos disponibles para tu cuenta. Un Gerente o el propietario del panel puede crear el primero.');
@@ -1687,7 +1725,7 @@ function renderProject() {
 function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); renderDashboard(); renderTrash(); }
 function openProject(spaceId) {
   const data = state.projects.get(spaceId);
-  if (!data || data.project.isTrashed) return;
+  if (!data || data.project.loaded !== true || data.project.isTrashed) return;
   state.selectedSpaceId = spaceId;
   elements.dashboardView.classList.add('hidden');
   elements.projectView.classList.remove('hidden');
@@ -1704,6 +1742,8 @@ function applyP2PState(nextState = {}) {
       sent: Array.isArray(nextState.invitations?.sent) ? nextState.invitations.sent : []
     },
     devices: Array.isArray(nextState.devices) ? nextState.devices : [],
+    portfolioHeads: nextState.portfolioHeads && typeof nextState.portfolioHeads === 'object' && !Array.isArray(nextState.portfolioHeads) ? nextState.portfolioHeads : {},
+    stateRevisions: nextState.stateRevisions && typeof nextState.stateRevisions === 'object' && !Array.isArray(nextState.stateRevisions) ? nextState.stateRevisions : {},
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
   };

@@ -8,6 +8,42 @@ const root = path.resolve(path.dirname(currentFile), '..');
 const clientSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
 const storageSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-storage.js'), 'utf8');
 
+const headMergeStart = clientSource.indexOf('export function mergePortfolioHeadsWithDeferredManifest(');
+const headMergeEnd = clientSource.indexOf('\nexport function assertCanonicalControlEnvelope', headMergeStart);
+assert.ok(headMergeStart >= 0 && headMergeEnd > headMergeStart, 'No se encontró la protección de cabezas de panel diferidas.');
+const headMergeSource = clientSource.slice(headMergeStart, headMergeEnd).replace('export function', 'function');
+const headMergeModule = await import(`data:text/javascript;base64,${Buffer.from(`${headMergeSource}
+export { mergePortfolioHeadsWithDeferredManifest };`).toString('base64')}#portfolio-head-deferred`);
+const previousHead = {
+  portfolioSpaceId: 'portfolio_pending',
+  revisionCode: 'HoldKnown',
+  replicaRevisionCode: 'PoldKnown',
+  managedSpaceIds: ['project_known'],
+  stateRevisions: { portfolio_pending: 4, project_known: 7 }
+};
+const preservedDeferredHead = headMergeModule.mergePortfolioHeadsWithDeferredManifest(
+  {},
+  { portfolio_pending: previousHead },
+  { failed: 1, deferred: true, pendingPortfolioSpaceIds: ['portfolio_pending'] },
+  [{ spaceId: 'portfolio_pending', resourceType: 'admin.portfolio' }]
+);
+assert.equal(preservedDeferredHead.portfolio_pending?.revisionCode, 'HoldKnown', 'Un fallo transitorio de bootstrap descartó la última cabeza conocida del panel.');
+assert.equal(preservedDeferredHead.portfolio_pending?.syncDeferred, true, 'La cabeza conservada debe quedar explícitamente bloqueada hasta una lectura autoritativa.');
+const firstDeferredHead = headMergeModule.mergePortfolioHeadsWithDeferredManifest(
+  {},
+  {},
+  {},
+  [{ spaceId: 'portfolio_new', resourceType: 'admin.portfolio' }]
+);
+assert.equal(firstDeferredHead.portfolio_new?.syncDeferred, true, 'Una membresía de panel sin cabeza no quedó protegida contra cards mínimas incompletas.');
+const refreshedHead = headMergeModule.mergePortfolioHeadsWithDeferredManifest(
+  { portfolio_pending: previousHead },
+  preservedDeferredHead,
+  { failed: 0, deferred: false, pendingPortfolioSpaceIds: [] },
+  [{ spaceId: 'portfolio_pending', resourceType: 'admin.portfolio' }]
+);
+assert.equal(refreshedHead.portfolio_pending?.syncDeferred, false, 'Una cabeza autoritativa nueva no desbloqueó el panel después de la recuperación.');
+
 const reconciliationStart = storageSource.indexOf('function cleanSpaceId(');
 const reconciliationEnd = storageSource.indexOf('\nasync function purgeSpaceRecords', reconciliationStart);
 assert.ok(reconciliationStart >= 0 && reconciliationEnd > reconciliationStart, 'No se encontró la reconciliación durable de proyectos.');
@@ -271,7 +307,10 @@ assert.match(responseMethod, /data\.replicaStaleAt = provisionalSpace\?\.replica
 assert.match(responseMethod, /prepareCommittedControlState\(/, 'La respuesta local no prepara el estado provisional antes de persistirlo.');
 assert.match(responseMethod, /authorizationState: canonicalDecision === 'accept' \? 'unconfirmed' : 'confirmed'/, 'La aceptación local todavía obtiene permisos antes de confirmar su réplica.');
 assert.match(responseMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'La aceptación repetida puede rebajar una réplica ya confirmada.');
-assert.match(responseMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'local-invitation-response' \}\)/);
+assert.match(responseMethod, /this\.applyCommittedControlState\(committedControlState, \{[\s\S]*?source: 'local-invitation-response',[\s\S]*?dispatch: !\(canonicalDecision === 'accept' && portfolioInvitation\)/, 'La aceptación de panel no debe publicar raíces mínimas antes de incorporar su cabeza autoritativa.');
+assert.match(responseMethod, /if \(portfolioInvitation\) \{[\s\S]*?dispatch\('p2p:state', \{ state: this\.bootstrapState, source: 'local-invitation-response' \}\)/, 'El primer estado visible del panel aceptado debe incluir ya su cabeza de versión.');
+assert.match(responseMethod, /data\.preferredSnapshotSourceUserId \|\| data\.invitation\?\.inviterUserId/, 'La cuenta que invitó debe seguir siendo una fuente preferente aunque su deviceId certificado haya quedado obsoleto.');
+assert.match(responseMethod, /data\.preferredSnapshotPanelRevisionCode \|\| currentReplicaRevisionCode/, 'La recuperación debe anclarse a la cabeza alfanumérica vigente devuelta al aceptar el panel.');
 
 assert.match(clientSource, /pendingReplicaSpaceIds/, 'El bootstrap no preserva el bloqueo mientras la revisión local está atrasada.');
 assert.match(clientSource, /recoveryEligibleSpaceIds\(/, 'La recuperación excluye precisamente el proyecto aceptado que debe recibir el snapshot.');
@@ -297,6 +336,22 @@ assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recupera
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
 assert.match(appSource, /state\.projects = new Map\(entries\)/, 'La interfaz sigue ocultando el proyecto hasta recibir la copia completa.');
-assert.match(appSource, /sharedProjectPendingTitle/, 'Falta la card mínima para reconocer el proyecto aceptado.');
+assert.match(appSource, /pendingProjectsTitle/, 'La interfaz debe representar la recuperación como estado de sincronización sin inventar una card de proyecto incompleta.');
+assert.match(appSource, /isIncompleteInvitedPortfolio/, 'El panel completo invitado debe permanecer oculto hasta validar todos sus proyectos contra la cabeza actual.');
+const incompletePanelStart = appSource.indexOf('function isIncompleteInvitedPortfolio(');
+const incompletePanelEnd = appSource.indexOf('\nfunction panelScopes()', incompletePanelStart);
+assert.ok(incompletePanelStart >= 0 && incompletePanelEnd > incompletePanelStart, 'No se encontró la barrera visual del panel invitado.');
+const incompletePanelFn = new Function(`${appSource.slice(incompletePanelStart, incompletePanelEnd)}; return isIncompleteInvitedPortfolio;`)();
+assert.equal(
+  incompletePanelFn({ type: 'portfolio', owned: false, portfolioHead: null, syncComplete: true }),
+  true,
+  'Una membresía real de panel sin cabeza de versión puede volver a mostrar cards mínimas como proyectos completos.'
+);
+assert.equal(
+  incompletePanelFn({ type: 'shared-portfolio', owned: false, portfolioHead: null, syncComplete: true }),
+  false,
+  'Una invitación individual de proyecto no debe ocultarse por no tener cabeza del panel completo.'
+);
+assert.match(appSource, /!panel\.portfolioHead \|\| panel\.portfolioHead\?\.syncDeferred === true/, 'La recuperación no vuelve a solicitar la raíz del panel cuando falta o quedó diferida su cabeza de versión.');
 
-console.log('OK: la aceptación monta control mínimo obsoleto sin bloquear, muestra la card y completa la réplica en segundo plano antes de habilitar edición.');
+console.log('OK: la aceptación monta control mínimo obsoleto sin bloquear, oculta datos incompletos y completa la réplica en segundo plano antes de habilitar edición.');

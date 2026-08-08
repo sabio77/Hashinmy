@@ -32,6 +32,12 @@ assert.match(leaveMethod, /new Set\(\[[\s\S]*?data\.revokedSpaceIds[\s\S]*?clean
 assert.match(leaveMethod, /for \(const revokedSpaceId of revokedSpaceIds\)/, 'Cada proyecto retirado del panel debe purgarse localmente en el dispositivo que abandona.');
 assert.match(leaveMethod, /purgeLocalSpace\(revokedSpaceId\)[\s\S]*?purgeSpaceCrypto\(revokedSpaceId\)/, 'La purga debe retirar tanto los datos administrativos como las claves locales de cada espacio revocado.');
 assert.match(leaveMethod, /removeSpaceFromBootstrapState\(revokedSpaceId\)/, 'Todos los espacios revocados deben salir inmediatamente del estado visible aun si el refresco de red falla.');
+const removeSpaceStart = source.indexOf("  removeSpaceFromBootstrapState(spaceId = '') {");
+const removeSpaceEnd = source.indexOf('\n  applyCommittedControlState', removeSpaceStart);
+assert.ok(removeSpaceStart >= 0 && removeSpaceEnd > removeSpaceStart, 'Debe existir la limpieza local del control de un espacio revocado.');
+const removeSpaceMethod = source.slice(removeSpaceStart, removeSpaceEnd);
+assert.match(removeSpaceMethod, /portfolioHeads:[\s\S]*?portfolioSpaceId !== cleanSpaceId/, 'Revocar un panel debe retirar inmediatamente su cabeza de versión para no ocultar accesos directos conservados.');
+assert.match(removeSpaceMethod, /stateRevisions:[\s\S]*?spaceId !== cleanSpaceId/, 'La desvinculación debe retirar también el watermark autoritativo obsoleto del espacio revocado.');
 assert.match(leaveMethod, /updateRecoveryRequirements\(\{[\s\S]*?retainSpaceIds: this\.readableSpaceIds\(\)/, 'Los requisitos de recuperación deben descartar espacios que dejaron de ser legibles.');
 assert.match(leaveMethod, /dispatch\('p2p:access-revoked', \{[\s\S]*?spaceIds: revokedSpaceIds/, 'Las demás pestañas y la interfaz deben recibir la lista completa de espacios retirados.');
 

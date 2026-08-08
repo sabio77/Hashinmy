@@ -90,4 +90,53 @@ assert.match(responseMethod, /mergeParticipationRootManifest\(/, 'Aceptar un pan
 assert.match(responseMethod, /data\.participationRoots = committedControlState\.spaces\.filter/, 'La interfaz no recibe las raíces mínimas ya persistidas.');
 assert.match(responseMethod, /authorizationState: canonicalDecision === 'accept' \? 'unconfirmed' : 'confirmed'/, 'Las raíces mínimas se están confirmando antes de recuperar la réplica real.');
 
-console.log('OK: manifiesto mínimo de proyectos validado, recuperación incremental y cascada de revocación protegida.');
+assert.match(responseMethod, /const recoverySpaceIds = normalizeSnapshotSpaceIds\(\[acceptedSpaceId, \.\.\.participationRootIds\]\)/, 'Aceptar un panel no agrupa el panel y todos sus proyectos mínimos en una sola recuperación dirigida.');
+assert.match(responseMethod, /portfolioHead\?\.replicaRevisionCode/, 'La app debe validar la fuente preferente contra la versión de datos que un dispositivo puede demostrar por ACK.');
+assert.match(responseMethod, /preferredSnapshotPanelRevisionCode/, 'La app ignora el código de revisión que certifica al invitador como fuente vigente.');
+assert.match(responseMethod, /preferredSnapshotSourceUserIdsBySpace/, 'La recuperación no propaga la fuente preferente por cada proyecto del panel.');
+assert.match(responseMethod, /recoverMissingProjectRoots\(recoverySpaceIds/, 'La app sigue recuperando solo el panel y deja las cards hijas esperando reconciliaciones posteriores.');
+assert.match(responseMethod, /primeReplicaRecoveryKeys\(recoverySpaceIds, sessionContext\)/, 'Aceptar un panel no solicita de forma anticipada las claves de todos los proyectos antes de recibir sus snapshots.');
+
+assert.match(responseMethod, /preferredSnapshotSourceInvitationId/, 'Aceptar un panel no conserva la invitación como prueba servidor-side de la instalación que certificó la cabeza vigente.');
+
+const inviteStart = clientSource.indexOf("  async buildPortfolioSnapshotSourceClaim(spaceId = ''");
+const inviteEnd = clientSource.indexOf('\n  async respondToInvitation', inviteStart);
+assert.ok(inviteStart >= 0 && inviteEnd > inviteStart, 'No se encontró la certificación local previa a invitar un panel.');
+const inviteSource = clientSource.slice(inviteStart, inviteEnd);
+assert.match(inviteSource, /requestedAccessScope === 'portfolio'[\s\S]*refreshBootstrap\(\{ requestSnapshots: false \}\)/, 'La invitación certifica contra una cabeza de panel potencialmente obsoleta en caché.');
+assert.match(inviteSource, /head\.replicaRevisionCode/, 'La instalación invitadora no certifica el código alfanumérico de réplica del panel.');
+assert.match(inviteSource, /listStateRevisions\(spaceIds\)/, 'La certificación no compara la cabeza del panel contra las revisiones realmente aplicadas en esta instalación.');
+assert.match(inviteSource, /listOutbox\(\)/, 'La certificación puede declarar vigente una instalación que aún tiene cambios locales pendientes de publicar.');
+assert.match(inviteSource, /hasCanonicalProjectRootEntity\(entities\)/, 'La certificación puede declarar vigente una instalación sin la raíz canónica de uno de los proyectos.');
+assert.match(inviteSource, /snapshotSourceClaim,/, 'La invitación no transporta la certificación local mínima hacia memoriaBACKEND.');
+
+const fetchBootstrapStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false)');
+const fetchBootstrapEnd = clientSource.indexOf('\n  async start(', fetchBootstrapStart);
+const fetchBootstrapSource = clientSource.slice(fetchBootstrapStart, fetchBootstrapEnd);
+assert.match(fetchBootstrapSource, /preferredSnapshotSourceInvitationId/, 'La recuperación dirigida no devuelve al backend la invitación aceptada para resolver allí la fuente certificada.');
+
+const snapshotRootHelperStart = clientSource.indexOf('export function hasCanonicalProjectRootEntity(');
+const snapshotRootHelperEnd = clientSource.indexOf('\n\nexport function canonicalLocalSnapshotEntities', snapshotRootHelperStart);
+assert.ok(snapshotRootHelperStart >= 0 && snapshotRootHelperEnd > snapshotRootHelperStart, 'No se encontró la validación de raíz canónica de proyecto.');
+const snapshotRootHelperSource = clientSource.slice(snapshotRootHelperStart, snapshotRootHelperEnd);
+const snapshotRootHelperModule = await import(`data:text/javascript;base64,${Buffer.from(`${snapshotRootHelperSource}`).toString('base64')}#canonical-project-root`);
+assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Proyecto válido' },
+  deleted: false
+}]), true, 'Una raíz de proyecto válida fue rechazada.');
+assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: {},
+  deleted: false
+}]), false, 'Una raíz sin nombre fue aceptada como proyecto completamente hidratado.');
+
+const completeStart = clientSource.indexOf('  async applyDecryptedOperationEvent(event = {}');
+const completeEnd = clientSource.indexOf('\n  async applyDecryptedOperationEventBatch(', completeStart);
+const completeMethod = clientSource.slice(completeStart, completeEnd);
+assert.match(completeMethod, /canonical_project_root_missing/, 'Un snapshot incompleto puede confirmarse aunque no haya recuperado la raíz canónica del proyecto.');
+assert.match(completeMethod, /rememberRejectedSnapshotSource\(event\.spaceId, event\.sourceDeviceId\)/, 'La app no excluye la réplica que entregó un proyecto sin raíz canónica.');
+
+console.log('OK: manifiesto mínimo, claves anticipadas, fuente vigente y raíz canónica de proyectos protegidos.');
