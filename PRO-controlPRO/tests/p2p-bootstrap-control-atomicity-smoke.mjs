@@ -33,6 +33,8 @@ const applyHarness = `
 const CURSOR_META_PREFIX = 'deliveryCursor:';
 let replaceFailure = null;
 let recoveryFailure = null;
+let latestStateRevisions = {};
+let lastPendingReplicaSpaceIds = [];
 function normalizeInvitationCollection(value = {}) {
   return {
     received: Array.isArray(value.received) ? value.received : [],
@@ -40,18 +42,36 @@ function normalizeInvitationCollection(value = {}) {
   };
 }
 function normalizeReplicaHealthMap(value = {}) { return value; }
-function mergeParticipationRootManifest(spaces = []) { return { spaces, rootSpaceIds: [] }; }
+function mergeParticipationRootManifest(spaces = [], roots = []) {
+  const merged = new Map();
+  for (const space of [...spaces, ...roots]) {
+    if (space?.spaceId) merged.set(space.spaceId, space);
+  }
+  return {
+    spaces: [...merged.values()],
+    rootSpaceIds: roots.map((space) => String(space?.spaceId || '')).filter(Boolean)
+  };
+}
 function mergePortfolioHeadsWithDeferredManifest(incomingHeads = {}) {
   return incomingHeads && typeof incomingHeads === 'object' && !Array.isArray(incomingHeads) ? incomingHeads : {};
 }
 async function getMeta() { return 0; }
 async function setMeta() { return true; }
-async function replaceBootstrapControlState(spaces, invitations) {
+async function listStateRevisions() { return { ...latestStateRevisions }; }
+async function replaceBootstrapControlState(spaces, invitations, options = {}) {
   if (replaceFailure) throw replaceFailure;
-  return { spaces: spaces.map((space) => ({ ...space, durable: true })), removedSpaceIds: [], preservedSpaceIds: [], invitations };
+  lastPendingReplicaSpaceIds = [...(options.pendingReplicaSpaceIds || [])];
+  return {
+    spaces: spaces.map((space) => ({ ...space, durable: true })),
+    removedSpaceIds: [],
+    preservedSpaceIds: [],
+    pendingReplicaSpaceIds: [...lastPendingReplicaSpaceIds],
+    invitations
+  };
 }
 async function purgeSpaceCrypto() { return true; }
 function dispatch() {}
+function configureP2PStorageLimits() {}
 class TestClient {
   constructor() {
     this.bootstrapState = { marker: 'old', spaces: [{ spaceId: 'old' }] };
@@ -62,19 +82,26 @@ class TestClient {
     this.lastAcceptedStreamSequence = 0;
     this.highestPendingAck = 0;
     this.snapshotRecoveryRequired = false;
+    this.syncedLocalStateRevisions = {};
   }
   captureSessionContext() { return { deviceId: 'device_atomic_1' }; }
   assertSessionContext() { return true; }
   async ensureCurrentSpaceKey() { return true; }
-  async syncRecoveryRequirements() { if (recoveryFailure) throw recoveryFailure; }
+  async syncRecoveryRequirements({ localStateRevisions = {} } = {}) {
+    this.syncedLocalStateRevisions = { ...localStateRevisions };
+    if (recoveryFailure) throw recoveryFailure;
+  }
   snapshotRecoveryDelay() { return 0; }
   scheduleSnapshotRecovery() {}
   clearSnapshotRecovery() {}
+  scheduleLifecycleFinalizationObserver() {}
 ${applyMethod}
 }
 function setReplaceFailure(error) { replaceFailure = error; }
 function setRecoveryFailure(error) { recoveryFailure = error; }
-export { TestClient, setReplaceFailure, setRecoveryFailure };
+function setLatestStateRevisions(value = {}) { latestStateRevisions = { ...value }; }
+function getLastPendingReplicaSpaceIds() { return [...lastPendingReplicaSpaceIds]; }
+export { TestClient, setReplaceFailure, setRecoveryFailure, setLatestStateRevisions, getLastPendingReplicaSpaceIds };
 `;
 
 const applyModule = await import(`data:text/javascript;base64,${Buffer.from(applyHarness).toString('base64')}#apply`);
@@ -104,6 +131,49 @@ const applyModule = await import(`data:text/javascript;base64,${Buffer.from(appl
   assert.equal(client.eventMaxBytes, 65536);
 }
 
+
+{
+  const client = new applyModule.TestClient();
+  client.bootstrapState = {
+    spaces: [{
+      spaceId: 'project_race',
+      governanceSpaceId: 'portfolio_race',
+      authorizationState: 'confirmed'
+    }],
+    portfolioHeads: {}
+  };
+  applyModule.setReplaceFailure(null);
+  applyModule.setRecoveryFailure(null);
+  applyModule.setLatestStateRevisions({ project_race: 9 });
+  await client.applyBootstrapData({
+    spaces: [],
+    participationRoots: [{
+      spaceId: 'project_race',
+      governanceSpaceId: 'portfolio_race',
+      encryptionVersion: 0
+    }],
+    portfolioHeads: {
+      portfolio_race: { stateRevisions: { project_race: 9 } }
+    },
+    stateRevisions: { project_race: 9 },
+    invitations: { received: [], sent: [] }
+  }, {
+    // Esta es exactamente la carrera corregida: el POST salió con revisión 0,
+    // snapshot.complete llegó mientras la respuesta seguía en vuelo y dejó IndexedDB en 9.
+    localStateRevisions: { project_race: 0 }
+  });
+  assert.equal(
+    client.syncedLocalStateRevisions.project_race,
+    9,
+    'La aplicación de bootstrap reutilizó la revisión capturada antes de un snapshot ya aplicado y puede volver a degradar una réplica confirmada.'
+  );
+  assert.deepEqual(
+    applyModule.getLastPendingReplicaSpaceIds(),
+    [],
+    'Una raíz ya confirmada por snapshot.complete volvió a quedar en replica_recovery por usar un watermark anterior al POST.'
+  );
+}
+
 const fetchStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false)');
 const fetchEnd = clientSource.indexOf('\n  async start(user = {})', fetchStart);
 assert.ok(fetchStart >= 0 && fetchEnd > fetchStart, 'No se encontró fetchBootstrap.');
@@ -119,6 +189,7 @@ class TestClient {
     this.bootstrapAppliedSequence = 0;
     this.bootstrapMinimumApplicableSequence = 0;
     this.bootstrapApplyQueue = Promise.resolve();
+    this.eventPipeline = Promise.resolve();
     this.bootstrapState = { marker: 'initial' };
     this.applied = [];
   }

@@ -39,6 +39,8 @@ async function loadFirebaseSdk() {
       initializeApp: appSdk.initializeApp,
       getApps: appSdk.getApps,
       getAuth: authSdk.getAuth,
+      setPersistence: authSdk.setPersistence,
+      browserSessionPersistence: authSdk.browserSessionPersistence,
       GoogleAuthProvider: authSdk.GoogleAuthProvider,
       signInWithPopup: authSdk.signInWithPopup,
       signOut: authSdk.signOut
@@ -84,6 +86,10 @@ export async function signInWithGooglePopup(firebaseWebConfig = {}) {
     const sdk = await loadFirebaseSdk();
     const app = getFirebaseAppInstance(firebaseWebConfig, sdk);
     const auth = sdk.getAuth(app);
+    // Firebase también debe respetar el aislamiento por ventana. El token de
+    // memoriaBACKEND ya queda fijado por contexto; mantener Firebase en persistencia
+    // local volvería a propagar el cambio de cuenta entre dos Chrome abiertos.
+    await sdk.setPersistence(auth, sdk.browserSessionPersistence);
     const provider = new sdk.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 

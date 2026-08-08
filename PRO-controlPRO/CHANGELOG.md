@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.10.21 - 2026-08-08
+
+- La recuperación de un panel aceptado ya no espera el TTL completo del grant cuando una fuente seleccionada no inicia el snapshot: mientras exista una réplica pendiente, el cliente vuelve a consultar a los 25 segundos para activar la liberación segura del lease ocioso de memoriaBACKEND y reintentar la fuente disponible.
+- Un snapshot autoritativo válido puede reparar `admin.project/project` aunque una raíz técnica legacy haya quedado guardada con una revisión local artificialmente mayor; la excepción queda limitada a raíces estructuralmente inválidas y no permite reemplazar proyectos canónicos realmente más recientes.
+- Se añadieron regresiones para el grant de 10 minutos sin respuesta y para la raíz `Espacio compartido` con presupuesto cero/revisión inflada, los dos estados que podían mantener las cards del invitado en “Sincronizando” pese a tener al invitador actualizado y conectado.
+
+## 1.10.20 - 2026-08-08
+
+- La recuperación inicial de proyectos compartidos ya no queda monopolizada por el invitador preferido cuando esa cuenta o instalación está desconectada: en revisión `0`, una réplica autorizada y realmente online puede tomar el relevo, mientras un invitador preferido que sí está conectado conserva la prioridad exclusiva.
+- Si una fuente seleccionada no empieza a subir el snapshot dentro de 20 segundos, memoriaBACKEND libera de forma atómica el lease ocioso únicamente cuando no existe propietario de subida ni ganador, y reintenta de inmediato con otra fuente válida en lugar de esperar el TTL largo del grant.
+- Cada ventana o pestaña mantiene su sesión backend y Firebase de forma independiente mediante `sessionStorage`/`browserSessionPersistence`; iniciar una segunda cuenta de Google en otro Chrome ya no desconecta ni sustituye la sesión P2P del invitador que debe servir la réplica.
+- Se ampliaron las regresiones de selección de réplica, exclusión de fuentes y aislamiento de sesión para cubrir el panel invitado con proyectos en “Sincronizando” y el escenario de dos cuentas abiertas simultáneamente.
+
+## 1.10.19 - 2026-08-08
+
+- La recuperación de paneles invitados ya no pone durante cinco minutos en cuarentena a una réplica sana por carreras temporales de snapshot: fuente ocupada por otro grant, clave local aún llegando, revisión poniéndose al día, recuperación local pendiente o autoridad de clave en transición.
+- Cuando la fuente temporalmente bloqueada queda disponible, el reintento existente puede volver a seleccionarla en segundos; esto evita que las cards mínimas de proyectos queden indefinidamente en “Sincronizando” después de aceptar un panel aun teniendo al invitador actualizado y conectado.
+- Las fuentes realmente inválidas —por ejemplo una réplica sin raíz canónica de proyecto— continúan excluyéndose temporalmente, preservando la selección segura de la copia más reciente. Se añadió una regresión específica para fijar esta diferencia.
+
+## 1.10.18 - 2026-08-08
+
+- La detección de actualización PWA compara ahora `version.json` con la versión realmente cargada en cada pestaña, no solo con el valor compartido de `localStorage`; una pestaña antigua ya no puede quedar ejecutando la lógica previa de sincronización porque otra pestaña haya registrado primero el release nuevo.
+- El generador de release produce un `build` y `releasedAt` nuevos en cada ejecución de CI/CD cuando no se fijan explícitamente, por lo que cada deploy de Render queda identificable aunque conserve la misma versión semántica.
+- Se añadieron regresiones para impedir que vuelva el enmascaramiento multi-pestaña del runtime obsoleto o la reutilización silenciosa de la identidad de un release anterior.
+
+## 1.10.17 - 2026-08-08
+
+- Corregida la reconstrucción de snapshots cifrados: al descifrar cada entidad se retiran los metadatos exclusivos de transporte (`encrypted`, `encryptionVersion`, `keyId`) antes de validar el digest, de modo que una copia AES-GCM válida ya no se rechaza como `snapshot_integrity_mismatch` y deja de quedar indefinidamente en “Sincronizando”.
+- Un snapshot completo ya verificado puede reparar una raíz técnica o corrupta cuando tiene la misma revisión canónica, incluso revisión `0`, sin permitir que un snapshot atrasado sustituya una revisión local realmente más nueva.
+- La instalación exacta certificada por una invitación solo conserva exclusividad mientras esté conectada; si esa réplica quedó ausente, memoriaBACKEND mantiene la certificación pero permite que otra réplica autorizada y actualizada —incluido el propietario/invitador online— entregue la reconstrucción sin esperar a que expire todo el lease.
+- Se añadieron regresiones específicas para la forma canónica del snapshot descifrado, reparación autoritativa en revisión igual/cero y fallback de fuente certificada ausente.
+
+## 1.10.14 - 2026-08-08
+
+- La recuperación de paneles compartidos deja de aceptar como proyecto funcional una raíz legacy de control con `initialBudget: 0` aunque incluya nombre y timestamp; esas cards permanecen en recuperación hasta recibir el presupuesto real y nunca vuelven a mostrar `0 COP` como estado válido.
+- Una réplica que no conserva la raíz funcional de `admin.project/project` ya no puede empezar a enviar un snapshot ni reclamar el turno temporal de reconstrucción; se aparta antes del primer fragmento para que responda una copia que sí tenga el proyecto completo.
+- Cuando la invitación identifica una instalación concreta vigente, memoriaBACKEND le concede en exclusiva el primer intento de snapshot. En proyectos legacy con revisión `0`, la recuperación dirigida usa primero una sola instalación del propietario/invitador para impedir que otra réplica válida pero antigua gane la carrera por velocidad; los reintentos posteriores conservan el fallback normal.
+- Se añadieron regresiones para la raíz técnica con presupuesto cero, la abstención de fuentes incompletas y la selección exclusiva de la instalación invitadora sin alterar el modo normal multi-fuente.
+
+## 1.10.13 - 2026-08-08
+
+- Al aceptar un panel, memoriaBACKEND devuelve la cabeza mínima del panel antes de cualquier reconciliación diferible; el invitado conoce desde la primera respuesta el total y los `spaceId` de los proyectos aunque una raíz individual todavía no haya sido materializada.
+- La recuperación del invitado incluye los proyectos declarados por `portfolioHead.managedSpaceIds`, y los reintentos dirigidos pueden seleccionar una instalación **online del propietario** aunque haya expirado su ACK temporal, manteniendo como fallback las réplicas confirmadas y validando nuevamente la revisión al enviar el snapshot.
+- Una raíz técnica o legacy que solo contiene un título deja de considerarse un proyecto completamente cargado: la edición permanece bloqueada hasta recibir la raíz canónica con presupuesto y marcas de tiempo, evitando cards con métricas falsas en `0 COP` que nunca convergen.
+- El panel aceptado permanece visible durante `replica_recovery`, pero sus acciones administrativas quedan bloqueadas hasta confirmar la autorización; se añadieron regresiones para panel con manifiesto parcial, fuente propietaria activa y raíz canónica incompleta.
+
+## 1.10.12 - 2026-08-07
+
+- La interfaz rehidrata inmediatamente los proyectos al recibir `snapshot.complete`; una raíz ya persistida no puede quedarse visualmente en “Sincronizando” por falta de una operación posterior, incluso en datos legacy con revisión `0`.
+- La recuperación dirigida de raíces con revisión `0` prioriza la cuenta fuente indicada por la invitación antes que una presencia genérica, manteniendo por encima cualquier instalación certificada por el código vigente del panel.
+- Se añadieron regresiones de interfaz y selección de fuente para cubrir exactamente el caso de panel aceptado con proyectos reconocidos pero sin terminar de cargar.
+
+## 1.10.11 - 2026-08-07
+
+- Corregida la carrera de recuperación al aceptar paneles/proyectos: la réplica fuente confirma primero su outbox y relee su revisión antes de construir el snapshot, evitando mezclar una revisión antigua con entidades recién confirmadas.
+- memoriaBACKEND puede promover atómicamente el grant temporal del snapshot cuando la fuente avanzó después del request **solo si Redis ya reconoce exactamente esa revisión como la cabeza autoritativa**; una réplica atrasada o una revisión no confirmada siguen rechazándose.
+- La promoción queda fijada durante todo el snapshot para que los fragmentos posteriores no queden bloqueados por la misma carrera, manteniendo intactos los permisos, el cifrado, la selección de fuente y el aislamiento por dominio/aplicación.
+- Se añadieron regresiones específicas para impedir que vuelva la igualdad estricta que dejaba las cards del invitado en “Sincronizando” tras aceptar un panel con una réplica activa.
+
 ## 1.10.6 - 2026-08-07
 
 - La aceptación o rechazo de una invitación al panel ya no espera secuencialmente las invitaciones de proyectos heredadas: la decisión autoritativa del panel se refleja de inmediato y la compatibilidad legacy converge en segundo plano.

@@ -364,15 +364,17 @@ if (!cryptoLayer.isRejectedEncryptedPayloadError(tamperError)
 }
 
 await cryptoLayer.setP2PCryptoContext(source.userId, source.deviceId);
-const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [{
+const canonicalSnapshotEntity = {
   entityType: 'admin.project',
   entityId: 'project_000001',
   value: { name: 'Proyecto cifrado', budget: 42000000 },
   stateRevision: 7,
   operationType: 'entity.put',
   deleted: false
-}]);
+};
+const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [canonicalSnapshotEntity]);
 await cryptoLayer.setP2PCryptoContext(guest.userId, guest.deviceId);
+const snapshotTransportChunkByteCount = new TextEncoder().encode(JSON.stringify(snapshotEntities)).byteLength;
 const snapshotEvent = await cryptoLayer.decryptOperationEvent({
   eventId: 'evt_snapshot_secure',
   eventType: 'p2p.operation',
@@ -383,11 +385,49 @@ const snapshotEvent = await cryptoLayer.decryptOperationEvent({
     encrypted: true,
     encryptionVersion: 1,
     keyId: sourceKeyForSharing.keyId,
-    payload: { entities: snapshotEntities }
+    payload: {
+      chunkByteCount: snapshotTransportChunkByteCount,
+      entities: snapshotEntities
+    }
   }
 });
 if (snapshotEvent.operation.payload.entities[0]?.value?.budget !== 42000000) {
   throw new Error('El snapshot cifrado no se reconstruyó con fidelidad.');
+}
+const decryptedSnapshotEntity = snapshotEvent.operation.payload.entities[0];
+if (JSON.stringify(decryptedSnapshotEntity) !== JSON.stringify(canonicalSnapshotEntity)
+  || Object.prototype.hasOwnProperty.call(decryptedSnapshotEntity || {}, 'encrypted')
+  || Object.prototype.hasOwnProperty.call(decryptedSnapshotEntity || {}, 'encryptionVersion')
+  || Object.prototype.hasOwnProperty.call(decryptedSnapshotEntity || {}, 'keyId')) {
+  throw new Error('El descifrado del snapshot conservó metadatos exclusivos del transporte y rompería el digest canónico de la réplica.');
+}
+if (snapshotEvent.transportSnapshotChunkByteCount !== snapshotTransportChunkByteCount) {
+  throw new Error('El descifrado perdió el tamaño real del fragmento transportado y la validación local podría comparar bytes cifrados contra bytes planos.');
+}
+let snapshotByteMismatchError = null;
+try {
+  await cryptoLayer.decryptOperationEvent({
+    eventId: 'evt_snapshot_size_tampered',
+    eventType: 'p2p.operation',
+    spaceId,
+    operation: {
+      operationId: 'snapshot_secure:chunk:tampered',
+      type: 'snapshot.chunk',
+      encrypted: true,
+      encryptionVersion: 1,
+      keyId: sourceKeyForSharing.keyId,
+      payload: {
+        chunkByteCount: snapshotTransportChunkByteCount + 1,
+        entities: snapshotEntities
+      }
+    }
+  });
+} catch (error) {
+  snapshotByteMismatchError = error;
+}
+if (!cryptoLayer.isRejectedEncryptedPayloadError(snapshotByteMismatchError)
+  || snapshotByteMismatchError?.reason !== 'snapshot_chunk_byte_count_mismatch') {
+  throw new Error('El cliente no rechazó un manifiesto cifrado cuyo tamaño fue alterado antes del descifrado.');
 }
 
 const delayedSpaceId = 'space_delayed_key_000001';
@@ -427,12 +467,47 @@ try {
 if (missingKey?.code !== 'P2P_SPACE_KEY_MISSING') {
   throw new Error('El cliente no identificó de forma recuperable una clave todavía no recibida.');
 }
+const delayedSnapshotCompleteEvent = {
+  eventId: 'evt_delayed_snapshot_complete',
+  eventType: 'p2p.operation',
+  deviceSequence: 10,
+  spaceSequence: 4,
+  spaceId: delayedSpaceId,
+  operation: {
+    operationId: 'snapshot_delayed:complete',
+    type: 'snapshot.complete',
+    encrypted: true,
+    encryptionVersion: 1,
+    keyId: delayedOperation.keyId,
+    payload: {
+      requestId: 'snapshot_delayed',
+      chunkCount: 1,
+      entityCount: 1,
+      snapshotByteCount: 64,
+      sourceStateRevision: 4,
+      snapshotDigest: 'digest_delayed'
+    }
+  }
+};
+let missingSnapshotCompleteKey = null;
+try {
+  await cryptoLayer.decryptOperationEvent(delayedSnapshotCompleteEvent);
+} catch (error) {
+  missingSnapshotCompleteKey = error;
+}
+if (missingSnapshotCompleteKey?.code !== 'P2P_SPACE_KEY_MISSING') {
+  throw new Error('snapshot.complete se aplicó antes de tener la clave y podría descartar sus fragmentos cifrados como incompletos.');
+}
 await cryptoLayer.deferEncryptedEvent(delayedEvent, missingKey);
 const deferred = await cryptoLayer.listDeferredEncryptedEvents(delayedSpaceId);
 if (deferred.length !== 1 || deferred[0].event?.eventId !== delayedEvent.eventId) {
   throw new Error('El ciphertext pendiente no quedó preservado localmente para reproducirse después.');
 }
 await cryptoLayer.importSpaceKeyEnvelope(delayedSpaceId, delayedEnvelope);
+const recoveredSnapshotComplete = await cryptoLayer.decryptOperationEvent(delayedSnapshotCompleteEvent);
+if (recoveredSnapshotComplete.operation?.type !== 'snapshot.complete') {
+  throw new Error('snapshot.complete no volvió a quedar aplicable después de importar la clave requerida.');
+}
 const recovered = await cryptoLayer.decryptOperationEvent(deferred[0].event);
 if (recovered.operation.payload?.patch?.description !== 'Cambio mientras el invitado estaba desconectado'
   || recovered.operation.payload?.expected?.description !== 'Descripción original'

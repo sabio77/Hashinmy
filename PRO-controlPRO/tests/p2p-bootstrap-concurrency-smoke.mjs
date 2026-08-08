@@ -46,6 +46,7 @@ class TestClient {
     this.bootstrapAppliedSequence = 0;
     this.bootstrapMinimumApplicableSequence = 0;
     this.bootstrapApplyQueue = Promise.resolve();
+    this.eventPipeline = Promise.resolve();
     this.bootstrapState = { marker: 'initial' };
     this.applied = [];
     this.applyWaiter = null;
@@ -167,6 +168,39 @@ async function loadHarness() {
   client.bootstrapState = { marker: 'mutation-after-fence' };
   assert.equal(client.bootstrapState.marker, 'mutation-after-fence');
   assert.deepEqual(client.applied, ['already-applying'], 'La prueba no ejercitó la aplicación que ya había cruzado la barrera.');
+}
+
+
+{
+  const module = await loadHarness();
+  const client = new module.TestClient();
+  let releaseSnapshot;
+  let snapshotConfirmed = false;
+  client.eventPipeline = new Promise((resolve) => {
+    releaseSnapshot = () => {
+      snapshotConfirmed = true;
+      client.bootstrapState = { marker: 'snapshot-confirmed-before-bootstrap' };
+      resolve();
+    };
+  });
+  client.onApplyStart = () => {
+    assert.equal(
+      snapshotConfirmed,
+      true,
+      'El bootstrap empezó a reconciliar control antes de terminar snapshot.complete ya encolado.'
+    );
+  };
+
+  const inFlight = client.fetchBootstrap(false);
+  await flushMicrotasks();
+  module.requests[0].resolve({ marker: 'bootstrap-after-snapshot' });
+  await flushMicrotasks();
+  assert.deepEqual(client.applied, [], 'La respuesta bootstrap se aplicó en paralelo con el snapshot realtime pendiente.');
+
+  releaseSnapshot();
+  const state = await inFlight;
+  assert.equal(state.marker, 'bootstrap-after-snapshot');
+  assert.deepEqual(client.applied, ['bootstrap-after-snapshot']);
 }
 
 console.log('OK: los bootstrap concurrentes conservan respuestas válidas, descartan estados anteriores a mutaciones autoritativas y esperan aplicaciones ya iniciadas antes de purgar o reemplazar datos locales.');

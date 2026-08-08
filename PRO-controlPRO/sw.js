@@ -54,6 +54,7 @@ const DEFAULT_APP_SHELL = [
   './src/js/p2p-crypto.js',
   './src/js/p2p-tab-coordinator.js',
   './src/js/p2p-client.js',
+  './src/js/p2p-audit.js',
   './src/js/p2p-space-creation-intent.js',
   './src/js/p2p-invitation-intent.js',
   './src/js/device-management.js',

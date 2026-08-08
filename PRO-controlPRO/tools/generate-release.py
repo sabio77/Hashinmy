@@ -54,6 +54,7 @@ DEFAULT_CRITICAL_ASSETS = [
     "./src/js/p2p-crypto.js",
     "./src/js/p2p-tab-coordinator.js",
     "./src/js/p2p-client.js",
+    "./src/js/p2p-audit.js",
     "./src/js/p2p-permissions.js",
     "./src/js/p2p-space-creation-intent.js",
     "./src/js/p2p-invitation-intent.js",
@@ -564,6 +565,7 @@ def fingerprint_check_files(language_manifest: Dict[str, Any], prompt_assets: It
         "./src/js/p2p-crypto.js",
         "./src/js/p2p-tab-coordinator.js",
         "./src/js/p2p-client.js",
+        "./src/js/p2p-audit.js",
         "./src/js/p2p-permissions.js",
         "./src/js/p2p-space-creation-intent.js",
         "./src/js/p2p-invitation-intent.js",
@@ -700,8 +702,11 @@ def main() -> None:
 
     current = read_json(VERSION_FILE)
     version = args.version or current.get("version") or "1.0.0"
-    build = args.build or current.get("build") or datetime.now().strftime("%Y%m%d%H%M%S")
-    released_at = args.released_at or current.get("releasedAt") or iso_now()
+    # Cada ejecución de CI/CD debe producir una identidad de release nueva aunque la versión
+    # semántica no cambie. Reutilizar build/releasedAt impide que una PWA antigua detecte
+    # correctamente que el servidor ya publica otro bundle.
+    build = args.build or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    released_at = args.released_at or iso_now()
 
     backend_url = update_runtime_config_file(require_backend=args.require_backend or render_environment())
     language_manifest = discover_languages(released_at)

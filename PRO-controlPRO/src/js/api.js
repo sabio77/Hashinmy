@@ -1,5 +1,6 @@
 import { P2P_APPLICATION_ID, scopedStorageKey } from './application-scope.js';
 export const SESSION_STORAGE_KEY = scopedStorageKey('semilla_google_session_token');
+export const SESSION_WINDOW_STATE_KEY = scopedStorageKey('semilla_google_session_window_state');
 export const SESSION_CHANGED_ERROR_CODE = 'APP_SESSION_CHANGED';
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -42,29 +43,87 @@ export function getBackendUrl() {
   throw error;
 }
 
-export function getSessionToken() {
+function getWindowSessionState(windowRef = window) {
   try {
-    return cleanToken(window.localStorage.getItem(SESSION_STORAGE_KEY));
+    return cleanToken(windowRef.sessionStorage?.getItem(SESSION_WINDOW_STATE_KEY)).toLowerCase();
   } catch {
     return '';
   }
 }
 
-export function setSessionToken(token = '') {
+function writeWindowSessionToken(token = '', windowRef = window, options = {}) {
   const cleanSessionToken = cleanToken(token);
   try {
-    if (cleanSessionToken) window.localStorage.setItem(SESSION_STORAGE_KEY, cleanSessionToken);
-    else window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    if (!windowRef.sessionStorage) return false;
+    if (cleanSessionToken) {
+      windowRef.sessionStorage.setItem(SESSION_STORAGE_KEY, cleanSessionToken);
+      windowRef.sessionStorage.setItem(SESSION_WINDOW_STATE_KEY, 'active');
+    } else {
+      windowRef.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      windowRef.sessionStorage.setItem(
+        SESSION_WINDOW_STATE_KEY,
+        options.signedOut === false ? 'empty' : 'signed_out'
+      );
+    }
+    return true;
   } catch {
-    // La sesión seguirá siendo válida en Firebase, pero no persistirá si el navegador bloquea storage.
+    return false;
+  }
+}
+
+function readPersistedSessionToken(windowRef = window) {
+  try {
+    return cleanToken(windowRef.localStorage?.getItem(SESSION_STORAGE_KEY));
+  } catch {
+    return '';
+  }
+}
+
+export function getSessionToken() {
+  try {
+    const direct = cleanToken(window.sessionStorage?.getItem(SESSION_STORAGE_KEY));
+    if (direct) return direct;
+    const windowState = getWindowSessionState(window);
+    if (windowState === 'active' || windowState === 'signed_out') return '';
+  } catch {
+    // Si sessionStorage está bloqueado, se mantiene el fallback persistente anterior.
+  }
+
+  const persisted = readPersistedSessionToken(window);
+  if (!persisted) return '';
+  // Un contexto nuevo puede heredar la última sesión persistida para conservar el
+  // acceso después de reabrir la PWA. Desde este momento la sesión queda fijada a
+  // esta ventana y cambios de cuenta en otras pestañas no la sustituyen.
+  writeWindowSessionToken(persisted, window, { signedOut: false });
+  return persisted;
+}
+
+export function setSessionToken(token = '') {
+  const cleanSessionToken = cleanToken(token);
+  const previous = getSessionToken();
+  writeWindowSessionToken(cleanSessionToken, window, { signedOut: !cleanSessionToken });
+  try {
+    if (cleanSessionToken) {
+      window.localStorage.setItem(SESSION_STORAGE_KEY, cleanSessionToken);
+    } else {
+      const persisted = readPersistedSessionToken(window);
+      if (!persisted || !previous || persisted === previous) window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  } catch {
+    // sessionStorage conserva la cuenta activa de esta ventana aunque falle la persistencia global.
   }
   return cleanSessionToken;
 }
 
 export function clearSessionToken(expectedToken = null) {
   const expected = expectedToken === null ? null : cleanToken(expectedToken);
-  if (expected !== null && getSessionToken() !== expected) return false;
-  setSessionToken('');
+  const current = getSessionToken();
+  if (expected !== null && current !== expected) return false;
+  writeWindowSessionToken('', window, { signedOut: true });
+  try {
+    const persisted = readPersistedSessionToken(window);
+    if (!persisted || !current || persisted === current) window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {}
   return getSessionToken() === '';
 }
 
@@ -84,6 +143,12 @@ export function subscribeSessionTokenChanges(listener, options = {}) {
   if (!windowRef?.addEventListener || typeof listener !== 'function') return () => {};
   const handler = (event = {}) => {
     if (event.key !== SESSION_STORAGE_KEY) return;
+    // localStorage se usa solo como sesión persistida por defecto para contextos nuevos.
+    // Una ventana que ya fijó cuenta (o cerró sesión explícitamente) nunca debe cambiar
+    // de usuario porque otra pestaña inició/cerró sesión: eso desconectaba al invitador
+    // justo cuando el invitado pedía los snapshots del panel compartido.
+    const state = getWindowSessionState(windowRef);
+    if (state === 'active' || state === 'signed_out') return;
     listener({
       previousToken: cleanToken(event.oldValue),
       token: cleanToken(event.newValue),

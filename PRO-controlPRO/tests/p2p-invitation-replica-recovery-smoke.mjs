@@ -43,6 +43,21 @@ const refreshedHead = headMergeModule.mergePortfolioHeadsWithDeferredManifest(
   [{ spaceId: 'portfolio_pending', resourceType: 'admin.portfolio' }]
 );
 assert.equal(refreshedHead.portfolio_pending?.syncDeferred, false, 'Una cabeza autoritativa nueva no desbloqueó el panel después de la recuperación.');
+const degradedIncomingHead = headMergeModule.mergePortfolioHeadsWithDeferredManifest(
+  {
+    portfolio_degraded: {
+      portfolioSpaceId: 'portfolio_degraded',
+      managedSpaceIds: ['project_1', 'project_2', 'project_3', 'project_4'],
+      projectCount: 4,
+      stateRevisions: { portfolio_degraded: 3, project_1: 8, project_2: 4, project_3: 9, project_4: 2 }
+    }
+  },
+  {},
+  { failed: 1, deferred: true, pendingPortfolioSpaceIds: ['portfolio_degraded'] },
+  [{ spaceId: 'portfolio_degraded', resourceType: 'admin.portfolio' }]
+);
+assert.equal(degradedIncomingHead.portfolio_degraded?.projectCount, 4, 'Un fallo transitorio del índice volvió a convertir un panel conocido en 0 proyectos.');
+assert.equal(degradedIncomingHead.portfolio_degraded?.syncDeferred, true, 'Una cabeza parcial conocida se marcó como completa antes de reparar el índice del panel.');
 
 const reconciliationStart = storageSource.indexOf('function cleanSpaceId(');
 const reconciliationEnd = storageSource.indexOf('\nasync function purgeSpaceRecords', reconciliationStart);
@@ -315,8 +330,59 @@ assert.match(responseMethod, /this\.applyCommittedControlState\(committedControl
 assert.match(responseMethod, /if \(portfolioInvitation\) \{[\s\S]*?dispatch\('p2p:state', \{ state: this\.bootstrapState, source: 'local-invitation-response' \}\)/, 'El primer estado visible del panel aceptado debe incluir ya su cabeza de versión.');
 assert.match(responseMethod, /data\.preferredSnapshotSourceUserId \|\| data\.invitation\?\.inviterUserId/, 'La cuenta que invitó debe seguir siendo una fuente preferente aunque su deviceId certificado haya quedado obsoleto.');
 assert.match(responseMethod, /data\.preferredSnapshotPanelRevisionCode \|\| currentReplicaRevisionCode/, 'La recuperación debe anclarse a la cabeza alfanumérica vigente devuelta al aceptar el panel.');
+assert.match(responseMethod, /const recoverySpaceIds = normalizeSnapshotSpaceIds\(\[[\s\S]*?acceptedSpaceId,[\s\S]*?\.\.\.participationRootIds,[\s\S]*?portfolioHead\?\.managedSpaceIds/, 'La aceptación del panel no dirige la recuperación a los projectIds autoritativos conocidos por la cabeza mínima cuando el manifiesto de raíces llega parcial.');
+assert.match(clientSource, /function hasCanonicalProjectRootEntity\([\s\S]*?hasOwnProperty\.call\(value, 'initialBudget'\)[\s\S]*?initialBudget > 0[\s\S]*?value\.createdAt \|\| value\.updatedAt/, 'Una entidad técnica con presupuesto 0 todavía puede hacerse pasar por raíz de proyecto cargada y dejar métricas falsas en 0.');
+assert.match(clientSource, /async sendSnapshot\(requestEvent = \{\}\)[\s\S]*?isAdminProjectSpace\(spaceId\)[\s\S]*?!hasCanonicalProjectRootEntity\(localEntities\)[\s\S]*?canonical_project_root_missing/, 'Una réplica sin raíz funcional todavía puede ganar el turno de snapshot antes que el dispositivo actualizado del invitador.');
 
 assert.match(clientSource, /pendingReplicaSpaceIds/, 'El bootstrap no preserva el bloqueo mientras la revisión local está atrasada.');
+assert.match(
+  clientSource,
+  /if \(provisionalReplicaSpaceIds\.has\(spaceId\)\) return true;/,
+  'Una aceptación mínima con revisión 0 puede quedar confirmada antes de recibir snapshot.complete.'
+);
+assert.match(
+  clientSource,
+  /pendingReplicaRecoverySpaceIds\(spaces = this\.bootstrapState\.spaces \|\| \[\]\)/,
+  'La recuperación no conserva como deuda los espacios mínimos aunque no exista un watermark mayor que cero.'
+);
+assert.match(
+  clientSource,
+  /const snapshotSpaceIds = this\.snapshotRecoveryTargetSpaceIds\(\);[\s\S]*?requestSnapshots: 'force',[\s\S]*?snapshotSpaceIds/,
+  'El reintento de snapshot pierde el objetivo explícito y memoriaBACKEND no vuelve a solicitar proyectos legacy con revisión 0.'
+);
+assert.match(
+  clientSource,
+  /const SNAPSHOT_SOURCE_RESPONSE_WATCHDOG_MS = 25 \* 1000;/,
+  'La recuperación volvió a depender únicamente del TTL largo del grant y puede dejar las cards sincronizando durante minutos.'
+);
+const recoveryDelayStart = clientSource.indexOf('  snapshotRecoveryDelay(snapshotRequests = []) {');
+const recoveryDelayEnd = clientSource.indexOf('\n  async resetDeliveryCursor', recoveryDelayStart);
+assert.ok(recoveryDelayStart >= 0 && recoveryDelayEnd > recoveryDelayStart, 'No se encontró el watchdog de recuperación de snapshot.');
+const recoveryDelayMethod = clientSource.slice(recoveryDelayStart, recoveryDelayEnd)
+  .trim()
+  .replace(/^snapshotRecoveryDelay/, 'function snapshotRecoveryDelay');
+const recoveryDelayModule = await import(`data:text/javascript;base64,${Buffer.from(`
+const SNAPSHOT_RECOVERY_FALLBACK_MS = 60 * 1000;
+const SNAPSHOT_RECOVERY_MARGIN_MS = 5 * 1000;
+const SNAPSHOT_SOURCE_RESPONSE_WATCHDOG_MS = 25 * 1000;
+${recoveryDelayMethod}
+export { snapshotRecoveryDelay };
+`).toString('base64')}#snapshot-recovery-watchdog`);
+const longGrantRetryDelay = recoveryDelayModule.snapshotRecoveryDelay.call(
+  { snapshotGrantTtlSeconds: 600 },
+  [{ requestId: 'req_stalled', expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() }]
+);
+assert.ok(
+  longGrantRetryDelay >= 5000 && longGrantRetryDelay <= 25000,
+  `Un grant sin respuesta todavía posterga la recuperación ${longGrantRetryDelay} ms en lugar de volver a consultar tras la gracia de la fuente.`
+);
+const noGrantRetryDelay = recoveryDelayModule.snapshotRecoveryDelay.call({ snapshotGrantTtlSeconds: 600 }, []);
+assert.equal(noGrantRetryDelay, 60000, 'El watchdog se activó fuera de una recuperación con snapshot pendiente.');
+assert.match(
+  storageSource,
+  /pendingReplicaSpaceIds: reconciliation\.pendingReplicaSpaceIds/,
+  'La persistencia atómica descarta la lista de réplicas pendientes y la capa superior no puede señalizar la recuperación.'
+);
 assert.match(clientSource, /recoveryEligibleSpaceIds\(/, 'La recuperación excluye precisamente el proyecto aceptado que debe recibir el snapshot.');
 assert.match(clientSource, /const spaceIds = this\.recoveryEligibleSpaceIds\(\)/, 'La reconciliación posterior al snapshot no lee la revisión de los proyectos todavía bloqueados.');
 assert.match(clientSource, /appliedStateRevisions: localStateRevisions/, 'Un watermark ya satisfecho puede quedar persistido y bloquear la promoción después de reiniciar.');
@@ -325,6 +391,31 @@ assert.match(clientSource, /membershipUnconfirmed/, 'El modo de recuperación no
 assert.match(clientSource, /!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)[\s\S]*!this\.isSpaceReplicaRecoveryPending\(cleanSpaceId\)/, 'La réplica aceptada no puede solicitar su clave cifrada y queda bloqueada antes de aplicar el snapshot.');
 assert.match(clientSource, /confirmRecoveredReplicaAuthorization\(/, 'No existe promoción durable después de completar la réplica.');
 assert.match(clientSource, /p2p:replica-recovery-confirmed/, 'La interfaz no recibe la transición que habilita la edición.');
+assert.match(clientSource, /confirmRecoveredReplicaAuthorization\([\s\S]*?getEntity\(cleanSpaceId, 'admin\.project', 'project'\)[\s\S]*?!hasCanonicalProjectRootEntity\(\[recoveredProjectRoot\]\)[\s\S]*?return false;/, 'Una operación delta todavía puede confirmar una réplica sin haber recibido la raíz canónica del proyecto.');
+assert.match(clientSource, /'p2p\.snapshot\.declined'/, 'El cliente no reconoce que una fuente descartó explícitamente una concesión de snapshot.');
+assert.match(clientSource, /apiPost\('\/api\/p2p\/snapshots\/decline'/, 'Una fuente incapaz de servir la réplica no libera su concesión en memoriaBACKEND.');
+assert.match(clientSource, /event\.eventType === 'p2p\.snapshot\.declined'[\s\S]*?transientSnapshotSourceDecline\(reason\)[\s\S]*?rememberRejectedSnapshotSource[\s\S]*?SNAPSHOT_REJECTION_RETRY_MS/, 'El invitado no distingue carreras transitorias de fuentes realmente inválidas antes de reintentar.');
+const transientSnapshotDeclines = clientSource.match(/const TRANSIENT_SNAPSHOT_SOURCE_DECLINE_REASONS = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '';
+for (const reason of [
+  'source_recovery_pending',
+  'source_revision_behind',
+  'p2p_space_key_missing',
+  'p2p_snapshot_source_busy',
+  'p2p_key_stale',
+  'p2p_key_authority_pending',
+  'p2p_key_rotation_required'
+]) {
+  assert.ok(
+    transientSnapshotDeclines.includes(`'${reason}'`),
+    `La condición transitoria ${reason} vuelve a poner una réplica recuperable en cuarentena durante 5 minutos.`
+  );
+}
+assert.equal(
+  transientSnapshotDeclines.includes("'canonical_project_root_missing'"),
+  false,
+  'Una fuente realmente incompleta no debe reutilizarse como si su rechazo fuera transitorio.'
+);
+assert.match(clientSource, /p2p:snapshot-source-decline-error'[\s\S]*?throw declineError;/, 'Una falla al liberar el grant todavía permite ACKear el request y deja al invitado esperando hasta el TTL.');
 
 
 assert.match(clientSource, /scheduleMinimalReplicaRecovery\(spaceId = '', options = \{\}\)/, 'Falta la recuperación asíncrona y deduplicada posterior a la aceptación.');
@@ -333,6 +424,13 @@ assert.match(clientSource, /minimalBootstrap: requiresSnapshotRecovery/, 'El eve
 assert.doesNotMatch(clientSource, /if \(canonicalDecision === 'accept'\) \{\s*const state = await this\.refreshBootstrap\(\{ requestSnapshots: 'force' \}\)/, 'Aceptar una invitación sigue bloqueando la respuesta hasta iniciar la copia completa.');
 
 const appSource = fs.readFileSync(path.join(root, 'src', 'js', 'app.js'), 'utf8');
+const snapshotCompleteListenerStart = appSource.indexOf("window.addEventListener('p2p:snapshot-complete'");
+const snapshotCompleteListenerEnd = appSource.indexOf("window.addEventListener('p2p:operation'", snapshotCompleteListenerStart);
+assert.ok(snapshotCompleteListenerStart >= 0 && snapshotCompleteListenerEnd > snapshotCompleteListenerStart, 'La interfaz no escucha la finalización durable del snapshot.');
+const snapshotCompleteListener = appSource.slice(snapshotCompleteListenerStart, snapshotCompleteListenerEnd);
+assert.match(snapshotCompleteListener, /refreshProjects\(\)/, 'Una raíz recuperada puede quedar visualmente en “Sincronizando” porque snapshot.complete no rehidrata IndexedDB.');
+assert.match(snapshotCompleteListener, /applyP2PState\(semillaP2P\.bootstrapState\)/, 'La finalización del snapshot no recupera el control si la raíz llegó antes que el estado visible de la interfaz.');
+
 assert.match(appSource, /result\?\.accessRevoked === true/, 'La interfaz no distingue una aceptación seguida por revocación.');
 assert.match(appSource, /result\?\.replicaPending === true/, 'La interfaz presenta como lista una invitación cuya réplica sigue en recuperación.');
 assert.match(appSource, /invite\.acceptedAccessRevoked/, 'Falta el mensaje de estado para una aceptación ya revocada.');
@@ -358,5 +456,21 @@ assert.match(appSource, /menu\.disabled = Boolean\(lifecycleTransaction\) \|\| !
 assert.match(appSource, /function panelScopes\(\) \{[\s\S]*?return allPanelScopes\(\);/, 'El panel aceptado sigue oculto durante la sincronización inicial.');
 assert.match(appSource, /isIncompleteInvitedPortfolio/, 'Se perdió el diagnóstico de panel incompleto necesario para mantener activa la recuperación.');
 assert.match(appSource, /!panel\.portfolioHead \|\| panel\.portfolioHead\?\.syncDeferred === true/, 'La recuperación no vuelve a solicitar la raíz del panel cuando falta o quedó diferida su cabeza de versión.');
+
+
+
+const sendSnapshotStart = clientSource.indexOf('  async sendSnapshot(requestEvent = {})');
+const sendSnapshotEnd = clientSource.indexOf('\n  async ensurePushSubscriptionForCurrentVapidKey(', sendSnapshotStart);
+assert.ok(sendSnapshotStart >= 0 && sendSnapshotEnd > sendSnapshotStart, 'No se encontró la respuesta de snapshot del dispositivo fuente.');
+const sendSnapshotMethod = clientSource.slice(sendSnapshotStart, sendSnapshotEnd);
+const snapshotFlushIndex = sendSnapshotMethod.indexOf('await this.flushOutbox()');
+const snapshotRevisionReadIndex = sendSnapshotMethod.indexOf('const localStateRevisions = await listStateRevisions([spaceId]);');
+assert.ok(snapshotFlushIndex >= 0 && snapshotRevisionReadIndex > snapshotFlushIndex, 'La fuente debe confirmar su outbox antes de congelar la revisión que enviará al invitado.');
+assert.match(sendSnapshotMethod, /if \(localStateRevision < requestedStateRevision\)/, 'La fuente debe diferir solo si está atrasada, no por haber avanzado a la cabeza autoritativa.');
+assert.doesNotMatch(sendSnapshotMethod, /localStateRevision !== requestedStateRevision/, 'La igualdad estricta vuelve a dejar al invitado bloqueado si la fuente confirma cambios después del request.');
+assert.match(sendSnapshotMethod, /!this\.realtimeLeader[\s\S]*?deferSnapshotSource\(requestEvent,[\s\S]*?source_not_realtime_leader/, 'Una pestaña que perdió el liderazgo todavía consume el request sin liberar el lease para la nueva líder.');
+assert.match(sendSnapshotMethod, /expiresAt <= Date\.now\(\) \+ 1000[\s\S]*?deferSnapshotSource\(requestEvent,[\s\S]*?source_request_expiring/, 'Un request a punto de expirar todavía queda ACKeado silenciosamente sin liberar su concesión.');
+assert.match(sendSnapshotMethod, /deferSnapshotSource\(requestEvent,[\s\S]*?source_recovery_pending/, 'Una fuente con recuperación pendiente no libera su grant para que el invitado pruebe otra réplica.');
+assert.match(sendSnapshotMethod, /deferSnapshotSource\(requestEvent,[\s\S]*?canonical_project_root_missing/, 'Una fuente sin raíz canónica no libera su grant y puede bloquear la recuperación durante todo el TTL.');
 
 console.log('OK: la aceptación monta control mínimo sin bloquear, muestra panel y cards reconocidas de inmediato y mantiene la edición bloqueada hasta completar la réplica.');

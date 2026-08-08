@@ -263,6 +263,20 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
     currentStateRevision: 5
   }
 })).eventType, 'p2p.snapshot.request');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.declined', {
+  actorUserId: 'user_source_1',
+  sourceDeviceId: 'device_source_000001',
+  data: {
+    requestId: 'snapshot_request_declined_1',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    sourceDeviceId: 'device_source_000001',
+    spaceId: 'space_control_1',
+    reason: 'canonical_project_root_missing',
+    remainingSources: 0,
+    retryAvailable: true
+  }
+})).eventType, 'p2p.snapshot.declined');
 
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked')),
@@ -473,6 +487,25 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'snapshot-request',
   'Una reparación forzada aceptó una réplica remota más antigua que la local.'
+);
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.declined', {
+    actorUserId: 'user_source_1',
+    sourceDeviceId: 'device_source_000001',
+    data: {
+      requestId: 'snapshot_request_declined_bad',
+      requestDeviceId: 'device_requester_0001',
+      requestUserId: 'user_requester_1',
+      sourceDeviceId: 'device_other_000001',
+      spaceId: 'space_control_1',
+      reason: 'source_revision_behind',
+      remainingSources: 0,
+      retryAvailable: true
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'snapshot-declined',
+  'El cliente aceptó un descarte de snapshot atribuido a otro dispositivo fuente.'
 );
 
 assert.throws(

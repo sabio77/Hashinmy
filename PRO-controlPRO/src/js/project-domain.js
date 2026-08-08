@@ -258,6 +258,20 @@ export function activeEntityValue(entity = null) {
   return entity.value && typeof entity.value === 'object' ? entity.value : null;
 }
 
+export function isCanonicalProjectRootValue(value = null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const name = cleanText(value.name || '', 120);
+  if (!name) return false;
+  const initialBudget = moneyValue(value.initialBudget);
+  // La interfaz solo crea proyectos con presupuesto inicial mayor que cero. Algunas
+  // versiones antiguas llegaron a persistir una raíz de control con el rótulo privado
+  // del espacio, initialBudget=0 y timestamp; esa forma no contiene datos funcionales
+  // y no puede habilitar una card ni certificar que la réplica ya fue recuperada.
+  return Object.prototype.hasOwnProperty.call(value, 'initialBudget')
+    && initialBudget > 0
+    && Boolean(cleanText(value.createdAt || value.updatedAt || '', 60));
+}
+
 export function isTrashedValue(value = null) {
   return Boolean(cleanText(value && typeof value === 'object' ? value.trashedAt : '', 60));
 }
@@ -291,7 +305,7 @@ export function projectRecord(space = {}, entities = []) {
   ));
   const value = activeEntityValue(entity) || {};
   const canonicalName = cleanText(value.name || '', 120);
-  const loaded = Boolean(entity && canonicalName);
+  const loaded = Boolean(entity && isCanonicalProjectRootValue(value));
   return {
     spaceId: space.spaceId || '',
     ownerUserId: space.ownerUserId || '',
@@ -494,7 +508,10 @@ export function buildProjectPanelScopes(input = {}) {
     .filter(([spaceId]) => spaceId));
 
   const scopes = spaces
-    .filter((space) => space?.resourceType === portfolioResourceType && space?.authorizationState !== 'unconfirmed')
+    .filter((space) => space?.resourceType === portfolioResourceType && (
+      space?.authorizationState !== 'unconfirmed'
+      || space?.authorizationPendingReason === 'replica_recovery'
+    ))
     .map((space) => ({
       id: cleanText(space?.spaceId || '', 140),
       type: 'portfolio',

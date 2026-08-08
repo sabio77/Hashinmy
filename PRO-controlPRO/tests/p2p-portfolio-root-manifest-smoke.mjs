@@ -91,7 +91,7 @@ assert.match(responseMethod, /mergeParticipationRootManifest\(/, 'Aceptar un pan
 assert.match(responseMethod, /data\.participationRoots = committedControlState\.spaces\.filter/, 'La interfaz no recibe las raíces mínimas ya persistidas.');
 assert.match(responseMethod, /authorizationState: canonicalDecision === 'accept' \? 'unconfirmed' : 'confirmed'/, 'Las raíces mínimas se están confirmando antes de recuperar la réplica real.');
 
-assert.match(responseMethod, /const recoverySpaceIds = normalizeSnapshotSpaceIds\(\[acceptedSpaceId, \.\.\.participationRootIds\]\)/, 'Aceptar un panel no agrupa el panel y todos sus proyectos mínimos en una sola recuperación dirigida.');
+assert.match(responseMethod, /const recoverySpaceIds = normalizeSnapshotSpaceIds\(\[[\s\S]*?acceptedSpaceId,[\s\S]*?\.\.\.participationRootIds,[\s\S]*?portfolioHead\?\.managedSpaceIds/, 'Aceptar un panel no agrupa el panel, sus raíces mínimas y los projectIds autoritativos de la cabeza en una sola recuperación dirigida.');
 assert.match(responseMethod, /portfolioHead\?\.replicaRevisionCode/, 'La app debe validar la fuente preferente contra la versión de datos que un dispositivo puede demostrar por ACK.');
 assert.match(responseMethod, /preferredSnapshotPanelRevisionCode/, 'La app ignora el código de revisión que certifica al invitador como fuente vigente.');
 assert.match(responseMethod, /preferredSnapshotSourceUserIdsBySpace/, 'La recuperación no propaga la fuente preferente por cada proyecto del panel.');
@@ -144,6 +144,22 @@ const fetchBootstrapEnd = clientSource.indexOf('\n  async start(', fetchBootstra
 const fetchBootstrapSource = clientSource.slice(fetchBootstrapStart, fetchBootstrapEnd);
 assert.match(fetchBootstrapSource, /preferredSnapshotSourceInvitationId/, 'La recuperación dirigida no devuelve al backend la invitación aceptada para resolver allí la fuente certificada.');
 
+const preferredHintStart = clientSource.indexOf('  preferredSnapshotRecoveryHints(spaceIds = [])');
+const preferredHintEnd = clientSource.indexOf('\n  updateSnapshotRecoveryRequired()', preferredHintStart);
+assert.ok(preferredHintStart >= 0 && preferredHintEnd > preferredHintStart, 'No se encontró la memoria de la fuente que invitó al panel para reintentos posteriores.');
+const preferredHintSource = clientSource.slice(preferredHintStart, preferredHintEnd);
+assert.match(preferredHintSource, /this\.bootstrapState\?\.invitations\?\.received/, 'Los reintentos no reconstruyen la fuente preferida desde la invitación aceptada persistida.');
+assert.match(preferredHintSource, /head\?\.managedSpaceIds/, 'La fuente preferida del panel no se propaga a todos sus proyectos administrados.');
+assert.match(preferredHintSource, /targets\.every\(\(spaceId\) => coveredSet\.has\(spaceId\)\)/, 'Una invitación se reutiliza como certificación aunque no cubra todo el conjunto de recuperación solicitado.');
+
+const scheduledRecoveryStart = clientSource.indexOf('  scheduleSnapshotRecovery(delayMs = SNAPSHOT_RECOVERY_FALLBACK_MS');
+const scheduledRecoveryEnd = clientSource.indexOf('\n  async reconcileSnapshotRecovery(', scheduledRecoveryStart);
+assert.ok(scheduledRecoveryStart >= 0 && scheduledRecoveryEnd > scheduledRecoveryStart, 'No se encontró el reintento de recuperación de snapshots.');
+const scheduledRecoverySource = clientSource.slice(scheduledRecoveryStart, scheduledRecoveryEnd);
+assert.match(scheduledRecoverySource, /preferredSnapshotRecoveryHints\(snapshotSpaceIds\)/, 'Los reintentos pierden al invitador actualizado y vuelven a depender solo del propietario u otras réplicas.');
+assert.match(scheduledRecoverySource, /preferredSnapshotSourceUserIdsBySpace: preferredSource\.userIdsBySpace/, 'El reintento no conserva la preferencia de fuente por proyecto.');
+assert.match(scheduledRecoverySource, /preferredSnapshotSourceInvitationId: preferredSource\.invitationId/, 'El reintento no reutiliza la certificación de la invitación cuando cubre todo el panel.');
+
 const snapshotRootHelperStart = clientSource.indexOf('export function hasCanonicalProjectRootEntity(');
 const snapshotRootHelperEnd = clientSource.indexOf('\n\nexport function canonicalLocalSnapshotEntities', snapshotRootHelperStart);
 assert.ok(snapshotRootHelperStart >= 0 && snapshotRootHelperEnd > snapshotRootHelperStart, 'No se encontró la validación de raíz canónica de proyecto.');
@@ -152,7 +168,7 @@ const snapshotRootHelperModule = await import(`data:text/javascript;base64,${Buf
 assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
   entityType: 'admin.project',
   entityId: 'project',
-  value: { name: 'Proyecto válido' },
+  value: { name: 'Proyecto válido', initialBudget: 1000000, createdAt: '2026-08-08T00:00:00.000Z' },
   deleted: false
 }]), true, 'Una raíz de proyecto válida fue rechazada.');
 assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
@@ -161,6 +177,24 @@ assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
   value: {},
   deleted: false
 }]), false, 'Una raíz sin nombre fue aceptada como proyecto completamente hidratado.');
+assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Espacio compartido' },
+  deleted: false
+}]), false, 'Una raíz técnica con solo título volvió a aceptarse como proyecto hidratado y puede mostrar métricas falsas en 0.');
+assert.equal(snapshotRootHelperModule.hasCanonicalProjectRootEntity([{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Espacio compartido', initialBudget: 0, updatedAt: '2026-08-08T00:00:00.000Z' },
+  deleted: false
+}]), false, 'Una raíz de control legacy con presupuesto 0 y timestamp volvió a aceptarse como réplica funcional.');
+
+const sendSnapshotStart = clientSource.indexOf('  async sendSnapshot(requestEvent = {})');
+const sendSnapshotEnd = clientSource.indexOf('\n  async ensurePushSubscriptionForCurrentVapidKey(', sendSnapshotStart);
+const sendSnapshotSource = clientSource.slice(sendSnapshotStart, sendSnapshotEnd);
+assert.match(sendSnapshotSource, /this\.isAdminProjectSpace\(spaceId\) && !hasCanonicalProjectRootEntity\(localEntities\)/, 'Una réplica incompleta todavía puede reclamar el turno de snapshot y bloquear a la instalación que sí conserva el proyecto real.');
+assert.match(sendSnapshotSource, /reason: 'canonical_project_root_missing'/, 'La fuente incompleta no declara por qué se abstuvo de reconstruir el proyecto.');
 
 const completeStart = clientSource.indexOf('  async applyDecryptedOperationEvent(event = {}');
 const completeEnd = clientSource.indexOf('\n  async applyDecryptedOperationEventBatch(', completeStart);

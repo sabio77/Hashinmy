@@ -177,6 +177,25 @@ const provisionalPortfolioPanel = provisionalPortfolioPanels.find((panel) => pan
 assert.equal(provisionalPortfolioPanel?.type, 'shared-portfolio', 'Mientras la membresía del panel siga provisional, sus proyectos no deben simular una membresía ya confirmada.');
 assert.equal(provisionalPortfolioPanel?.syncComplete, false, 'La cabeza conocida no debe hacer visible el panel hasta confirmar también su autorización local.');
 
+
+const minimalAcceptedPortfolioPanels = buildProjectPanelScopes({
+  spaces: [{
+    spaceId: 'portfolio_a',
+    resourceType: 'admin.portfolio',
+    ownerUserId: 'owner_a',
+    authorizationState: 'unconfirmed',
+    authorizationPendingReason: 'replica_recovery',
+    members: [sharedOwnerA, { userId: 'guest', role: 'member', permissions: ['read'], accessScope: 'portfolio' }]
+  }],
+  projects: [],
+  portfolioHeads: { portfolio_a: portfolioHeadA },
+  currentUserId: 'guest'
+});
+const minimalAcceptedPortfolioPanel = minimalAcceptedPortfolioPanels.find((panel) => panel.id === 'portfolio_a');
+assert.equal(minimalAcceptedPortfolioPanel?.type, 'portfolio', 'Un panel recién aceptado debe existir como panel real durante la recuperación de réplica.');
+assert.deepEqual(minimalAcceptedPortfolioPanel?.missingProjectSpaceIds, ['project_a_1', 'project_a_2'], 'La cabeza mínima debe anunciar los proyectos faltantes aunque todavía no hayan llegado sus raíces.');
+assert.equal(minimalAcceptedPortfolioPanel?.syncComplete, false, 'El panel mínimo debe permanecer bloqueado hasta validar su copia completa.');
+
 const missingProject = projectRecord({ spaceId: 'space_missing', title: 'Espacio compartido' }, []);
 assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe identificarse como incompleto.');
 
@@ -187,6 +206,20 @@ const partialProject = projectRecord({ spaceId: 'space_partial', title: 'Espacio
 }]);
 assert.equal(partialProject.loaded, false, 'Una entidad raíz parcial no debe habilitar una card como si el snapshot estuviera completo.');
 assert.notEqual(partialProject.name, 'Espacio compartido', 'El título técnico del espacio no debe aparecer como nombre de un proyecto incompleto.');
+
+const technicalTitleOnlyProject = projectRecord({ spaceId: 'space_technical' }, [{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Espacio compartido' }
+}]);
+assert.equal(technicalTitleOnlyProject.loaded, false, 'Una raíz técnica con solo nombre no debe mostrar métricas 0 como si fuera un proyecto completamente recuperado.');
+
+const technicalZeroBudgetProject = projectRecord({ spaceId: 'space_technical_zero' }, [{
+  entityType: 'admin.project',
+  entityId: 'project',
+  value: { name: 'Espacio compartido', initialBudget: 0, updatedAt: '2026-08-08T00:00:00.000Z' }
+}]);
+assert.equal(technicalZeroBudgetProject.loaded, false, 'Una raíz de control legacy con presupuesto 0 y timestamp no debe habilitar la card ni aparentar una réplica completa.');
 
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);

@@ -11,6 +11,7 @@ import {
 } from './api.js';
 import { getFirebaseWebConfigError, signInWithGooglePopup, signOutFirebaseSession } from './firebase-auth.js';
 import { semillaP2P } from './p2p-client.js';
+import { auditPanelRender } from './p2p-audit.js';
 import { canRetireDevice, compactDeviceId, normalizeDeviceList } from './device-management.js';
 import {
   listPendingSpaceCreations,
@@ -142,10 +143,10 @@ const elements = {
 
 function t(key, fallback) { return window.AppI18n?.t?.(key, fallback) || fallback; }
 function setStatus(element, message = '', status = '') { if (!element) return; element.textContent = message; status ? element.dataset.state = status : delete element.dataset.state; }
-function getCachedUser() { try { const value = JSON.parse(localStorage.getItem(CACHED_USER_STORAGE_KEY) || 'null'); return value?.userId ? value : null; } catch { return null; } }
-function setCachedUser(user = null) { try { user?.userId ? localStorage.setItem(CACHED_USER_STORAGE_KEY, JSON.stringify({ userId: user.userId, email: user.email || '', displayName: user.displayName || '', photoUrl: user.photoUrl || '' })) : localStorage.removeItem(CACHED_USER_STORAGE_KEY); } catch {} }
-function getCachedActivePanelId(userId = '') { try { const value = JSON.parse(localStorage.getItem(ACTIVE_PANEL_STORAGE_KEY) || 'null'); return value?.userId === String(userId || '') ? String(value.panelId || '') : ''; } catch { return ''; } }
-function setActivePanelId(panelId = '', options = {}) { const normalized = String(panelId || '').trim(); state.activePanelId = normalized; if (options.persist === false || !state.user?.userId) return normalized; try { normalized ? localStorage.setItem(ACTIVE_PANEL_STORAGE_KEY, JSON.stringify({ userId: state.user.userId, panelId: normalized })) : localStorage.removeItem(ACTIVE_PANEL_STORAGE_KEY); } catch {} return normalized; }
+function getCachedUser() { try { const value = JSON.parse(sessionStorage.getItem(CACHED_USER_STORAGE_KEY) || 'null'); return value?.userId ? value : null; } catch { return null; } }
+function setCachedUser(user = null) { try { user?.userId ? sessionStorage.setItem(CACHED_USER_STORAGE_KEY, JSON.stringify({ userId: user.userId, email: user.email || '', displayName: user.displayName || '', photoUrl: user.photoUrl || '' })) : sessionStorage.removeItem(CACHED_USER_STORAGE_KEY); } catch {} }
+function getCachedActivePanelId(userId = '') { try { const value = JSON.parse(sessionStorage.getItem(ACTIVE_PANEL_STORAGE_KEY) || 'null'); return value?.userId === String(userId || '') ? String(value.panelId || '') : ''; } catch { return ''; } }
+function setActivePanelId(panelId = '', options = {}) { const normalized = String(panelId || '').trim(); state.activePanelId = normalized; if (options.persist === false || !state.user?.userId) return normalized; try { normalized ? sessionStorage.setItem(ACTIVE_PANEL_STORAGE_KEY, JSON.stringify({ userId: state.user.userId, panelId: normalized })) : sessionStorage.removeItem(ACTIVE_PANEL_STORAGE_KEY); } catch {} return normalized; }
 function money(amount = 0) { const exactAmount = typeof amount === 'bigint' ? amount : Number(amount || 0); return new Intl.NumberFormat(document.documentElement.lang || 'es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(exactAmount); }
 function shortDate(value = '') { const date = value ? new Date(value.length <= 10 ? `${value}T12:00:00` : value) : null; return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || 'es-CO', { dateStyle: 'medium' }).format(date) : ''; }
 function shortDateTime(value = '') { const date = value ? new Date(value) : null; return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || 'es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(date) : ''; }
@@ -407,7 +408,7 @@ function renderPanelSwitcher(activePanel = activePanelScope()) {
     detail.textContent = `${countLabel} · ${panelTypeDescription(panel)}`;
     copy.append(title, detail); button.append(marker, copy); card.append(button);
 
-    if (panel.type === 'portfolio' && panel.space?.spaceId && currentMember(panel.space)) {
+    if (panel.type === 'portfolio' && panel.space?.spaceId && currentMember(panel.space) && !isAuthorizationUnconfirmed(panel.space)) {
       const menu = contextMenuButton(
         { scope: 'panel', spaceId: panel.space.spaceId, panelId: panel.id },
         t('actions.panelMenu', 'Opciones del panel')
@@ -1090,6 +1091,25 @@ function lifecycleStatusMessage(transaction = null) {
     : '';
 }
 
+function auditDashboardProjectState(panel = null, allProjects = [], visibleProjects = []) {
+  if (typeof auditPanelRender !== 'function' || !panel) return;
+  const recognizedSpaceIds = (Array.isArray(allProjects) ? allProjects : [])
+    .map((data) => String(data?.space?.spaceId || '').trim())
+    .filter(Boolean);
+  const loadedSpaceIds = (Array.isArray(allProjects) ? allProjects : [])
+    .filter((data) => data?.project?.loaded === true)
+    .map((data) => String(data?.space?.spaceId || '').trim())
+    .filter(Boolean);
+  const visibleSpaceIds = (Array.isArray(visibleProjects) ? visibleProjects : [])
+    .map((data) => String(data?.space?.spaceId || '').trim())
+    .filter(Boolean);
+  auditPanelRender(panel?.space?.spaceId || panel?.id || '', recognizedSpaceIds, loadedSpaceIds, {
+    panelType: panel?.type || '',
+    visibleSpaceIds,
+    expectedProjectCount: panelProjectCount(panel)
+  });
+}
+
 function renderDashboard() {
   const panel = activePanelScope();
   renderPanelSwitcher(panel);
@@ -1132,12 +1152,16 @@ function renderDashboard() {
       ? t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')
       : t('dashboard.emptyRestrictedDescription', 'Aún no hay proyectos disponibles para tu cuenta. Un Gerente o el propietario del panel puede crear el primero.');
     empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${emptyDescription}</p>`;
-    elements.projectList.append(empty); return;
+    elements.projectList.append(empty);
+    auditDashboardProjectState(panel, allProjects, []);
+    return;
   }
   if (!projects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
     empty.innerHTML = `<strong>${t('dashboard.filterNoResultsTitle', 'No hay proyectos coincidentes')}</strong><p>${t('dashboard.filterNoResultsDescription', 'Prueba con otra palabra del nombre, la descripción o la dirección.')}</p>`;
-    elements.projectList.append(empty); return;
+    elements.projectList.append(empty);
+    auditDashboardProjectState(panel, allProjects, []);
+    return;
   }
   for (const data of projects) {
     const card = document.createElement('article'); card.className = 'project-card';
@@ -1175,6 +1199,7 @@ function renderDashboard() {
     card.append(openButton, menu);
     elements.projectList.append(card);
   }
+  auditDashboardProjectState(panel, allProjects, projects);
 }
 
 function queueInvitationIntent(invitationId = '') {
@@ -3231,6 +3256,27 @@ window.addEventListener('p2p:invitation', (event) => {
       'warning'
     );
   }
+});
+window.addEventListener('p2p:snapshot-complete', (event) => {
+  const snapshotEvent = event.detail?.event || {};
+  const spaceId = String(snapshotEvent.spaceId || '').trim();
+  if (!spaceId) return;
+
+  // snapshot.complete ya fue validado y persistido por p2p-client antes de emitir
+  // este evento. Rehidratar desde IndexedDB aquí evita que una card mínima quede
+  // visualmente en “Sincronizando” cuando no hay una operación posterior que fuerce
+  // el render (caso especialmente visible en proyectos legacy con revisión 0).
+  const currentSpaceKnown = state.p2pState.spaces.some((space) => space?.spaceId === spaceId);
+  const bootstrapSpaceKnown = (semillaP2P.bootstrapState?.spaces || []).some((space) => space?.spaceId === spaceId);
+  if (!currentSpaceKnown && bootstrapSpaceKnown) {
+    applyP2PState(semillaP2P.bootstrapState);
+    return;
+  }
+  if (!currentSpaceKnown) return;
+
+  refreshProjects().then(() => {
+    if (spaceId === state.selectedSpaceId) renderProject();
+  }).catch(() => null);
 });
 window.addEventListener('p2p:operation', (event) => {
   const operationEvent = event.detail?.event || {};
