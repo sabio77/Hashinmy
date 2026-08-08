@@ -613,15 +613,21 @@ export function assertCanonicalControlEnvelope(event = {}) {
     const requestDeviceId = String(data.requestDeviceId || '').trim();
     const requestUserId = String(data.requestUserId || '').trim();
     const dataSpaceId = String(data.spaceId || '').trim();
+    const localStateRevision = Number(data.localStateRevision);
+    const currentStateRevision = Number(data.currentStateRevision);
+    const recoveryReason = String(data.reason || '').trim().toLowerCase();
+    const forcedSameRevisionRepair = recoveryReason === 'forced'
+      && currentStateRevision === localStateRevision;
     if (
       !sourceDeviceId
       || !requestId
       || requestDeviceId !== sourceDeviceId
       || requestUserId !== actorUserId
       || dataSpaceId !== spaceId
-      || !isSafeRevision(data.localStateRevision)
-      || !isSafeRevision(data.currentStateRevision, { positive: true })
-      || data.currentStateRevision <= data.localStateRevision
+      || !isSafeRevision(localStateRevision)
+      || !isSafeRevision(currentStateRevision)
+      || currentStateRevision < localStateRevision
+      || (currentStateRevision === localStateRevision && !forcedSameRevisionRepair)
     ) invalid('snapshot-request');
     return event;
   }
