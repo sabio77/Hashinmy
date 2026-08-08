@@ -335,23 +335,21 @@ assert.match(appSource, /invite\.acceptedAccessRevoked/, 'Falta el mensaje de es
 assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recuperación posterior a la aceptación.');
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
-assert.match(appSource, /state\.projects = new Map\(entries\)/, 'La interfaz sigue ocultando el proyecto hasta recibir la copia completa.');
-assert.match(appSource, /pendingProjectsTitle/, 'La interfaz debe representar la recuperación como estado de sincronización sin inventar una card de proyecto incompleta.');
-assert.match(appSource, /isIncompleteInvitedPortfolio/, 'El panel completo invitado debe permanecer oculto hasta validar todos sus proyectos contra la cabeza actual.');
-const incompletePanelStart = appSource.indexOf('function isIncompleteInvitedPortfolio(');
-const incompletePanelEnd = appSource.indexOf('\nfunction panelScopes()', incompletePanelStart);
-assert.ok(incompletePanelStart >= 0 && incompletePanelEnd > incompletePanelStart, 'No se encontró la barrera visual del panel invitado.');
-const incompletePanelFn = new Function(`${appSource.slice(incompletePanelStart, incompletePanelEnd)}; return isIncompleteInvitedPortfolio;`)();
-assert.equal(
-  incompletePanelFn({ type: 'portfolio', owned: false, portfolioHead: null, syncComplete: true }),
-  true,
-  'Una membresía real de panel sin cabeza de versión puede volver a mostrar cards mínimas como proyectos completos.'
-);
-assert.equal(
-  incompletePanelFn({ type: 'shared-portfolio', owned: false, portfolioHead: null, syncComplete: true }),
-  false,
-  'Una invitación individual de proyecto no debe ocultarse por no tener cabeza del panel completo.'
-);
+assert.match(appSource, /state\.projects = new Map\(entries\)/, 'La interfaz no conserva inmediatamente las raíces mínimas de proyectos aceptados.');
+assert.match(appSource, /function panelProjectCount\(/, 'La card del panel no calcula proyectos reconocidos mientras la réplica completa sus datos.');
+assert.match(appSource, /panel\.expectedProjectSpaceIds/, 'El contador del panel ignora proyectos reconocidos por la cabeza mínima.');
+assert.match(appSource, /panel\.portfolioHead\?\.projectCount/, 'El contador del panel no conserva el total autoritativo durante una recuperación parcial.');
+assert.match(appSource, /function pendingPanelProjectPlaceholders\(/, 'Faltan cards mínimas para proyectos reconocidos cuya raíz todavía está llegando.');
+assert.match(appSource, /\[\.\.\.panelProjects, \.\.\.pendingPanelProjectPlaceholders\(panel\)\]/, 'El dashboard sigue excluyendo proyectos mínimos del panel aceptado.');
+const renderDashboardStart = appSource.indexOf('function renderDashboard()');
+const renderDashboardEnd = appSource.indexOf('\nfunction queueInvitationIntent(', renderDashboardStart);
+assert.ok(renderDashboardStart >= 0 && renderDashboardEnd > renderDashboardStart, 'No se encontró el render del dashboard.');
+const renderDashboardSource = appSource.slice(renderDashboardStart, renderDashboardEnd);
+assert.doesNotMatch(renderDashboardSource, /\.filter\(\(item\) => item\.project\.loaded === true && !item\.project\.isTrashed\)/, 'El dashboard vuelve a ocultar las cards hasta hidratar por completo el proyecto.');
+assert.match(appSource, /if \(!projectLoaded\) \{[\s\S]*?openButton\.disabled = true/, 'Una card mínima podría abrirse antes de validar la réplica completa.');
+assert.match(appSource, /menu\.disabled = Boolean\(lifecycleTransaction\) \|\| !projectLoaded/, 'Una card mínima permite acciones antes de validar la réplica completa.');
+assert.match(appSource, /function panelScopes\(\) \{[\s\S]*?return allPanelScopes\(\);/, 'El panel aceptado sigue oculto durante la sincronización inicial.');
+assert.match(appSource, /isIncompleteInvitedPortfolio/, 'Se perdió el diagnóstico de panel incompleto necesario para mantener activa la recuperación.');
 assert.match(appSource, /!panel\.portfolioHead \|\| panel\.portfolioHead\?\.syncDeferred === true/, 'La recuperación no vuelve a solicitar la raíz del panel cuando falta o quedó diferida su cabeza de versión.');
 
-console.log('OK: la aceptación monta control mínimo obsoleto sin bloquear, oculta datos incompletos y completa la réplica en segundo plano antes de habilitar edición.');
+console.log('OK: la aceptación monta control mínimo sin bloquear, muestra panel y cards reconocidas de inmediato y mantiene la edición bloqueada hasta completar la réplica.');

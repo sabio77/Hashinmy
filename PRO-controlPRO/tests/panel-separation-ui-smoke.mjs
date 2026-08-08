@@ -13,13 +13,14 @@ assert.match(html, /id="panel-list"/, 'Los paneles disponibles deben tener una l
 assert.match(appSource, /const PERSONAL_PANEL_ID = '__personal_panel__'/, 'El panel personal debe tener identidad estable y separada.');
 assert.match(appSource, /const SHARED_PROJECTS_PANEL_ID = '__shared_projects_panel__'/, 'Las invitaciones individuales deben agruparse sin mezclarse con el panel personal.');
 assert.match(appSource, /function allPanelScopes\(\)/, 'La clasificación completa de paneles debe estar centralizada.');
-assert.match(appSource, /function panelScopes\(\)/, 'La vista debe aplicar una compuerta separada sobre la clasificación autoritativa.');
+assert.match(appSource, /function panelScopes\(\)[\s\S]*?return allPanelScopes\(\);/, 'La vista debe mantener visibles los paneles aceptados mientras se completa su réplica.');
 assert.match(appSource, /buildProjectPanelScopes\(\{/, 'La clasificación debe usar el modelo puro que separa paneles virtuales por propietario.');
 assert.match(appSource, /function projectBelongsToPortfolio\(data = null, portfolioSpace = null\)[\s\S]*?governanceSpaceId[\s\S]*?return governanceSpaceId === portfolioSpaceId/, 'La relación autoritativa governanceSpaceId debe prevalecer sobre metadatos replicados o el propietario.');
 assert.match(appSource, /function portfolioForProjectSpace\(space = null\)[\s\S]*?portfolioSpaceById\(space\?\.governanceSpaceId \|\| data\?\.project\?\.portfolioSpaceId/, 'Las acciones de acceso deben resolver primero el panel gobernante autoritativo del proyecto.');
 assert.match(appSource, /\['shared', 'shared-portfolio'\]\.includes/, 'Los paneles virtuales de proyectos individuales no deben habilitar acciones de panel completo.');
-assert.match(appSource, /const allProjects = panelProjects[\s\S]*?item\.project\.loaded === true[\s\S]*?!item\.project\.isTrashed/, 'El dashboard debe renderizar únicamente proyectos completos del panel activo.');
-assert.match(appSource, /isIncompleteInvitedPortfolio[\s\S]*?panel\.portfolioHead[\s\S]*?panel\.syncComplete !== true/, 'Un panel invitado con cabeza conocida debe permanecer fuera de la UI hasta completar todo su conjunto de proyectos.');
+assert.match(appSource, /const allProjects = \[\.\.\.panelProjects, \.\.\.pendingPanelProjectPlaceholders\(panel\)\][\s\S]*?!item\.project\.isTrashed/, 'El dashboard debe renderizar proyectos completos y cards mínimas reconocidas del panel activo.');
+assert.match(appSource, /isIncompleteInvitedPortfolio[\s\S]*?panel\.portfolioHead[\s\S]*?panel\.syncComplete !== true/, 'La UI debe detectar paneles incompletos para mantener su recuperación activa sin ocultarlos.');
+assert.match(appSource, /function panelProjectCount\([\s\S]*?panel\.portfolioHead\?\.projectCount/, 'La card del panel debe conservar el total de proyectos reconocido por la cabeza mínima.');
 assert.match(appSource, /portfolioHeads: state\.p2pState\.portfolioHeads/, 'La vista debe conservar y consumir las cabezas de versión de panel entregadas por el backend.');
 assert.match(appSource, /const ordered = \[\.\.\.activePanelProjects\(\)\]/, 'La papelera también debe respetar el panel activo.');
 assert.match(appSource, /state\.pendingPanelId = invitation\?\.resourceType === PORTFOLIO_RESOURCE_TYPE/, 'Aceptar una invitación debe preparar la entrada automática al panel correcto.');
@@ -32,8 +33,8 @@ for (const language of ['es', 'en', 'ar']) {
   assert.ok(messages.dashboard?.personalPanel, `El idioma ${language} debe traducir el panel personal.`);
   assert.ok(messages.dashboard?.sharedProjectsPanel, `El idioma ${language} debe traducir los proyectos compartidos.`);
   assert.ok(messages.dashboard?.invitedPanel, `El idioma ${language} debe traducir los paneles invitados.`);
-  assert.ok(messages.p2p?.panelSyncPending, `El idioma ${language} debe traducir la sincronización fail-closed del panel.`);
-  assert.ok(messages.p2p?.pendingProjectsTitle, `El idioma ${language} debe traducir la espera de proyectos completos.`);
+  assert.ok(messages.p2p?.panelSyncPending, `El idioma ${language} debe traducir la sincronización visible del panel.`);
+  assert.ok(messages.p2p?.pendingProjectsTitle, `El idioma ${language} debe traducir la sincronización de proyectos ya reconocidos.`);
 }
 
 console.log('OK: panel personal, paneles invitados y proyectos compartidos permanecen separados y navegables.');
