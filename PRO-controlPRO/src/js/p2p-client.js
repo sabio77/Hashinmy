@@ -7288,6 +7288,7 @@ export class SemillaP2PClient {
     const data = await apiPost('/api/p2p/spaces/create', {
       resourceType: options.resourceType || 'generic',
       permissionProfile: String(options.permissionProfile || '').trim().toLowerCase(),
+      accessScope: String(options.accessScope || '').trim().toLowerCase(),
       governanceSpaceId: String(options.governanceSpaceId || options.portfolioSpaceId || '').trim(),
       requestId: String(options.requestId || options.clientRequestId || createId('space_request')).trim()
     });
@@ -7342,17 +7343,46 @@ export class SemillaP2PClient {
     return data;
   }
 
-
   async invite(email = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const requestedSpaceId = String(options.spaceId || '').trim();
     const requestedAccessScope = String(options.accessScope || 'project').trim().toLowerCase();
+    let expectedPortfolioProjectSpaceIds = normalizeSnapshotSpaceIds(options.portfolioProjectSpaceIds || [])
+      .filter((spaceId) => spaceId !== requestedSpaceId);
     if (requestedSpaceId && requestedAccessScope === 'portfolio') {
       // La invitación debe certificar contra la cabeza autoritativa del panel del
       // mismo instante, no contra un bootstrap anterior que pudo quedar en caché.
       await this.refreshBootstrap({ requestSnapshots: false });
       this.assertSessionContext(sessionContext);
+      let head = this.bootstrapState?.portfolioHeads?.[requestedSpaceId] || null;
+      let managedSpaceIds = new Set((Array.isArray(head?.managedSpaceIds) ? head.managedSpaceIds : [])
+        .map((spaceId) => String(spaceId || '').trim())
+        .filter(Boolean));
+      let missingSpaceIds = expectedPortfolioProjectSpaceIds.filter((spaceId) => !managedSpaceIds.has(spaceId));
+      const portfolioSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId) || null;
+      if (missingSpaceIds.length && String(portfolioSpace?.ownerUserId || '').trim() === sessionContext.userId) {
+        // Compatibilidad con paneles creados por versiones anteriores: si la UI del
+        // propietario ya reconoce proyectos legacy, incorporarlos al grafo autoritativo
+        // antes de emitir la invitación impide que el invitado reciba un panel vacío.
+        await this.attachProjectsToPortfolio(requestedSpaceId, missingSpaceIds);
+        this.assertSessionContext(sessionContext);
+        head = this.bootstrapState?.portfolioHeads?.[requestedSpaceId] || null;
+        managedSpaceIds = new Set((Array.isArray(head?.managedSpaceIds) ? head.managedSpaceIds : [])
+          .map((spaceId) => String(spaceId || '').trim())
+          .filter(Boolean));
+        missingSpaceIds = expectedPortfolioProjectSpaceIds.filter((spaceId) => !managedSpaceIds.has(spaceId));
+      }
+      if (missingSpaceIds.length) {
+        const error = new Error('El panel todavía no ha confirmado todos sus proyectos en el estado compartido.');
+        error.code = 'P2P_PORTFOLIO_PROJECT_MANIFEST_MISMATCH';
+        error.details = { portfolioSpaceId: requestedSpaceId, missingSpaceIds };
+        throw error;
+      }
+      // Tras la lectura autoritativa, enviar el conjunto exacto del backend. Esto
+      // también cubre proyectos nuevos que otra pestaña añadió mientras se abría
+      // el formulario y evita emitir una invitación desde una vista local atrasada.
+      expectedPortfolioProjectSpaceIds = [...managedSpaceIds];
     }
     if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
@@ -7373,6 +7403,7 @@ export class SemillaP2PClient {
       role: String(options.role || 'member').trim().toLowerCase(),
       accessScope: requestedAccessScope,
       snapshotSourceClaim,
+      portfolioProjectSpaceIds: expectedPortfolioProjectSpaceIds,
       requestId: String(options.requestId || options.clientRequestId || '').trim()
     });
     this.assertSessionContext(sessionContext);
@@ -7413,6 +7444,49 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     return data;
   }
+
+  async attachProjectsToPortfolio(portfolioSpaceId = '', projectSpaceIds = []) {
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const cleanPortfolioSpaceId = String(portfolioSpaceId || '').trim();
+    const cleanProjectSpaceIds = [...new Set((Array.isArray(projectSpaceIds) ? projectSpaceIds : [])
+      .map((spaceId) => String(spaceId || '').trim())
+      .filter((spaceId) => spaceId && spaceId !== cleanPortfolioSpaceId))];
+    if (!cleanPortfolioSpaceId) throw new Error('Falta el panel que debe gobernar los proyectos existentes.');
+    if (!cleanProjectSpaceIds.length) {
+      return { portfolioSpaceId: cleanPortfolioSpaceId, projectSpaceIds: [], changed: 0, participationReconciliations: [] };
+    }
+    this.assertSpaceAuthorizationConfirmed(cleanPortfolioSpaceId);
+    cleanProjectSpaceIds.forEach((spaceId) => this.assertSpaceAuthorizationConfirmed(spaceId));
+
+    let changed = 0;
+    const participationReconciliations = [];
+    for (let index = 0; index < cleanProjectSpaceIds.length; index += 100) {
+      this.assertSessionContext(sessionContext);
+      const batch = cleanProjectSpaceIds.slice(index, index + 100);
+      const data = await apiPost('/api/p2p/portfolios/attach-projects', {
+        portfolioSpaceId: cleanPortfolioSpaceId,
+        projectSpaceIds: batch
+      });
+      this.assertSessionContext(sessionContext);
+      changed += Math.max(0, Number(data.changed || 0));
+      if (Array.isArray(data.participationReconciliations)) {
+        participationReconciliations.push(...data.participationReconciliations);
+      }
+    }
+
+    await this.fenceBootstrapResponses(sessionContext);
+    this.assertSessionContext(sessionContext);
+    await this.refreshBootstrap({ requestSnapshots: false });
+    this.assertSessionContext(sessionContext);
+    return {
+      portfolioSpaceId: cleanPortfolioSpaceId,
+      projectSpaceIds: cleanProjectSpaceIds,
+      changed,
+      participationReconciliations
+    };
+  }
+
 
   async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();

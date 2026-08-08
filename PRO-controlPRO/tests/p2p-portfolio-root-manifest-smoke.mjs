@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const currentFile = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(currentFile), '..');
 const clientSource = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
+const appSource = fs.readFileSync(path.join(root, 'src', 'js', 'app.js'), 'utf8');
 
 const helperStart = clientSource.indexOf('function realtimeProtocolError(');
 const helperEnd = clientSource.indexOf('\nexport function assertCanonicalControlEnvelope', helperStart);
@@ -109,6 +110,34 @@ assert.match(inviteSource, /listStateRevisions\(spaceIds\)/, 'La certificación 
 assert.match(inviteSource, /listOutbox\(\)/, 'La certificación puede declarar vigente una instalación que aún tiene cambios locales pendientes de publicar.');
 assert.match(inviteSource, /hasCanonicalProjectRootEntity\(entities\)/, 'La certificación puede declarar vigente una instalación sin la raíz canónica de uno de los proyectos.');
 assert.match(inviteSource, /snapshotSourceClaim,/, 'La invitación no transporta la certificación local mínima hacia memoriaBACKEND.');
+
+const attachStart = clientSource.indexOf("  async attachProjectsToPortfolio(portfolioSpaceId = '', projectSpaceIds = [])");
+const attachEnd = clientSource.indexOf('\n\n  async respondToInvitation(', attachStart);
+assert.ok(attachStart >= 0 && attachEnd > attachStart, 'No se encontró la migración cliente de proyectos anteriores al panel.');
+const attachSource = clientSource.slice(attachStart, attachEnd);
+assert.match(attachSource, /apiPost\('\/api\/p2p\/portfolios\/attach-projects'/, 'La app no persiste la gobernanza de proyectos standalone en memoriaBACKEND.');
+assert.match(attachSource, /index \+= 100/, 'La migración debe respetar lotes acotados para paneles grandes.');
+assert.match(attachSource, /refreshBootstrap\(\{ requestSnapshots: false \}\)/, 'Después de migrar proyectos la app debe releer la cabeza autoritativa antes de invitar.');
+
+const migrationStart = appSource.indexOf('async function reconcileOwnedPortfolioProjectGovernance(');
+const migrationEnd = appSource.indexOf('\nfunction projectBelongsToPortfolio', migrationStart);
+assert.ok(migrationStart >= 0 && migrationEnd > migrationStart, 'No se encontró la reparación de gobernanza para proyectos existentes.');
+const migrationSource = appSource.slice(migrationStart, migrationEnd);
+assert.match(migrationSource, /candidates\.length === 1/, 'La reparación automática no debe adivinar panel cuando el propietario administra varios paneles.');
+assert.match(migrationSource, /semillaP2P\.attachProjectsToPortfolio/, 'La reparación visual no está conectada a la gobernanza autoritativa del backend.');
+
+const portfolioInviteStart = appSource.indexOf("async function inviteAcrossPortfolio(email = '', grant = {})");
+const portfolioInviteEnd = appSource.indexOf('\nfunction invitationTargetSpace', portfolioInviteStart);
+assert.ok(portfolioInviteStart >= 0 && portfolioInviteEnd > portfolioInviteStart, 'No se encontró el flujo de invitación de panel.');
+const portfolioInviteSource = appSource.slice(portfolioInviteStart, portfolioInviteEnd);
+assert.match(portfolioInviteSource, /semillaP2P\.createSpace\(\{[\s\S]*?resourceType: PORTFOLIO_RESOURCE_TYPE,[\s\S]*?accessScope: 'portfolio'/, 'El primer panel no se prepara con alcance portfolio antes de vincular proyectos existentes.');
+assert.match(portfolioInviteSource, /await reconcileOwnedPortfolioProjectGovernance\(portfolioSpace, legacyProjectSpaceIds\)/, 'La invitación puede publicarse antes de que los proyectos existentes pertenezcan realmente al panel.');
+assert.ok(
+  portfolioInviteSource.indexOf('await reconcileOwnedPortfolioProjectGovernance(portfolioSpace, legacyProjectSpaceIds)')
+    < portfolioInviteSource.indexOf('await upsertSpaceAccessByEmail'),
+  'La gobernanza de proyectos debe quedar lista antes de crear o actualizar la participación del invitado.'
+);
+assert.match(appSource, /queueMicrotask\(\(\) => reconcileOwnedPortfolioProjectGovernance\(\)/, 'Una invitación ya aceptada no se autorrepara cuando el propietario vuelve a abrir la versión actualizada.');
 
 const fetchBootstrapStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false)');
 const fetchBootstrapEnd = clientSource.indexOf('\n  async start(', fetchBootstrapStart);

@@ -292,6 +292,10 @@ const inviteMethod = clientSource.slice(inviteStart, inviteEnd);
 assert.match(inviteMethod, /prepareCommittedControlState\(/);
 assert.match(inviteMethod, /authorizationState: 'confirmed'/, 'La creación autoritativa del propietario dejó de persistirse como confirmada.');
 assert.match(inviteMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'local-invite' \}\)/);
+assert.match(inviteMethod, /expectedPortfolioProjectSpaceIds/, 'La invitación de panel no transporta el manifiesto de proyectos que el remitente ve.');
+assert.match(inviteMethod, /this\.attachProjectsToPortfolio\(requestedSpaceId, missingSpaceIds\)/, 'La invitación no repara proyectos legacy antes de publicarse.');
+assert.match(inviteMethod, /expectedPortfolioProjectSpaceIds = \[\.\.\.managedSpaceIds\]/, 'La invitación no termina usando la cabeza autoritativa más reciente del panel.');
+assert.match(inviteMethod, /portfolioProjectSpaceIds: expectedPortfolioProjectSpaceIds/, 'El backend no recibe el manifiesto exacto de proyectos al crear o reutilizar la invitación.');
 
 const responseStart = inviteEnd + 1;
 const responseEnd = clientSource.indexOf('\n  async leave(', responseStart);
@@ -336,6 +340,9 @@ assert.match(appSource, /invite\.acceptedSyncing/, 'Falta el mensaje de recupera
 assert.match(appSource, /p2p:replica-recovery-pending/);
 assert.match(appSource, /p2p:replica-recovery-confirmed/);
 assert.match(appSource, /state\.projects = new Map\(entries\)/, 'La interfaz no conserva inmediatamente las raíces mínimas de proyectos aceptados.');
+assert.match(appSource, /function panelProjectSources\(\) \{[\s\S]*?state\.p2pState\.spaces[\s\S]*?resolvedProjectData\(space, \[\]\)/, 'El dashboard no consume las raíces P2P mínimas antes de terminar la hidratación de IndexedDB.');
+assert.match(appSource, /projects:\s*panelProjectSources\(\)/, 'Los scopes del panel todavía dependen exclusivamente de state.projects y pueden renderizar 0 proyectos durante la aceptación.');
+assert.doesNotMatch(appSource, /if \(pending\) return \{ reused: true, invitation: pending, space \};/, 'Una invitación pendiente puede evitar la nueva validación del manifiesto y conservar un panel antiguo con 0 proyectos.');
 assert.match(appSource, /function panelProjectCount\(/, 'La card del panel no calcula proyectos reconocidos mientras la réplica completa sus datos.');
 assert.match(appSource, /panel\.expectedProjectSpaceIds/, 'El contador del panel ignora proyectos reconocidos por la cabeza mínima.');
 assert.match(appSource, /panel\.portfolioHead\?\.projectCount/, 'El contador del panel no conserva el total autoritativo durante una recuperación parcial.');
