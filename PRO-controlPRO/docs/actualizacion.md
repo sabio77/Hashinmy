@@ -10,7 +10,7 @@ La app instalada consulta `version.json` con `cache: no-store` únicamente cuand
 
 El archivo `version.json` contiene huellas SHA-256 de los archivos críticos generadas por `tools/generate-release.py`. El cliente compara esas huellas sin descargar todos los archivos críticos en cada revisión. Cuando el manifiesto de release cambia, pide al Service Worker precargar los `criticalAssets` por evento real; esto ayuda a que idiomas nuevos, logo e íconos queden disponibles tras la recarga sin usar polling.
 
-Existe un fallback directo opcional para errores humanos, pero no usa polling: solo puede ejecutarse cuando una revisión por evento ya está ocurriendo y respeta una ventana mínima entre corridas. Esta verificación directa ahora tolera assets opcionales ausentes, registra el estado `missing` y detecta cuando aparece o cambia cualquier PNG `assets/logoAPP_*.png` esperado.
+Existe un fallback directo opcional para errores humanos, pero no usa polling: solo puede ejecutarse cuando una revisión por evento ya está ocurriendo y respeta una ventana mínima entre corridas. Esta verificación directa ahora tolera assets opcionales ausentes, registra el estado `missing` y detecta cuando aparece o cambia `assets/icons/logo.png` o cualquiera de los íconos esperados.
 
 ## 3. Service Worker
 
@@ -51,12 +51,3 @@ Si un CDN congela `sw.js`, `index.html` o `version.json`, ninguna PWA puede gara
 ## Sin polling
 
 La actualización no usa `setInterval`. Si la app permanece abierta sin foco, navegación ni reconexión, el navegador no entrega una señal confiable para consultar el static site sin caer en polling. La semilla prioriza la regla solicitada: actualización automática al iniciar, volver a foco, recuperar visibilidad, reconectar o recibir eventos del Service Worker.
-
-
-## Actualización del logo instalado
-
-La familia oficial de iconos vive directamente en `assets/` y todos sus archivos comienzan con `logoAPP_`. El build calcula una huella SHA-256 del PNG real; mientras el PNG no exista usa la huella de su archivo `.png.txt`. Esa huella se agrega como `?v=` a las URLs del manifiesto, favicon, Apple Touch, interfaz y notificaciones. Por eso, al reemplazar cualquier PNG y desplegar, la URL de identidad cambia aunque el nombre estable del archivo se conserve.
-
-`manifest.webmanifest` mantiene siempre la misma ruta para no romper la identidad instalada. El generador actualiza únicamente las URLs internas de `icons`. La interfaz activa y su favicon se refrescan al recibir el nuevo `version.json`; el Service Worker crea un caché nuevo por `appIconVersion` y conserva un fallback geométrico si el PNG todavía no existe.
-
-La actualización del icono del lanzador depende finalmente del navegador y del sistema operativo. Chrome 144+ detecta el cambio al variar la URL del icono y puede solicitar aprobación del usuario para cambios de identidad; iOS/iPadOS puede requerir reinstalación. El proyecto no promete sustituir por JavaScript una decisión que pertenece al sistema operativo, pero sí entrega la señal correcta, inmediata y verificable para todas las plataformas compatibles.

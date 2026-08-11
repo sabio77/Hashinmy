@@ -38,9 +38,7 @@
     var height = Number(slot.getAttribute('data-image-height') || width);
     var alt = slot.getAttribute('data-image-alt') || (root.AppI18n && root.AppI18n.t ? root.AppI18n.t('app.logoAlt', 'Logo de la app') : 'Logo de la app');
     var image = new Image(width, height);
-    var requestToken = String(Date.now()) + ':' + Math.random().toString(16).slice(2);
 
-    slot.dataset.assetRequest = requestToken;
     slot.textContent = '';
     slot.style.width = width + 'px';
     slot.style.height = height + 'px';
@@ -55,7 +53,6 @@
     var skeleton = beginSkeletonFor(slot);
 
     image.addEventListener('load', function showImage() {
-      if (slot.dataset.assetRequest !== requestToken) return;
       skeleton.end();
       slot.textContent = '';
       slot.appendChild(image);
@@ -63,7 +60,6 @@
     }, { once: true });
 
     image.addEventListener('error', function showFallback() {
-      if (slot.dataset.assetRequest !== requestToken) return;
       skeleton.end();
       slot.textContent = '';
       slot.appendChild(createFallback(width, height, alt));
@@ -80,15 +76,7 @@
   }
 
   root.AppAssetLoader = Object.freeze({
-    hydrate: hydrate,
-    refreshAppIdentity: function refreshAppIdentity(url) {
-      if (url) {
-        document.querySelectorAll('[data-app-icon-role="interface-logo"]').forEach(function updateLogoSlot(slot) {
-          slot.setAttribute('data-image-src', url);
-        });
-      }
-      hydrate(document);
-    }
+    hydrate: hydrate
   });
 
   if (document.readyState === 'loading') {

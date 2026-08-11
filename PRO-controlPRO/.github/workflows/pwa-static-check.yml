@@ -22,12 +22,6 @@ jobs:
       - name: Run static smoke check
         run: python tests/pwa-smoke-check.py
 
-      - name: Validate content-versioned PWA logo updates
-        run: python tests/pwa-logo-update-smoke.py
-
-      - name: Validate runtime PWA identity refresh
-        run: node tests/pwa-logo-runtime-smoke.mjs
-
       - name: Validate cache isolation between app folders
         run: node tests/pwa-cache-isolation-smoke.mjs
 

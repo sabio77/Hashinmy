@@ -68,7 +68,7 @@ Las solicitudes de estado entre ventanas quedan dirigidas al `tabId` y al térmi
 
 2. **Instalación PWA**
    - `manifest.webmanifest`
-   - familia de iconos `assets/logoAPP_*.png`
+   - íconos en `assets/icons`
    - `sw.js`
 
 3. **Multilenguaje**

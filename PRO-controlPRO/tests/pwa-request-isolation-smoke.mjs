@@ -43,7 +43,7 @@ function createWorker(applicationPath = '/') {
       build: 'request-isolation-test',
       precacheUrls: [
         './', './index.html', './offline.html', './manifest.webmanifest', './sw.js',
-        './src/js/app.js', './assets/logoAPP_192x192.png'
+        './src/js/app.js', './assets/icons/icon-192.png'
       ],
       rootOwnedPathPrefixes: ['/assets/', '/src/', '/textX/', '/.well-known/'],
       rootNavigationPaths: ['/', '/index.html', '/offline.html']

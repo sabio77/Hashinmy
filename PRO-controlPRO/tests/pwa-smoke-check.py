@@ -44,15 +44,11 @@ REQUIRED_FILES = [
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
-    "src/js/pwa-install-prompt.js",
     "src/js/pwa-update-manager.js",
     "src/js/app.js",
     "src/css/app.css",
     "tests/application-scope-smoke.mjs",
     "tests/pwa-request-isolation-smoke.mjs",
-    "tests/pwa-install-prompt-smoke.mjs",
-    "tests/pwa-logo-update-smoke.py",
-    "tests/pwa-logo-runtime-smoke.mjs",
     "tests/p2p-local-state-smoke.mjs",
     "tests/p2p-batch-intent-smoke.mjs",
     "tests/p2p-replication-contract-smoke.mjs",
@@ -74,20 +70,11 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_PROMPTS = [
-    "assets/logoAPP_16x16.png.txt",
-    "assets/logoAPP_32x32.png.txt",
-    "assets/logoAPP_48x48.png.txt",
-    "assets/logoAPP_72x72.png.txt",
-    "assets/logoAPP_96x96.png.txt",
-    "assets/logoAPP_128x128.png.txt",
-    "assets/logoAPP_144x144.png.txt",
-    "assets/logoAPP_152x152.png.txt",
-    "assets/logoAPP_180x180.png.txt",
-    "assets/logoAPP_192x192.png.txt",
-    "assets/logoAPP_384x384.png.txt",
-    "assets/logoAPP_512x512.png.txt",
-    "assets/logoAPP_maskable_192x192.png.txt",
-    "assets/logoAPP_maskable_512x512.png.txt",
+    "assets/icons/icon-192.png.txt",
+    "assets/icons/icon-512.png.txt",
+    "assets/icons/maskable-192.png.txt",
+    "assets/icons/maskable-512.png.txt",
+    "assets/icons/logo.png.txt",
 ]
 
 JAVASCRIPT_FILES = [
@@ -108,7 +95,6 @@ JAVASCRIPT_FILES = [
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
-    "src/js/pwa-install-prompt.js",
     "src/js/pwa-update-manager.js",
     "src/js/app.js",
     "sw.js",
@@ -238,20 +224,6 @@ def assert_application_scope() -> None:
     if result.returncode != 0:
         fail(f"Falló el aislamiento por dominio y aplicación: {result.stderr.strip() or result.stdout.strip()}")
 
-
-def assert_install_prompt() -> None:
-    node = shutil.which("node")
-    if not node:
-        print("ADVERTENCIA: node no está disponible; se omite prueba de presentación de instalación PWA.", file=sys.stderr)
-        return
-    result = subprocess.run(
-        [node, str(ROOT / "tests" / "pwa-install-prompt-smoke.mjs")],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        fail(f"Falló la presentación de instalación PWA: {result.stderr.strip() or result.stdout.strip()}")
 
 def assert_service_worker_request_isolation() -> None:
     node = shutil.which("node")
@@ -1063,7 +1035,7 @@ def assert_manifest_icon_fallbacks(manifest: Dict[str, Any]) -> None:
     if not isinstance(icons, list) or not icons:
         fail("manifest.webmanifest debe declarar icons instalables.")
 
-    png_icons = [icon for icon in icons if str(icon.get("src", "")).startswith("./assets/logoAPP_")]
+    png_icons = [icon for icon in icons if str(icon.get("src", "")).startswith("./assets/icons/")]
     data_fallbacks = [icon for icon in icons if str(icon.get("src", "")).startswith("data:image/svg+xml,")]
 
     if len(png_icons) < 4:
@@ -1316,7 +1288,6 @@ def main() -> None:
     assert_retry_after_recovery()
     assert_application_scope()
     assert_service_worker_request_isolation()
-    assert_install_prompt()
     assert_snapshot_request_liveness()
     assert_no_update_polling()
     assert_runtime_backend_injection()
@@ -1332,7 +1303,7 @@ def main() -> None:
         if marker not in app_source and marker not in (ROOT / "src/js/project-domain.js").read_text(encoding="utf-8"):
             fail(f"La interfaz administrativa perdió una capacidad funcional requerida: {marker}.")
 
-    for needle in ["manifest.webmanifest", "i18n.js", "skeleton-screen.js", "asset-loader.js", "pwa-install-prompt.js", "pwa-update-manager.js", "pwa-install-dialog", "pwa-install-button", "pwa-install-close", "data-language-selector", "data-skeleton-slot"]:
+    for needle in ["manifest.webmanifest", "i18n.js", "skeleton-screen.js", "asset-loader.js", "pwa-update-manager.js", "data-language-selector", "data-skeleton-slot"]:
         if needle not in index:
             fail(f"index.html no contiene {needle}.")
 
@@ -1343,13 +1314,6 @@ def main() -> None:
     if manifest.get("display") not in ["standalone", "fullscreen", "minimal-ui"]:
         fail("manifest.webmanifest debe usar display instalable.")
     assert_manifest_icon_fallbacks(manifest)
-    external_icon_urls = [str(icon.get("src", "")) for icon in manifest.get("icons", []) if str(icon.get("src", "")).startswith("./assets/logoAPP_")]
-    if not external_icon_urls or any("?v=" not in url for url in external_icon_urls):
-        fail("Todos los iconos logoAPP_ del manifest deben usar URL con huella ?v= para activar actualizaciones de identidad.")
-    required_sizes = {"48x48", "72x72", "96x96", "128x128", "144x144", "152x152", "180x180", "192x192", "384x384", "512x512"}
-    available_sizes = {str(icon.get("sizes", "")) for icon in manifest.get("icons", []) if str(icon.get("src", "")).startswith("./assets/logoAPP_") and icon.get("purpose") == "any"}
-    if not required_sizes.issubset(available_sizes):
-        fail(f"Faltan tamaños estándar logoAPP_ en manifest.webmanifest: {sorted(required_sizes - available_sizes)}")
 
     languages = read_json("textX/languages.json")
     codes = [item.get("code") for item in languages.get("languages", [])]
@@ -1367,16 +1331,6 @@ def main() -> None:
     for needle in ["html[dir=\"rtl\"]", "letter-spacing: 0", "left: calc(16px + var(--safe-left))"]:
         if needle not in css:
             fail(f"src/css/app.css no contiene soporte RTL robusto: {needle}")
-
-    install_prompt = (ROOT / "src/js/pwa-install-prompt.js").read_text(encoding="utf-8")
-    if "AppI18n.apply(dialog)" in install_prompt:
-        fail("La presentación PWA no debe redisparar el aplicador global de idioma desde app-language-ready.")
-    for required in ["beforeinstallprompt", "appinstalled", "display-mode: standalone", "navigator.standalone", "showModal", "installManualIos", "installManualGeneric"]:
-        if required not in install_prompt:
-            fail(f"src/js/pwa-install-prompt.js perdió una garantía de instalación: {required}")
-    for required in ["position: fixed", "inset: 0", ".pwa-install-close", ".pwa-install-button"]:
-        if required not in css:
-            fail(f"src/css/app.css no centra o presenta correctamente la instalación PWA: {required}")
 
     for needle in ["project-filter-toolbar", "project-filter-field", "project-filter-summary", "focus-within"]:
         if needle not in css:
@@ -1463,7 +1417,7 @@ def main() -> None:
 
     if "updateCheckIntervalMs: 0" not in config or "periodicUpdateChecksEnabled: false" not in config:
         fail("config.js debe dejar desactivadas las revisiones periódicas.")
-    for optional_asset in ["./assets/logoAPP_32x32.png", "./assets/logoAPP_192x192.png", "./assets/logoAPP_512x512.png", "./assets/logoAPP_maskable_512x512.png"]:
+    for optional_asset in ["./assets/icons/logo.png", "./assets/icons/icon-192.png", "./assets/icons/icon-512.png"]:
         if optional_asset not in config:
             fail(f"config.js debe vigilar cambios del asset opcional: {optional_asset}")
     if "fetchBytesNoStore" not in manager or "missing:0" not in manager:
@@ -1498,12 +1452,6 @@ def main() -> None:
         fail("version.json debe incluir metadatos i18n.")
     if "assetPrompts" not in version or "files" not in version.get("assetPrompts", {}):
         fail("version.json debe incluir metadatos de prompts de assets autodetectados.")
-    identity = version.get("appIdentity") or {}
-    if version.get("schemaVersion", 0) < 4 or not identity.get("iconVersion"):
-        fail("version.json debe incluir appIdentity versionada con schemaVersion >= 4.")
-    for key in ["interfaceLogo", "favicon", "appleTouchIcon", "notificationIcon"]:
-        if "?v=" not in str(identity.get(key, "")):
-            fail(f"version.json appIdentity.{key} debe contener URL con huella.")
 
     for asset in assets:
         url = asset.get("url", "")
@@ -1542,7 +1490,7 @@ def main() -> None:
     assert_release_tracks_languages(version, metadata_text)
 
     sw = (ROOT / "sw.js").read_text(encoding="utf-8")
-    for needle in ["skipWaiting", "clients.claim", "navigationPreload", "APP_SW_ACTIVATED", "textX/languages.json", "src/js/skeleton-screen.js", "src/js/p2p-invitation-intent.js", "P2P_PUSH_RECEIVED", "createGeneratedImageFallbackResponse", "networkFirstWithGeneratedImageFallback", "buildVersionedAppIconUrl", "APP_ICON_VERSION", "logoAPP_192x192.png", "isApplicationOwnedUrl", "isOwnedMessageSource", "isApplicationClientUrl", "rootOwnedPathPrefixes", "rootNavigationPaths"]:
+    for needle in ["skipWaiting", "clients.claim", "navigationPreload", "APP_SW_ACTIVATED", "textX/languages.json", "src/js/skeleton-screen.js", "src/js/p2p-invitation-intent.js", "P2P_PUSH_RECEIVED", "createGeneratedImageFallbackResponse", "networkFirstWithGeneratedImageFallback", "isApplicationOwnedUrl", "isOwnedMessageSource", "isApplicationClientUrl", "rootOwnedPathPrefixes", "rootNavigationPaths"]:
         if needle not in sw:
             fail(f"sw.js no contiene señal esperada: {needle}")
     for needle in ["createCanonicalOptionalAssetRequest", "cache.put(canonicalRequest", "ignoreSearch: true"]:

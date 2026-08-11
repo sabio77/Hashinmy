@@ -6,7 +6,7 @@ Antes de publicar una app real basada en esta semilla:
 
 - [ ] Cambiar `name`, `short_name` y `description` en `manifest.webmanifest`.
 - [ ] Cambiar `appName` en `src/js/app-metadata.js`.
-- [ ] Generar o sustituir los PNG `assets/logoAPP_*.png` conservando exactamente sus tamaños declarados.
+- [ ] Cambiar íconos en `assets/icons`.
 - [ ] Ajustar `theme_color` y `background_color`.
 
 ## Instalación

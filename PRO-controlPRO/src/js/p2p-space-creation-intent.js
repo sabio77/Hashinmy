@@ -14,7 +14,6 @@ export function normalizeSpaceCreationIntent(input = {}) {
   const operationId = cleanText(source.operationId);
   const resourceType = cleanText(source.resourceType || 'generic', 120);
   const permissionProfile = cleanText(source.permissionProfile, 80).toLowerCase();
-  const governanceSpaceId = cleanText(source.governanceSpaceId || source.portfolioSpaceId);
   const entityType = cleanText(source.entityType, 160);
   const entityId = cleanText(source.entityId, 180);
   const value = safeObject(source.value);
@@ -24,7 +23,6 @@ export function normalizeSpaceCreationIntent(input = {}) {
     operationId,
     resourceType,
     permissionProfile,
-    governanceSpaceId,
     entityType,
     entityId,
     spaceId: cleanText(source.spaceId),
@@ -74,7 +72,6 @@ export async function completeSpaceCreationIntent(input = {}, adapters = {}) {
     const created = await createSpace({
       resourceType: intent.resourceType,
       permissionProfile: intent.permissionProfile,
-      governanceSpaceId: intent.governanceSpaceId,
       requestId: intent.requestId
     });
     const spaceId = cleanText(created?.space?.spaceId || created?.spaceId || '');

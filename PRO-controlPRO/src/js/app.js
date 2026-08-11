@@ -49,12 +49,7 @@ import {
   createLocalId,
   entitiesByType,
   hasPermission,
-  individualRecordAccess,
-  memberForUser,
   normalizeCollaborationPermissions,
-  normalizeCollaborationRole,
-  operationAuthorship,
-  rolePermissions,
   normalizeIncomeInput,
   normalizeProjectInput,
   normalizeProjectFilterText,
@@ -63,7 +58,6 @@ import {
   normalizePurchaseInput,
   projectMatchesFilter,
   projectRecord,
-  roleLabel,
   resolveProjectionActuals,
   resolvePurchaseProjectionLinks,
   sumMoneyValues
@@ -93,16 +87,10 @@ const state = {
   invitationRefreshSequence: 0,
   missingProjectRecoveryActive: false,
   missingProjectRecoveryAt: new Map(),
-  projectFilterQuery: '',
-  inviteScope: 'project',
-  portfolioInviteAccepting: false,
-  accessScopeContext: 'project',
-  portfolioReconciliationActive: false
+  projectFilterQuery: ''
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
-const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio';
-const PROJECT_RESOURCE_TYPE = 'admin.project';
 
 let externalSessionQueue = Promise.resolve();
 
@@ -115,15 +103,15 @@ const elements = {
   devicesButton: byId('devices-button'), devicesDialog: byId('devices-dialog'), deviceList: byId('device-list'), deviceStatus: byId('device-status'), deviceConfirmPanel: byId('device-confirm-panel'), deviceConfirmMessage: byId('device-confirm-message'), deviceConfirmButton: byId('device-confirm-button'), deviceConfirmCancel: byId('device-confirm-cancel'),
   localNetworkButton: byId('local-network-button'), localNetworkDialog: byId('local-network-dialog'), localNetworkState: byId('local-network-state'), localNetworkInput: byId('local-network-input'), localNetworkOutput: byId('local-network-output'), localNetworkCreateOffer: byId('local-network-create-offer'), localNetworkAcceptOffer: byId('local-network-accept-offer'), localNetworkCompleteAnswer: byId('local-network-complete-answer'), localNetworkCopy: byId('local-network-copy'), localNetworkPeers: byId('local-network-peers'), localNetworkStatus: byId('local-network-status'),
   dashboardView: byId('dashboard-view'), projectView: byId('project-view'), dashboardStatus: byId('dashboard-status'), projectStatus: byId('project-status'),
-  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), managePortfolioAccessButton: byId('manage-portfolio-access-button'), invitePortfolioButton: byId('invite-portfolio-button'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
+  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
   projectName: byId('project-name'), projectDescription: byId('project-description'), projectAddress: byId('project-address'), projectMemberSummary: byId('project-member-summary'), projectReplicaHealth: byId('project-replica-health'),
   projectMetrics: byId('project-metrics'), budgetProgressValue: byId('budget-progress-value'), budgetProgressLabel: byId('budget-progress-label'),
   inviteCollaboratorButton: byId('invite-collaborator-button'), manageAccessButton: byId('manage-access-button'), editProjectButton: byId('edit-project-button'), addPurchaseButton: byId('add-purchase-button'), addIncomeButton: byId('add-income-button'), addProjectionButton: byId('add-projection-button'),
   purchaseList: byId('purchase-list'), projectionList: byId('projection-list'), incomeList: byId('income-list'), purchaseCount: byId('purchase-count'), projectionCount: byId('projection-count'), incomeCount: byId('income-count'),
   projectDialog: byId('project-dialog'), projectForm: byId('project-form'), projectFormMode: byId('project-form-mode'), projectDialogTitle: byId('project-dialog-title'), projectNameInput: byId('project-name-input'), projectDescriptionInput: byId('project-description-input'), projectAddressInput: byId('project-address-input'), projectBudgetInput: byId('project-budget-input'), projectFormStatus: byId('project-form-status'), projectSubmitButton: byId('project-submit-button'),
   recordDialog: byId('record-dialog'), recordForm: byId('record-form'), recordTypeInput: byId('record-type-input'), recordDialogEyebrow: byId('record-dialog-eyebrow'), recordDialogTitle: byId('record-dialog-title'), recordDescriptionInput: byId('record-description-input'), recordInvoiceInput: byId('record-invoice-input'), recordAmountInput: byId('record-amount-input'), recordDateInput: byId('record-date-input'), recordProjectionInput: byId('record-projection-input'), invoiceField: byId('invoice-field'), projectionLinkField: byId('projection-link-field'), recordDateLabel: byId('record-date-label'), recordAmountLabel: byId('record-amount-label'), recordFormStatus: byId('record-form-status'), recordSubmitButton: byId('record-submit-button'),
-  inviteDialog: byId('invite-dialog'), inviteForm: byId('invite-form'), inviteDialogTitle: byId('invite-dialog-title'), inviteScopeMessage: byId('invite-scope-message'), inviteRoleSelect: byId('invite-role-select'), invitePermissionFieldset: byId('invite-permission-fieldset'), inviteEmailInput: byId('invite-email-input'), inviteStatus: byId('invite-status'), inviteSubmitButton: byId('invite-submit-button'), invitationsDialog: byId('invitations-dialog'),
-  accessDialog: byId('access-dialog'), accessDialogTitle: byId('access-dialog-title'), accessDialogDescription: byId('access-dialog-description'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel'),
+  inviteDialog: byId('invite-dialog'), inviteForm: byId('invite-form'), inviteEmailInput: byId('invite-email-input'), inviteStatus: byId('invite-status'), inviteSubmitButton: byId('invite-submit-button'), invitationsDialog: byId('invitations-dialog'),
+  accessDialog: byId('access-dialog'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel'),
   trashButton: byId('trash-button'), trashCount: byId('trash-count'), trashDialog: byId('trash-dialog'), trashList: byId('trash-list'), trashStatus: byId('trash-status'),
   actionMenuDialog: byId('action-menu-dialog'), actionMenuTitle: byId('action-menu-title'), actionMenuContext: byId('action-menu-context'), actionMenuList: byId('action-menu-list'), actionMenuStatus: byId('action-menu-status'), actionMenuConfirmPanel: byId('action-menu-confirm-panel'), actionMenuConfirmTitle: byId('action-menu-confirm-title'), actionMenuConfirmMessage: byId('action-menu-confirm-message'), actionMenuConfirmButton: byId('action-menu-confirm-button'), actionMenuConfirmCancel: byId('action-menu-confirm-cancel')
 };
@@ -148,201 +136,6 @@ function isSelectedProjectOwner() {
 function spaceUserCan(space = null, permission = '') { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user && hasPermission(space, state.user.userId, permission)); }
 function userCan(permission) { return spaceUserCan(selectedSpace(), permission); }
 function isSpaceOwner(space = null) { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user?.userId && space.ownerUserId === state.user.userId); }
-function currentMember(space = null) { return state.user?.userId ? memberForUser(space || {}, state.user.userId) : null; }
-function currentRole(space = null) { return normalizeCollaborationRole(currentMember(space)?.role || 'member'); }
-function accessSpace() { return state.accessScopeContext === 'portfolio' ? primaryPortfolioSpace() : selectedSpace(); }
-function accessProjectData() { return state.accessScopeContext === 'project' ? selectedProjectData() : null; }
-function translatedRoleLabel(role = '') {
-  const normalized = normalizeCollaborationRole(role);
-  return t(`roles.${normalized}`, roleLabel(normalized));
-}
-function roleRank(role = '') { return ({ owner: 4, manager: 3, admin: 2, individual: 1, member: 1 })[normalizeCollaborationRole(role)] || 0; }
-function canManageMember(space = null, member = null) {
-  const actor = currentMember(space);
-  if (!actor || !member || actor.userId === member.userId || !spaceUserCan(space, 'manage_access')) return false;
-  return normalizeCollaborationRole(actor.role) === 'owner' || roleRank(actor.role) > roleRank(member.role);
-}
-function portfolioSpaces() {
-  return (state.p2pState.spaces || []).filter((space) => space?.resourceType === PORTFOLIO_RESOURCE_TYPE && !isAuthorizationUnconfirmed(space));
-}
-function portfolioSpaceById(spaceId = '') {
-  const cleanSpaceId = String(spaceId || '').trim();
-  return portfolioSpaces().find((space) => String(space?.spaceId || '').trim() === cleanSpaceId) || null;
-}
-function primaryPortfolioSpace() {
-  const spaces = portfolioSpaces();
-  return spaces.find((space) => space.ownerUserId === state.user?.userId)
-    || spaces.find((space) => spaceUserCan(space, 'manage_access'))
-    || spaces[0]
-    || null;
-}
-function projectBelongsToPortfolio(data = null, portfolioSpace = null) {
-  if (!data?.space || !portfolioSpace?.spaceId || data.space.resourceType === PORTFOLIO_RESOURCE_TYPE) return false;
-  const projectPortfolioSpaceId = String(data.project?.portfolioSpaceId || '').trim();
-  if (projectPortfolioSpaceId) return projectPortfolioSpaceId === String(portfolioSpace.spaceId || '').trim();
-  const projectPortfolioOwnerUserId = String(data.project?.portfolioOwnerUserId || '').trim();
-  const portfolioOwnerUserId = String(portfolioSpace.ownerUserId || '').trim();
-  if (projectPortfolioOwnerUserId) return projectPortfolioOwnerUserId === portfolioOwnerUserId;
-  return String(data.space.ownerUserId || '').trim() === portfolioOwnerUserId;
-}
-function portfolioProjectSpaces(portfolioSpace = primaryPortfolioSpace()) {
-  if (!portfolioSpace?.spaceId) return [];
-  return [...state.projects.values()]
-    .filter((data) => projectBelongsToPortfolio(data, portfolioSpace))
-    .map((data) => data.space);
-}
-function portfolioProjectsOwnedBy(portfolioSpace = null, userId = '') {
-  const cleanUserId = String(userId || '').trim();
-  if (!portfolioSpace?.spaceId || !cleanUserId) return [];
-  return portfolioProjectSpaces(portfolioSpace).filter((space) => String(space?.ownerUserId || '').trim() === cleanUserId);
-}
-function canCreatePortfolioProject(portfolioSpace = primaryPortfolioSpace()) {
-  return !portfolioSpace || ['owner', 'manager', 'admin'].includes(currentRole(portfolioSpace));
-}
-function portfolioCollaborators(portfolioSpace = primaryPortfolioSpace()) {
-  if (!portfolioSpace?.spaceId) return [];
-  const cleanOwnerUserId = String(portfolioSpace.ownerUserId || '').trim();
-  const cleanPortfolioSpaceId = String(portfolioSpace.spaceId || '').trim();
-  const grants = new Map();
-
-  for (const invitation of state.p2pState.invitations?.sent || []) {
-    const email = String(invitation?.recipientEmail || '').trim().toLowerCase();
-    if (!email || invitation?.status !== 'pending' || invitation?.resourceType !== PORTFOLIO_RESOURCE_TYPE || String(invitation.spaceId || '').trim() !== cleanPortfolioSpaceId) continue;
-    grants.set(email, {
-      email,
-      userId: invitation.recipientUserId || '',
-      role: normalizeCollaborationRole(invitation.role),
-      permissions: rolePermissions(invitation.role, invitation.permissions),
-      accessScope: 'portfolio'
-    });
-  }
-
-  if (spaceUserCan(portfolioSpace, 'manage_access') || portfolioSpace.ownerUserId === state.user?.userId) {
-    for (const member of portfolioSpace.members || []) {
-      if (!member?.userId || member.accessScope !== 'portfolio') continue;
-      const email = String(member.profile?.email || '').trim().toLowerCase();
-      if (!email) continue;
-      const isPortfolioOwner = member.userId === cleanOwnerUserId;
-      grants.set(email, {
-        email,
-        userId: member.userId,
-        role: isPortfolioOwner ? 'manager' : normalizeCollaborationRole(member.role),
-        permissions: isPortfolioOwner ? rolePermissions('manager', []) : rolePermissions(member.role, member.permissions),
-        accessScope: 'portfolio',
-        portfolioOwner: isPortfolioOwner
-      });
-    }
-  }
-  return [...grants.values()];
-}
-function memberByEmail(space = null, email = '') {
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  return (space?.members || []).find((member) => String(member?.profile?.email || '').trim().toLowerCase() === normalizedEmail) || null;
-}
-function samePermissionSet(left = [], right = []) {
-  const first = [...new Set((Array.isArray(left) ? left : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))].sort();
-  const second = [...new Set((Array.isArray(right) ? right : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))].sort();
-  return first.length === second.length && first.every((value, index) => value === second[index]);
-}
-function memberMatchesGrant(member = null, grant = {}) {
-  if (!member) return false;
-  if (normalizeCollaborationRole(member.role) === 'owner') return true;
-  const role = normalizeCollaborationRole(grant.role || 'member');
-  const expectedPermissions = normalizeCollaborationPermissions(grant.permissions || rolePermissions(role, []));
-  return normalizeCollaborationRole(member.role) === role
-    && member.accessScope === 'portfolio'
-    && samePermissionSet(rolePermissions(member.role, member.permissions), rolePermissions(role, expectedPermissions));
-}
-function pendingInvitationMatches(space = null, email = '', grant = {}) {
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  const role = normalizeCollaborationRole(grant.role || 'member');
-  const permissions = normalizeCollaborationPermissions(grant.permissions || rolePermissions(role, []));
-  return (state.p2pState.invitations?.sent || []).find((invitation) => (
-    invitation?.status === 'pending'
-    && String(invitation.spaceId || '').trim() === String(space?.spaceId || '').trim()
-    && String(invitation.recipientEmail || '').trim().toLowerCase() === normalizedEmail
-    && normalizeCollaborationRole(invitation.role) === role
-    && invitation.accessScope === 'portfolio'
-    && samePermissionSet(rolePermissions(invitation.role, invitation.permissions), rolePermissions(role, permissions))
-  )) || null;
-}
-async function upsertSpaceAccessByEmail(space = null, email = '', grant = {}) {
-  if (!space?.spaceId) throw new Error(t('invite.error', 'No se pudo enviar la invitación.'));
-  const role = normalizeCollaborationRole(grant.role || 'member');
-  const permissions = normalizeCollaborationPermissions(grant.permissions || rolePermissions(role, []));
-  const accessScope = grant.accessScope === 'portfolio' ? 'portfolio' : 'project';
-  const existingMember = memberByEmail(space, email);
-  if (existingMember) {
-    if (accessScope === 'portfolio' && memberMatchesGrant(existingMember, { role, permissions })) return { unchanged: true, member: existingMember, space };
-    return semillaP2P.updatePermissions(space.spaceId, existingMember.userId, permissions, { role, accessScope });
-  }
-  const pending = accessScope === 'portfolio' ? pendingInvitationMatches(space, email, { role, permissions }) : null;
-  if (pending) return { reused: true, invitation: pending, space };
-  return semillaP2P.invite(email, {
-    spaceId: space.spaceId,
-    resourceType: space.resourceType || PROJECT_RESOURCE_TYPE,
-    permissions,
-    role,
-    accessScope,
-    requestId: createLocalId('invite_request')
-  });
-}
-async function invitePortfolioCollaboratorsToProject(spaceId = '', collaborators = portfolioCollaborators()) {
-  const cleanSpaceId = String(spaceId || '').trim();
-  const space = (state.p2pState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId && candidate?.resourceType !== PORTFOLIO_RESOURCE_TYPE);
-  if (!space || !spaceUserCan(space, 'invite') || !collaborators.length) return { total: collaborators.length, succeeded: 0, failed: 0 };
-  const results = await Promise.allSettled(collaborators.map((grant) => upsertSpaceAccessByEmail(space, grant.email, { ...grant, accessScope: 'portfolio' })));
-  return {
-    total: results.length,
-    succeeded: results.filter((result) => result.status === 'fulfilled').length,
-    failed: results.filter((result) => result.status === 'rejected').length
-  };
-}
-async function reconcilePortfolioAccess() {
-  if (state.portfolioReconciliationActive || state.p2pBusy || !state.user?.userId || navigator.onLine === false) return { changed: 0, failed: 0 };
-  const manageablePortfolios = portfolioSpaces().filter((space) => spaceUserCan(space, 'manage_access'));
-  if (!manageablePortfolios.length) return { changed: 0, failed: 0 };
-  state.portfolioReconciliationActive = true;
-  let changed = 0;
-  let failed = 0;
-  try {
-    for (const portfolioSpace of manageablePortfolios) {
-      const collaborators = portfolioCollaborators(portfolioSpace);
-      const projects = portfolioProjectSpaces(portfolioSpace).filter((space) => spaceUserCan(space, 'invite'));
-      for (const projectSpace of projects) {
-        for (const grant of collaborators) {
-          const existing = memberByEmail(projectSpace, grant.email);
-          if (normalizeCollaborationRole(existing?.role) === 'owner') continue;
-          if (memberMatchesGrant(existing, grant) || pendingInvitationMatches(projectSpace, grant.email, grant)) continue;
-          try {
-            await upsertSpaceAccessByEmail(projectSpace, grant.email, { ...grant, accessScope: 'portfolio' });
-            changed += 1;
-          } catch {
-            failed += 1;
-          }
-        }
-      }
-    }
-    if (changed) {
-      await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
-      applyP2PState(semillaP2P.bootstrapState);
-    }
-    return { changed, failed };
-  } finally {
-    state.portfolioReconciliationActive = false;
-  }
-}
-function individualVisibleRecord(space = null, record = {}) {
-  const membership = currentMember(space);
-  return normalizeCollaborationRole(membership?.role) !== 'individual' || record?.createdByUserId === state.user?.userId;
-}
-function recordAccessError(space = null, record = {}) {
-  const access = individualRecordAccess(space || {}, state.user?.userId || '', record);
-  if (!access.restricted || access.allowed) return '';
-  return access.owner
-    ? t('permissions.individualExpired', 'El plazo de una hora para editar o eliminar este registro ya terminó.')
-    : t('permissions.individualOwnOnly', 'El rol Individual solo puede editar o eliminar registros creados por su propia cuenta.');
-}
 function replicaHealthForSpace(spaceId = '') {
   const cleanSpaceId = String(spaceId || '').trim();
   const health = state.p2pState.replicaHealth?.[cleanSpaceId];
@@ -404,17 +197,12 @@ function setOperationSavedStatus(result = {}, message = '') {
 
 function setBusy(value) { state.busy = Boolean(value); if (elements.loginButton) elements.loginButton.disabled = state.busy; if (elements.logoutButton) elements.logoutButton.disabled = state.busy; }
 function setP2PBusy(value) {
-  const wasBusy = state.p2pBusy;
   state.p2pBusy = Boolean(value);
-  [elements.projectSubmitButton, elements.recordSubmitButton, elements.inviteSubmitButton, elements.managePortfolioAccessButton, elements.invitePortfolioButton, elements.newProjectButton, elements.deleteProjectButton, elements.accessConfirmButton, elements.deviceConfirmButton, elements.actionMenuConfirmButton].forEach((button) => { if (button) button.disabled = state.p2pBusy; });
-  [elements.inviteEmailInput, elements.inviteRoleSelect].forEach((control) => { if (control) control.disabled = state.p2pBusy; });
-  elements.accessMemberList?.querySelectorAll('button, input, select').forEach((control) => {
+  [elements.projectSubmitButton, elements.recordSubmitButton, elements.inviteSubmitButton, elements.deleteProjectButton, elements.accessConfirmButton, elements.deviceConfirmButton, elements.actionMenuConfirmButton].forEach((button) => { if (button) button.disabled = state.p2pBusy; });
+  elements.accessMemberList?.querySelectorAll('button, input').forEach((control) => {
     control.disabled = state.p2pBusy || control.dataset.permissionLocked === 'true';
   });
   elements.deviceList?.querySelectorAll('button').forEach((control) => { control.disabled = state.p2pBusy || control.dataset.deviceRetirable !== 'true'; });
-  if (wasBusy && !state.p2pBusy && state.user?.userId) {
-    queueMicrotask(() => reconcilePortfolioAccess().catch(() => null));
-  }
 }
 function setConnectionState(connectionState = 'connecting') {
   const labels = { connected: t('p2p.connected', 'Sincronización activa'), 'local-connected': t('localNetwork.connectedShort', 'Conectado por Wi‑Fi'), disconnected: t('p2p.disconnected', 'Reconectando…'), connecting: t('p2p.connecting', 'Conectando…'), error: t('p2p.connectionError', 'Sin conexión al stream') };
@@ -709,31 +497,25 @@ function resolvedProjectData(space, entities) {
   const rawProjections = entitiesByType(entities, PROJECTION_ENTITY_TYPE);
   const projectionLinks = entitiesByType(entities, PROJECTION_LINK_ENTITY_TYPE);
   const strictProjectionLinks = space?.permissionProfile === ADMIN_PROJECT_PERMISSION_PROFILE;
-  const resolvedPurchases = resolvePurchaseProjectionLinks(rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
-  const resolvedProjections = resolveProjectionActuals(rawProjections, rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
-  const purchases = resolvedPurchases.filter((record) => individualVisibleRecord(space, record));
-  const visibleIncomes = incomes.filter((record) => individualVisibleRecord(space, record));
-  const projections = resolvedProjections.filter((record) => individualVisibleRecord(space, record));
-  const visibleProjectionIds = new Set(projections.map((record) => record.id));
-  const visiblePurchaseIds = new Set(purchases.map((record) => record.id));
-  const visibleProjectionLinks = projectionLinks.filter((link) => visiblePurchaseIds.has(link.purchaseId || link.id) && (!link.projectionId || visibleProjectionIds.has(link.projectionId)));
-  const trashedPurchases = entitiesByType(entities, PURCHASE_ENTITY_TYPE, { onlyTrashed: true }).filter((record) => individualVisibleRecord(space, record));
-  const trashedIncomes = entitiesByType(entities, INCOME_ENTITY_TYPE, { onlyTrashed: true }).filter((record) => individualVisibleRecord(space, record));
-  const trashedProjections = entitiesByType(entities, PROJECTION_ENTITY_TYPE, { onlyTrashed: true }).filter((record) => individualVisibleRecord(space, record));
+  const purchases = resolvePurchaseProjectionLinks(rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
+  const projections = resolveProjectionActuals(rawProjections, rawPurchases, projectionLinks, { strictLinks: strictProjectionLinks });
+  const trashedPurchases = entitiesByType(entities, PURCHASE_ENTITY_TYPE, { onlyTrashed: true });
+  const trashedIncomes = entitiesByType(entities, INCOME_ENTITY_TYPE, { onlyTrashed: true });
+  const trashedProjections = entitiesByType(entities, PROJECTION_ENTITY_TYPE, { onlyTrashed: true });
   return {
     space,
     project,
     purchases,
-    incomes: visibleIncomes,
+    incomes,
     projections,
-    projectionLinks: visibleProjectionLinks,
+    projectionLinks,
     trash: {
       purchases: trashedPurchases,
       incomes: trashedIncomes,
       projections: trashedProjections
     },
     strictProjectionLinks,
-    metrics: calculateProjectMetrics(project, purchases, visibleIncomes, projections)
+    metrics: calculateProjectMetrics(project, purchases, incomes, projections)
   };
 }
 
@@ -805,7 +587,7 @@ async function recoverMissingProjectCards(spaceIds = []) {
 
 async function refreshProjects() {
   const renderSequence = ++state.renderSequence;
-  const spaces = (Array.isArray(state.p2pState.spaces) ? state.p2pState.spaces : []).filter((space) => space?.resourceType !== PORTFOLIO_RESOURCE_TYPE);
+  const spaces = Array.isArray(state.p2pState.spaces) ? state.p2pState.spaces : [];
   const entries = await Promise.all(spaces.map(async (space) => {
     const entities = await semillaP2P.listEntities(space.spaceId).catch(() => []);
     return [space.spaceId, resolvedProjectData(space, entities)];
@@ -906,11 +688,6 @@ function lifecycleStatusMessage(transaction = null) {
 
 function renderDashboard() {
   renderPortfolioMetrics();
-  const portfolioSpace = primaryPortfolioSpace();
-  const canManagePortfolio = Boolean(portfolioSpace && spaceUserCan(portfolioSpace, 'manage_access'));
-  if (elements.managePortfolioAccessButton) elements.managePortfolioAccessButton.hidden = !canManagePortfolio;
-  if (elements.invitePortfolioButton) elements.invitePortfolioButton.hidden = Boolean(portfolioSpace && !canManagePortfolio);
-  if (elements.newProjectButton) elements.newProjectButton.hidden = !canCreatePortfolioProject(portfolioSpace);
   elements.projectList.replaceChildren();
   const allProjects = [...state.projects.values()]
     .filter((item) => !item.project.isTrashed)
@@ -933,10 +710,7 @@ function renderDashboard() {
   }
   if (!allProjects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
-    const emptyDescription = canCreatePortfolioProject(portfolioSpace)
-      ? t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')
-      : t('dashboard.emptyRestrictedDescription', 'Aún no hay proyectos disponibles para tu cuenta. Un Gerente o el propietario del panel puede crear el primero.');
-    empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${emptyDescription}</p>`;
+    empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`;
     elements.projectList.append(empty); return;
   }
   if (!projects.length) {
@@ -1019,122 +793,24 @@ async function refreshInvitationIntent(invitationId = '') {
   }
 }
 
-function invitationGovernanceSpaceId(invitation = {}) {
-  return String(invitation.resourceType === PORTFOLIO_RESOURCE_TYPE
-    ? invitation.spaceId || ''
-    : invitation.governanceSpaceId || '').trim();
-}
-
-function invitationGroupKey(invitation = {}) {
-  return [
-    invitationGovernanceSpaceId(invitation),
-    invitation.inviterUserId || '',
-    normalizeCollaborationRole(invitation.role),
-    invitation.accessScope || 'project'
-  ].join('|');
-}
-
 function renderInvitations() {
-  const allPending = (state.p2pState.invitations?.received || []).filter((invitation) => invitation.status === 'pending');
-  const portfolioKeys = new Set(allPending
-    .filter((invitation) => invitation.resourceType === PORTFOLIO_RESOURCE_TYPE)
-    .map(invitationGroupKey));
-  const pending = allPending.filter((invitation) => !(
-    invitation.resourceType !== PORTFOLIO_RESOURCE_TYPE
-    && invitation.accessScope === 'portfolio'
-    && portfolioKeys.has(invitationGroupKey(invitation))
-  ));
-  elements.invitationCount.textContent = String(pending.length);
-  elements.invitationCount.hidden = pending.length === 0;
-  elements.invitationList.replaceChildren();
-  if (!pending.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = t('invite.none', 'No tienes invitaciones pendientes.');
-    elements.invitationList.append(empty);
-    return;
-  }
+  const pending = (state.p2pState.invitations?.received || []).filter((invitation) => invitation.status === 'pending');
+  elements.invitationCount.textContent = String(pending.length); elements.invitationCount.hidden = pending.length === 0; elements.invitationList.replaceChildren();
+  if (!pending.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = t('invite.none', 'No tienes invitaciones pendientes.'); elements.invitationList.append(empty); return; }
   for (const invitation of pending) {
     const item = document.createElement('article'); item.className = 'invitation-item';
-    const content = document.createElement('div');
-    const title = document.createElement('h3');
-    title.textContent = invitation.resourceType === PORTFOLIO_RESOURCE_TYPE
-      ? t('invite.portfolioTitle', 'Invitar a Control de proyectos')
-      : invitation.title || t('project.defaultName', 'Proyecto compartido');
-    const sender = document.createElement('p');
-    sender.textContent = [
-      invitation.inviter?.displayName || invitation.inviter?.email || t('invite.someone', 'Un colaborador'),
-      translatedRoleLabel(invitation.role),
-      invitation.accessScope === 'portfolio' ? t('access.portfolioScope', 'Todo el panel') : ''
-    ].filter(Boolean).join(' · ');
-    content.append(title, sender);
+    const content = document.createElement('div'); const title = document.createElement('h3'); title.textContent = invitation.title || t('project.defaultName', 'Proyecto compartido'); const sender = document.createElement('p'); sender.textContent = invitation.inviter?.displayName || invitation.inviter?.email || t('invite.someone', 'Un colaborador'); content.append(title, sender);
     const actions = document.createElement('div'); actions.className = 'invitation-actions';
-    for (const [decision, label, className] of [['reject', t('invite.reject', 'Rechazar'), 'button button-ghost button-compact'], ['accept', t('invite.accept', 'Aceptar'), 'button button-primary button-compact']]) {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = className;
-      button.dataset.invitationId = invitation.invitationId;
-      button.dataset.decision = decision;
-      button.textContent = label;
-      actions.append(button);
-    }
-    item.append(content, actions);
-    elements.invitationList.append(item);
+    for (const [decision, label, className] of [['reject', t('invite.reject', 'Rechazar'), 'button button-ghost button-compact'], ['accept', t('invite.accept', 'Aceptar'), 'button button-primary button-compact']]) { const button = document.createElement('button'); button.type = 'button'; button.className = className; button.dataset.invitationId = invitation.invitationId; button.dataset.decision = decision; button.textContent = label; actions.append(button); }
+    item.append(content, actions); elements.invitationList.append(item);
   }
   revealPendingInvitationIntent();
 }
 
-async function autoAcceptInheritedPortfolioInvitations() {
-  if (state.portfolioInviteAccepting || !state.user?.userId) return false;
-  const authorizedInvitersByPortfolio = new Map();
-  for (const space of portfolioSpaces().filter((candidate) => memberForUser(candidate, state.user.userId))) {
-    const portfolioSpaceId = String(space.spaceId || '').trim();
-    if (!portfolioSpaceId) continue;
-    const authorizedInviters = new Set();
-    const ownerUserId = String(space.ownerUserId || '').trim();
-    if (ownerUserId) authorizedInviters.add(ownerUserId);
-    for (const member of space.members || []) {
-      if (['owner', 'manager', 'admin'].includes(normalizeCollaborationRole(member?.role)) && member?.userId) {
-        authorizedInviters.add(String(member.userId).trim());
-      }
-    }
-    authorizedInvitersByPortfolio.set(portfolioSpaceId, authorizedInviters);
-  }
-  if (!authorizedInvitersByPortfolio.size) return false;
-  const pending = (state.p2pState.invitations?.received || []).filter((invitation) => {
-    const governanceSpaceId = invitationGovernanceSpaceId(invitation);
-    const authorizedInviters = authorizedInvitersByPortfolio.get(governanceSpaceId);
-    return invitation?.status === 'pending'
-      && invitation.resourceType !== PORTFOLIO_RESOURCE_TYPE
-      && invitation.accessScope === 'portfolio'
-      && Boolean(governanceSpaceId)
-      && authorizedInviters?.has(String(invitation.inviterUserId || '').trim());
-  });
-  if (!pending.length) return false;
-  state.portfolioInviteAccepting = true;
-  try {
-    for (const invitation of pending) {
-      await semillaP2P.respondToInvitation(invitation.invitationId, 'accept');
-    }
-    applyP2PState(semillaP2P.bootstrapState);
-    return true;
-  } finally {
-    state.portfolioInviteAccepting = false;
-  }
-}
-
 function memberLabel(member = {}) { return member.profile?.displayName || member.profile?.email || (member.userId === state.user?.userId ? t('project.you', 'Tú') : t('project.participant', 'Participante')); }
 function renderMembers(data) { elements.projectMemberSummary.replaceChildren(); for (const member of data.space.members || []) { const chip = document.createElement('span'); chip.className = 'member-chip'; chip.textContent = memberLabel(member); chip.title = (member.permissions || []).join(', '); elements.projectMemberSummary.append(chip); } }
-function roleHint(role = '') {
-  const normalized = normalizeCollaborationRole(role);
-  if (normalized === 'manager') return t('access.managerHint', 'Control total, incluida la eliminación de proyectos.');
-  if (normalized === 'admin') return t('access.adminHint', 'Control administrativo sin permiso para eliminar proyectos.');
-  if (normalized === 'individual') return t('access.individualHint', 'Puede ver sus propios registros y editarlos o eliminarlos únicamente durante la primera hora.');
-  return t('access.customHint', 'Permisos configurados manualmente.');
-}
 function permissionSummary(member = {}) {
-  const role = normalizeCollaborationRole(member.role);
-  const scope = member.accessScope === 'portfolio' ? t('access.portfolioScope', 'Todo el panel') : t('access.projectScope', 'Solo este proyecto');
-  if (['owner', 'manager', 'admin', 'individual'].includes(role)) return `${translatedRoleLabel(role)} · ${scope} · ${roleHint(role)}`;
+  if (member.role === 'owner') return t('access.fullControl', 'Control total');
   const labels = {
     read: t('invite.read', 'Lectura'),
     add: t('invite.add', 'Agregar y editar'),
@@ -1143,8 +819,7 @@ function permissionSummary(member = {}) {
     invite: t('project.invite', 'Invitar'),
     write: t('access.legacyWrite', 'Edición heredada')
   };
-  const permissions = rolePermissions(role, member.permissions);
-  return `${translatedRoleLabel(role)} · ${scope} · ${permissions.map((permission) => labels[permission] || permission).join(' · ') || t('access.readOnly', 'Solo lectura')}`;
+  return (member.permissions || []).map((permission) => labels[permission] || permission).join(' · ') || t('access.readOnly', 'Solo lectura');
 }
 function accessActionButton(action, userId, label, dangerous = false) {
   const button = document.createElement('button');
@@ -1157,30 +832,11 @@ function accessActionButton(action, userId, label, dangerous = false) {
   return button;
 }
 function memberHasPermission(member = {}, permission = '') {
-  const permissions = rolePermissions(member.role, member.permissions);
+  const permissions = Array.isArray(member.permissions) ? member.permissions : [];
   if (permission === 'read') return true;
   return permissions.includes(permission) || (permissions.includes('write') && ['add', 'delete', 'projection'].includes(permission));
 }
-function roleOptionsForActor(space = null) {
-  const actorRole = currentRole(space);
-  if (actorRole === 'owner') return ['manager', 'admin', 'individual', 'member'];
-  if (actorRole === 'manager') return ['manager', 'admin', 'individual', 'member'];
-  if (actorRole === 'admin') return ['admin', 'individual', 'member'];
-  return [];
-}
-function applyRolePresetToPermissionControls(container = null, role = 'member') {
-  if (!container) return;
-  const normalizedRole = normalizeCollaborationRole(role);
-  const preset = normalizedRole !== 'member';
-  const permissions = new Set(rolePermissions(normalizedRole, []));
-  container.dataset.rolePreset = preset ? 'true' : 'false';
-  container.dataset.roleHint = preset ? roleHint(normalizedRole) : '';
-  container.querySelectorAll('input[name="permissions"], input[name="permission"]').forEach((checkbox) => {
-    checkbox.checked = checkbox.value === 'read' || (preset ? permissions.includes(checkbox.value) : checkbox.checked);
-    checkbox.disabled = checkbox.value === 'read' || preset;
-  });
-}
-function accessPermissionEditor(member = {}, space = null) {
+function accessPermissionEditor(member = {}) {
   const form = document.createElement('form');
   form.className = 'access-permission-editor hidden';
   form.dataset.permissionUserId = member.userId;
@@ -1193,29 +849,6 @@ function accessPermissionEditor(member = {}, space = null) {
   hint.textContent = t('access.permissionsHint', 'Lectura permanece activa mientras el participante conserve acceso.');
   heading.append(title, hint);
 
-  const roleControls = document.createElement('div');
-  roleControls.className = 'access-role-controls';
-  const roleLabelNode = document.createElement('label');
-  roleLabelNode.textContent = t('access.role', 'Rol');
-  const roleSelect = document.createElement('select');
-  roleSelect.name = 'role';
-  for (const role of roleOptionsForActor(space)) {
-    const option = document.createElement('option'); option.value = role; option.textContent = translatedRoleLabel(role); roleSelect.append(option);
-  }
-  roleSelect.value = normalizeCollaborationRole(member.role);
-  roleLabelNode.append(roleSelect);
-  const scopeLabel = document.createElement('label');
-  scopeLabel.textContent = t('access.scope', 'Alcance');
-  const scopeSelect = document.createElement('select');
-  scopeSelect.name = 'accessScope';
-  for (const [value, label] of [['project', t('access.projectScope', 'Solo este proyecto')], ['portfolio', t('access.portfolioScope', 'Todo el panel')]]) {
-    const option = document.createElement('option'); option.value = value; option.textContent = label; scopeSelect.append(option);
-  }
-  scopeSelect.value = member.accessScope === 'portfolio' ? 'portfolio' : 'project';
-  scopeSelect.disabled = true;
-  scopeLabel.append(scopeSelect);
-  roleControls.append(roleLabelNode, scopeLabel);
-
   const options = document.createElement('div');
   options.className = 'access-permission-options';
   const permissionLabels = {
@@ -1227,24 +860,33 @@ function accessPermissionEditor(member = {}, space = null) {
   for (const permission of ['read', 'add', 'delete', 'projection']) {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox'; checkbox.name = 'permissions'; checkbox.value = permission;
+    checkbox.type = 'checkbox';
+    checkbox.name = 'permissions';
+    checkbox.value = permission;
     checkbox.checked = memberHasPermission(member, permission);
-    if (permission === 'read') { checkbox.disabled = true; checkbox.dataset.permissionLocked = 'true'; }
-    const text = document.createElement('span'); text.textContent = permissionLabels[permission];
-    label.append(checkbox, text); options.append(label);
+    if (permission === 'read') {
+      checkbox.disabled = true;
+      checkbox.dataset.permissionLocked = 'true';
+    }
+    const text = document.createElement('span');
+    text.textContent = permissionLabels[permission];
+    label.append(checkbox, text);
+    options.append(label);
   }
-  applyRolePresetToPermissionControls(options, roleSelect.value);
-  roleSelect.addEventListener('change', () => applyRolePresetToPermissionControls(options, roleSelect.value));
 
   const actions = document.createElement('div');
   actions.className = 'access-permission-actions';
   const cancel = document.createElement('button');
-  cancel.type = 'button'; cancel.className = 'button button-ghost button-compact';
-  cancel.dataset.permissionCancel = member.userId; cancel.textContent = t('access.cancelPermissions', 'Cancelar');
+  cancel.type = 'button';
+  cancel.className = 'button button-ghost button-compact';
+  cancel.dataset.permissionCancel = member.userId;
+  cancel.textContent = t('access.cancelPermissions', 'Cancelar');
   const submit = document.createElement('button');
-  submit.type = 'submit'; submit.className = 'button button-primary button-compact'; submit.textContent = t('access.savePermissions', 'Guardar permisos');
+  submit.type = 'submit';
+  submit.className = 'button button-primary button-compact';
+  submit.textContent = t('access.savePermissions', 'Guardar permisos');
   actions.append(cancel, submit);
-  form.append(heading, roleControls, options, actions);
+  form.append(heading, options, actions);
   return form;
 }
 function togglePermissionEditor(userId = '', forceOpen = null) {
@@ -1258,118 +900,28 @@ function togglePermissionEditor(userId = '', forceOpen = null) {
   target.classList.toggle('hidden', !shouldOpen);
   if (shouldOpen) target.querySelector('input:not(:disabled)')?.focus();
 }
-function portfolioForProjectSpace(space = null) {
-  const data = space?.spaceId ? state.projects.get(space.spaceId) : null;
-  const explicit = portfolioSpaceById(data?.project?.portfolioSpaceId || '');
-  if (explicit) return explicit;
-  const ownerUserId = String(data?.project?.portfolioOwnerUserId || space?.ownerUserId || '').trim();
-  return portfolioSpaces().find((candidate) => String(candidate?.ownerUserId || '').trim() === ownerUserId) || null;
-}
-function accessPortfolioForMember(space = null, member = null) {
-  if (state.accessScopeContext === 'portfolio') return space;
-  return member?.accessScope === 'portfolio' ? portfolioForProjectSpace(space) : null;
-}
-async function updatePortfolioMemberAccess(portfolioSpace = null, member = null, permissions = [], options = {}) {
-  if (!portfolioSpace?.spaceId || !member?.userId) throw new Error(t('access.portfolioUnavailable', 'No se pudo identificar el panel asociado a este participante.'));
-  const ownedProjects = portfolioProjectsOwnedBy(portfolioSpace, member.userId);
-  if (ownedProjects.length) {
-    throw new Error(t('access.portfolioOwnerRoleBlocked', 'Antes de cambiar este rol, transfiere la propiedad de los proyectos que pertenecen a este participante.'));
-  }
-  const email = String(member.profile?.email || '').trim().toLowerCase();
-  const targetSpaces = [portfolioSpace, ...portfolioProjectSpaces(portfolioSpace)];
-  const targets = targetSpaces.map((targetSpace) => ({
-    space: targetSpace,
-    member: (targetSpace.members || []).find((candidate) => candidate?.userId === member.userId) || (email ? memberByEmail(targetSpace, email) : null)
-  }));
-  for (const target of targets) {
-    if (target.member && !canManageMember(target.space, target.member)) {
-      throw new Error(t('access.portfolioAuthorizationBlocked', 'No se puede aplicar el cambio global porque tu rol no permite administrar a este participante en uno o más proyectos.'));
-    }
-    if (!target.member && (!email || !spaceUserCan(target.space, 'invite'))) {
-      throw new Error(t('access.portfolioAuthorizationBlocked', 'No se puede aplicar el cambio global porque tu rol no permite administrar a este participante en uno o más proyectos.'));
-    }
-  }
-  const results = [];
-  for (const target of targets) {
-    try {
-      if (target.member) {
-        results.push(await semillaP2P.updatePermissions(target.space.spaceId, target.member.userId, permissions, { ...options, accessScope: 'portfolio' }));
-      } else {
-        results.push(await upsertSpaceAccessByEmail(target.space, email, { ...options, permissions, accessScope: 'portfolio' }));
-      }
-    } catch (error) {
-      results.push({ error });
-    }
-  }
-  const failed = results.filter((result) => result?.error).length;
-  return { results, failed, updated: results.length - failed };
-}
-async function revokePortfolioMemberAccess(portfolioSpace = null, member = null) {
-  if (!portfolioSpace?.spaceId || !member?.userId) throw new Error(t('access.portfolioUnavailable', 'No se pudo identificar el panel asociado a este participante.'));
-  const ownedProjects = portfolioProjectsOwnedBy(portfolioSpace, member.userId);
-  if (ownedProjects.length) {
-    throw new Error(t('access.portfolioOwnerRevokeBlocked', 'No se puede revocar el acceso global mientras este participante sea propietario de uno o más proyectos. Transfiere primero esas propiedades.'));
-  }
-  const email = String(member.profile?.email || '').trim().toLowerCase();
-  const projectTargets = portfolioProjectSpaces(portfolioSpace)
-    .map((space) => ({ space, member: (space.members || []).find((candidate) => candidate?.userId === member.userId) || (email ? memberByEmail(space, email) : null) }))
-    .filter((entry) => entry.member?.accessScope === 'portfolio');
-  if (!canManageMember(portfolioSpace, member) || projectTargets.some((entry) => !canManageMember(entry.space, entry.member))) {
-    throw new Error(t('access.portfolioAuthorizationBlocked', 'No se puede aplicar el cambio global porque tu rol no permite administrar a este participante en uno o más proyectos.'));
-  }
-  const projectResults = [];
-  for (const entry of projectTargets) {
-    try { projectResults.push(await semillaP2P.revoke(entry.space.spaceId, entry.member.userId)); }
-    catch (error) { projectResults.push({ error }); }
-  }
-  const failed = projectResults.filter((result) => result?.error).length;
-  if (failed) return { projectResults, failed, portfolioRevoked: false };
-  const portfolioResult = await semillaP2P.revoke(portfolioSpace.spaceId, member.userId);
-  const keyRotationCompleted = [...projectResults, portfolioResult]
-    .every((result) => result?.keyRotation?.completed !== false);
-  return {
-    projectResults,
-    failed: 0,
-    portfolioRevoked: true,
-    portfolioResult,
-    keyRotation: { completed: keyRotationCompleted }
-  };
-}
 async function submitPermissionUpdate(event) {
   event.preventDefault();
   const form = event.target.closest('form[data-permission-user-id]');
-  const space = accessSpace();
+  const data = selectedProjectData();
   const targetUserId = String(form?.dataset.permissionUserId || '').trim();
-  const member = (space?.members || []).find((candidate) => candidate?.userId === targetUserId) || null;
-  if (!space || !member || !targetUserId || state.p2pBusy) return;
-  const role = normalizeCollaborationRole(form.querySelector('select[name="role"]')?.value || 'member');
-  const permissions = role === 'member'
-    ? normalizeCollaborationPermissions(['read', ...Array.from(form.querySelectorAll('input[name="permissions"]:checked:not([value="read"])')).map((input) => input.value)])
-    : normalizeCollaborationPermissions(rolePermissions(role, []));
-  const portfolioSpace = accessPortfolioForMember(space, member);
+  if (!data || !targetUserId || state.p2pBusy) return;
+  const permissions = ['read', ...Array.from(form.querySelectorAll('input[name="permissions"]:checked:not([value="read"])')).map((input) => input.value)];
   setP2PBusy(true);
-  setStatus(elements.accessStatus, portfolioSpace ? t('access.portfolioPermissionsSaving', 'Actualizando permisos en todo el panel…') : t('access.permissionsSaving', 'Guardando permisos…'));
+  setStatus(elements.accessStatus, t('access.permissionsSaving', 'Guardando permisos…'));
   try {
-    const result = portfolioSpace
-      ? await updatePortfolioMemberAccess(portfolioSpace, member, permissions, { role })
-      : await semillaP2P.updatePermissions(space.spaceId, targetUserId, permissions, { role, accessScope: 'project' });
+    const result = await semillaP2P.updatePermissions(data.space.spaceId, targetUserId, permissions);
     applyP2PState(semillaP2P.bootstrapState);
     await refreshProjects();
     renderProject();
     renderAccessManagement();
-    if (portfolioSpace && result.failed) {
-      setStatus(elements.accessStatus, t('access.portfolioPermissionsPartial', 'Los permisos se actualizaron parcialmente. La reconciliación automática completará los proyectos pendientes al recuperar conexión.'), 'warning');
-    } else {
-      setStatus(
-        elements.accessStatus,
-        result?.unchanged
-          ? t('access.permissionsUnchanged', 'Los permisos ya estaban configurados de esa forma.')
-          : portfolioSpace
-            ? t('access.portfolioPermissionsUpdated', 'Los permisos se actualizaron en el panel y en todos sus proyectos.')
-            : t('access.permissionsUpdated', 'Los permisos se actualizaron en todos los dispositivos.'),
-        'success'
-      );
-    }
+    setStatus(
+      elements.accessStatus,
+      result?.unchanged
+        ? t('access.permissionsUnchanged', 'Los permisos ya estaban configurados de esa forma.')
+        : t('access.permissionsUpdated', 'Los permisos se actualizaron en todos los dispositivos.'),
+      'success'
+    );
   } catch (error) {
     setStatus(elements.accessStatus, error?.message || t('access.permissionsError', 'No se pudieron actualizar los permisos.'), 'error');
   } finally {
@@ -1377,6 +929,7 @@ async function submitPermissionUpdate(event) {
     renderAccessManagement();
   }
 }
+
 function clearAccessConfirmation() {
   state.pendingAccessAction = null;
   elements.accessConfirmPanel?.classList.add('hidden');
@@ -1387,87 +940,60 @@ function clearAccessConfirmation() {
   }
 }
 function renderAccessManagement() {
-  const space = accessSpace();
-  const data = accessProjectData();
+  const data = selectedProjectData();
   if (!elements.accessMemberList) return;
   elements.accessMemberList.replaceChildren();
   elements.accessOwnerActions?.classList.add('hidden');
-  if (elements.accessDialogTitle) {
-    elements.accessDialogTitle.textContent = state.accessScopeContext === 'portfolio'
-      ? t('access.portfolioTitle', 'Participantes del panel')
-      : t('access.title', 'Administrar acceso');
-  }
-  if (elements.accessDialogDescription) {
-    elements.accessDialogDescription.textContent = state.accessScopeContext === 'portfolio'
-      ? t('access.portfolioDescription', 'Los cambios realizados aquí se aplican al panel completo y a todos sus proyectos actuales y futuros.')
-      : t('access.description', 'Gestiona participantes, permisos y propiedad del proyecto.');
-  }
-  if (!space || !state.user) return;
-  const actorMember = currentMember(space);
-  const actorRole = normalizeCollaborationRole(actorMember?.role);
-  const canManageAccess = spaceUserCan(space, 'manage_access');
-  const canDeleteProject = state.accessScopeContext === 'project' && spaceUserCan(space, 'delete_project');
-  elements.accessOwnerActions?.classList.toggle('hidden', !canDeleteProject || isAuthorizationUnconfirmed(space));
-  for (const member of space.members || []) {
+  if (!data || !state.user) return;
+  const isOwner = data.space.ownerUserId === state.user.userId;
+  elements.accessOwnerActions?.classList.toggle('hidden', !isOwner || isAuthorizationUnconfirmed(data.space));
+  for (const member of data.space.members || []) {
     const item = document.createElement('article'); item.className = 'access-member';
     const content = document.createElement('div');
     const title = document.createElement('h3'); title.textContent = memberLabel(member);
-    const role = document.createElement('span'); role.className = 'access-role'; role.textContent = translatedRoleLabel(member.role); title.append(role);
-    if (member.accessScope === 'portfolio') {
-      const scope = document.createElement('span'); scope.className = 'access-scope-badge'; scope.textContent = t('access.portfolioScope', 'Todo el panel'); title.append(scope);
-    }
+    const role = document.createElement('span'); role.className = 'access-role'; role.textContent = member.role === 'owner' ? t('access.owner', 'Propietario') : t('access.member', 'Participante'); title.append(role);
     const profileEmail = String(member.profile?.email || '').trim();
     const details = document.createElement('p'); details.textContent = [profileEmail && profileEmail !== memberLabel(member) ? profileEmail : '', permissionSummary(member)].filter(Boolean).join(' · ');
     content.append(title, details);
     const actions = document.createElement('div'); actions.className = 'access-member-actions';
-    const manageable = canManageMember(space, member);
-    if (manageable) {
-      actions.append(accessActionButton('permissions', member.userId, t('access.editPermissions', 'Editar permisos')));
-      if (state.accessScopeContext === 'project' && actorRole === 'owner') actions.append(accessActionButton('transfer', member.userId, t('access.transfer', 'Transferir propiedad')));
-      actions.append(accessActionButton('revoke', member.userId, t('access.revoke', 'Revocar acceso'), true));
-    } else if (state.accessScopeContext === 'project' && member.userId === state.user.userId && actorRole !== 'owner') {
+    if (isOwner && member.userId !== state.user.userId) {
+      actions.append(
+        accessActionButton('permissions', member.userId, t('access.editPermissions', 'Editar permisos')),
+        accessActionButton('transfer', member.userId, t('access.transfer', 'Transferir propiedad')),
+        accessActionButton('revoke', member.userId, t('access.revoke', 'Revocar acceso'), true)
+      );
+    } else if (!isOwner && member.userId === state.user.userId) {
       actions.append(accessActionButton('leave', member.userId, t('access.leave', 'Abandonar proyecto'), true));
     }
     item.append(content, actions);
-    if (manageable && canManageAccess) item.append(accessPermissionEditor(member, space));
+    if (isOwner && member.userId !== state.user.userId) item.append(accessPermissionEditor(member));
     elements.accessMemberList.append(item);
   }
   if (!elements.accessMemberList.children.length) elements.accessMemberList.append(emptyRecord(t('access.noMembers', 'No hay participantes disponibles.')));
 }
-function openAccessManagement(scope = 'project') {
-  state.accessScopeContext = scope === 'portfolio' ? 'portfolio' : 'project';
-  const space = accessSpace();
-  if (!space || (state.accessScopeContext === 'portfolio' && !spaceUserCan(space, 'manage_access'))) return;
+function openAccessManagement() {
+  if (!selectedProjectData()) return;
   clearAccessConfirmation();
   setStatus(elements.accessStatus, '');
   renderAccessManagement();
   openDialog(elements.accessDialog);
 }
 function prepareAccessAction(action = '', userId = '') {
-  const space = accessSpace();
-  const data = accessProjectData();
-  if (!space || state.p2pBusy) return;
+  const data = selectedProjectData();
+  if (!data || state.p2pBusy) return;
   const isProjectDeletion = action === 'delete-project';
-  if (isProjectDeletion && state.accessScopeContext !== 'project') return;
-  const member = isProjectDeletion ? null : (space.members || []).find((candidate) => candidate?.userId === userId);
+  const member = isProjectDeletion ? null : (data.space.members || []).find((candidate) => candidate?.userId === userId);
   if (!isProjectDeletion && !member) return;
-  if (['revoke', 'transfer'].includes(action) && !canManageMember(space, member)) return;
-  if (action === 'transfer' && (state.accessScopeContext !== 'project' || currentRole(space) !== 'owner')) return;
-  if (action === 'leave' && member?.userId !== state.user?.userId) return;
-  if (action === 'leave' && state.accessScopeContext !== 'project') return;
-  if (isProjectDeletion && !spaceUserCan(space, 'delete_project')) return;
-  const portfolioSpace = member ? accessPortfolioForMember(space, member) : null;
-  const label = member ? memberLabel(member) : data?.project?.name || t('project.defaultName', 'Proyecto compartido');
+  if (isProjectDeletion && (data.space.ownerUserId !== state.user?.userId || isAuthorizationUnconfirmed(data.space))) return;
+  const label = member ? memberLabel(member) : data.project?.name || t('project.defaultName', 'Proyecto compartido');
   const messages = {
-    revoke: (portfolioSpace
-      ? t('access.portfolioRevokeConfirm', '{name} perderá el acceso al panel completo y a todos sus proyectos actuales y futuros.')
-      : t('access.revokeConfirm', '{name} perderá el acceso y las claves futuras del proyecto.')).replace('{name}', label),
+    revoke: t('access.revokeConfirm', '{name} perderá el acceso y las claves futuras del proyecto.').replace('{name}', label),
     transfer: t('access.transferConfirm', '{name} será el nuevo propietario. Debe haber abierto y sincronizado completamente este proyecto en al menos uno de sus dispositivos. Tú conservarás acceso como participante.').replace('{name}', label),
     leave: t('access.leaveConfirm', 'Perderás acceso y la copia local de este proyecto se eliminará de este dispositivo.'),
     'delete-project': t('access.deleteConfirm', '{name} y todos sus registros dejarán de aparecer en las vistas activas. Podrás restaurarlo desde la papelera.').replace('{name}', label)
   };
   if (!messages[action]) return;
-  state.pendingAccessAction = { action, userId, spaceId: space.spaceId, scope: state.accessScopeContext, portfolioSpaceId: portfolioSpace?.spaceId || '', label };
+  state.pendingAccessAction = { action, userId, spaceId: data.space.spaceId, label };
   elements.accessConfirmMessage.textContent = messages[action];
   elements.accessConfirmButton.textContent = action === 'transfer'
     ? t('access.transferConfirmButton', 'Transferir')
@@ -1487,14 +1013,7 @@ async function executeAccessAction() {
   setP2PBusy(true); setStatus(elements.accessStatus, t('access.processing', 'Aplicando cambio de acceso…'));
   try {
     let result = null;
-    if (pending.action === 'revoke') {
-      const sourceSpace = (state.p2pState.spaces || []).find((space) => space?.spaceId === pending.spaceId) || accessSpace();
-      const member = (sourceSpace?.members || []).find((candidate) => candidate?.userId === pending.userId) || null;
-      const portfolioSpace = portfolioSpaceById(pending.portfolioSpaceId) || accessPortfolioForMember(sourceSpace, member);
-      result = portfolioSpace
-        ? await revokePortfolioMemberAccess(portfolioSpace, member)
-        : await semillaP2P.revoke(pending.spaceId, pending.userId);
-    }
+    if (pending.action === 'revoke') result = await semillaP2P.revoke(pending.spaceId, pending.userId);
     if (pending.action === 'transfer') result = await semillaP2P.transfer(pending.spaceId, pending.userId);
     if (pending.action === 'leave') result = await semillaP2P.leave(pending.spaceId);
     if (pending.action === 'delete-project') {
@@ -1525,25 +1044,13 @@ async function executeAccessAction() {
       );
       return;
     }
-    await refreshProjects();
-    if (pending.scope === 'project') renderProject();
-    renderAccessManagement();
-    if (pending.action === 'revoke' && result?.failed) {
-      setStatus(elements.accessStatus, t('access.portfolioRevokePartial', 'No se revocó el acceso al panel porque uno o más proyectos no pudieron actualizarse. Se conservará el acceso global hasta completar una revocación consistente.'), 'warning');
-    } else if (pending.action === 'revoke' && result?.keyRotation?.completed === false) {
-      setStatus(
-        elements.accessStatus,
-        pending.portfolioSpaceId
-          ? t('access.portfolioRevokedRotationPending', 'El acceso global fue revocado, pero una o más rotaciones de clave quedaron pendientes. Reconecta antes de agregar información sensible.')
-          : t('access.revokedRotationPending', 'El acceso fue revocado, pero la rotación de clave quedó pendiente. Reconecta este dispositivo antes de seguir agregando información sensible.'),
-        'warning'
-      );
+    await refreshProjects(); renderProject(); renderAccessManagement();
+    if (pending.action === 'revoke' && result?.keyRotation?.completed === false) {
+      setStatus(elements.accessStatus, t('access.revokedRotationPending', 'El acceso fue revocado, pero la rotación de clave quedó pendiente. Reconecta este dispositivo antes de seguir agregando información sensible.'), 'warning');
     } else {
       const message = pending.action === 'transfer'
         ? t('access.transferredSuccess', 'La propiedad fue transferida correctamente.')
-        : pending.portfolioSpaceId
-          ? t('access.portfolioRevokedSuccess', 'El acceso al panel y a todos sus proyectos fue revocado correctamente.')
-          : t('access.revokedSuccess', 'El acceso fue revocado y las claves del proyecto fueron renovadas.');
+        : t('access.revokedSuccess', 'El acceso fue revocado y las claves del proyecto fueron renovadas.');
       setStatus(elements.accessStatus, message, 'success');
     }
   } catch (error) {
@@ -1597,9 +1104,8 @@ function renderRecordList(container, records, type) {
         amount.append(variance);
       }
     } else amount.textContent = money(record.amount);
-    const data = selectedProjectData();
-    const canEdit = recordCanEdit(data?.space, type, record);
-    const canDelete = recordCanDelete(data?.space, type, record);
+    const canEdit = userCan(type === 'projection' ? 'projection' : 'add');
+    const canDelete = userCan('delete') && (type !== 'projection' || userCan('projection'));
     const menu = contextMenuButton(
       { scope: 'record', spaceId: state.selectedSpaceId, type, entityId: record.id },
       t('actions.recordMenu', 'Opciones del registro')
@@ -1637,12 +1143,12 @@ function renderProject() {
   renderRecordList(elements.purchaseList, data.purchases, 'purchase'); renderRecordList(elements.projectionList, data.projections, 'projection'); renderRecordList(elements.incomeList, data.incomes, 'income');
   const authorizationUnconfirmed = isAuthorizationUnconfirmed(data.space);
   const replicaRecoveryPending = isReplicaRecoveryPending(data.space);
-  elements.inviteCollaboratorButton.disabled = authorizationUnconfirmed || !userCan('invite');
+  elements.inviteCollaboratorButton.disabled = authorizationUnconfirmed || (!userCan('invite') && data.space.ownerUserId !== state.user?.userId);
   elements.manageAccessButton.disabled = authorizationUnconfirmed || !(data.space.members || []).some((member) => member.userId === state.user?.userId);
   const lifecycleLocked = Boolean(lifecycleTransaction);
   elements.inviteCollaboratorButton.disabled = lifecycleLocked || elements.inviteCollaboratorButton.disabled;
   elements.manageAccessButton.disabled = lifecycleLocked || elements.manageAccessButton.disabled;
-  elements.editProjectButton.disabled = !userCan('edit_project'); elements.addPurchaseButton.disabled = !userCan('add'); elements.addIncomeButton.disabled = !userCan('add'); elements.addProjectionButton.disabled = !userCan('projection');
+  elements.editProjectButton.disabled = !isSelectedProjectOwner(); elements.addPurchaseButton.disabled = !userCan('add'); elements.addIncomeButton.disabled = !userCan('add'); elements.addProjectionButton.disabled = !userCan('projection');
   if (lifecycleLocked) [elements.editProjectButton, elements.addPurchaseButton, elements.addIncomeButton, elements.addProjectionButton].forEach((button) => { button.disabled = true; });
   if (lifecycleTransaction) setStatus(elements.projectStatus, lifecycleStatusMessage(lifecycleTransaction), 'warning');
   else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
@@ -1671,12 +1177,7 @@ function applyP2PState(nextState = {}) {
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
   };
-  renderInvitations();
-  if (elements.devicesDialog?.open) renderDevices();
-  refreshProjects()
-    .then(() => reconcilePortfolioAccess())
-    .catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
-  queueMicrotask(() => autoAcceptInheritedPortfolioInvitations().catch(() => false));
+  renderInvitations(); if (elements.devicesDialog?.open) renderDevices(); refreshProjects().catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
 }
 
 async function loadPublicConfig() { if (state.firebaseWebConfig) return state.firebaseWebConfig; const data = await apiGet('/api/config'); if (String(data?.approvedApplication || '') !== P2P_APPLICATION_ID) { console.error('[semilla-auth] La aplicación aprobada por memoriaBACKEND no coincide con la carpeta pública.', { expected: P2P_APPLICATION_ID, received: data?.approvedApplication || '' }); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } const config = data?.firebaseWebConfig || {}; const error = getFirebaseWebConfigError(config); if (error) { console.error('[semilla-auth]', error); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } state.firebaseWebConfig = config; return config; }
@@ -1710,7 +1211,6 @@ function buildPendingProjectCreation(project = {}) {
     operationId: current.operationId || createLocalId('op_project_create'),
     resourceType: 'admin.project',
     permissionProfile: ADMIN_PROJECT_PERMISSION_PROFILE,
-    governanceSpaceId: project.portfolioSpaceId || '',
     entityType: PROJECT_ENTITY_TYPE,
     entityId: PROJECT_ENTITY_ID,
     spaceId: current.spaceId || '',
@@ -1920,12 +1420,8 @@ async function logout() {
 }
 
 function openProjectForm(mode = 'create') {
-  if (mode === 'create' && !canCreatePortfolioProject()) {
-    setStatus(elements.dashboardStatus, t('permissions.projectCreateDenied', 'Tu rol no permite crear proyectos dentro de este panel.'), 'error');
-    return;
-  }
-  if (mode === 'edit' && !userCan('edit_project')) {
-    setStatus(elements.projectStatus, t('permissions.projectEditDenied', 'Tu rol no permite editar la información base de este proyecto.'), 'error');
+  if (mode === 'edit' && !isSelectedProjectOwner()) {
+    setStatus(elements.projectStatus, t('project.ownerEditOnly', 'Solo el propietario puede modificar la información base y el presupuesto del proyecto.'), 'error');
     return;
   }
   const data = selectedProjectData(); elements.projectForm.reset(); elements.projectFormMode.value = mode; setStatus(elements.projectFormStatus, '');
@@ -1936,28 +1432,12 @@ function openProjectForm(mode = 'create') {
 }
 async function submitProject(event) {
   event.preventDefault(); if (state.p2pBusy) return; const mode = elements.projectFormMode.value;
-  if (mode === 'create' && !canCreatePortfolioProject()) {
+  if (mode === 'edit' && !isSelectedProjectOwner()) {
     closeDialog(elements.projectDialog);
-    setStatus(elements.dashboardStatus, t('permissions.projectCreateDenied', 'Tu rol no permite crear proyectos dentro de este panel.'), 'error');
+    setStatus(elements.projectStatus, t('project.ownerEditOnly', 'Solo el propietario puede modificar la información base y el presupuesto del proyecto.'), 'error');
     return;
   }
-  if (mode === 'edit' && !userCan('edit_project')) {
-    closeDialog(elements.projectDialog);
-    setStatus(elements.projectStatus, t('permissions.projectEditDenied', 'Tu rol no permite editar la información base de este proyecto.'), 'error');
-    return;
-  }
-  const existing = selectedProjectData();
-  const activePortfolioSpace = mode === 'create' && spaceUserCan(primaryPortfolioSpace(), 'manage_access') ? primaryPortfolioSpace() : null;
-  const inheritedCollaborators = mode === 'create' ? portfolioCollaborators(activePortfolioSpace) : [];
-  const project = normalizeProjectInput({
-    name: elements.projectNameInput.value,
-    description: elements.projectDescriptionInput.value,
-    address: elements.projectAddressInput.value,
-    initialBudget: elements.projectBudgetInput.value,
-    portfolioSpaceId: mode === 'edit' ? existing?.project.portfolioSpaceId : activePortfolioSpace?.spaceId,
-    portfolioOwnerUserId: mode === 'edit' ? existing?.project.portfolioOwnerUserId : activePortfolioSpace?.ownerUserId,
-    createdAt: mode === 'edit' ? existing?.project.createdAt : ''
-  });
+  const existing = selectedProjectData(); const project = normalizeProjectInput({ name: elements.projectNameInput.value, description: elements.projectDescriptionInput.value, address: elements.projectAddressInput.value, initialBudget: elements.projectBudgetInput.value, createdAt: mode === 'edit' ? existing?.project.createdAt : '' });
   if (!project.name || !project.initialBudget) { setStatus(elements.projectFormStatus, t('project.required', 'Ingresa un nombre y un presupuesto mayor que cero.'), 'error'); return; }
   setP2PBusy(true); setStatus(elements.projectFormStatus, t('common.saving', 'Guardando…'));
   let spaceId = state.selectedSpaceId;
@@ -1990,22 +1470,7 @@ async function submitProject(event) {
       publishResult = await semillaP2P.put(spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, project);
     }
     state.pendingProjectCreation = null;
-    await semillaP2P.refreshBootstrap({ requestSnapshots: false });
-    applyP2PState(semillaP2P.bootstrapState);
-    await refreshProjects();
-    const inherited = mode === 'create'
-      ? await invitePortfolioCollaboratorsToProject(spaceId, inheritedCollaborators)
-      : { failed: 0 };
-    if (mode === 'create' && inheritedCollaborators.length) {
-      await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
-      applyP2PState(semillaP2P.bootstrapState);
-      await refreshProjects();
-    }
-    closeDialog(elements.projectDialog);
-    openProject(spaceId);
-    if (inherited.failed) {
-      setStatus(elements.projectStatus, t('invite.portfolioPartial', 'El acceso al panel se guardó, pero {failed} proyectos deberán reintentarse al recuperar conexión.').replace('{failed}', String(inherited.failed)), 'warning');
-    } else setOperationSavedStatus(publishResult, t('project.saved', 'Proyecto guardado y sincronizado.'));
+    await semillaP2P.refreshBootstrap({ requestSnapshots: false }); applyP2PState(semillaP2P.bootstrapState); await refreshProjects(); closeDialog(elements.projectDialog); openProject(spaceId); setOperationSavedStatus(publishResult, t('project.saved', 'Proyecto guardado y sincronizado.'));
   } catch (error) {
     if (error?.p2pQueued && spaceId) {
       const pendingRequestId = state.pendingProjectCreation?.requestId || '';
@@ -2028,8 +1493,6 @@ function recordByType(type = '', entityId = '', options = {}) {
 
 function openRecordForm(type, record = null) {
   const permission = type === 'projection' ? 'projection' : 'add'; if (!userCan(permission)) { setStatus(elements.projectStatus, t('permissions.denied', 'Tus permisos no permiten realizar esta acción.'), 'error'); return; }
-  const accessError = record ? recordAccessError(selectedSpace(), record) : '';
-  if (accessError) { setStatus(elements.projectStatus, accessError, 'error'); return; }
   elements.recordForm.reset(); state.editingRecord = record ? { type, id: record.id } : null; elements.recordTypeInput.value = type; setStatus(elements.recordFormStatus, ''); const today = localDateValue(); elements.recordDateInput.value = today;
   const config = {
     purchase: { eyebrow: t('record.expenseEyebrow', 'Gasto real'), title: record ? t('record.purchaseEditTitle', 'Editar compra') : t('record.purchaseTitle', 'Agregar compra'), amount: t('record.invoiceValue', 'Valor de factura'), date: t('record.purchaseDate', 'Fecha de compra') },
@@ -2087,24 +1550,19 @@ async function submitRecord(event) {
   let value;
   let id;
   const existing = state.editingRecord?.type === type ? recordByType(type, state.editingRecord.id) : null;
-  const existingAccessError = existing ? recordAccessError(projectData?.space, existing) : '';
-  if (existingAccessError) {
-    setStatus(elements.recordFormStatus, existingAccessError, 'error');
-    return;
-  }
   if (type === 'purchase') {
     entityType = PURCHASE_ENTITY_TYPE;
-    value = normalizePurchaseInput({ ...input, createdByUserId: existing?.createdByUserId || state.user?.userId, createdAt: existing?.createdAt });
+    value = normalizePurchaseInput({ ...input, createdAt: existing?.createdAt });
     id = existing?.id || createLocalId('purchase');
   }
   if (type === 'income') {
     entityType = INCOME_ENTITY_TYPE;
-    value = normalizeIncomeInput({ ...input, createdByUserId: existing?.createdByUserId || state.user?.userId, createdAt: existing?.createdAt });
+    value = normalizeIncomeInput({ ...input, createdAt: existing?.createdAt });
     id = existing?.id || createLocalId('income');
   }
   if (type === 'projection') {
     entityType = PROJECTION_ENTITY_TYPE;
-    value = normalizeProjectionInput({ ...input, createdByUserId: existing?.createdByUserId || state.user?.userId, createdAt: existing?.createdAt });
+    value = normalizeProjectionInput({ ...input, createdAt: existing?.createdAt });
     id = existing?.id || createLocalId('projection');
   }
   if (!value?.description || !(value.amount || value.projectedAmount)) {
@@ -2123,7 +1581,6 @@ async function submitRecord(event) {
       purchaseId: id,
       projectionId: requestedProjectionId,
       active: Boolean(requestedProjectionId),
-      createdByUserId: existing?.projectionLink?.createdByUserId || state.user?.userId,
       createdAt: existing?.projectionLink?.createdAt
     })
     : null;
@@ -2165,7 +1622,6 @@ async function submitRecord(event) {
           type: 'entity.patch',
           entityType,
           entityId: id,
-          authorship: operationAuthorship(existing, state.user?.userId),
           payload: {
             patch: conditional.patch,
             expected: conditional.expected,
@@ -2180,7 +1636,6 @@ async function submitRecord(event) {
         type: 'entity.put',
         entityType,
         entityId: id,
-        authorship: operationAuthorship(value, state.user?.userId),
         payload: { value }
       };
     }
@@ -2192,7 +1647,6 @@ async function submitRecord(event) {
         type: 'entity.put',
         entityType: PROJECTION_LINK_ENTITY_TYPE,
         entityId: id,
-        authorship: operationAuthorship(projectionLink, state.user?.userId),
         payload: {
           value: projectionLink,
           ...(projectionLink.active ? {
@@ -2275,14 +1729,12 @@ function recordTypeLabel(type = '') {
   }[type] || t('record.genericLabel', 'Registro');
 }
 
-function recordCanEdit(space = null, type = '', record = null) {
-  if (!spaceUserCan(space, type === 'projection' ? 'projection' : 'add')) return false;
-  return !record || individualRecordAccess(space || {}, state.user?.userId || '', record).allowed;
+function recordCanEdit(space = null, type = '') {
+  return spaceUserCan(space, type === 'projection' ? 'projection' : 'add');
 }
 
-function recordCanDelete(space = null, type = '', record = null) {
-  if (!spaceUserCan(space, 'delete') || (type === 'projection' && !spaceUserCan(space, 'projection'))) return false;
-  return !record || individualRecordAccess(space || {}, state.user?.userId || '', record).allowed;
+function recordCanDelete(space = null, type = '') {
+  return spaceUserCan(space, 'delete') && (type !== 'projection' || spaceUserCan(space, 'projection'));
 }
 
 function menuActionButton(action = '', icon = '', label = '', options = {}) {
@@ -2340,24 +1792,24 @@ function renderActionMenu() {
     elements.actionMenuTitle.textContent = data.project.name;
     elements.actionMenuContext.textContent = t('actions.projectContext', 'Acciones generales del proyecto');
     actions.push(menuActionButton('open-project', '↗', t('actions.openProject', 'Abrir proyecto')));
-    if (spaceUserCan(space, 'edit_project')) actions.push(menuActionButton('edit-project', '✎', t('common.edit', 'Editar')));
-    if (!isAuthorizationUnconfirmed(space) && spaceUserCan(space, 'invite')) actions.push(menuActionButton('invite-project', '＋', t('project.invite', 'Invitar')));
+    if (isSpaceOwner(space)) actions.push(menuActionButton('edit-project', '✎', t('common.edit', 'Editar')));
+    if (!isAuthorizationUnconfirmed(space) && (isSpaceOwner(space) || spaceUserCan(space, 'invite'))) actions.push(menuActionButton('invite-project', '＋', t('project.invite', 'Invitar')));
     if (!isAuthorizationUnconfirmed(space) && (space.members || []).some((member) => member.userId === state.user?.userId)) actions.push(menuActionButton('manage-access', '♙', t('access.manage', 'Participantes')));
-    if (spaceUserCan(space, 'delete_project')) actions.push(menuActionButton('trash-project', '♲', t('trash.moveProject', 'Mover a papelera'), { danger: true }));
+    if (isSpaceOwner(space)) actions.push(menuActionButton('trash-project', '♲', t('trash.moveProject', 'Mover a papelera'), { danger: true }));
   }
 
   if (context.scope === 'record') {
     const record = actionMenuRecord(context);
     elements.actionMenuTitle.textContent = record?.description || recordTypeLabel(context.type);
     elements.actionMenuContext.textContent = recordTypeLabel(context.type);
-    if (record && recordCanEdit(space, context.type, record)) actions.push(menuActionButton('edit-record', '✎', t('common.edit', 'Editar')));
-    if (record && recordCanDelete(space, context.type, record)) actions.push(menuActionButton('trash-record', '♲', t('trash.moveRecord', 'Mover a papelera'), { danger: true }));
+    if (record && recordCanEdit(space, context.type)) actions.push(menuActionButton('edit-record', '✎', t('common.edit', 'Editar')));
+    if (record && recordCanDelete(space, context.type)) actions.push(menuActionButton('trash-record', '♲', t('trash.moveRecord', 'Mover a papelera'), { danger: true }));
   }
 
   if (context.scope === 'trash-project') {
     elements.actionMenuTitle.textContent = data.project.name;
     elements.actionMenuContext.textContent = t('trash.projectContext', 'Proyecto completo en la papelera');
-    if (spaceUserCan(space, 'delete_project')) {
+    if (isSpaceOwner(space)) {
       actions.push(menuActionButton('restore-project', '↶', t('trash.restore', 'Restaurar')));
       actions.push(menuActionButton('purge-project', '×', t('trash.deletePermanently', 'Eliminar permanentemente'), { danger: true }));
     }
@@ -2367,7 +1819,7 @@ function renderActionMenu() {
     const record = actionMenuRecord(context);
     elements.actionMenuTitle.textContent = record?.description || recordTypeLabel(context.type);
     elements.actionMenuContext.textContent = `${recordTypeLabel(context.type)} · ${t('trash.inTrash', 'En la papelera')}`;
-    if (record && recordCanDelete(space, context.type, record)) {
+    if (record && recordCanDelete(space, context.type)) {
       actions.push(menuActionButton('restore-record', '↶', t('trash.restore', 'Restaurar')));
       actions.push(menuActionButton('purge-record', '×', t('trash.deletePermanently', 'Eliminar permanentemente'), { danger: true }));
     }
@@ -2426,7 +1878,7 @@ async function purgeRecord(context = {}, record = null, data = null) {
     ));
     for (const link of orphanLinks) {
       try {
-        await semillaP2P.purge(context.spaceId, PROJECTION_LINK_ENTITY_TYPE, link.id, { expected: link._entity?.value || link, authorship: operationAuthorship(link, state.user?.userId) });
+        await semillaP2P.purge(context.spaceId, PROJECTION_LINK_ENTITY_TYPE, link.id, { expected: link._entity?.value || link });
       } catch (error) {
         if (!error?.p2pQueued) throw error;
         queued = true;
@@ -2435,7 +1887,6 @@ async function purgeRecord(context = {}, record = null, data = null) {
   }
   const result = await semillaP2P.purge(context.spaceId, entityType, context.entityId, {
     expected: record._entity.value,
-    authorship: operationAuthorship(record, state.user?.userId),
     ...(context.type === 'purchase' && data.strictProjectionLinks && record.projectionLink ? {
       dependentDeletes: [{ entityType: PROJECTION_LINK_ENTITY_TYPE, entityId: context.entityId, relation: 'admin.purchase-projection-link-v1' }]
     } : {}),
@@ -2459,19 +1910,19 @@ async function executeLifecycleAction(action = '', context = null) {
     let result = null;
     let queued = false;
     if (isProjectAction) {
-      if (!spaceUserCan(data.space, 'delete_project')) throw new Error(t('permissions.projectDeleteDenied', 'Tu rol no permite eliminar proyectos.'));
+      if (!isSpaceOwner(data.space)) throw new Error(t('permissions.ownerRequired', 'Solo el propietario puede realizar esta acción.'));
       if (action === 'trash-project') result = await semillaP2P.trashProjectAfterReplicas(context.spaceId, { expected: data.project._entity?.value || {} });
       if (action === 'restore-project') result = await semillaP2P.restore(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
       if (action === 'purge-project') result = await semillaP2P.deleteProjectAfterReplicas(context.spaceId);
     } else {
-      if (!recordCanDelete(data.space, context.type, record)) throw new Error(t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'));
+      if (!recordCanDelete(data.space, context.type)) throw new Error(t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'));
       const entityType = RECORD_ENTITY_TYPES[context.type];
       if (!entityType || !record?._entity?.value) throw new Error(t('trash.recordUnavailable', 'No se encontró la versión actual del registro.'));
       if (context.type === 'projection' && (record.actualPurchaseIds || []).length && action !== 'restore-record') {
         throw new Error(t('projection.deleteLinkedError', 'No se puede eliminar una proyección con compras reales vinculadas. Desvincula o elimina esas compras primero.'));
       }
-      if (action === 'trash-record') result = await semillaP2P.trash(context.spaceId, entityType, context.entityId, { expected: record._entity.value, authorship: operationAuthorship(record, state.user?.userId) });
-      if (action === 'restore-record') result = await semillaP2P.restore(context.spaceId, entityType, context.entityId, { expected: record._entity.value, authorship: operationAuthorship(record, state.user?.userId) });
+      if (action === 'trash-record') result = await semillaP2P.trash(context.spaceId, entityType, context.entityId, { expected: record._entity.value });
+      if (action === 'restore-record') result = await semillaP2P.restore(context.spaceId, entityType, context.entityId, { expected: record._entity.value });
       if (action === 'purge-record') {
         const purge = await purgeRecord(context, record, data);
         result = purge.result;
@@ -2569,8 +2020,7 @@ function renderTrashItem(data = null, context = null, titleText = '', detailText
   content.append(title, detail);
   const menu = contextMenuButton(context, t('actions.trashMenu', 'Opciones del elemento en papelera'));
   const lifecycleTransaction = context.scope === 'trash-project' ? activeProjectLifecycle(data.space.spaceId) : null;
-  const trashedRecord = context.scope === 'trash-record' ? actionMenuRecord(context) : null;
-  const canAct = context.scope === 'trash-project' ? spaceUserCan(data.space, 'delete_project') : recordCanDelete(data.space, context.type, trashedRecord);
+  const canAct = context.scope === 'trash-project' ? isSpaceOwner(data.space) : recordCanDelete(data.space, context.type);
   menu.disabled = !canAct || Boolean(lifecycleTransaction);
   item.append(content);
   if (lifecycleTransaction) {
@@ -2623,133 +2073,15 @@ function openTrashDialog() {
   openDialog(elements.trashDialog);
 }
 
-async function inviteAcrossPortfolio(email = '', grant = {}) {
-  let portfolioSpace = primaryPortfolioSpace();
-  let portfolioResult = null;
-  if (portfolioSpace) {
-    if (!spaceUserCan(portfolioSpace, 'manage_access')) throw new Error(t('permissions.denied', 'Tus permisos no permiten realizar esta acción.'));
-    portfolioResult = await upsertSpaceAccessByEmail(portfolioSpace, email, { ...grant, accessScope: 'portfolio' });
-  } else {
-    portfolioResult = await semillaP2P.invite(email, {
-      resourceType: PORTFOLIO_RESOURCE_TYPE,
-      permissions: grant.permissions,
-      role: grant.role,
-      accessScope: 'portfolio',
-      requestId: createLocalId('portfolio_invite_request')
-    });
-    portfolioSpace = portfolioResult?.space || null;
-  }
-  await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
-  applyP2PState(semillaP2P.bootstrapState);
-  const projectSpaces = portfolioProjectSpaces(portfolioSpace).filter((space) => spaceUserCan(space, 'invite'));
-  const results = await Promise.allSettled(projectSpaces.map((space) => upsertSpaceAccessByEmail(space, email, { ...grant, accessScope: 'portfolio' })));
-  await semillaP2P.refreshBootstrap({ requestSnapshots: false }).catch(() => null);
-  applyP2PState(semillaP2P.bootstrapState);
-  await refreshProjects();
-  return {
-    portfolioResult,
-    totalProjects: results.length,
-    succeeded: results.filter((result) => result.status === 'fulfilled').length,
-    failed: results.filter((result) => result.status === 'rejected').length
-  };
-}
-
-function openInviteForm(scope = 'project') {
-  const normalizedScope = scope === 'portfolio' ? 'portfolio' : 'project';
-  if (normalizedScope === 'project' && !selectedProjectData()) return;
-  state.inviteScope = normalizedScope;
-  elements.inviteForm.reset();
-  if (elements.inviteRoleSelect) elements.inviteRoleSelect.value = 'member';
-  const defaults = new Set(['read', 'add', 'projection']);
-  elements.inviteForm.querySelectorAll('input[name="permission"]').forEach((input) => { input.checked = defaults.has(input.value); });
-  applyRolePresetToPermissionControls(elements.invitePermissionFieldset, elements.inviteRoleSelect?.value || 'member');
-  if (elements.inviteDialogTitle) elements.inviteDialogTitle.textContent = normalizedScope === 'portfolio'
-    ? t('invite.portfolioTitle', 'Invitar a Control de proyectos')
-    : t('invite.title', 'Invitar participante');
-  if (elements.inviteScopeMessage) elements.inviteScopeMessage.textContent = normalizedScope === 'portfolio'
-    ? t('invite.portfolioScope', 'Esta invitación aplica al panel completo y a todos los proyectos actuales y futuros.')
-    : t('invite.projectScope', 'Esta invitación aplica únicamente a este proyecto.');
-  setStatus(elements.inviteStatus, '');
-  openDialog(elements.inviteDialog);
-  elements.inviteEmailInput.focus();
-}
+function openInviteForm() { if (!selectedProjectData()) return; elements.inviteForm.reset(); const read = elements.inviteForm.querySelector('input[value="read"]'); if (read) read.checked = true; const add = elements.inviteForm.querySelector('input[value="add"]'); if (add) add.checked = true; const projection = elements.inviteForm.querySelector('input[value="projection"]'); if (projection) projection.checked = true; setStatus(elements.inviteStatus, ''); openDialog(elements.inviteDialog); elements.inviteEmailInput.focus(); }
 async function submitInvitation(event) {
-  event.preventDefault();
-  if (state.p2pBusy) return;
-  const scope = state.inviteScope === 'portfolio' ? 'portfolio' : 'project';
-  const data = selectedProjectData();
-  const email = String(elements.inviteEmailInput.value || '').trim();
-  const role = normalizeCollaborationRole(elements.inviteRoleSelect?.value || 'member');
-  const selectedPermissions = [...elements.inviteForm.querySelectorAll('input[name="permission"]:checked')].map((input) => input.value);
-  const permissions = normalizeCollaborationPermissions(role === 'member' ? selectedPermissions : rolePermissions(role, []));
-  if (!email || (scope === 'project' && !data)) return;
-  setP2PBusy(true);
-  setStatus(elements.inviteStatus, scope === 'portfolio' ? t('invite.portfolioSending', 'Aplicando acceso a todo el panel…') : t('invite.sending', 'Enviando invitación…'));
-  try {
-    if (scope === 'portfolio') {
-      const result = await inviteAcrossPortfolio(email, { role, permissions, accessScope: 'portfolio' });
-      closeDialog(elements.inviteDialog);
-      if (result.failed) {
-        setStatus(elements.dashboardStatus, t('invite.portfolioPartial', 'El acceso al panel se guardó, pero {failed} proyectos deberán reintentarse al recuperar conexión.').replace('{failed}', String(result.failed)), 'warning');
-      } else if (!result.totalProjects) {
-        setStatus(elements.dashboardStatus, t('invite.portfolioNoProjects', 'El acceso al panel se creó. Se heredará automáticamente en los proyectos nuevos.'), 'success');
-      } else setStatus(elements.dashboardStatus, t('invite.portfolioSent', 'El acceso al panel y a sus proyectos fue enviado correctamente.'), 'success');
-    } else {
-      const result = await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: PROJECT_RESOURCE_TYPE, permissions, role, accessScope: 'project' });
-      applyP2PState(semillaP2P.bootstrapState);
-      closeDialog(elements.inviteDialog);
-      setStatus(elements.projectStatus, result.reused ? t('invite.alreadyPending', 'La invitación ya estaba pendiente.') : t('invite.sent', 'Invitación enviada correctamente.'), 'success');
-    }
-  } catch (error) {
-    setStatus(elements.inviteStatus, error?.message || t('invite.error', 'No se pudo enviar la invitación.'), 'error');
-  } finally { setP2PBusy(false); }
+  event.preventDefault(); if (state.p2pBusy) return; const data = selectedProjectData(); const email = String(elements.inviteEmailInput.value || '').trim(); const permissions = normalizeCollaborationPermissions([...elements.inviteForm.querySelectorAll('input[name="permission"]:checked')].map((input) => input.value)); if (!data || !email) return;
+  setP2PBusy(true); setStatus(elements.inviteStatus, t('invite.sending', 'Enviando invitación…'));
+  try { const result = await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: 'admin.project', permissions }); applyP2PState(semillaP2P.bootstrapState); closeDialog(elements.inviteDialog); setStatus(elements.projectStatus, result.reused ? t('invite.alreadyPending', 'La invitación ya estaba pendiente.') : t('invite.sent', 'Invitación enviada correctamente.'), 'success'); }
+  catch (error) { setStatus(elements.inviteStatus, error?.message || t('invite.error', 'No se pudo enviar la invitación.'), 'error'); }
+  finally { setP2PBusy(false); }
 }
-async function respondInvitation(event) {
-  const button = event.target.closest('button[data-invitation-id]');
-  if (!button || state.p2pBusy) return;
-  const invitationId = button.dataset.invitationId;
-  const decision = button.dataset.decision;
-  const invitation = (state.p2pState.invitations?.received || []).find((item) => item.invitationId === invitationId) || null;
-  const related = invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE
-    ? (state.p2pState.invitations?.received || []).filter((item) => (
-      item.status === 'pending'
-      && item.invitationId !== invitationId
-      && item.resourceType !== PORTFOLIO_RESOURCE_TYPE
-      && item.accessScope === 'portfolio'
-      && invitationGovernanceSpaceId(item) === String(invitation.spaceId || '').trim()
-      && item.inviterUserId === invitation.inviterUserId
-      && normalizeCollaborationRole(item.role) === normalizeCollaborationRole(invitation.role)
-    ))
-    : [];
-  setP2PBusy(true);
-  setStatus(elements.dashboardStatus, invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && decision === 'accept' ? t('invite.portfolioAccepting', 'Aceptando acceso al panel y a sus proyectos…') : '');
-  try {
-    const result = await semillaP2P.respondToInvitation(invitationId, decision);
-    const relatedResults = [];
-    for (const item of related) {
-      try { relatedResults.push(await semillaP2P.respondToInvitation(item.invitationId, decision)); }
-      catch (error) { relatedResults.push({ error }); }
-    }
-    const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);
-    const accessRevoked = result?.accessRevoked === true;
-    const replicaPending = result?.replicaPending === true || relatedResults.some((entry) => entry?.replicaPending === true);
-    applyP2PState(semillaP2P.bootstrapState);
-    if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
-    const message = accessRevoked
-      ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.')
-      : invitation?.resourceType === PORTFOLIO_RESOURCE_TYPE && canonicalDecision === 'accept'
-        ? t('invite.portfolioAccepted', 'Acceso al panel aceptado. Los proyectos compartidos se están incorporando automáticamente.')
-        : replicaPending
-          ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.')
-          : canonicalDecision === 'accept'
-            ? t('invite.accepted', 'Invitación aceptada.')
-            : t('invite.rejected', 'Invitación rechazada.');
-    setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success');
-  } catch (error) {
-    setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');
-  } finally { setP2PBusy(false); }
-}
-
+async function respondInvitation(event) { const button = event.target.closest('button[data-invitation-id]'); if (!button || state.p2pBusy) return; setP2PBusy(true); try { const result = await semillaP2P.respondToInvitation(button.dataset.invitationId, button.dataset.decision); const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, button.dataset.decision); const accessRevoked = result?.accessRevoked === true; const replicaPending = result?.replicaPending === true; applyP2PState(semillaP2P.bootstrapState); if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog); const message = accessRevoked ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.') : replicaPending ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.') : canonicalDecision === 'accept' ? t('invite.accepted', 'Invitación aceptada.') : t('invite.rejected', 'Invitación rechazada.'); setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success'); } catch (error) { setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error'); } finally { setP2PBusy(false); } }
 function renderLocalNetworkStatus(detail = null) {
   const status = detail?.status || semillaP2P.getLocalNetworkStatus();
   if (elements.localNetworkButton) elements.localNetworkButton.hidden = status.enabled !== true;
@@ -2968,8 +2300,6 @@ elements.localNetworkCopy?.addEventListener('click', copyLocalNetworkCode);
 elements.deviceList?.addEventListener('click', (event) => { const button = event.target.closest('button[data-device-retire]'); if (button) prepareDeviceRetirement(button.dataset.deviceRetire); });
 elements.deviceConfirmButton?.addEventListener('click', executeDeviceRetirement); elements.deviceConfirmCancel?.addEventListener('click', clearDeviceConfirmation);
 elements.protectStorageButton?.addEventListener('click', () => requestStorageProtection({ announce: true }));
-elements.managePortfolioAccessButton?.addEventListener('click', () => openAccessManagement('portfolio'));
-elements.invitePortfolioButton?.addEventListener('click', () => openInviteForm('portfolio'));
 elements.newProjectButton?.addEventListener('click', () => { requestStorageProtection(); openProjectForm('create'); }); elements.projectForm?.addEventListener('submit', submitProject); elements.editProjectButton?.addEventListener('click', () => openProjectForm('edit'));
 elements.projectFilterInput?.addEventListener('input', (event) => {
   state.projectFilterQuery = String(event.currentTarget?.value || '').slice(0, 300);
@@ -3010,9 +2340,8 @@ elements.trashList?.addEventListener('click', (event) => {
 elements.actionMenuList?.addEventListener('click', handleActionMenuSelection);
 elements.actionMenuConfirmButton?.addEventListener('click', executeActionMenuConfirmation);
 elements.actionMenuConfirmCancel?.addEventListener('click', clearActionMenuConfirmation);
-elements.inviteCollaboratorButton?.addEventListener('click', () => openInviteForm('project'));
-elements.inviteRoleSelect?.addEventListener('change', () => applyRolePresetToPermissionControls(elements.invitePermissionFieldset, elements.inviteRoleSelect.value)); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
-elements.manageAccessButton?.addEventListener('click', () => openAccessManagement('project'));
+elements.inviteCollaboratorButton?.addEventListener('click', openInviteForm); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
+elements.manageAccessButton?.addEventListener('click', openAccessManagement);
 elements.accessMemberList?.addEventListener('click', (event) => {
   const cancel = event.target.closest('button[data-permission-cancel]');
   if (cancel) { togglePermissionEditor(cancel.dataset.permissionCancel, false); return; }
@@ -3025,16 +2354,14 @@ elements.accessMemberList?.addEventListener('submit', submitPermissionUpdate);
 elements.deleteProjectButton?.addEventListener('click', () => prepareAccessAction('delete-project'));
 elements.accessConfirmButton?.addEventListener('click', executeAccessAction); elements.accessConfirmCancel?.addEventListener('click', clearAccessConfirmation);
 document.addEventListener('click', (event) => { const button = event.target.closest('[data-close-dialog]'); if (button) closeDialog(byId(button.dataset.closeDialog)); });
-elements.accessDialog?.addEventListener('close', () => { clearAccessConfirmation(); setStatus(elements.accessStatus, ''); });
 elements.actionMenuDialog?.addEventListener('close', () => { state.actionMenuContext = null; clearActionMenuConfirmation(); setStatus(elements.actionMenuStatus, ''); });
-document.addEventListener('app-language-ready', () => { renderInvitations(); renderDevices(); renderDashboard(); renderTrash(); renderStorageDurability(); if (state.selectedSpaceId) renderProject(); if (elements.accessDialog?.open) renderAccessManagement(); if (elements.actionMenuDialog?.open) renderActionMenu(); setConnectionState(elements.connectionStatus?.dataset.state || 'connecting'); window.AppAssetLoader?.hydrate(document); });
+document.addEventListener('app-language-ready', () => { renderInvitations(); renderDevices(); renderDashboard(); renderTrash(); renderStorageDurability(); if (state.selectedSpaceId) { renderProject(); if (elements.accessDialog?.open) renderAccessManagement(); } if (elements.actionMenuDialog?.open) renderActionMenu(); setConnectionState(elements.connectionStatus?.dataset.state || 'connecting'); window.AppAssetLoader?.hydrate(document); });
 
 subscribeSessionTokenChanges(({ token }) => {
   queueExternalSessionSynchronization(token);
 });
 window.addEventListener('online', () => {
   if (!state.user && getSessionToken()) queueExternalSessionSynchronization(getSessionToken());
-  if (state.user) reconcilePortfolioAccess().catch(() => null);
 });
 
 restoreSession();

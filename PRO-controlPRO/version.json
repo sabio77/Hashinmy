@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.9.98+2026-08-04-159",
-  "version": "1.9.98",
-  "build": "2026-08-04-159",
-  "releasedAt": "2026-08-04T20:47:00-05:00",
+  "schemaVersion": 3,
+  "releaseId": "semilla-appweb-pwa@1.9.90+2026-08-04-150",
+  "version": "1.9.90",
+  "build": "2026-08-04-150",
+  "releasedAt": "2026-08-04T12:30:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -27,8 +27,8 @@
   "criticalAssets": [
     {
       "url": "./index.html",
-      "sha256": "08637cb3f2cd24ec58fca75dd8a57aa67708e42726d0bd2e216d8ecaa40cbb2e",
-      "bytes": 27547
+      "sha256": "f127921b79f5e3e19a75945d1c0a49b157111276f45f5c299a600226a248f2e6",
+      "bytes": 24545
     },
     {
       "url": "./offline.html",
@@ -37,23 +37,23 @@
     },
     {
       "url": "./manifest.webmanifest",
-      "sha256": "6e043f18b81e97d5138b40c700570833e99cb77d78a437728f9dbdc59aeeb45c",
-      "bytes": 7975
+      "sha256": "c45eedf43b9f6746cacd378e11ab4643c435ba2dc1fdd87b4b1c75cc416c8e79",
+      "bytes": 7987
     },
     {
       "url": "./sw.js",
-      "sha256": "731ff35152016367d3f3faee523f62dcaababf0141c104d777282a3e5aa9b9af",
-      "bytes": 34121
+      "sha256": "c09eced243ab9d671a2ec2113d8eca1f3ed84bc5d8dd803faa24007c156fe277",
+      "bytes": 32393
     },
     {
       "url": "./src/css/app.css",
-      "sha256": "b8be46936663c8e3db73eaa6d0606ca5f2ea59472ca1aceebddf990f94f54c1f",
-      "bytes": 37981
+      "sha256": "59bb1a373d379b8e843897af2e72051aeeaeb2bb391858156b91380f35d13397",
+      "bytes": 33416
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "33ab6844264e417d27bd2f732aafd8dc5114788d81d869f3b0af64a205144906",
-      "bytes": 5264
+      "sha256": "1c20682a5811a734bd0aee187b101f21708b2f5da2e69c93a942f851724f4cb9",
+      "bytes": 4592
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -62,8 +62,8 @@
     },
     {
       "url": "./src/js/config.js",
-      "sha256": "2692671f349c033226ccb975ecec03e31fa90156f5a8df2a35bcd6a75616ed6d",
-      "bytes": 6939
+      "sha256": "06b71e5e5a7eafaf311d712ebef3a62ac09007f3c377aa5513ed2093a54b34f2",
+      "bytes": 5383
     },
     {
       "url": "./src/js/application-scope.js",
@@ -92,8 +92,8 @@
     },
     {
       "url": "./src/js/p2p-crypto.js",
-      "sha256": "fa00f15ad092557bbf4b2295b8cd7e9c3b648319a3d04d75ec10c5c905a9c1da",
-      "bytes": 46703
+      "sha256": "579971689ea052f9368c09baf619c49567833fd34b718737b6da8bf8802faec6",
+      "bytes": 46396
     },
     {
       "url": "./src/js/p2p-tab-coordinator.js",
@@ -102,18 +102,18 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "57fe7a7fbd78b58ba652371f3b5fb13ed8caa4d7f959b015f3c7ec6b7b54064f",
-      "bytes": 379985
+      "sha256": "4822bfcf1cc3c6aaf2d9b1a66a38fdd37503b1e77478fba44afc1806c8e159a4",
+      "bytes": 377634
     },
     {
       "url": "./src/js/p2p-permissions.js",
-      "sha256": "4e0e4023a8c1cd1d7e9d29159799a2df4c198e2514224088436894fdd3721060",
-      "bytes": 4240
+      "sha256": "bb5f557d6a895a9a196dc873bb944be59aa8678e2b6c57e5b909bde829854173",
+      "bytes": 2768
     },
     {
       "url": "./src/js/p2p-space-creation-intent.js",
-      "sha256": "9db8e0a0a9701ecafb8aeeda14d120f0973fd518440a990c69328ea68e3e36f4",
-      "bytes": 4736
+      "sha256": "9ad019a731250ad7324c1a3a4b60b2ecd30c60d5c2f6909450624a62a89881e6",
+      "bytes": 4570
     },
     {
       "url": "./src/js/p2p-invitation-intent.js",
@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/project-domain.js",
-      "sha256": "aa8582df5611d3283ceeb63534a2cb713f8a4e9f09d0951e23597273c2d2c2ad",
-      "bytes": 19139
+      "sha256": "8976ad0defcaa3ec91f3966574b65462191836e1c07f9418d949e1790bd10f2e",
+      "bytes": 16595
     },
     {
       "url": "./src/js/device-management.js",
@@ -142,33 +142,28 @@
     },
     {
       "url": "./src/js/asset-loader.js",
-      "sha256": "be410687a408a13bacfe0d68a03e6cf19a00a0e590a5c7a0ea724f8041b2df78",
-      "bytes": 3319
-    },
-    {
-      "url": "./src/js/pwa-install-prompt.js",
-      "sha256": "b7f11acc2a48ec3f90c43a79aeee58a3efb8a5329eebdf8da9f18a600c8f225f",
-      "bytes": 6634
+      "sha256": "e00071c4fffcfc25b2bac768c6bd8d20bd6f1b39b7aab06a0051555cc53a5ce8",
+      "bytes": 2767
     },
     {
       "url": "./src/js/pwa-update-manager.js",
-      "sha256": "86a3988f059672d89eee7e8929abb964551b1bdb50660dc86a404a82b443c29d",
-      "bytes": 22203
+      "sha256": "49b6e44c70091d7276e8cb7991502049fa4e5639a1454c3cd2f038ce4c59fdc3",
+      "bytes": 20118
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "d8b8b91d7e87ca316f3f5f992efb5d05012f5f84880acf012a788d52b12496c8",
-      "bytes": 176188
+      "sha256": "22afe9424c64c983814974a6d4b2bab616e56dbd842a3ee52f7e27061b81308a",
+      "bytes": 137098
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "59281921d6d026fb784fb6fb67ed0146a3d4b6a676a4da2cf6b87705d8d0ebeb",
+      "sha256": "44b0d987988b2aa615b36dffed51edaf1652bcdd61d0fcce9f3d47bf3b277fc0",
       "bytes": 981
     },
     {
       "url": "./textX/app/es.json",
-      "sha256": "0626c9b550e348b2731f00de83a1ff00860cf65cb03913241104d9979a602b24",
-      "bytes": 28867
+      "sha256": "045e092f59d57136d4f71d6cdc380b36f4e39d8e1163efee5368da8179fd2ea0",
+      "bytes": 23781
     },
     {
       "url": "./textX/seo/es.json",
@@ -177,8 +172,8 @@
     },
     {
       "url": "./textX/app/ar.json",
-      "sha256": "b7cc310a0f26ca15ff49f989106baebddd1254567de221b86cb38643d150a227",
-      "bytes": 34845
+      "sha256": "d4fb1db5116957f27a016484a9d624ed8ac4670e22dcc01ce0ff87f3f26b5747",
+      "bytes": 28472
     },
     {
       "url": "./textX/seo/ar.json",
@@ -187,8 +182,8 @@
     },
     {
       "url": "./textX/app/en.json",
-      "sha256": "606ed385b2531bf1f4792c699300149b7f0a35b471e00808a3da4a61af0b3e48",
-      "bytes": 27125
+      "sha256": "eedb191964fd0bb095deaf6d60cce6793f3424b870b7ec2fac435d9f303a5012",
+      "bytes": 22370
     },
     {
       "url": "./textX/seo/en.json",
@@ -201,74 +196,29 @@
       "bytes": 25179
     },
     {
-      "url": "./assets/logoAPP_16x16.png.txt",
-      "sha256": "1078e781510356620e5dd9b8d4da4ee88ad4f7aacc2f75329b419238d2893b90",
-      "bytes": 1635
+      "url": "./assets/icons/logo.png.txt",
+      "sha256": "5303a9e299dc72ae4424b108ce59a5f580dd38c1b8fc4522b9ccaa0fa01da879",
+      "bytes": 509
     },
     {
-      "url": "./assets/logoAPP_32x32.png.txt",
-      "sha256": "9251f6dedc9239502030d0dea0b4b11e8770afd903df8a22a813cdf3e4e0f7cf",
-      "bytes": 1635
+      "url": "./assets/icons/icon-192.png.txt",
+      "sha256": "dfc9b0383f8164e9dc10f3544cde68e272db5ef4b5b2dc097f81e615246787fc",
+      "bytes": 476
     },
     {
-      "url": "./assets/logoAPP_48x48.png.txt",
-      "sha256": "c9e20856102de013fd0c4acf7519cfeab4a32b94ded8e0026ce2edbcb798d2ad",
-      "bytes": 1636
+      "url": "./assets/icons/icon-512.png.txt",
+      "sha256": "defbc3bd510091cec8d5274fc4db0a5b8cfa4f9bd8608faffbe9ca49e68c5c28",
+      "bytes": 476
     },
     {
-      "url": "./assets/logoAPP_72x72.png.txt",
-      "sha256": "b36cbed2ee69cca7ddea8f8ec21d1be8de962cc2b3609c84c39b9f8a82b3c8da",
-      "bytes": 1636
+      "url": "./assets/icons/maskable-192.png.txt",
+      "sha256": "7920a25b7668e7dd4f93f3b139f7f1120bc2e2fbcc07d083e5b97d77ad57a93e",
+      "bytes": 485
     },
     {
-      "url": "./assets/logoAPP_96x96.png.txt",
-      "sha256": "0279392149e4d3765df59d36d98c2ac77771b6cb7f3060c44051d9fbf055b5a4",
-      "bytes": 1637
-    },
-    {
-      "url": "./assets/logoAPP_128x128.png.txt",
-      "sha256": "f5e6e40b8a6d922f68316e45d0c8ff69877b186d09f304d00b4dba5916e95d8c",
-      "bytes": 1640
-    },
-    {
-      "url": "./assets/logoAPP_144x144.png.txt",
-      "sha256": "fd0c5d21feb4651f96e09ab0899d760df6173ebc29ce5b5c53e3f47cbc9efc8c",
-      "bytes": 1640
-    },
-    {
-      "url": "./assets/logoAPP_152x152.png.txt",
-      "sha256": "fcccce6032508170e7e7bb5dd52557984035195f1d4837d1987d1962aef7f957",
-      "bytes": 1643
-    },
-    {
-      "url": "./assets/logoAPP_180x180.png.txt",
-      "sha256": "1197b4d6e5a0580b1d10d42f1f8620588a5f1d685c903c628831a143fbf01b64",
-      "bytes": 1643
-    },
-    {
-      "url": "./assets/logoAPP_192x192.png.txt",
-      "sha256": "098d9d6d9d997ab8a5e75967b56266f03db05c7ff5634c20e5d85dcb36407a7f",
-      "bytes": 1643
-    },
-    {
-      "url": "./assets/logoAPP_384x384.png.txt",
-      "sha256": "e0da336cf0dfa5c579889ff358b52ce731fc765e626e5fe2e99baa361c7fa69f",
-      "bytes": 1642
-    },
-    {
-      "url": "./assets/logoAPP_512x512.png.txt",
-      "sha256": "d644211fc47131d7859e731e7c8f222f8504f737426483fa5d7f87bdea32bb84",
-      "bytes": 1643
-    },
-    {
-      "url": "./assets/logoAPP_maskable_192x192.png.txt",
-      "sha256": "6ad4aeccaa64a65201bb32dddf609623c322287ea030ef2830bf7e3927a4b400",
-      "bytes": 1668
-    },
-    {
-      "url": "./assets/logoAPP_maskable_512x512.png.txt",
-      "sha256": "a8603e3b67e851fea0b147522c0ab289ecdefac20bb1dc58cb93d3ee7a16b5ae",
-      "bytes": 1668
+      "url": "./assets/icons/maskable-512.png.txt",
+      "sha256": "cd8fe9ac30252bda9afb2eaca4bbd4b6da051eaa4db4b64d42c44299243f111e",
+      "bytes": 485
     }
   ],
   "i18n": {
@@ -288,145 +238,13 @@
   },
   "assetPrompts": {
     "autoDiscovery": "build-time scan of assets/**/*.png.txt",
-    "count": 14,
+    "count": 5,
     "files": [
-      "./assets/logoAPP_16x16.png.txt",
-      "./assets/logoAPP_32x32.png.txt",
-      "./assets/logoAPP_48x48.png.txt",
-      "./assets/logoAPP_72x72.png.txt",
-      "./assets/logoAPP_96x96.png.txt",
-      "./assets/logoAPP_128x128.png.txt",
-      "./assets/logoAPP_144x144.png.txt",
-      "./assets/logoAPP_152x152.png.txt",
-      "./assets/logoAPP_180x180.png.txt",
-      "./assets/logoAPP_192x192.png.txt",
-      "./assets/logoAPP_384x384.png.txt",
-      "./assets/logoAPP_512x512.png.txt",
-      "./assets/logoAPP_maskable_192x192.png.txt",
-      "./assets/logoAPP_maskable_512x512.png.txt"
-    ]
-  },
-  "appIdentity": {
-    "manifest": "./manifest.webmanifest",
-    "iconVersion": "4719159321b39a5d3eac",
-    "updateMode": "fingerprinted-icon-url",
-    "interfaceLogo": "./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7",
-    "favicon": "./assets/logoAPP_32x32.png?v=9251f6dedc9239502030",
-    "appleTouchIcon": "./assets/logoAPP_180x180.png?v=1197b4d6e5a0580b1d10",
-    "notificationIcon": "./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7",
-    "icons": [
-      {
-        "url": "./assets/logoAPP_16x16.png?v=1078e781510356620e5d",
-        "path": "./assets/logoAPP_16x16.png",
-        "sizes": "16x16",
-        "purpose": "any",
-        "fingerprint": "1078e781510356620e5d",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_32x32.png?v=9251f6dedc9239502030",
-        "path": "./assets/logoAPP_32x32.png",
-        "sizes": "32x32",
-        "purpose": "any",
-        "fingerprint": "9251f6dedc9239502030",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_48x48.png?v=c9e20856102de013fd0c",
-        "path": "./assets/logoAPP_48x48.png",
-        "sizes": "48x48",
-        "purpose": "any",
-        "fingerprint": "c9e20856102de013fd0c",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_72x72.png?v=b36cbed2ee69cca7ddea",
-        "path": "./assets/logoAPP_72x72.png",
-        "sizes": "72x72",
-        "purpose": "any",
-        "fingerprint": "b36cbed2ee69cca7ddea",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_96x96.png?v=0279392149e4d3765df5",
-        "path": "./assets/logoAPP_96x96.png",
-        "sizes": "96x96",
-        "purpose": "any",
-        "fingerprint": "0279392149e4d3765df5",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_128x128.png?v=f5e6e40b8a6d922f6831",
-        "path": "./assets/logoAPP_128x128.png",
-        "sizes": "128x128",
-        "purpose": "any",
-        "fingerprint": "f5e6e40b8a6d922f6831",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_144x144.png?v=fd0c5d21feb4651f96e0",
-        "path": "./assets/logoAPP_144x144.png",
-        "sizes": "144x144",
-        "purpose": "any",
-        "fingerprint": "fd0c5d21feb4651f96e0",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_152x152.png?v=fcccce6032508170e7e7",
-        "path": "./assets/logoAPP_152x152.png",
-        "sizes": "152x152",
-        "purpose": "any",
-        "fingerprint": "fcccce6032508170e7e7",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_180x180.png?v=1197b4d6e5a0580b1d10",
-        "path": "./assets/logoAPP_180x180.png",
-        "sizes": "180x180",
-        "purpose": "any",
-        "fingerprint": "1197b4d6e5a0580b1d10",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_192x192.png?v=098d9d6d9d997ab8a5e7",
-        "path": "./assets/logoAPP_192x192.png",
-        "sizes": "192x192",
-        "purpose": "any",
-        "fingerprint": "098d9d6d9d997ab8a5e7",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_384x384.png?v=e0da336cf0dfa5c57988",
-        "path": "./assets/logoAPP_384x384.png",
-        "sizes": "384x384",
-        "purpose": "any",
-        "fingerprint": "e0da336cf0dfa5c57988",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_512x512.png?v=d644211fc47131d7859e",
-        "path": "./assets/logoAPP_512x512.png",
-        "sizes": "512x512",
-        "purpose": "any",
-        "fingerprint": "d644211fc47131d7859e",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_maskable_192x192.png?v=6ad4aeccaa64a65201bb",
-        "path": "./assets/logoAPP_maskable_192x192.png",
-        "sizes": "192x192",
-        "purpose": "maskable",
-        "fingerprint": "6ad4aeccaa64a65201bb",
-        "available": false
-      },
-      {
-        "url": "./assets/logoAPP_maskable_512x512.png?v=a8603e3b67e851fea0b1",
-        "path": "./assets/logoAPP_maskable_512x512.png",
-        "sizes": "512x512",
-        "purpose": "maskable",
-        "fingerprint": "a8603e3b67e851fea0b1",
-        "available": false
-      }
+      "./assets/icons/logo.png.txt",
+      "./assets/icons/icon-192.png.txt",
+      "./assets/icons/icon-512.png.txt",
+      "./assets/icons/maskable-192.png.txt",
+      "./assets/icons/maskable-512.png.txt"
     ]
   }
 }

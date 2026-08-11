@@ -10,11 +10,6 @@ import {
   MAX_MONEY_VALUE,
   moneyValue,
   hasPermission,
-  individualRecordAccess,
-  INDIVIDUAL_EDIT_WINDOW_MS,
-  normalizeCollaborationRole,
-  operationAuthorship,
-  rolePermissions,
   normalizeCollaborationPermissions,
   normalizeProjectInput,
   normalizeProjectFilterText,
@@ -35,14 +30,6 @@ assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe id
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);
 assert.equal(project.name, 'Obra Norte');
-const portfolioProject = normalizeProjectInput({
-  name: 'Obra compartida',
-  initialBudget: 5000000,
-  portfolioSpaceId: 'portfolio_space_1',
-  portfolioOwnerUserId: 'owner_1'
-});
-assert.equal(portfolioProject.portfolioSpaceId, 'portfolio_space_1', 'Cada proyecto debe conservar el espacio de panel que gobierna su acceso global.');
-assert.equal(portfolioProject.portfolioOwnerUserId, 'owner_1', 'La asociación heredada por propietario debe persistirse para compatibilidad y recuperación.');
 assert.equal(normalizeProjectFilterText('  Dirección ÁRBOL #12  '), 'direccion arbol 12', 'El filtro debe ignorar mayúsculas, tildes y símbolos.');
 assert.equal(projectMatchesFilter({ name: 'مشروع البناء', description: 'مخزن مركزي', address: 'عمان' }, 'البناء مخزن'), true, 'El filtro debe conservar alfabetos no latinos admitidos por la interfaz multidioma.');
 assert.equal(projectMatchesFilter({ name: 'Obra Norte', description: 'Remodelación comercial', address: 'Carrera 7 Bogotá' }, 'nort remo'), true, 'Las palabras parciales coincidentes deben buscarse en todos los campos.');
@@ -206,33 +193,6 @@ assert.equal(hasPermission(space, 'guest', 'add'), true);
 assert.equal(hasPermission(space, 'guest', 'delete'), false);
 assert.deepEqual(normalizeCollaborationPermissions(['projection', 'delete']), ['read', 'delete', 'projection']);
 
-const roleSpace = {
-  members: [
-    { userId: 'owner', role: 'owner', permissions: [] },
-    { userId: 'manager', role: 'manager', permissions: [] },
-    { userId: 'admin', role: 'admin', permissions: [] },
-    { userId: 'individual', role: 'individual', permissions: [] }
-  ]
-};
-assert.equal(normalizeCollaborationRole('GERENTE'), 'member', 'Los roles se transportan con identificadores canónicos y no con etiquetas traducidas.');
-assert.equal(normalizeCollaborationRole('manager'), 'manager');
-assert.equal(hasPermission(roleSpace, 'manager', 'delete_project'), true, 'Gerente debe conservar control total, incluida la eliminación del proyecto.');
-assert.equal(hasPermission(roleSpace, 'admin', 'edit_project'), true, 'Admin debe poder editar el proyecto.');
-assert.equal(hasPermission(roleSpace, 'admin', 'manage_access'), true, 'Admin debe poder gestionar participantes.');
-assert.equal(hasPermission(roleSpace, 'admin', 'delete_project'), false, 'Admin no puede eliminar proyectos.');
-assert.equal(hasPermission(roleSpace, 'individual', 'add'), true, 'Individual puede crear registros propios.');
-assert.equal(hasPermission(roleSpace, 'individual', 'delete_project'), false, 'Individual nunca puede eliminar proyectos.');
-assert.deepEqual(rolePermissions('admin'), ['read', 'add', 'delete', 'projection', 'invite', 'write']);
-
-const now = Date.parse('2026-08-04T18:00:00.000Z');
-const ownRecentRecord = { createdByUserId: 'individual', createdAt: new Date(now - 30 * 60 * 1000).toISOString() };
-const ownExpiredRecord = { createdByUserId: 'individual', createdAt: new Date(now - INDIVIDUAL_EDIT_WINDOW_MS - 1).toISOString() };
-const foreignRecord = { createdByUserId: 'other-user', createdAt: new Date(now - 10 * 60 * 1000).toISOString() };
-assert.deepEqual(individualRecordAccess(roleSpace, 'individual', ownRecentRecord, now), { restricted: true, owner: true, withinWindow: true, allowed: true });
-assert.equal(individualRecordAccess(roleSpace, 'individual', ownExpiredRecord, now).allowed, false, 'Individual pierde edición y eliminación al cumplirse una hora.');
-assert.equal(individualRecordAccess(roleSpace, 'individual', foreignRecord, now).allowed, false, 'Individual no puede operar registros de terceros.');
-assert.deepEqual(operationAuthorship(ownRecentRecord, 'individual'), { ownerUserId: 'individual', createdAt: ownRecentRecord.createdAt });
-
 const conditionalPatch = buildConcurrentSafePatch(
   { name: 'Obra Norte', address: 'Calle 1', initialBudget: 100000000, updatedAt: 'old' },
   { name: 'Obra Norte', address: 'Calle 2', initialBudget: 100000000, updatedAt: 'new' },
@@ -253,9 +213,9 @@ assert.equal(/strictProjectionLinks[\s\S]*PROJECTION_LINK_ENTITY_TYPE, field: 'p
 assert.equal(/dependentDeletes:\s*\[\{[\s\S]*entityType:\s*PROJECTION_LINK_ENTITY_TYPE[\s\S]*relation:\s*'admin\.purchase-projection-link-v1'/.test(appSource), true);
 assert.equal(/orphanLinks[\s\S]*!activePurchaseIds\.has\(String\(link\?\.purchaseId/.test(appSource), true);
 assert.equal(appSource.includes('function isSelectedProjectOwner()'), true);
-assert.equal(appSource.includes("elements.editProjectButton.disabled = !userCan('edit_project')"), true, 'La edición del proyecto debe obedecer al rol efectivo.');
-assert.equal(/mode === 'edit' && !userCan\('edit_project'\)/.test(appSource), true, 'El formulario debe validar la edición por rol antes de abrir y guardar.');
-assert.equal((appSource.match(/permissions\.projectEditDenied/g) || []).length >= 2, true);
+assert.equal(appSource.includes('elements.editProjectButton.disabled = !isSelectedProjectOwner()'), true);
+assert.equal(/mode === 'edit' && !isSelectedProjectOwner\(\)/.test(appSource), true);
+assert.equal((appSource.match(/project\.ownerEditOnly/g) || []).length >= 2, true);
 assert.equal(appSource.includes('money(absoluteMoneyValue(record.varianceAmount || 0))'), true, 'La etiqueta de variación debe usar la operación monetaria compatible con BigInt.');
 assert.equal(appSource.includes('const today = localDateValue()'), true, 'El formulario debe usar el día calendario local del dispositivo.');
 assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false, 'La interfaz no debe volver a derivar fechas administrativas desde UTC.');
@@ -264,35 +224,11 @@ assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, dat
 assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica antes de permanecer ocultos.');
 assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFilter)'), true, 'La lista debe aplicar el filtro local sin consultar memoriaBACKEND.');
 assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');
-assert.equal(appSource.includes("const PORTFOLIO_RESOURCE_TYPE = 'admin.portfolio'"), true, 'La invitación global debe usar un espacio de cartera aislado de los proyectos.');
-assert.equal(appSource.includes("accessScope: 'portfolio'"), true, 'El alcance global debe persistirse explícitamente.');
-assert.equal(appSource.includes('inviteAcrossPortfolio(email'), true, 'El panel debe propagar el acceso a los proyectos actuales.');
-assert.equal(appSource.includes('invitePortfolioCollaboratorsToProject(spaceId'), true, 'Los proyectos nuevos deben heredar colaboradores aceptados del panel.');
-assert.equal(appSource.includes('for (const invitation of state.p2pState.invitations?.sent || [])'), true, 'Los proyectos nuevos también deben heredar invitaciones globales todavía pendientes.');
-assert.equal(appSource.includes('function projectBelongsToPortfolio(data = null, portfolioSpace = null)'), true, 'La propagación global debe resolver explícitamente qué proyectos pertenecen a cada panel.');
-assert.equal(appSource.includes("data.project?.portfolioSpaceId"), true, 'El aislamiento global debe priorizar el identificador persistido del panel.');
-assert.equal(appSource.includes('async function reconcilePortfolioAccess()'), true, 'Las propagaciones parciales deben reconciliarse automáticamente al recuperar conectividad.');
-assert.equal(appSource.includes('async function updatePortfolioMemberAccess('), true, 'Cambiar un rol global debe actualizar el panel y sus proyectos asociados.');
-assert.equal(appSource.includes('async function revokePortfolioMemberAccess('), true, 'Revocar un rol global debe retirar el acceso de todos los proyectos asociados antes de cerrar el panel.');
-assert.equal(appSource.includes('function portfolioProjectsOwnedBy('), true, 'La administración global debe detectar proyectos cuya propiedad impide una revocación consistente.');
-assert.equal(appSource.includes('access.portfolioOwnerRevokeBlocked'), true, 'No se debe retirar parcialmente a un participante que todavía sea propietario de proyectos asociados.');
-assert.equal(appSource.includes("role: isPortfolioOwner ? 'manager'"), true, 'El propietario del panel debe heredar control en proyectos creados por un Gerente.');
-assert.equal(appSource.includes("['owner', 'manager', 'admin'].includes(currentRole(portfolioSpace))"), true, 'Propietario, Gerente y Admin deben poder crear proyectos; Individual no debe hacerlo.');
-assert.equal(appSource.includes("governanceSpaceId: project.portfolioSpaceId || ''"), true, 'La creación debe delegar la propiedad al panel sin convertir al Admin en propietario.');
-assert.equal(appSource.includes("['owner', 'manager', 'admin'].includes(normalizeCollaborationRole(member?.role))"), true, 'Las invitaciones heredadas deben aceptar como emisores autorizados al propietario, Gerente y Admin del panel.');
-assert.equal(appSource.includes("individualRecordAccess(space || {}, state.user?.userId || '', record)"), true, 'La interfaz debe aplicar la ventana Individual antes de editar o eliminar.');
-assert.equal(appSource.includes('authorship: operationAuthorship'), true, 'Las operaciones deben transportar autoría verificable al backend.');
 
 const indexSource = await fs.readFile(path.resolve(path.dirname(currentFile), '../index.html'), 'utf8');
 assert.equal(/id="project-budget-input"[^>]*max="9007199254740991"/.test(indexSource), true);
 assert.equal(indexSource.includes('id="project-filter-input"'), true, 'El panel debe incluir un input de filtro encima de la lista.');
 assert.equal(indexSource.includes('aria-controls="project-list"'), true, 'El filtro debe declarar accesiblemente la lista que controla.');
-assert.equal(indexSource.includes('id="manage-portfolio-access-button"'), true, 'El panel debe permitir administrar directamente los participantes globales.');
-assert.equal(indexSource.includes('id="access-dialog-title"'), true, 'El diálogo de acceso debe adaptar su título al alcance panel o proyecto.');
 assert.equal(/id="record-amount-input"[^>]*max="9007199254740991"/.test(indexSource), true);
 
-console.log('OK: dominio administrativo, roles Gerente/Admin/Individual, invitación global, autoría temporal, vínculos de proyección, métricas exactas, permisos y parches concurrentes validados.');
-assert.equal(appSource.includes('function invitationGovernanceSpaceId(invitation = {})'), true, 'Las invitaciones globales deben correlacionarse con el panel autoritativo.');
-assert.equal(appSource.includes('const authorizedInvitersByPortfolio = new Map()'), true, 'La aceptación automática debe separar remitentes autorizados por cada panel.');
-assert.equal(/authorizedInvitersByPortfolio\.get\(governanceSpaceId\)/.test(appSource), true, 'Cada invitación heredada debe validarse contra su panel exacto.');
-assert.equal(/invitationGovernanceSpaceId\(item\) === String\(invitation\.spaceId \|\| ''\)\.trim\(\)/.test(appSource), true, 'Aceptar o rechazar un panel solo debe afectar invitaciones de proyectos gobernados por ese panel.');
+console.log('OK: dominio administrativo, raíz presupuestal exclusiva del propietario, vínculos de proyección autorizables, UI restringida, métricas exactas incluso en agregados superiores al entero seguro, permisos y parches concurrentes validados.');

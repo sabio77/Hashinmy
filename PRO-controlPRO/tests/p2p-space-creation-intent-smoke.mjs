@@ -28,19 +28,12 @@ if (!appSource.includes('completeSpaceCreationIntent(intent, projectCreationAdap
   throw new Error('La interfaz no conectó el commit recuperable y el perfil estricto al alta y al arranque de la cuenta.');
 }
 if (!clientSource.includes("permissionProfile: String(options.permissionProfile || '').trim().toLowerCase()")
-  || !clientSource.includes("governanceSpaceId: String(options.governanceSpaceId || options.portfolioSpaceId || '').trim()")
-  || !serverSource.includes("permissionProfile: req.body?.permissionProfile || ''")
-  || !serverSource.includes("governanceSpaceId: req.body?.governanceSpaceId || req.body?.portfolioSpaceId || ''")) {
-  throw new Error('El perfil y el panel de gobierno no atraviesan completamente PWA -> API -> memoriaBACKEND.');
+  || !serverSource.includes("permissionProfile: req.body?.permissionProfile || ''")) {
+  throw new Error('El perfil de permisos no atraviesa completamente PWA -> API -> memoriaBACKEND.');
 }
 if (!storageSource.includes('export async function savePendingSpaceCreation')
   || !storageSource.includes('export async function removePendingSpaceCreation')) {
   throw new Error('IndexedDB no expone el ciclo durable del intent de creación.');
-}
-if (!clientSource.includes(`entityVisibleToCurrentUser(spaceId = '', entity = null)`)
-  || !clientSource.includes("membership?.role || '').trim().toLowerCase() === 'individual'")
-  || !clientSource.includes("['admin.purchase', 'admin.income', 'admin.projection', 'admin.projection-link'].includes(entityType)")) {
-  throw new Error('La API pública P2P no filtra las entidades administrativas ajenas para el rol Individual.');
 }
 
 const baseIntent = normalizeSpaceCreationIntent({
@@ -48,19 +41,14 @@ const baseIntent = normalizeSpaceCreationIntent({
   operationId: 'op_project_create_1',
   resourceType: 'admin.project',
   permissionProfile: 'admin-project-v1',
-  governanceSpaceId: 'space_portfolio_1',
   entityType: 'admin.project',
   entityId: 'project',
   value: { name: 'Proyecto recuperable', initialBudget: 1000000 },
   createdAt: '2026-07-30T12:00:00.000Z',
   updatedAt: '2026-07-30T12:00:00.000Z'
 });
-if (!baseIntent
-  || baseIntent.spaceId
-  || baseIntent.operationId !== 'op_project_create_1'
-  || baseIntent.permissionProfile !== 'admin-project-v1'
-  || baseIntent.governanceSpaceId !== 'space_portfolio_1') {
-  throw new Error('La intención de creación no conservó sus identidades estables ni el panel de gobierno.');
+if (!baseIntent || baseIntent.spaceId || baseIntent.operationId !== 'op_project_create_1' || baseIntent.permissionProfile !== 'admin-project-v1') {
+  throw new Error('La intención de creación no conservó sus identidades estables.');
 }
 
 const deduplicated = normalizeSpaceCreationIntents([
@@ -86,11 +74,10 @@ const adapters = {
     if (persisted?.requestId === requestId) persisted = null;
     removeCalls += 1;
   },
-  async createSpace({ requestId, permissionProfile, governanceSpaceId }) {
+  async createSpace({ requestId, permissionProfile }) {
     createCalls += 1;
     if (requestId !== baseIntent.requestId) throw new Error('Cambió el requestId durante el reintento.');
     if (permissionProfile !== 'admin-project-v1') throw new Error('No se conservó el perfil estricto de permisos durante la creación.');
-    if (governanceSpaceId !== 'space_portfolio_1') throw new Error('No se conservó el panel de gobierno durante la creación recuperable.');
     return { space: { spaceId: 'space_1' } };
   },
   async listEntities() {
