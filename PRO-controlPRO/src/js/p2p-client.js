@@ -94,9 +94,6 @@ const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_REJECTION_RETRY_MS = 5 * 1000;
-const SNAPSHOT_SOURCE_RETRY_BASE_MS = 800;
-const SNAPSHOT_SOURCE_RETRY_MAX_MS = 5000;
-const SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS = 1000;
 const LOCAL_CONTROL_MAX_AGE_MS = 10 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_TTL_MS = 2 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_MAX = 64;
@@ -1363,7 +1360,6 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
     this.rejectedSnapshotSources = new Map();
-    this.snapshotSourceRetries = new Map();
     this.user = null;
     this.eventSource = null;
     this.openPromise = null;
@@ -3984,7 +3980,6 @@ export class SemillaP2PClient {
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
-    this.clearSnapshotSourceRetries();
     this.retryTimer = 0;
     this.ackTimer = 0;
     this.replicaHealthTimer = 0;
@@ -5676,7 +5671,6 @@ export class SemillaP2PClient {
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
-    this.clearSnapshotSourceRetries();
     this.retryTimer = 0;
     this.ackTimer = 0;
     this.replicaHealthTimer = 0;
@@ -6790,7 +6784,10 @@ export class SemillaP2PClient {
       await this.fenceBootstrapResponses(sessionContext);
       const invitation = event.data?.invitation;
       const space = event.data?.space;
-      const requiresSnapshotRecovery = event.eventType === 'p2p.invitation.accepted';
+      const invitationAccepted = event.eventType === 'p2p.invitation.accepted';
+      const acceptedForCurrentUser = invitationAccepted
+        && String(event.actorUserId || '').trim() === String(sessionContext.userId || '').trim();
+      const requiresSnapshotRecovery = acceptedForCurrentUser;
       const committedControlState = prepareCommittedControlState({
         spaces: space ? [space] : [],
         invitations: invitation ? [invitation] : []
@@ -6805,6 +6802,10 @@ export class SemillaP2PClient {
 
       if (requiresSnapshotRecovery) {
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
+        if (cleanSpaceId && Math.max(0, Number(space?.encryptionVersion || 0)) >= 1) {
+          await this.requestSpaceKey(cleanSpaceId, '', { force: true }).catch(() => false);
+          this.assertSessionContext(sessionContext);
+        }
         const state = await this.refreshBootstrap({
           requestSnapshots: 'force',
           snapshotSpaceIds: cleanSpaceId ? [cleanSpaceId] : []
@@ -7151,6 +7152,10 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
+      if (acceptedSpaceId && Math.max(0, Number(data.space?.encryptionVersion || 0)) >= 1) {
+        await this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
+        this.assertSessionContext(sessionContext);
+      }
       const state = await this.refreshBootstrap({
         requestSnapshots: 'force',
         snapshotSpaceIds: acceptedSpaceId ? [acceptedSpaceId] : []
@@ -7185,10 +7190,6 @@ export class SemillaP2PClient {
       });
     }
     this.assertSessionContext(sessionContext);
-    if (canonicalDecision === 'accept' && data.space && Math.max(0, Number(data.space.encryptionVersion || 0)) >= 1) {
-      await this.requestSpaceKey(data.space.spaceId, '', { force: true }).catch(() => false);
-      this.assertSessionContext(sessionContext);
-    }
     return data;
   }
 
@@ -8291,119 +8292,6 @@ export class SemillaP2PClient {
     return { sent, rejected, pending: remaining, sentOperations, rejectedOperations };
   }
 
-  clearSnapshotSourceRetry(requestId = '') {
-    const cleanRequestId = String(requestId || '').trim();
-    if (!cleanRequestId) return false;
-    const retry = this.snapshotSourceRetries.get(cleanRequestId);
-    if (retry?.timer) window.clearTimeout(retry.timer);
-    return this.snapshotSourceRetries.delete(cleanRequestId);
-  }
-
-  clearSnapshotSourceRetries() {
-    for (const retry of this.snapshotSourceRetries.values()) {
-      if (retry?.timer) window.clearTimeout(retry.timer);
-    }
-    this.snapshotSourceRetries.clear();
-  }
-
-  isSnapshotSourceRetryableError(error = null) {
-    const code = String(error?.code || '').trim().toUpperCase();
-    return [
-      'P2P_SNAPSHOT_SOURCE_BEHIND',
-      'P2P_SNAPSHOT_SOURCE_AHEAD_OF_BACKEND',
-      'P2P_SNAPSHOT_STATE_UNAVAILABLE'
-    ].includes(code) || this.isRetryableTransportError(error);
-  }
-
-  scheduleSnapshotSourceRetry(requestEvent = {}, reason = '', error = null) {
-    const request = requestEvent?.data || {};
-    const requestId = String(request.requestId || '').trim();
-    const spaceId = String(request.spaceId || requestEvent?.spaceId || '').trim();
-    if (
-      !requestId
-      || !spaceId
-      || this.manualClose
-      || !this.started
-      || !this.realtimeLeader
-      || !getSessionToken()
-    ) return false;
-
-    const expiresAt = Date.parse(request.expiresAt || '');
-    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) {
-      this.clearSnapshotSourceRetry(requestId);
-      return false;
-    }
-
-    const existing = this.snapshotSourceRetries.get(requestId);
-    if (existing?.timer) return true;
-    const attempt = Math.max(0, Number(existing?.attempt || 0)) + 1;
-    const delay = Math.min(
-      SNAPSHOT_SOURCE_RETRY_MAX_MS,
-      SNAPSHOT_SOURCE_RETRY_BASE_MS * (2 ** Math.min(attempt - 1, 3))
-    );
-    if (Number.isFinite(expiresAt) && Date.now() + delay >= expiresAt - SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) {
-      this.clearSnapshotSourceRetry(requestId);
-      return false;
-    }
-
-    const sessionContext = this.captureSessionContext();
-    if (!this.isSessionContextCurrent(sessionContext)) return false;
-    const retry = {
-      requestEvent,
-      requestId,
-      spaceId,
-      attempt,
-      reason: String(reason || '').trim(),
-      errorCode: String(error?.code || '').trim(),
-      timer: 0
-    };
-    retry.timer = window.setTimeout(async () => {
-      const active = this.snapshotSourceRetries.get(requestId);
-      if (!active || active !== retry) return;
-      retry.timer = 0;
-      this.snapshotSourceRetries.set(requestId, retry);
-      if (
-        !this.isSessionContextCurrent(sessionContext)
-        || this.manualClose
-        || !this.started
-        || !this.realtimeLeader
-        || !getSessionToken()
-      ) {
-        this.clearSnapshotSourceRetry(requestId);
-        return;
-      }
-      if (!navigator.onLine) {
-        this.scheduleSnapshotSourceRetry(requestEvent, 'waiting_online', error);
-        return;
-      }
-      try {
-        const sent = await this.sendSnapshot(requestEvent);
-        if (sent) this.clearSnapshotSourceRetry(requestId);
-      } catch (retryError) {
-        if (this.isSessionContextChangedError(retryError)) {
-          this.clearSnapshotSourceRetry(requestId);
-          return;
-        }
-        if (!this.isSnapshotSourceRetryableError(retryError)) {
-          this.clearSnapshotSourceRetry(requestId);
-          dispatch('p2p:snapshot-source-error', { event: requestEvent, error: retryError, retryable: false });
-          return;
-        }
-        this.scheduleSnapshotSourceRetry(requestEvent, 'transport_retry', retryError);
-      }
-    }, delay);
-    this.snapshotSourceRetries.set(requestId, retry);
-    dispatch('p2p:snapshot-source-retry-scheduled', {
-      requestId,
-      spaceId,
-      attempt,
-      delay,
-      reason: retry.reason,
-      errorCode: retry.errorCode
-    });
-    return true;
-  }
-
   async sendSnapshot(requestEvent = {}) {
     if (!this.realtimeLeader) return false;
     const sessionContext = this.captureSessionContext();
@@ -8414,12 +8302,23 @@ export class SemillaP2PClient {
     const spaceId = String(request.spaceId || requestEvent.spaceId || '').trim();
     if (!requestDeviceId || !requestId || !spaceId || requestDeviceId === sessionContext.deviceId) return false;
     const expiresAt = Date.parse(request.expiresAt || '');
-    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) {
-      this.clearSnapshotSourceRetry(requestId);
+    if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
+
+    const requestedStateRevision = Math.max(0, Number(request.currentStateRevision || 0));
+    this.recoveryRequirements = await getRecoveryRequirements();
+    this.assertSessionContext(sessionContext);
+    const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
+    if (unresolvedRecoveryRevision) {
+      dispatch('p2p:snapshot-source-deferred', {
+        requestId,
+        spaceId,
+        requestedStateRevision,
+        unresolvedRecoveryRevision,
+        reason: 'source_recovery_pending'
+      });
       return false;
     }
 
-    const requestedStateRevision = Math.max(0, Number(request.currentStateRevision || 0));
     let pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
     this.assertSessionContext(sessionContext);
     if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
@@ -8428,41 +8327,35 @@ export class SemillaP2PClient {
         return null;
       });
       this.assertSessionContext(sessionContext);
+      pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
+      this.assertSessionContext(sessionContext);
     }
 
-    const [localStateRevisions, recoveryRequirements, currentOutbox, localEntities] = await Promise.all([
-      listStateRevisions([spaceId]),
-      getRecoveryRequirements(),
-      listOutbox(),
-      listEntities(spaceId)
-    ]);
+    const localStateRevisions = await listStateRevisions([spaceId]);
     this.assertSessionContext(sessionContext);
-    this.recoveryRequirements = recoveryRequirements || {};
-    pendingForSpace = currentOutbox.filter((item) => String(item?.spaceId || '').trim() === spaceId);
     const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
-    const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
-    const optimisticEntities = localEntities.filter((entity) => entity?.optimistic === true);
-    const hasOptimisticEntities = optimisticEntities.length > 0;
-    const sourceBehindRequestedRevision = localStateRevision < requestedStateRevision;
-    if (unresolvedRecoveryRevision || sourceBehindRequestedRevision || pendingForSpace.length || hasOptimisticEntities) {
-      const reason = unresolvedRecoveryRevision
-        ? 'source_recovery_pending'
-        : sourceBehindRequestedRevision
-          ? 'source_revision_behind'
-          : pendingForSpace.length
-            ? 'source_outbox_pending'
-            : 'source_optimistic_state';
+    if (localStateRevision < requestedStateRevision) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,
         localStateRevision,
         requestedStateRevision,
-        unresolvedRecoveryRevision,
-        pendingOperations: pendingForSpace.length,
-        optimisticEntities: optimisticEntities.length,
-        reason
+        unresolvedRecoveryRevision: 0,
+        reason: 'source_revision_behind'
       });
-      this.scheduleSnapshotSourceRetry(requestEvent, reason);
+      return false;
+    }
+
+    const localEntities = await listEntities(spaceId);
+    this.assertSessionContext(sessionContext);
+    const hasOptimisticEntities = localEntities.some((entity) => entity?.optimistic === true);
+    if (pendingForSpace.length || hasOptimisticEntities) {
+      dispatch('p2p:snapshot-source-deferred', {
+        requestId,
+        spaceId,
+        pendingOperations: pendingForSpace.length,
+        optimisticEntities: localEntities.filter((entity) => entity?.optimistic === true).length
+      });
       return false;
     }
 
@@ -8537,55 +8430,33 @@ export class SemillaP2PClient {
       error.code = 'P2P_SNAPSHOT_TOO_LARGE';
       throw error;
     }
-    let publishedChunks = 0;
-    try {
-      for (const operation of chunkOperations) {
-        this.assertSessionContext(sessionContext);
-        await this.publish(
-          spaceId,
-          operation,
-          { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false }
-        );
-        publishedChunks += 1;
-        this.assertSessionContext(sessionContext);
-      }
+    for (const operation of chunkOperations) {
       this.assertSessionContext(sessionContext);
-      await this.publish(spaceId, {
-        operationId: `${requestId}:complete`,
-        type: 'snapshot.complete',
-        entityType: '__snapshot__',
-        entityId: requestId,
-        ...encryptionMetadata,
-        payload: {
-          requestId,
-          chunkCount: chunks.length,
-          entityCount: entities.length,
-          snapshotByteCount,
-          sourceStateRevision,
-          snapshotDigest
-        }
-      }, { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false });
+      await this.publish(
+        spaceId,
+        operation,
+        { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false }
+      );
       this.assertSessionContext(sessionContext);
-      this.clearSnapshotSourceRetry(requestId);
-      return true;
-    } catch (error) {
-      if (this.isSessionContextChangedError(error)) throw error;
-      if (publishedChunks === 0 && this.isSnapshotSourceRetryableError(error)) {
-        dispatch('p2p:snapshot-source-deferred', {
-          requestId,
-          spaceId,
-          localStateRevision,
-          requestedStateRevision,
-          sourceStateRevision,
-          reason: 'source_backend_not_settled',
-          errorCode: String(error?.code || '')
-        });
-        this.scheduleSnapshotSourceRetry(requestEvent, 'source_backend_not_settled', error);
-        return false;
-      }
-      this.clearSnapshotSourceRetry(requestId);
-      throw error;
     }
+    this.assertSessionContext(sessionContext);
+    await this.publish(spaceId, {
+      operationId: `${requestId}:complete`,
+      type: 'snapshot.complete',
+      entityType: '__snapshot__',
+      entityId: requestId,
+      ...encryptionMetadata,
+      payload: {
+        requestId,
+        chunkCount: chunks.length,
+        entityCount: entities.length,
+        snapshotByteCount,
+        sourceStateRevision,
+        snapshotDigest
+      }
+    }, { targetDeviceIds: [requestDeviceId], applyLocally: false, queueWhenOffline: false });
+    this.assertSessionContext(sessionContext);
+    return true;
   }
 
   async ensurePushSubscriptionForCurrentVapidKey(registration, keyData = {}, sessionContext = this.captureSessionContext()) {
