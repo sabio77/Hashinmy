@@ -1015,11 +1015,17 @@ export async function decryptOperationEvent(event = {}) {
       ].join('|'));
       entities.push({ ...source, value });
     }
+    const decryptedChunkByteCount = new TextEncoder().encode(JSON.stringify(entities)).byteLength;
     return {
       ...event,
       operation: {
         ...operation,
-        payload: { ...(operation.payload || {}), entities }
+        payload: {
+          ...(operation.payload || {}),
+          entities,
+          transportChunkByteCount: Number(operation.payload?.chunkByteCount || 0),
+          chunkByteCount: decryptedChunkByteCount
+        }
       }
     };
   }

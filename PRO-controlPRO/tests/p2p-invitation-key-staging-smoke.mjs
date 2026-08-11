@@ -1,0 +1,52 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const source = fs.readFileSync(path.resolve(here, '../src/js/p2p-client.js'), 'utf8');
+
+const required = [
+  "'/api/p2p/crypto/invitation-key-targets'",
+  "'/api/p2p/crypto/invitation-key-stage'",
+  "'/api/p2p/crypto/invitation-bootstrap-stage'",
+  'stageInvitationBootstrapSnapshot',
+  'applyInvitationBootstrapSnapshot',
+  'stageInvitationKeyForRecipient',
+  'stagedKeyEnvelope',
+  'stagedKeySource',
+  'escrowRecipient',
+  'escrowEnvelope',
+  'escrowStaged',
+  "deviceId: this.deviceId"
+];
+for (const marker of required) {
+  if (!source.includes(marker)) throw new Error(`Falta el contrato de clave temporal de invitación: ${marker}`);
+}
+
+const inviteStart = source.indexOf("async invite(email = '', options = {})");
+const respondStart = source.indexOf("async respondToInvitation(invitationId = '', decision = 'accept')");
+if (inviteStart < 0 || respondStart < 0) throw new Error('No se encontraron los flujos de invitar/responder.');
+const inviteSource = source.slice(inviteStart, respondStart);
+const bootstrapStageIndex = inviteSource.indexOf('await this.stageInvitationBootstrapSnapshot(data.invitation)');
+const stageIndex = inviteSource.indexOf('await this.stageInvitationKeyForRecipient(data.invitation)');
+const commitIndex = inviteSource.indexOf('prepareCommittedControlState');
+if (bootstrapStageIndex < 0 || stageIndex < 0 || commitIndex < 0
+  || bootstrapStageIndex > stageIndex || stageIndex > commitIndex) {
+  throw new Error('La invitación debe congelar primero el snapshot cifrado, preparar después la clave temporal y solo entonces consolidar el alta.');
+}
+
+const respondEnd = source.indexOf('\n  async ', respondStart + 10);
+const respondSource = source.slice(respondStart, respondEnd > respondStart ? respondEnd : undefined);
+const importIndex = respondSource.indexOf('await importSpaceKeyEnvelope(acceptedSpaceId, data.stagedKeyEnvelope');
+const bootstrapApplyIndex = respondSource.indexOf('await this.applyInvitationBootstrapSnapshot(');
+const fallbackIndex = respondSource.indexOf('await this.requestSpaceKey(acceptedSpaceId');
+const refreshIndex = respondSource.indexOf('await this.refreshBootstrap({');
+if (importIndex < 0 || bootstrapApplyIndex < 0 || fallbackIndex < 0 || refreshIndex < 0
+  || importIndex > bootstrapApplyIndex || bootstrapApplyIndex > fallbackIndex || fallbackIndex > refreshIndex) {
+  throw new Error('Al aceptar debe importar la AES, materializar el snapshot Redis, dejar P2P como fallback y reconciliar después.');
+}
+if (!/apiPost\('\/api\/p2p\/invitations\/respond', \{ invitationId, decision, deviceId: this\.deviceId \}\)/.test(respondSource)) {
+  throw new Error('La aceptación debe identificar el dispositivo para recuperar su sobre ECDH específico.');
+}
+
+console.log('OK: el cliente conserva snapshot + clave antes de anunciar la invitación y, al aceptar, importa la AES y materializa la copia Redis antes de cualquier fallback P2P.');

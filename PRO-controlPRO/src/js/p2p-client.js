@@ -5043,6 +5043,315 @@ export class SemillaP2PClient {
     };
   }
 
+  async stageInvitationKeyForRecipient(invitation = {}) {
+    const invitationId = String(invitation?.invitationId || '').trim();
+    const spaceId = String(invitation?.spaceId || '').trim();
+    if (!invitationId || !spaceId || !this.started || !getSessionToken()) return null;
+    this.assertSpaceAuthorizationConfirmed(spaceId);
+    const targets = await apiPost('/api/p2p/crypto/invitation-key-targets', {
+      deviceId: this.deviceId,
+      invitationId
+    });
+    const keyId = String(targets.keyId || '').trim();
+    const keyEpoch = Math.max(0, Number(targets.keyEpoch || 0));
+    const recipientDevices = Array.isArray(targets.recipientDevices) ? targets.recipientDevices : [];
+    const escrowRecipient = targets.escrowRecipient && typeof targets.escrowRecipient === 'object'
+      ? targets.escrowRecipient
+      : null;
+    if (!keyId) {
+      const error = new Error('La invitación no tiene una clave activa para preparar el descifrado inmediato.');
+      error.code = 'P2P_INVITATION_KEY_AUTHORITY_PENDING';
+      error.status = 409;
+      throw error;
+    }
+    if (!escrowRecipient?.deviceId || !escrowRecipient?.encryptionPublicKey) {
+      const error = new Error('El backend no publicó la autoridad de escrow necesaria para aceptar la invitación desde un dispositivo nuevo.');
+      error.code = 'P2P_INVITATION_ESCROW_NOT_CONFIGURED';
+      error.status = 503;
+      throw error;
+    }
+    if (!(await hasSpaceKey(spaceId, keyId))) {
+      await this.ensureCurrentSpaceKey(spaceId, { requireAuthority: true, requestIfMissing: false });
+    }
+    const escrowEnvelope = await createSpaceKeyEnvelope(spaceId, escrowRecipient, { keyId });
+    if (!recipientDevices.length) {
+      const staged = await apiPost('/api/p2p/crypto/invitation-key-stage', {
+        deviceId: this.deviceId,
+        invitationId,
+        envelopes: [],
+        escrowEnvelope
+      });
+      if (staged.complete !== true || staged.escrowStaged !== true) {
+        const error = new Error('La clave temporal de la invitación no quedó protegida en Redis para un futuro dispositivo del invitado.');
+        error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
+        error.status = 503;
+        error.retryable = true;
+        error.staging = staged;
+        throw error;
+      }
+      return {
+        ...staged,
+        pendingRecipientDevice: true
+      };
+    }
+    const envelopes = await createSpaceKeyEnvelopes(spaceId, recipientDevices, { keyId });
+    if (envelopes.length !== recipientDevices.length) {
+      const error = new Error('No se pudo preparar la clave para todos los dispositivos registrados del invitado.');
+      error.code = 'P2P_INVITATION_KEY_STAGING_INCOMPLETE';
+      error.status = 409;
+      error.retryable = true;
+      throw error;
+    }
+    const staged = await apiPost('/api/p2p/crypto/invitation-key-stage', {
+      deviceId: this.deviceId,
+      invitationId,
+      envelopes,
+      escrowEnvelope
+    });
+    if (Number(staged.staged || 0) !== recipientDevices.length
+      || staged.escrowStaged !== true
+      || staged.complete !== true) {
+      const error = new Error('La clave temporal de la invitación no quedó preparada para todos los dispositivos del invitado.');
+      error.code = 'P2P_INVITATION_KEY_STAGING_INCOMPLETE';
+      error.status = 503;
+      error.retryable = true;
+      error.staging = staged;
+      throw error;
+    }
+    return staged;
+  }
+
+  async stageInvitationBootstrapSnapshot(invitation = {}) {
+    const invitationId = String(invitation?.invitationId || '').trim();
+    const spaceId = String(invitation?.spaceId || '').trim();
+    if (!invitationId || !spaceId || !this.started || !getSessionToken()) return null;
+    this.assertSpaceAuthorizationConfirmed(spaceId);
+
+    this.recoveryRequirements = await getRecoveryRequirements();
+    const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
+    if (unresolvedRecoveryRevision) {
+      const error = new Error('Este dispositivo todavía está recuperando el proyecto y no puede preparar una invitación con una copia incompleta.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_SOURCE_PENDING';
+      error.status = 409;
+      error.retryable = true;
+      throw error;
+    }
+
+    let pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
+    if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
+      await this.flushOutbox().catch((error) => {
+        if (this.isSessionContextChangedError(error)) throw error;
+        return null;
+      });
+      pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
+    }
+
+    const localEntities = await listEntities(spaceId);
+    const optimisticEntities = localEntities.filter((entity) => entity?.optimistic === true);
+    if (pendingForSpace.length || optimisticEntities.length) {
+      const error = new Error('El proyecto tiene cambios locales pendientes y todavía no puede congelar una copia segura para la invitación.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_SOURCE_DIRTY';
+      error.status = 409;
+      error.retryable = true;
+      error.pendingOperations = pendingForSpace.length;
+      error.optimisticEntities = optimisticEntities.length;
+      throw error;
+    }
+
+    const activeKey = await getActiveSpaceKey(spaceId);
+    const authoritativeSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === spaceId) || {};
+    const activeKeyId = String(authoritativeSpace.activeEncryptionKeyId || activeKey?.keyId || '').trim();
+    const keyEpoch = Math.max(0, Number(authoritativeSpace.encryptionKeyEpoch ?? activeKey?.keyEpoch ?? 0));
+    if (!activeKey?.keyId || activeKey.keyId !== activeKeyId) {
+      const error = new Error('La clave local del proyecto todavía no coincide con la autoridad necesaria para preparar la invitación.');
+      error.code = 'P2P_INVITATION_KEY_AUTHORITY_PENDING';
+      error.status = 409;
+      error.retryable = true;
+      throw error;
+    }
+
+    const localStateRevisions = await listStateRevisions([spaceId]);
+    const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
+    const entities = sortSnapshotEntities(localEntities.map((entity) => ({
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      value: entity.value,
+      deleted: Boolean(entity.deleted),
+      operationId: entity.operationId,
+      operationType: entity.operationType || (entity.deleted ? 'entity.delete' : 'entity.put'),
+      spaceSequence: Number(entity.spaceSequence || 0),
+      stateRevision: Number(entity.stateRevision || entity.spaceSequence || 0),
+      updatedAt: entity.updatedAt || ''
+    })));
+    const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
+      maximum,
+      Number(entity.stateRevision || entity.spaceSequence || 0)
+    ), 0);
+    const sourceStateRevision = Math.max(entityStateRevision, localStateRevision);
+    const snapshotDigest = await sha256Hex(JSON.stringify(entities));
+    const transportEntities = await encryptSnapshotEntities(spaceId, entities);
+    const chunks = snapshotChunksByBytes(transportEntities, this.eventMaxBytes);
+    if (chunks.length > this.snapshotMaxChunks) {
+      const error = new Error('La copia cifrada de la invitación necesita demasiados fragmentos. Reduce o divide la información del proyecto.');
+      error.code = 'P2P_SNAPSHOT_TOO_LARGE';
+      throw error;
+    }
+    const chunkByteCounts = chunks.map((chunk) => jsonByteLength(chunk));
+    const snapshotByteCount = chunkByteCounts.reduce((total, bytes) => total + bytes, 0);
+    if (snapshotByteCount > this.snapshotMaxBytes) {
+      const error = new Error('La copia cifrada de la invitación supera el tamaño seguro temporal. Reduce o divide la información del proyecto.');
+      error.code = 'P2P_SNAPSHOT_TOO_LARGE';
+      throw error;
+    }
+
+    const staged = await apiPost('/api/p2p/crypto/invitation-bootstrap-stage', {
+      deviceId: this.deviceId,
+      invitationId,
+      snapshot: {
+        keyId: activeKeyId,
+        keyEpoch,
+        sourceStateRevision,
+        snapshotDigest,
+        entityCount: entities.length,
+        snapshotByteCount,
+        chunks: chunks.map((chunk, index) => ({
+          chunkIndex: index,
+          chunkCount: chunks.length,
+          chunkByteCount: chunkByteCounts[index],
+          entities: chunk
+        }))
+      }
+    });
+    if (staged.complete !== true || Number(staged.chunkCount || 0) !== chunks.length) {
+      const error = new Error('El backend no confirmó la copia cifrada temporal necesaria para abrir el proyecto al aceptar.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_INCOMPLETE';
+      error.status = 503;
+      error.retryable = true;
+      throw error;
+    }
+    return staged;
+  }
+
+  async applyInvitationBootstrapSnapshot(spaceId = '', snapshot = {}, invitation = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    const invitationId = String(invitation?.invitationId || '').trim();
+    const sourceDeviceId = String(snapshot?.sourceDeviceId || '').trim();
+    const keyId = String(snapshot?.keyId || '').trim();
+    const keyEpoch = Math.max(0, Number(snapshot?.keyEpoch || 0));
+    const sourceStateRevision = Math.max(0, Number(snapshot?.sourceStateRevision || 0));
+    const snapshotDigest = String(snapshot?.snapshotDigest || '').trim();
+    const entityCount = Math.max(0, Number(snapshot?.entityCount || 0));
+    const snapshotByteCount = Math.max(0, Number(snapshot?.snapshotByteCount || 0));
+    const chunks = Array.isArray(snapshot?.chunks) ? snapshot.chunks : [];
+    if (!cleanSpaceId || !invitationId || !sourceDeviceId || !keyId || !snapshotDigest || !chunks.length) {
+      const error = new Error('La copia temporal de la invitación está incompleta.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
+      throw error;
+    }
+    const activeKey = await getActiveSpaceKey(cleanSpaceId);
+    if (!activeKey || activeKey.keyId !== keyId || Math.max(0, Number(activeKey.keyEpoch || 0)) !== keyEpoch) {
+      const error = new Error('La copia temporal de la invitación no corresponde a la clave importada por este dispositivo.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_KEY_MISMATCH';
+      throw error;
+    }
+
+    const requestId = `invitation_bootstrap:${invitationId}`;
+    const actorUserId = String(invitation?.inviterUserId || '').trim() || 'invitation-bootstrap';
+    for (let index = 0; index < chunks.length; index += 1) {
+      this.assertSessionContext(sessionContext);
+      const chunk = chunks[index] || {};
+      const event = {
+        eventId: `${requestId}:chunk:${index}`,
+        eventType: 'p2p.operation',
+        spaceId: cleanSpaceId,
+        actorUserId,
+        sourceDeviceId,
+        spaceSequence: 1,
+        stateRevision: 0,
+        operation: {
+          operationId: `${requestId}:chunk:${index}`,
+          type: 'snapshot.chunk',
+          entityType: '__snapshot__',
+          entityId: `${requestId}:${index}`,
+          encrypted: true,
+          encryptionVersion: 1,
+          keyId,
+          payload: {
+            requestId,
+            chunkIndex: index,
+            chunkCount: chunks.length,
+            entityCount,
+            snapshotByteCount,
+            chunkByteCount: Math.max(0, Number(chunk.chunkByteCount || 0)),
+            sourceStateRevision,
+            snapshotDigest,
+            entities: Array.isArray(chunk.entities) ? chunk.entities : []
+          }
+        }
+      };
+      const decrypted = await decryptOperationEvent(event);
+      this.assertSessionContext(sessionContext);
+      const staged = await applyP2PEvent(decrypted);
+      this.assertSessionContext(sessionContext);
+      if (!staged?.staged || staged?.snapshotIncomplete) {
+        const error = new Error('No se pudo aplicar un fragmento de la copia temporal de la invitación.');
+        error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
+        error.result = staged;
+        throw error;
+      }
+    }
+
+    const completeEvent = {
+      eventId: `${requestId}:complete`,
+      eventType: 'p2p.operation',
+      spaceId: cleanSpaceId,
+      actorUserId,
+      sourceDeviceId,
+      spaceSequence: 1,
+      stateRevision: 0,
+      operation: {
+        operationId: `${requestId}:complete`,
+        type: 'snapshot.complete',
+        entityType: '__snapshot__',
+        entityId: requestId,
+        encrypted: true,
+        encryptionVersion: 1,
+        keyId,
+        payload: {
+          requestId,
+          chunkCount: chunks.length,
+          entityCount,
+          snapshotByteCount,
+          sourceStateRevision,
+          snapshotDigest
+        }
+      }
+    };
+    const result = await applyP2PEvent(completeEvent);
+    this.assertSessionContext(sessionContext);
+    if (result?.snapshotIncomplete) {
+      const error = new Error('La copia temporal de la invitación no superó la validación de integridad local.');
+      error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
+      error.result = result;
+      throw error;
+    }
+    this.recoveryRequirements = await resolveRecoveryRequirement(cleanSpaceId, sourceStateRevision);
+    this.assertSessionContext(sessionContext);
+    dispatch('p2p:snapshot-complete', {
+      event: completeEvent,
+      result,
+      invitationBootstrap: true,
+      recoveryRequirements: this.recoveryRequirements
+    });
+    dispatch('p2p:operation', {
+      event: completeEvent,
+      result,
+      invitationBootstrap: true
+    });
+    return result;
+  }
+
   async replayDeferredEncryptedEvents(spaceId = '', sessionContext = this.captureSessionContext()) {
     this.assertSessionContext(sessionContext);
     const records = await listDeferredEncryptedEvents(spaceId);
@@ -7278,6 +7587,27 @@ export class SemillaP2PClient {
       data.space = activation.space || invitationSpace;
       this.assertSessionContext(sessionContext);
     }
+    const encryptedInvitationSpace = data.space || invitationSpace;
+    if (data.invitation?.status === 'pending' && Math.max(0, Number(encryptedInvitationSpace?.encryptionVersion || 0)) >= 1) {
+      try {
+        // La copia cifrada se conserva antes de liberar la invitación. Después se
+        // prepara la AES; el backend solo despacha la notificación cuando ambos
+        // materiales temporales están listos en Redis.
+        data.bootstrapStaging = await this.stageInvitationBootstrapSnapshot(data.invitation);
+        this.assertSessionContext(sessionContext);
+        data.keyStaging = await this.stageInvitationKeyForRecipient(data.invitation);
+      } catch (error) {
+        dispatch('p2p:key-distribution-pending', {
+          spaceId: String(data.invitation?.spaceId || '').trim(),
+          invitationId: String(data.invitation?.invitationId || '').trim(),
+          stage: 'invitation-create',
+          bootstrapStaging: data.bootstrapStaging || null,
+          error
+        });
+        throw error;
+      }
+      this.assertSessionContext(sessionContext);
+    }
     const committedControlState = prepareCommittedControlState({
       spaces: data.space ? [data.space] : [],
       invitations: data.invitation ? [data.invitation] : []
@@ -7305,7 +7635,7 @@ export class SemillaP2PClient {
   async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
+    const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision, deviceId: this.deviceId });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
@@ -7323,8 +7653,50 @@ export class SemillaP2PClient {
     if (canonicalDecision === 'accept') {
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       if (acceptedSpaceId && Math.max(0, Number(data.space?.encryptionVersion || 0)) >= 1) {
-        await this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
-        this.assertSessionContext(sessionContext);
+        let stagedImported = false;
+        if (data.stagedKeyEnvelope) {
+          try {
+            const imported = await importSpaceKeyEnvelope(acceptedSpaceId, data.stagedKeyEnvelope, {
+              keyEpoch: Math.max(0, Number(data.stagedKeyEpoch || data.space?.encryptionKeyEpoch || 0))
+            });
+            stagedImported = imported?.imported === true;
+            if (stagedImported) {
+              this.clearRejectedKeyEnvelopeSources(
+                acceptedSpaceId,
+                String(data.stagedKeyEnvelope?.keyId || '').trim(),
+                Math.max(0, Number(data.stagedKeyEpoch || data.space?.encryptionKeyEpoch || 0))
+              );
+              dispatch('p2p:key-shared', {
+                spaceId: acceptedSpaceId,
+                targetDeviceId: this.deviceId,
+                source: String(data.stagedKeySource || '').trim() || 'invitation-redis-staging'
+              });
+            }
+          } catch (error) {
+            dispatch('p2p:key-envelope-rejected', {
+              spaceId: acceptedSpaceId,
+              keyId: String(data.stagedKeyEnvelope?.keyId || '').trim(),
+              keyEpoch: Math.max(0, Number(data.stagedKeyEpoch || 0)),
+              sourceDeviceId: String(data.stagedKeyEnvelope?.senderDeviceId || '').trim(),
+              reason: error?.reason || 'invitation_staged_envelope_invalid',
+              requestError: error
+            });
+          }
+          this.assertSessionContext(sessionContext);
+        }
+        if (stagedImported && data.stagedBootstrapSnapshot) {
+          data.bootstrapSnapshotResult = await this.applyInvitationBootstrapSnapshot(
+            acceptedSpaceId,
+            data.stagedBootstrapSnapshot,
+            data.invitation,
+            sessionContext
+          );
+          this.assertSessionContext(sessionContext);
+        }
+        if (!stagedImported) {
+          await this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
+          this.assertSessionContext(sessionContext);
+        }
       }
       const state = await this.refreshBootstrap({
         requestSnapshots: 'force',

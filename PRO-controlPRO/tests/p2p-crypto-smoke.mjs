@@ -373,6 +373,7 @@ const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [{
   deleted: false
 }]);
 await cryptoLayer.setP2PCryptoContext(guest.userId, guest.deviceId);
+const encryptedSnapshotChunkBytes = new TextEncoder().encode(JSON.stringify(snapshotEntities)).byteLength;
 const snapshotEvent = await cryptoLayer.decryptOperationEvent({
   eventId: 'evt_snapshot_secure',
   eventType: 'p2p.operation',
@@ -383,11 +384,14 @@ const snapshotEvent = await cryptoLayer.decryptOperationEvent({
     encrypted: true,
     encryptionVersion: 1,
     keyId: sourceKeyForSharing.keyId,
-    payload: { entities: snapshotEntities }
+    payload: { entities: snapshotEntities, chunkByteCount: encryptedSnapshotChunkBytes }
   }
 });
-if (snapshotEvent.operation.payload.entities[0]?.value?.budget !== 42000000) {
-  throw new Error('El snapshot cifrado no se reconstruyó con fidelidad.');
+const decryptedSnapshotChunkBytes = new TextEncoder().encode(JSON.stringify(snapshotEvent.operation.payload.entities)).byteLength;
+if (snapshotEvent.operation.payload.entities[0]?.value?.budget !== 42000000
+  || snapshotEvent.operation.payload.transportChunkByteCount !== encryptedSnapshotChunkBytes
+  || snapshotEvent.operation.payload.chunkByteCount !== decryptedSnapshotChunkBytes) {
+  throw new Error('El snapshot cifrado no preservó por separado el presupuesto de transporte y el tamaño local descifrado.');
 }
 
 const delayedSpaceId = 'space_delayed_key_000001';
