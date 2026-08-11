@@ -2273,7 +2273,20 @@ window.addEventListener('p2p:space-deleted', (event) => {
 window.addEventListener('p2p:authorization-unconfirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.authorizationUnconfirmedDashboard', 'Se conservaron proyectos locales cuya autorización no pudo confirmarse. Permanecen disponibles en modo de solo lectura para evitar pérdida de datos.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'La invitación fue aceptada. El proyecto permanecerá en solo lectura hasta recuperar y validar su copia completa.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-confirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryConfirmed', 'La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.'), 'success'); });
-window.addEventListener('p2p:error', () => setConnectionState('error'));
+window.addEventListener('p2p:error', (event) => {
+  const stage = String(event.detail?.stage || '').trim().toLowerCase();
+  const code = String(event.detail?.error?.code || '').trim().toUpperCase();
+  const recoverableStreamFailure = stage === 'realtime-stale'
+    || stage === 'realtime-connect-timeout'
+    || stage.startsWith('event-')
+    || stage.startsWith('delivery-gap-');
+  const fatalStreamFailure = stage === 'realtime' || stage === 'realtime-open';
+  if (recoverableStreamFailure) {
+    setConnectionState('connecting');
+    return;
+  }
+  if (fatalStreamFailure || stage === 'startup' || code === 'BACKEND_NOT_CONFIGURED') setConnectionState('error');
+});
 navigator.serviceWorker?.addEventListener('message', (event) => {
   const invitationId = invitationIntentFromServiceWorkerMessage(event.data || {});
   if (invitationId) refreshInvitationIntent(invitationId);

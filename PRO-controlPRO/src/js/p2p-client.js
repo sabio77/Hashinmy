@@ -74,6 +74,10 @@ const DEFAULT_SNAPSHOT_MAX_CHUNKS = 500;
 const SNAPSHOT_EVENT_SAFETY_BYTES = 12 * 1024;
 const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1200;
+const REALTIME_HEARTBEAT_DEFAULT_MS = 25000;
+const REALTIME_CONNECT_TIMEOUT_MS = 20000;
+const REALTIME_WATCHDOG_MIN_MS = 45000;
+const REALTIME_WATCHDOG_FACTOR = 3.2;
 const SERVER_RETRY_FALLBACK_MS = 5000;
 const SERVER_RETRY_MAX_MS = 60 * 60 * 1000;
 const ACK_BATCH_DELAY_MS = 250;
@@ -1354,9 +1358,17 @@ export class SemillaP2PClient {
     this.manualClose = false;
     this.retryCount = 0;
     this.retryTimer = 0;
+    this.realtimeConnectTimer = 0;
+    this.realtimeConnectStartedAt = 0;
+    this.realtimeWatchdogTimer = 0;
+    this.realtimeLastActivityAt = 0;
+    this.realtimeHeartbeatIntervalMs = REALTIME_HEARTBEAT_DEFAULT_MS;
     this.serverRetryTimer = 0;
     this.serverRetryDueAt = 0;
     this.serverRetryStage = '';
+    this.connectivityRetryTimer = 0;
+    this.connectivityRetryDueAt = 0;
+    this.connectivityRetryStage = '';
     this.ackTimer = 0;
     this.ackPromise = null;
     this.ackGeneration = 0;
@@ -1419,6 +1431,10 @@ export class SemillaP2PClient {
     this.leadershipTask = Promise.resolve();
     this.boundOnline = () => {
       this.recoverOnline().catch((error) => dispatch('p2p:error', { error, stage: 'recover' }));
+    };
+    this.boundRealtimeResume = (event = {}) => {
+      if (event?.type === 'visibilitychange' && globalThis.document?.visibilityState === 'hidden') return;
+      this.revalidateRealtimeOnResume(event?.type || 'resume');
     };
     this.boundRateLimited = (event = {}) => {
       const detail = event?.detail || {};
@@ -3948,7 +3964,11 @@ export class SemillaP2PClient {
     this.clearLocalCapabilityRefreshTimer();
     this.clearLifecycleFinalizationObserver();
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
+    this.clearRealtimeConnectTimeout();
+    this.realtimeConnectStartedAt = 0;
+    this.clearRealtimeWatchdog();
     this.clearServerRecoveryTimer();
+    this.clearConnectivityRecoveryTimer();
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
@@ -4081,6 +4101,13 @@ export class SemillaP2PClient {
     this.serverRetryStage = '';
   }
 
+  clearConnectivityRecoveryTimer() {
+    if (this.connectivityRetryTimer) window.clearTimeout(this.connectivityRetryTimer);
+    this.connectivityRetryTimer = 0;
+    this.connectivityRetryDueAt = 0;
+    this.connectivityRetryStage = '';
+  }
+
   scheduleServerRecovery(error = null, stage = 'rate-limit') {
     const rateLimitCode = String(error?.code || '').trim().toUpperCase();
     const serverDirected = Number(error?.retryAfterSeconds || 0) > 0
@@ -4090,6 +4117,7 @@ export class SemillaP2PClient {
     if (!this.isSessionContextCurrent(sessionContext)) return false;
     const delay = retryAfterMilliseconds(error);
     const dueAt = Date.now() + delay;
+    this.clearConnectivityRecoveryTimer();
     if (this.serverRetryTimer) {
       if (this.serverRetryDueAt >= dueAt) return true;
       window.clearTimeout(this.serverRetryTimer);
@@ -4125,6 +4153,62 @@ export class SemillaP2PClient {
       || !status
       || status >= 500
       || [401, 408, 425, 429].includes(status);
+  }
+
+  scheduleConnectivityRecovery(error = null, stage = 'transport-retry') {
+    if (this.scheduleServerRecovery(error, stage)) return true;
+    if (this.serverRetryTimer) return true;
+    if (
+      !this.isRetryableTransportError(error)
+      || this.manualClose
+      || !this.started
+      || !this.realtimeLeader
+      || !getSessionToken()
+    ) return false;
+
+    const sessionContext = this.captureSessionContext();
+    if (!this.isSessionContextCurrent(sessionContext)) return false;
+
+    const delay = Math.min(30000, RETRY_BASE_MS * (2 ** Math.min(this.retryCount, 5)));
+    const dueAt = Date.now() + delay;
+    if (this.connectivityRetryTimer) {
+      if (this.connectivityRetryDueAt > 0 && this.connectivityRetryDueAt <= dueAt) return true;
+      window.clearTimeout(this.connectivityRetryTimer);
+    }
+
+    this.retryCount += 1;
+    this.connectivityRetryDueAt = dueAt;
+    this.connectivityRetryStage = String(stage || 'transport-retry').slice(0, 180);
+    dispatch('p2p:connection', {
+      state: 'connecting',
+      reason: 'transport-retry',
+      deviceId: sessionContext.deviceId,
+      retryInMs: delay,
+      retryAt: dueAt,
+      stage: this.connectivityRetryStage
+    });
+
+    this.connectivityRetryTimer = window.setTimeout(() => {
+      this.connectivityRetryTimer = 0;
+      this.connectivityRetryDueAt = 0;
+      this.connectivityRetryStage = '';
+      if (!this.isSessionContextCurrent(sessionContext)) return;
+      if (navigator.onLine === false) {
+        dispatch('p2p:connection', {
+          state: 'disconnected',
+          deviceId: sessionContext.deviceId,
+          reason: 'offline'
+        });
+        return;
+      }
+      this.recoverOnline().catch((recoveryError) => {
+        if (this.isSessionContextChangedError(recoveryError)) return;
+        if (!this.scheduleConnectivityRecovery(recoveryError, 'transport-retry')) {
+          dispatch('p2p:error', { error: recoveryError, stage: 'transport-retry' });
+        }
+      });
+    }, delay);
+    return true;
   }
 
   isPermanentOutboxRejection(error = null) {
@@ -5430,8 +5514,12 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       if (this.snapshotRecoveryRequired) this.scheduleSnapshotRecovery(SNAPSHOT_RECOVERY_FALLBACK_MS);
       window.removeEventListener('online', this.boundOnline);
+      window.removeEventListener('pageshow', this.boundRealtimeResume);
+      globalThis.document?.removeEventListener?.('visibilitychange', this.boundRealtimeResume);
       window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
       window.addEventListener('online', this.boundOnline);
+      window.addEventListener('pageshow', this.boundRealtimeResume);
+      globalThis.document?.addEventListener?.('visibilitychange', this.boundRealtimeResume);
       window.addEventListener('p2p:rate-limited', this.boundRateLimited);
       this.tabCoordinationReady = false;
       this.realtimeLeader = await this.tabCoordinator.start({
@@ -5472,7 +5560,7 @@ export class SemillaP2PClient {
           if (this.isSessionContextCurrent(sessionContext)) await this.stop();
           throw error;
         }
-        this.scheduleServerRecovery(error, 'bootstrap-start');
+        this.scheduleConnectivityRecovery(error, 'bootstrap-start');
       }
 
       this.assertSessionContext(sessionContext);
@@ -5500,6 +5588,7 @@ export class SemillaP2PClient {
         }
       } else if (!backendReady) {
         dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, localOnly: true });
+        if (!this.realtimeLeader) this.requestTabState('startup-backend-unavailable');
       } else {
         dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, sharedTab: true });
         this.requestTabState('startup-follower');
@@ -5557,6 +5646,8 @@ export class SemillaP2PClient {
     this.clearAtomicTransportBatchTimer();
     this.pendingAtomicEventBatches.clear();
     window.removeEventListener('online', this.boundOnline);
+    window.removeEventListener('pageshow', this.boundRealtimeResume);
+    globalThis.document?.removeEventListener?.('visibilitychange', this.boundRealtimeResume);
     window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
     this.unbindTabRelays();
     const pendingTabCoordinator = this.tabCoordinator.stop().catch(() => null);
@@ -5564,7 +5655,11 @@ export class SemillaP2PClient {
     const pendingLeadership = options.skipLeadershipWait ? Promise.resolve() : this.leadershipTask;
     this.leadershipTask = Promise.resolve();
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
+    this.clearRealtimeConnectTimeout();
+    this.realtimeConnectStartedAt = 0;
+    this.clearRealtimeWatchdog();
     this.clearServerRecoveryTimer();
+    this.clearConnectivityRecoveryTimer();
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
@@ -5666,13 +5761,14 @@ export class SemillaP2PClient {
       });
       this.assertSessionContext(sessionContext);
       this.clearServerRecoveryTimer();
+      this.clearConnectivityRecoveryTimer();
       return true;
     } catch (error) {
       if (isDeviceIdentityConflict(error)) {
         return this.restartWithFreshDeviceIdentity(error);
       }
       if (this.isSessionContextChangedError(error)) return false;
-      if (this.scheduleServerRecovery(error, 'recover-online')) return false;
+      if (this.scheduleConnectivityRecovery(error, 'recover-online')) return false;
       throw error;
     }
   }
@@ -5682,7 +5778,152 @@ export class SemillaP2PClient {
     this.pendingAtomicEventBatches.clear();
     this.eventPipelineBlocked = true;
     dispatch('p2p:error', { error, stage });
-    this.scheduleReconnect();
+    this.scheduleReconnect(stage);
+  }
+
+  clearRealtimeConnectTimeout() {
+    if (this.realtimeConnectTimer) window.clearTimeout(this.realtimeConnectTimer);
+    this.realtimeConnectTimer = 0;
+  }
+
+  armRealtimeConnectTimeout(source = this.eventSource, sessionContext = this.captureSessionContext()) {
+    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
+    this.clearRealtimeConnectTimeout();
+    if (!this.realtimeConnectStartedAt) this.realtimeConnectStartedAt = Date.now();
+    const expectedSource = source;
+    const expectedGeneration = Number(sessionContext.generation);
+    const dueIn = Math.max(250, (this.realtimeConnectStartedAt + REALTIME_CONNECT_TIMEOUT_MS) - Date.now());
+    this.realtimeConnectTimer = window.setTimeout(() => {
+      this.realtimeConnectTimer = 0;
+      if (
+        this.manualClose
+        || !this.started
+        || !this.realtimeLeader
+        || this.eventSource !== expectedSource
+        || !this.isSessionContextCurrent(sessionContext)
+        || Number(sessionContext.generation) !== expectedGeneration
+      ) return;
+      const error = new Error('El stream no confirmó la conexión dentro del tiempo seguro. Se abrirá una conexión nueva automáticamente.');
+      error.code = 'P2P_REALTIME_CONNECT_TIMEOUT';
+      error.retryable = true;
+      dispatch('p2p:error', { error, stage: 'realtime-connect-timeout', timeoutMs: REALTIME_CONNECT_TIMEOUT_MS });
+      this.scheduleReconnect('realtime-connect-timeout');
+    }, dueIn);
+    return true;
+  }
+
+  realtimeSourceRequiresRecycle(source = this.eventSource) {
+    if (!source) return true;
+    const openState = Number(globalThis.EventSource?.OPEN ?? 1);
+    const connectingState = Number(globalThis.EventSource?.CONNECTING ?? 0);
+    const closedState = Number(globalThis.EventSource?.CLOSED ?? 2);
+    const readyState = Number(source.readyState);
+    const now = Date.now();
+    if (readyState === closedState) return true;
+    if (readyState === connectingState) {
+      return this.realtimeConnectStartedAt > 0
+        && (now - this.realtimeConnectStartedAt) >= REALTIME_CONNECT_TIMEOUT_MS;
+    }
+    if (readyState === openState) {
+      return this.realtimeLastActivityAt > 0
+        && (now - this.realtimeLastActivityAt) >= this.realtimeWatchdogDelay();
+    }
+    return false;
+  }
+
+  revalidateRealtimeOnResume(reason = 'resume') {
+    if (
+      this.manualClose
+      || !this.started
+      || !this.tabCoordinationReady
+      || !this.realtimeLeader
+      || !getSessionToken()
+      || navigator.onLine === false
+      || globalThis.document?.visibilityState === 'hidden'
+    ) return false;
+
+    const sessionContext = this.captureSessionContext();
+    if (!this.isSessionContextCurrent(sessionContext)) return false;
+    const source = this.eventSource;
+    const openState = Number(globalThis.EventSource?.OPEN ?? 1);
+    const connectingState = Number(globalThis.EventSource?.CONNECTING ?? 0);
+
+    if (!source || this.realtimeSourceRequiresRecycle(source)) {
+      if (source) this.scheduleReconnect(`realtime-${reason}-stale`);
+      else this.openRealtime().catch((error) => {
+        if (this.isSessionContextChangedError(error)) return;
+        if (!this.scheduleConnectivityRecovery(error, `realtime-${reason}`)) {
+          dispatch('p2p:error', { error, stage: 'realtime-resume' });
+        }
+      });
+      return true;
+    }
+
+    if (Number(source.readyState) === connectingState) {
+      this.armRealtimeConnectTimeout(source, sessionContext);
+      return true;
+    }
+    if (Number(source.readyState) === openState) {
+      this.armRealtimeWatchdog(source, sessionContext);
+      return true;
+    }
+    return false;
+  }
+
+  clearRealtimeWatchdog() {
+    if (this.realtimeWatchdogTimer) window.clearTimeout(this.realtimeWatchdogTimer);
+    this.realtimeWatchdogTimer = 0;
+    this.realtimeLastActivityAt = 0;
+  }
+
+  realtimeWatchdogDelay() {
+    return Math.max(
+      REALTIME_WATCHDOG_MIN_MS,
+      Math.ceil(Math.max(1000, Number(this.realtimeHeartbeatIntervalMs || REALTIME_HEARTBEAT_DEFAULT_MS)) * REALTIME_WATCHDOG_FACTOR)
+    );
+  }
+
+  armRealtimeWatchdog(source = this.eventSource, sessionContext = this.captureSessionContext()) {
+    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
+    if (this.realtimeWatchdogTimer) window.clearTimeout(this.realtimeWatchdogTimer);
+    const expectedSource = source;
+    const expectedGeneration = Number(sessionContext.generation);
+    const delay = this.realtimeWatchdogDelay();
+    const dueIn = Math.max(250, (this.realtimeLastActivityAt + delay) - Date.now());
+    this.realtimeWatchdogTimer = window.setTimeout(() => {
+      this.realtimeWatchdogTimer = 0;
+      if (
+        this.manualClose
+        || !this.started
+        || !this.realtimeLeader
+        || this.eventSource !== expectedSource
+        || !this.isSessionContextCurrent(sessionContext)
+        || Number(sessionContext.generation) !== expectedGeneration
+      ) return;
+      const silentFor = Date.now() - this.realtimeLastActivityAt;
+      if (silentFor < delay) {
+        this.armRealtimeWatchdog(expectedSource, sessionContext);
+        return;
+      }
+      const error = new Error('El stream dejó de responder aunque el dispositivo mantiene conectividad. Se abrirá una conexión nueva automáticamente.');
+      error.code = 'P2P_REALTIME_STALE';
+      error.retryable = true;
+      dispatch('p2p:error', { error, stage: 'realtime-stale', silentForMs: silentFor });
+      this.scheduleReconnect('realtime-stale');
+    }, dueIn);
+    return true;
+  }
+
+  touchRealtimeActivity(source = this.eventSource, sessionContext = this.captureSessionContext(), heartbeatIntervalMs = 0) {
+    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
+    this.clearRealtimeConnectTimeout();
+    this.realtimeConnectStartedAt = 0;
+    const reportedHeartbeat = Math.max(0, Number(heartbeatIntervalMs || 0));
+    if (reportedHeartbeat >= 1000 && reportedHeartbeat <= 120000) {
+      this.realtimeHeartbeatIntervalMs = reportedHeartbeat;
+    }
+    this.realtimeLastActivityAt = Date.now();
+    return this.armRealtimeWatchdog(source, sessionContext);
   }
 
   async openRealtime() {
@@ -5690,7 +5931,14 @@ export class SemillaP2PClient {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     if (this.openPromise) return this.openPromise;
-    if (this.eventSource && this.eventSource.readyState !== EventSource.CLOSED) return this.eventSource;
+    if (this.eventSource && this.eventSource.readyState !== EventSource.CLOSED) {
+      if (!this.realtimeSourceRequiresRecycle(this.eventSource)) return this.eventSource;
+      this.clearRealtimeConnectTimeout();
+      this.realtimeConnectStartedAt = 0;
+      this.clearRealtimeWatchdog();
+      this.eventSource.close();
+      this.eventSource = null;
+    }
 
     const opening = (async () => {
       if (this.eventPipelineBlocked) {
@@ -5712,17 +5960,47 @@ export class SemillaP2PClient {
       const token = encodeURIComponent(tokenData.realtimeToken || '');
       if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
       const source = new EventSource(`${getBackendUrl()}/api/p2p/realtime/stream?realtimeToken=${token}&cursor=${encodeURIComponent(cursor)}&p2pApplication=${encodeURIComponent(P2P_APPLICATION_ID)}`);
+      this.eventSource = source;
+      this.realtimeConnectStartedAt = Date.now();
+      dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, reason: 'stream-opening' });
+      this.armRealtimeConnectTimeout(source, sessionContext);
       const isCurrentSource = () => this.realtimeLeader
         && this.eventSource === source
         && this.isSessionContextCurrent(sessionContext);
-      source.addEventListener('p2p_ready', () => {
+      source.onopen = () => {
         if (!isCurrentSource()) {
           source.close();
           return;
         }
+        this.touchRealtimeActivity(source, sessionContext);
+        dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, reason: 'transport-open' });
+      };
+      source.addEventListener('p2p_ready', (event) => {
+        if (!isCurrentSource()) {
+          source.close();
+          return;
+        }
+        let heartbeatIntervalMs = REALTIME_HEARTBEAT_DEFAULT_MS;
+        try {
+          const payload = JSON.parse(event.data || '{}');
+          heartbeatIntervalMs = Number(payload.heartbeatIntervalMs || REALTIME_HEARTBEAT_DEFAULT_MS);
+        } catch {}
         this.retryCount = 0;
+        this.touchRealtimeActivity(source, sessionContext, heartbeatIntervalMs);
         this.scheduleAck(this.lastProcessedSequence, { immediate: true });
         dispatch('p2p:connection', { state: 'connected', deviceId: sessionContext.deviceId });
+      });
+      source.addEventListener('p2p_heartbeat', (event) => {
+        if (!isCurrentSource()) {
+          source.close();
+          return;
+        }
+        let heartbeatIntervalMs = 0;
+        try {
+          const payload = JSON.parse(event.data || '{}');
+          heartbeatIntervalMs = Number(payload.heartbeatIntervalMs || 0);
+        } catch {}
+        this.touchRealtimeActivity(source, sessionContext, heartbeatIntervalMs);
       });
       source.addEventListener('p2p_gap', (event) => {
         if (!isCurrentSource()) {
@@ -5731,6 +6009,7 @@ export class SemillaP2PClient {
         }
         try {
           const payload = JSON.parse(event.data || '{}');
+          this.touchRealtimeActivity(source, sessionContext);
           const gapEvent = {
             ...payload,
             eventId: payload.eventId || createId('gap'),
@@ -5760,6 +6039,7 @@ export class SemillaP2PClient {
         }
         try {
           const payload = JSON.parse(event.data || '{}');
+          this.touchRealtimeActivity(source, sessionContext);
           assertRealtimeEventEnvelope(payload);
           this.enqueueEvent(payload).catch(() => null);
         } catch (error) {
@@ -5782,12 +6062,14 @@ export class SemillaP2PClient {
           source.close();
           return;
         }
-        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId });
+        this.clearRealtimeConnectTimeout();
+        this.clearRealtimeWatchdog();
+        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'stream-error' });
         if (this.manualClose || !getSessionToken()) {
           source.close();
           return;
         }
-        this.scheduleReconnect();
+        this.scheduleReconnect('stream-error');
       };
       try {
         this.assertSessionContext(sessionContext);
@@ -5799,32 +6081,62 @@ export class SemillaP2PClient {
         source.close();
         throw error;
       }
-      this.eventSource = source;
       return source;
     })();
 
     this.openPromise = opening;
     try {
       return await opening;
+    } catch (error) {
+      if (this.isSessionContextChangedError(error)) throw error;
+      this.clearRealtimeConnectTimeout();
+      this.realtimeConnectStartedAt = 0;
+      this.clearRealtimeWatchdog();
+      if (this.eventSource) this.eventSource.close();
+      this.eventSource = null;
+      if (this.scheduleServerRecovery(error, 'realtime-open')) return null;
+      if (this.isRetryableTransportError(error)) {
+        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'realtime-open' });
+        this.scheduleReconnect('realtime-open');
+        return null;
+      }
+      throw error;
     } finally {
       if (this.openPromise === opening) this.openPromise = null;
     }
   }
 
-  scheduleReconnect() {
-    if (this.retryTimer || this.manualClose || !this.started || !this.realtimeLeader) return;
+  scheduleReconnect(reason = 'realtime') {
+    if (this.manualClose || !this.started || !this.realtimeLeader) return;
     const sessionContext = this.captureSessionContext();
     if (!this.isSessionContextCurrent(sessionContext)) return;
+    this.clearRealtimeConnectTimeout();
+    this.realtimeConnectStartedAt = 0;
+    this.clearRealtimeWatchdog();
     if (this.eventSource) this.eventSource.close();
     this.eventSource = null;
+    if (navigator.onLine === false) {
+      dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'offline' });
+      return;
+    }
+    // Aunque ya exista un backoff pendiente, el stream actual debe cerrarse.
+    // Si se conserva un EventSource nuevo en CONNECTING, el timer anterior lo ve
+    // como conexión vigente y puede dejarlo bloqueado indefinidamente.
+    if (this.retryTimer) return;
     const delay = Math.min(30000, RETRY_BASE_MS * (2 ** Math.min(this.retryCount, 5)));
     this.retryCount += 1;
+    dispatch('p2p:connection', {
+      state: 'disconnected',
+      deviceId: sessionContext.deviceId,
+      reason: String(reason || 'realtime').slice(0, 80),
+      retryInMs: delay
+    });
     this.retryTimer = window.setTimeout(() => {
       this.retryTimer = 0;
-      if (!this.isSessionContextCurrent(sessionContext)) return;
+      if (!this.isSessionContextCurrent(sessionContext) || navigator.onLine === false) return;
       this.openRealtime().catch((error) => {
         if (this.isSessionContextChangedError(error)) return;
-        this.scheduleReconnect();
+        this.scheduleReconnect('realtime-retry');
       });
     }, delay);
   }

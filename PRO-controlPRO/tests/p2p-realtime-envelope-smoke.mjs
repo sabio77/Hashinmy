@@ -509,7 +509,7 @@ assert.match(eventHandler, /this\.resetDeliveryCursor\(currentSequence, sessionC
 assert.match(eventHandler, /this\.lastAcceptedStreamSequence = nextCursor/);
 
 const openRealtimeStart = source.indexOf('  async openRealtime()');
-const openRealtimeEnd = source.indexOf('\n  scheduleReconnect()', openRealtimeStart);
+const openRealtimeEnd = source.indexOf('\n  scheduleReconnect(', openRealtimeStart);
 const openRealtime = source.slice(openRealtimeStart, openRealtimeEnd);
 assert.match(openRealtime, /this\.lastAcceptedStreamSequence = cursor/);
 

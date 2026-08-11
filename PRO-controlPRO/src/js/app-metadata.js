@@ -37,9 +37,9 @@
 
   var metadata = Object.freeze({
     appName: 'Semilla App Web',
-    version: '1.9.90',
-    build: '2026-08-04-150',
-    releasedAt: '2026-08-04T12:30:00-05:00',
+    version: '1.9.92',
+    build: '2026-08-10-152',
+    releasedAt: '2026-08-10T19:51:00-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
