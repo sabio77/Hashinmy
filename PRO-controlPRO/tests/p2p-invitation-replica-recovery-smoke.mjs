@@ -240,6 +240,24 @@ assert.ok(
 const acceptedCriticalBootstrap = acceptedBranch.slice(acceptedBranch.indexOf('const state = await this.refreshBootstrap({'));
 assert.doesNotMatch(acceptedCriticalBootstrap, /refreshBootstrap\(\{[\s\S]*?\}\)\.catch\(/, 'La recuperación crítica de una invitación aceptada todavía absorbe el fallo y permite avanzar el ACK.');
 
+const snapshotControlBranchStart = clientSource.indexOf("    } else if (event.eventType === 'p2p.snapshot.request') {");
+const snapshotControlBranchEnd = clientSource.indexOf("    } else if (event.eventType === 'p2p.lifecycle.progress') {", snapshotControlBranchStart);
+assert.ok(snapshotControlBranchStart >= 0 && snapshotControlBranchEnd > snapshotControlBranchStart, 'No se encontró la rama realtime que atiende snapshot-request.');
+const snapshotControlBranch = clientSource.slice(snapshotControlBranchStart, snapshotControlBranchEnd);
+assert.match(snapshotControlBranch, /const retryScheduled = sent \? false : this\.scheduleSnapshotSourceRetry\(event\)/, 'Una fuente temporalmente ocupada todavía consume el snapshot-request sin programar reintento local.');
+assert.match(snapshotControlBranch, /this\.isSnapshotSourceRetryableError\(error\)/, 'Los fallos transitorios al servir un snapshot no se clasifican antes de decidir su reintento.');
+assert.match(snapshotControlBranch, /retryable \? this\.scheduleSnapshotSourceRetry\(event\) : false/, 'Un fallo transitorio de transporte todavía puede perder la única concesión dirigida del invitado.');
+
+const snapshotRetryStart = clientSource.indexOf('  scheduleSnapshotSourceRetry(requestEvent = {})');
+const snapshotRetryEnd = clientSource.indexOf('\n  snapshotSourceRejectionScope(', snapshotRetryStart);
+assert.ok(snapshotRetryStart >= 0 && snapshotRetryEnd > snapshotRetryStart, 'No se encontró el reintento local acotado para una fuente de snapshot.');
+const snapshotRetryMethods = clientSource.slice(clientSource.indexOf('  snapshotSourceRetryKey(', snapshotRetryStart - 9000), snapshotRetryEnd);
+assert.match(snapshotRetryMethods, /pendingSnapshotSourceRetries/, 'Los reintentos de snapshot no se deduplican por concesión.');
+assert.match(snapshotRetryMethods, /expiresAtMs/, 'El reintento de snapshot no queda acotado por el vencimiento de la concesión.');
+assert.match(snapshotRetryMethods, /await this\.sendSnapshot\(entry\.event\)/, 'El propietario no vuelve a intentar servir la misma concesión cuando su réplica ya está lista.');
+assert.match(snapshotRetryMethods, /P2P_SNAPSHOT_TOO_LARGE/, 'Un error determinista de tamaño podría entrar en un bucle de reintentos.');
+assert.match(clientSource, /this\.clearSnapshotSourceRetries\(\)/, 'Los timers de snapshot pueden sobrevivir al cierre o cambio de sesión.');
+
 const inviteStart = clientSource.indexOf("  async invite(email = '', options = {})");
 const inviteEnd = clientSource.indexOf('\n  async respondToInvitation(', inviteStart);
 const inviteMethod = clientSource.slice(inviteStart, inviteEnd);

@@ -94,6 +94,9 @@ const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_REJECTION_RETRY_MS = 5 * 1000;
+const SNAPSHOT_SOURCE_RETRY_BASE_MS = 750;
+const SNAPSHOT_SOURCE_RETRY_MAX_MS = 8000;
+const SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS = 750;
 const LOCAL_CONTROL_MAX_AGE_MS = 10 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_TTL_MS = 2 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_MAX = 64;
@@ -1360,6 +1363,7 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
     this.rejectedSnapshotSources = new Map();
+    this.pendingSnapshotSourceRetries = new Map();
     this.user = null;
     this.eventSource = null;
     this.openPromise = null;
@@ -4683,6 +4687,165 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeRetryTimers.clear();
   }
 
+  snapshotSourceRetryKey(requestEvent = {}) {
+    const request = requestEvent?.data || {};
+    const requestId = String(request.requestId || '').trim().slice(0, 180);
+    const requestDeviceId = String(request.requestDeviceId || '').trim().slice(0, 180);
+    const spaceId = String(request.spaceId || requestEvent?.spaceId || '').trim().slice(0, 140);
+    return requestId && requestDeviceId && spaceId
+      ? `${requestId}|${requestDeviceId}|${spaceId}`
+      : '';
+  }
+
+  snapshotSourceRetryExpiresAt(requestEvent = {}) {
+    const explicitExpiry = Date.parse(String(requestEvent?.data?.expiresAt || ''));
+    if (Number.isFinite(explicitExpiry)) return explicitExpiry;
+    return Date.now() + Math.max(30000, Number(this.snapshotGrantTtlSeconds || 600) * 1000);
+  }
+
+  snapshotSourceRetryDelay(attempt = 0, expiresAtMs = 0) {
+    const exponent = Math.min(5, Math.max(0, Math.floor(Number(attempt || 0))));
+    const planned = Math.min(SNAPSHOT_SOURCE_RETRY_MAX_MS, SNAPSHOT_SOURCE_RETRY_BASE_MS * (2 ** exponent));
+    const remaining = Number(expiresAtMs || 0) - Date.now() - SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS;
+    if (!Number.isFinite(remaining) || remaining <= 0) return 0;
+    return Math.max(250, Math.min(planned, remaining));
+  }
+
+  isSnapshotSourceRetryableError(error = null) {
+    const code = String(error?.code || '').trim();
+    if (code === 'P2P_SPACE_KEY_MISSING') return true;
+    if (code === 'P2P_SNAPSHOT_TOO_LARGE') return false;
+    const status = Number(error?.status || 0);
+    if ([400, 403, 404, 409, 410, 413, 422].includes(status)) return false;
+    return this.isRetryableTransportError(error);
+  }
+
+  clearSnapshotSourceRetry(requestEventOrKey = '') {
+    const key = typeof requestEventOrKey === 'string'
+      ? requestEventOrKey
+      : this.snapshotSourceRetryKey(requestEventOrKey);
+    if (!key) return false;
+    const entry = this.pendingSnapshotSourceRetries.get(key);
+    if (!entry) return false;
+    if (entry.timer) window.clearTimeout(entry.timer);
+    this.pendingSnapshotSourceRetries.delete(key);
+    return true;
+  }
+
+  clearSnapshotSourceRetries() {
+    for (const entry of this.pendingSnapshotSourceRetries.values()) {
+      if (entry?.timer) window.clearTimeout(entry.timer);
+    }
+    this.pendingSnapshotSourceRetries.clear();
+  }
+
+  armSnapshotSourceRetry(entry = null) {
+    if (!entry || this.pendingSnapshotSourceRetries.get(entry.key) !== entry || entry.timer || entry.inFlight) return false;
+    const delay = this.snapshotSourceRetryDelay(entry.attempt, entry.expiresAtMs);
+    if (!delay) {
+      this.clearSnapshotSourceRetry(entry.key);
+      dispatch('p2p:snapshot-source-retry-expired', {
+        event: entry.event,
+        requestId: entry.requestId,
+        spaceId: entry.spaceId,
+        attempts: entry.attempt
+      });
+      return false;
+    }
+
+    entry.timer = window.setTimeout(async () => {
+      entry.timer = 0;
+      if (this.pendingSnapshotSourceRetries.get(entry.key) !== entry) return;
+      if (!this.isSessionContextCurrent(entry.sessionContext) || this.manualClose || !this.started) {
+        this.clearSnapshotSourceRetry(entry.key);
+        return;
+      }
+      if (Date.now() >= entry.expiresAtMs - SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) {
+        this.clearSnapshotSourceRetry(entry.key);
+        return;
+      }
+      if (!this.realtimeLeader || !navigator.onLine || !getSessionToken()) {
+        entry.attempt += 1;
+        this.armSnapshotSourceRetry(entry);
+        return;
+      }
+
+      entry.inFlight = true;
+      try {
+        const sent = await this.sendSnapshot(entry.event);
+        this.assertSessionContext(entry.sessionContext);
+        if (sent) {
+          this.clearSnapshotSourceRetry(entry.key);
+          dispatch('p2p:snapshot-source-recovered', {
+            event: entry.event,
+            requestId: entry.requestId,
+            spaceId: entry.spaceId,
+            attempts: entry.attempt + 1
+          });
+          return;
+        }
+        entry.attempt += 1;
+      } catch (error) {
+        if (this.isSessionContextChangedError(error)) {
+          this.clearSnapshotSourceRetry(entry.key);
+          return;
+        }
+        const retryable = this.isSnapshotSourceRetryableError(error);
+        dispatch('p2p:snapshot-source-error', {
+          event: entry.event,
+          error,
+          retryable,
+          retryScheduled: retryable,
+          stage: 'source-retry'
+        });
+        if (!retryable) {
+          this.clearSnapshotSourceRetry(entry.key);
+          return;
+        }
+        entry.attempt += 1;
+      } finally {
+        entry.inFlight = false;
+      }
+
+      if (this.pendingSnapshotSourceRetries.get(entry.key) === entry) this.armSnapshotSourceRetry(entry);
+    }, delay);
+    return true;
+  }
+
+  scheduleSnapshotSourceRetry(requestEvent = {}) {
+    const key = this.snapshotSourceRetryKey(requestEvent);
+    const request = requestEvent?.data || {};
+    const requestDeviceId = String(request.requestDeviceId || '').trim();
+    const requestId = String(request.requestId || '').trim();
+    const spaceId = String(request.spaceId || requestEvent?.spaceId || '').trim();
+    if (
+      !key
+      || !requestDeviceId
+      || requestDeviceId === String(this.deviceId || '').trim()
+      || !this.started
+      || this.manualClose
+    ) return false;
+    const existing = this.pendingSnapshotSourceRetries.get(key);
+    if (existing) return true;
+    const expiresAtMs = this.snapshotSourceRetryExpiresAt(requestEvent);
+    if (expiresAtMs <= Date.now() + SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) return false;
+    const sessionContext = this.captureSessionContext();
+    if (!this.isSessionContextCurrent(sessionContext)) return false;
+    const entry = {
+      key,
+      event: requestEvent,
+      requestId,
+      spaceId,
+      expiresAtMs,
+      attempt: 0,
+      timer: 0,
+      inFlight: false,
+      sessionContext
+    };
+    this.pendingSnapshotSourceRetries.set(key, entry);
+    return this.armSnapshotSourceRetry(entry);
+  }
+
   scheduleRejectedKeyEnvelopeRetry(spaceId = '', keyId = '', keyEpoch = 0) {
     const scope = this.keyEnvelopeRejectionScope(spaceId, keyId, keyEpoch);
     if (!scope || this.rejectedKeyEnvelopeRetryTimers.has(scope)) return false;
@@ -5508,6 +5671,7 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeSources.clear();
     this.clearRejectedKeyEnvelopeRetryTimers();
     this.rejectedSnapshotSources.clear();
+    this.clearSnapshotSourceRetries();
     const sessionContext = this.captureSessionContext();
 
     try {
@@ -5676,6 +5840,7 @@ export class SemillaP2PClient {
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds.clear();
     this.pendingAckReplicaSpaceIds.clear();
+    this.clearSnapshotSourceRetries();
     this.ackGeneration += 1;
     this.ackPromise = null;
     this.ackRetryCount = 0;
@@ -6640,13 +6805,18 @@ export class SemillaP2PClient {
       try {
         const sent = await this.sendSnapshot(event);
         this.assertSessionContext(sessionContext);
-        dispatch('p2p:snapshot-source', { event, sent });
+        const retryScheduled = sent ? false : this.scheduleSnapshotSourceRetry(event);
+        if (sent) this.clearSnapshotSourceRetry(event);
+        dispatch('p2p:snapshot-source', { event, sent, retryScheduled });
       } catch (error) {
         if (this.isSessionContextChangedError(error)) throw error;
+        const retryable = this.isSnapshotSourceRetryableError(error);
+        const retryScheduled = retryable ? this.scheduleSnapshotSourceRetry(event) : false;
         dispatch('p2p:snapshot-source-error', {
           event,
           error,
-          retryable: this.isRetryableTransportError(error)
+          retryable,
+          retryScheduled
         });
       }
     } else if (event.eventType === 'p2p.lifecycle.progress') {

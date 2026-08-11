@@ -569,6 +569,12 @@ client.lastProcessedSequence = 6;
 client.lastAcceptedStreamSequence = 6;
 let acknowledged = 0;
 client.scheduleAck = (sequence) => { acknowledged = sequence; };
+let snapshotRetrySchedules = 0;
+const scheduleSnapshotSourceRetry = client.scheduleSnapshotSourceRetry.bind(client);
+client.scheduleSnapshotSourceRetry = () => {
+  snapshotRetrySchedules += 1;
+  return true;
+};
 client.sendSnapshot = async () => {
   const error = new Error('Concesión vencida');
   error.status = 403;
@@ -594,6 +600,49 @@ await client.handleEvent({
 if (acknowledged !== 7) throw new Error('La solicitud fallida no avanzó el ACK del stream.');
 if (!dispatched.some((event) => event.type === 'p2p:snapshot-source-error')) {
   throw new Error('No se aisló el error de la fuente de snapshot.');
+}
+if (snapshotRetrySchedules !== 0) {
+  throw new Error('Una concesión de snapshot rechazada de forma terminal programó reintentos inútiles.');
+}
+
+client.scheduleSnapshotSourceRetry = scheduleSnapshotSourceRetry;
+
+const deferredClient = new SemillaP2PClient();
+deferredClient.started = true;
+deferredClient.manualClose = false;
+deferredClient.deviceId = 'dev_source_000001';
+deferredClient.lastProcessedSequence = 6;
+deferredClient.lastAcceptedStreamSequence = 6;
+let deferredAcknowledged = 0;
+deferredClient.scheduleAck = (sequence) => { deferredAcknowledged = sequence; };
+deferredClient.scheduleSnapshotSourceRetry = () => {
+  snapshotRetrySchedules += 1;
+  return true;
+};
+deferredClient.sendSnapshot = async () => false;
+await deferredClient.handleEvent({
+  eventId: 'evt_snapshot_deferred',
+  eventType: 'p2p.snapshot.request',
+  deviceSequence: 7,
+  spaceId: 'space_1',
+  actorUserId: 'user_target_000001',
+  sourceDeviceId: 'dev_target_000001',
+  data: {
+    requestId: 'snapshot_deferred',
+    requestDeviceId: 'dev_target_000001',
+    requestUserId: 'user_target_000001',
+    spaceId: 'space_1',
+    localStateRevision: 1,
+    currentStateRevision: 2,
+    expiresAt: new Date(Date.now() + 60000).toISOString()
+  }
+});
+if (deferredAcknowledged !== 7) throw new Error('La solicitud diferida bloqueó el ACK del stream.');
+if (snapshotRetrySchedules !== 1) {
+  throw new Error('Una fuente temporalmente ocupada perdió el snapshot-request sin programar reintento local.');
+}
+if (!dispatched.some((event) => event.type === 'p2p:snapshot-source' && event.detail?.retryScheduled === true)) {
+  throw new Error('No se informó que la recuperación diferida quedó programada sin bloquear el stream.');
 }
 
 client.sendSnapshot = SemillaP2PClient.prototype.sendSnapshot.bind(client);
