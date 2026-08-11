@@ -2467,17 +2467,12 @@ async function respondInvitation(event) {
     let accessRevoked = false;
     let accepted = 0;
     let responded = 0;
-    const acceptedSpaceIds = new Set();
     const failures = [];
     for (const invitation of group.invitations) {
       try {
-        const result = await semillaP2P.respondToInvitation(invitation.invitationId, decision, { waitForReplica: false });
+        const result = await semillaP2P.respondToInvitation(invitation.invitationId, decision);
         const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);
-        if (canonicalDecision === 'accept') {
-          accepted += 1;
-          const acceptedSpaceId = String(result?.space?.spaceId || invitation?.spaceId || '').trim();
-          if (acceptedSpaceId) acceptedSpaceIds.add(acceptedSpaceId);
-        }
+        if (canonicalDecision === 'accept') accepted += 1;
         responded += 1;
         replicaPending = replicaPending || result?.replicaPending === true;
         accessRevoked = accessRevoked || result?.accessRevoked === true;
@@ -2487,11 +2482,6 @@ async function respondInvitation(event) {
       }
     }
     if (!responded && failures.length) throw failures[0].error;
-    if (decision === 'accept' && replicaPending && acceptedSpaceIds.size) {
-      const handoff = await semillaP2P.waitForReplicaRecoveries([...acceptedSpaceIds], { timeoutMs: 12000 });
-      replicaPending = handoff.pendingSpaceIds.length > 0 || handoff.missingSpaceIds.length > 0;
-      accessRevoked = accessRevoked || handoff.revokedSpaceIds.length > 0;
-    }
     applyP2PState(semillaP2P.bootstrapState);
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = failures.length

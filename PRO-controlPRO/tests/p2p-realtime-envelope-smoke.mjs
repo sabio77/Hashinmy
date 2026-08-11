@@ -191,6 +191,32 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
     currentStateRevision: 5
   }
 })).eventType, 'p2p.snapshot.request');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    requestId: 'snapshot_request_forced_equal',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    spaceId: 'space_control_1',
+    reason: 'forced',
+    localStateRevision: 5,
+    currentStateRevision: 5
+  }
+})).eventType, 'p2p.snapshot.request');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    requestId: 'snapshot_request_forced_zero',
+    requestDeviceId: 'device_requester_0001',
+    requestUserId: 'user_requester_1',
+    spaceId: 'space_control_1',
+    reason: 'forced',
+    localStateRevision: 0,
+    currentStateRevision: 0
+  }
+})).eventType, 'p2p.snapshot.request');
 
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked')),
@@ -338,6 +364,44 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'snapshot-request',
   'Una solicitud de snapshot sin brecha real siguió consumiendo trabajo y cursor.'
+);
+
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+    actorUserId: 'user_requester_1',
+    sourceDeviceId: 'device_requester_0001',
+    data: {
+      requestId: 'snapshot_request_new_device_equal',
+      requestDeviceId: 'device_requester_0001',
+      requestUserId: 'user_requester_1',
+      spaceId: 'space_control_1',
+      reason: 'new_device',
+      localStateRevision: 5,
+      currentStateRevision: 5
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'snapshot-request',
+  'Una recuperación new_device sin brecha real siguió avanzando el cursor.'
+);
+
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
+    actorUserId: 'user_requester_1',
+    sourceDeviceId: 'device_requester_0001',
+    data: {
+      requestId: 'snapshot_request_unknown_reason',
+      requestDeviceId: 'device_requester_0001',
+      requestUserId: 'user_requester_1',
+      spaceId: 'space_control_1',
+      reason: 'unknown',
+      localStateRevision: 5,
+      currentStateRevision: 5
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'snapshot-request',
+  'Una solicitud de snapshot con causa fuera del contrato siguió avanzando el cursor.'
 );
 
 assert.throws(

@@ -85,7 +85,6 @@ const ACK_RETRY_BASE_MS = 1000;
 const ACK_RETRY_MAX_MS = 30000;
 const SNAPSHOT_RECOVERY_FALLBACK_MS = 60 * 1000;
 const SNAPSHOT_RECOVERY_MARGIN_MS = 5 * 1000;
-const INVITATION_REPLICA_HANDOFF_WAIT_MS = 12 * 1000;
 const ATOMIC_BATCH_ASSEMBLY_TIMEOUT_MS = 15 * 1000;
 const TAB_STATE_REQUEST_RETRY_BASE_MS = 1500;
 const TAB_STATE_REQUEST_RETRY_MAX_MS = 12000;
@@ -377,6 +376,7 @@ function realtimeProtocolError(message = '', code = 'P2P_REALTIME_EVENT_INVALID_
 
 const CANONICAL_STATE_OPERATION_TYPES = new Set(['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom']);
 const CANONICAL_SNAPSHOT_OPERATION_TYPES = new Set(['snapshot.chunk', 'snapshot.complete']);
+const SNAPSHOT_RECOVERY_REASONS = new Set(['state_gap', 'forced', 'new_device']);
 const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.key.request',
   'p2p.key.envelope',
@@ -503,15 +503,22 @@ export function assertCanonicalControlEnvelope(event = {}) {
     const requestDeviceId = String(data.requestDeviceId || '').trim();
     const requestUserId = String(data.requestUserId || '').trim();
     const dataSpaceId = String(data.spaceId || '').trim();
+    const recoveryReason = String(data.reason || '').trim().toLowerCase() || 'state_gap';
+    const requiresRevisionGap = recoveryReason !== 'forced';
     if (
       !sourceDeviceId
       || !requestId
       || requestDeviceId !== sourceDeviceId
       || requestUserId !== actorUserId
       || dataSpaceId !== spaceId
+      || !SNAPSHOT_RECOVERY_REASONS.has(recoveryReason)
       || !isSafeRevision(data.localStateRevision)
-      || !isSafeRevision(data.currentStateRevision, { positive: true })
-      || data.currentStateRevision <= data.localStateRevision
+      || !isSafeRevision(data.currentStateRevision)
+      || data.currentStateRevision < data.localStateRevision
+      || (requiresRevisionGap && (
+        !isSafeRevision(data.currentStateRevision, { positive: true })
+        || data.currentStateRevision <= data.localStateRevision
+      ))
     ) invalid('snapshot-request');
     return event;
   }
@@ -4985,97 +4992,6 @@ export class SemillaP2PClient {
     return this.recoveryRequirements;
   }
 
-  async waitForReplicaRecoveries(spaceIds = [], options = {}) {
-    const sessionContext = options.sessionContext || this.captureSessionContext();
-    this.assertSessionContext(sessionContext);
-    const requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [spaceIds])
-      .map((spaceId) => String(spaceId || '').trim())
-      .filter(Boolean)));
-    const timeoutMs = Math.min(30 * 1000, Math.max(1000, Number(
-      options.timeoutMs || INVITATION_REPLICA_HANDOFF_WAIT_MS
-    )));
-
-    const inspect = () => {
-      this.assertSessionContext(sessionContext);
-      const spaces = Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : [];
-      const revoked = new Set((Array.isArray(this.bootstrapState?.revokedSpaceIds)
-        ? this.bootstrapState.revokedSpaceIds
-        : []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean));
-      const pendingSpaceIds = [];
-      const confirmedSpaceIds = [];
-      const revokedSpaceIds = [];
-      const missingSpaceIds = [];
-      for (const spaceId of requestedSpaceIds) {
-        if (revoked.has(spaceId)) {
-          revokedSpaceIds.push(spaceId);
-          continue;
-        }
-        const space = spaces.find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
-        if (!space) {
-          missingSpaceIds.push(spaceId);
-          continue;
-        }
-        if (space.authorizationState !== 'unconfirmed') confirmedSpaceIds.push(spaceId);
-        else pendingSpaceIds.push(spaceId);
-      }
-      return {
-        complete: pendingSpaceIds.length === 0 && missingSpaceIds.length === 0,
-        confirmedSpaceIds,
-        pendingSpaceIds,
-        revokedSpaceIds,
-        missingSpaceIds
-      };
-    };
-
-    const initial = inspect();
-    if (initial.complete) return initial;
-
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      let timer = 0;
-      const eventNames = [
-        'p2p:state',
-        'p2p:snapshot-complete',
-        'p2p:replica-recovery-confirmed',
-        'p2p:access-revoked'
-      ];
-      const cleanup = () => {
-        if (timer) window.clearTimeout(timer);
-        timer = 0;
-        for (const eventName of eventNames) window.removeEventListener(eventName, onProgress);
-      };
-      const finish = (result) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        resolve(result);
-      };
-      const fail = (error) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        reject(error);
-      };
-      const onProgress = () => {
-        try {
-          const current = inspect();
-          if (current.complete) finish(current);
-        } catch (error) {
-          fail(error);
-        }
-      };
-      for (const eventName of eventNames) window.addEventListener(eventName, onProgress);
-      timer = window.setTimeout(() => {
-        try {
-          finish(inspect());
-        } catch (error) {
-          fail(error);
-        }
-      }, timeoutMs);
-      onProgress();
-    });
-  }
-
   async confirmRecoveredReplicaAuthorization(
     spaceId = '',
     sessionContext = this.captureSessionContext()
@@ -7095,39 +7011,6 @@ export class SemillaP2PClient {
     }, delay);
   }
 
-  async prepareInvitationSource(spaceId = '', sessionContext = this.captureSessionContext()) {
-    this.assertSessionContext(sessionContext);
-    const cleanSpaceId = String(spaceId || '').trim();
-    if (!cleanSpaceId) return { ready: true, pending: 0 };
-    this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
-
-    let pendingForSpace = (await listOutbox())
-      .filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === cleanSpaceId);
-    this.assertSessionContext(sessionContext);
-    if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
-      await this.flushOutbox();
-      this.assertSessionContext(sessionContext);
-      pendingForSpace = (await listOutbox())
-        .filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === cleanSpaceId);
-      this.assertSessionContext(sessionContext);
-    }
-
-    const optimisticEntities = (await listEntities(cleanSpaceId)).filter((entity) => entity?.optimistic === true);
-    this.assertSessionContext(sessionContext);
-    if (pendingForSpace.length || optimisticEntities.length) {
-      const error = new Error('Hay cambios locales pendientes de confirmar. La invitación se enviará cuando esta copia quede al día para poder reconstruir al invitado sin una espera innecesaria.');
-      error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING';
-      error.status = 409;
-      error.retryable = true;
-      error.spaceId = cleanSpaceId;
-      error.pendingOperations = pendingForSpace.length;
-      error.optimisticEntities = optimisticEntities.length;
-      throw error;
-    }
-
-    return { ready: true, pending: 0, optimistic: 0 };
-  }
-
   async createSpace(options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -7191,11 +7074,7 @@ export class SemillaP2PClient {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const requestedSpaceId = String(options.spaceId || '').trim();
-    if (requestedSpaceId) {
-      this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
-      await this.prepareInvitationSource(requestedSpaceId, sessionContext);
-      this.assertSessionContext(sessionContext);
-    }
+    if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
     if (requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1) {
       await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true });
@@ -7246,7 +7125,7 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {
+  async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision });
@@ -7264,10 +7143,8 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
     this.assertSessionContext(sessionContext);
-    const acceptedSpaceId = canonicalDecision === 'accept'
-      ? String(data.space?.spaceId || data.invitation?.spaceId || '').trim()
-      : '';
     if (canonicalDecision === 'accept') {
+      const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       const state = await this.refreshBootstrap({
         requestSnapshots: 'force',
         snapshotSpaceIds: acceptedSpaceId ? [acceptedSpaceId] : []
@@ -7305,18 +7182,6 @@ export class SemillaP2PClient {
     if (canonicalDecision === 'accept' && data.space && Math.max(0, Number(data.space.encryptionVersion || 0)) >= 1) {
       await this.requestSpaceKey(data.space.spaceId, '', { force: true }).catch(() => false);
       this.assertSessionContext(sessionContext);
-    }
-    if (canonicalDecision === 'accept' && data.replicaPending === true && acceptedSpaceId && options.waitForReplica !== false) {
-      const handoff = await this.waitForReplicaRecoveries([acceptedSpaceId], {
-        sessionContext,
-        timeoutMs: options.replicaWaitMs
-      });
-      this.assertSessionContext(sessionContext);
-      data.replicaPending = handoff.pendingSpaceIds.length > 0 || handoff.missingSpaceIds.length > 0;
-      data.accessRevoked = data.accessRevoked === true || handoff.revokedSpaceIds.length > 0;
-      if (!data.replicaPending && !data.accessRevoked) {
-        data.space = (this.bootstrapState.spaces || []).find((space) => String(space?.spaceId || '').trim() === acceptedSpaceId) || data.space;
-      }
     }
     return data;
   }
@@ -8432,27 +8297,6 @@ export class SemillaP2PClient {
     const expiresAt = Date.parse(request.expiresAt || '');
     if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
 
-    let pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === spaceId);
-    this.assertSessionContext(sessionContext);
-    if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
-      await this.flushOutbox().catch((error) => {
-        if (this.isSessionContextChangedError(error)) throw error;
-        return null;
-      });
-      this.assertSessionContext(sessionContext);
-      pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === spaceId);
-      this.assertSessionContext(sessionContext);
-    }
-    if (pendingForSpace.length) {
-      dispatch('p2p:snapshot-source-deferred', {
-        requestId,
-        spaceId,
-        pendingOperations: pendingForSpace.length,
-        reason: 'source_outbox_pending'
-      });
-      return false;
-    }
-
     const localStateRevisions = await listStateRevisions([spaceId]);
     this.assertSessionContext(sessionContext);
     const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
@@ -8474,6 +8318,18 @@ export class SemillaP2PClient {
             : 'source_revision_advanced'
       });
       return false;
+    }
+
+    let pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
+    this.assertSessionContext(sessionContext);
+    if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
+      await this.flushOutbox().catch((error) => {
+        if (this.isSessionContextChangedError(error)) throw error;
+        return null;
+      });
+      this.assertSessionContext(sessionContext);
+      pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
+      this.assertSessionContext(sessionContext);
     }
 
     const localEntities = await listEntities(spaceId);
