@@ -266,6 +266,22 @@ assert.match(clientSource, /!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)
 assert.match(clientSource, /confirmRecoveredReplicaAuthorization\(/, 'No existe promoción durable después de completar la réplica.');
 assert.match(clientSource, /p2p:replica-recovery-confirmed/, 'La interfaz no recibe la transición que habilita la edición.');
 
+const snapshotSourceStart = clientSource.indexOf('  async sendSnapshot(requestEvent = {})');
+const snapshotSourceEnd = clientSource.indexOf('\n  async ensurePushSubscriptionForCurrentVapidKey(', snapshotSourceStart);
+assert.ok(snapshotSourceStart >= 0 && snapshotSourceEnd > snapshotSourceStart, 'No se encontró la respuesta de snapshot del dispositivo fuente.');
+const snapshotSourceMethod = clientSource.slice(snapshotSourceStart, snapshotSourceEnd);
+assert.doesNotMatch(snapshotSourceMethod, /localStateRevision !== requestedStateRevision/, 'Una fuente más nueva todavía descarta silenciosamente una concesión válida y deja al invitado esperando hasta el TTL.');
+assert.match(snapshotSourceMethod, /await this\.flushOutbox\(\)/, 'La fuente no confirma primero sus cambios pendientes antes de decidir si puede reconstruir al invitado.');
+assert.ok(
+  snapshotSourceMethod.indexOf('await this.flushOutbox()') < snapshotSourceMethod.indexOf('listStateRevisions([spaceId])'),
+  'La revisión de la fuente se calcula antes de vaciar el outbox y puede quedar obsoleta dentro del mismo snapshot-request.'
+);
+assert.match(snapshotSourceMethod, /sourceBehindRequestedRevision = localStateRevision < requestedStateRevision/, 'La fuente sigue exigiendo igualdad exacta en vez de permitir una revisión confirmada más reciente.');
+assert.match(snapshotSourceMethod, /this\.scheduleSnapshotSourceRetry\(requestEvent, reason\)/, 'Un snapshot aplazado todavía puede perderse sin reintento en el propietario conectado.');
+assert.match(clientSource, /scheduleSnapshotSourceRetry\(requestEvent = \{\}, reason = '', error = null\)/, 'No existe reintento acotado para una concesión de snapshot ya recibida.');
+assert.match(clientSource, /SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS/, 'El reintento de la fuente no está cercado por el vencimiento de la concesión.');
+assert.match(clientSource, /clearSnapshotSourceRetries\(\)/, 'Los reintentos de snapshot no se limpian al perder liderazgo o detener la sesión.');
+
 const appSource = fs.readFileSync(path.join(root, 'src', 'js', 'app.js'), 'utf8');
 assert.match(appSource, /result\?\.accessRevoked === true/, 'La interfaz no distingue una aceptación seguida por revocación.');
 assert.match(appSource, /result\?\.replicaPending === true/, 'La interfaz presenta como lista una invitación cuya réplica sigue en recuperación.');
