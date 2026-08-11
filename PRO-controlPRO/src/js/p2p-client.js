@@ -6790,9 +6790,12 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
 
       if (requiresSnapshotRecovery) {
-        const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
-        this.assertSessionContext(sessionContext);
         const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
+        const state = await this.refreshBootstrap({
+          requestSnapshots: 'force',
+          snapshotSpaceIds: cleanSpaceId ? [cleanSpaceId] : []
+        });
+        this.assertSessionContext(sessionContext);
         const localStateRevisions = await listStateRevisions([cleanSpaceId]);
         this.assertSessionContext(sessionContext);
         const replicaState = assertAcceptedInvitationReplicaState(state, cleanSpaceId, {
@@ -7133,9 +7136,12 @@ export class SemillaP2PClient {
     this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
-      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
-      this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
+      const state = await this.refreshBootstrap({
+        requestSnapshots: 'force',
+        snapshotSpaceIds: acceptedSpaceId ? [acceptedSpaceId] : []
+      });
+      this.assertSessionContext(sessionContext);
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
       this.assertSessionContext(sessionContext);
       const replicaState = assertAcceptedInvitationReplicaState(
@@ -7177,7 +7183,10 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
     if (!cleanSpaceId) throw new Error('Falta el espacio que deseas abandonar.');
-    this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
+    if (!this.isSpaceAuthorizationConfirmed(cleanSpaceId)
+      && !this.isSpaceReplicaRecoveryPending(cleanSpaceId)) {
+      this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
+    }
     const data = await apiPost('/api/p2p/access/leave', { spaceId: cleanSpaceId });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);

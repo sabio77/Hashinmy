@@ -41,6 +41,7 @@ REQUIRED_FILES = [
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
+    "src/js/panel-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
@@ -65,6 +66,7 @@ REQUIRED_FILES = [
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
     "tests/project-domain-smoke.mjs",
+    "tests/p2p-panel-collaboration-smoke.mjs",
     "tests/p2p-trash-lifecycle-smoke.mjs",
     "_headers",
 ]
@@ -92,6 +94,7 @@ JAVASCRIPT_FILES = [
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
+    "src/js/panel-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
@@ -375,6 +378,21 @@ def assert_project_domain() -> None:
     )
     if result.returncode != 0:
         fail(f"Falló el dominio administrativo: {result.stderr.strip() or result.stdout.strip()}")
+
+
+def assert_panel_collaboration_domain() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba de colaboración por panel.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "p2p-panel-collaboration-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló la colaboración agrupada por panel: {result.stderr.strip() or result.stdout.strip()}")
 
 
 def assert_invitation_notification_intent() -> None:
@@ -1282,6 +1300,7 @@ def main() -> None:
     assert_multitab_coordination()
     assert_session_isolation()
     assert_project_domain()
+    assert_panel_collaboration_domain()
     assert_trash_lifecycle()
     assert_invitation_notification_intent()
     assert_control_mutation_atomicity()
@@ -1471,6 +1490,8 @@ def main() -> None:
         fail("El alcance por aplicación debe formar parte del precache offline.")
     if "./src/js/project-domain.js" not in metadata_text:
         fail("El módulo administrativo importado debe formar parte del precache offline.")
+    if "./src/js/panel-domain.js" not in metadata_text:
+        fail("El módulo de colaboración por panel debe formar parte del precache offline.")
     if "./src/js/p2p-durability.js" not in metadata_text:
         fail("El módulo de durabilidad local debe formar parte del precache offline.")
     if "./src/js/p2p-tab-coordinator.js" not in metadata_text:
@@ -1481,6 +1502,8 @@ def main() -> None:
         fail("version.json debe verificar la huella del alcance por aplicación.")
     if not any(asset.get("url") == "./src/js/project-domain.js" for asset in assets):
         fail("version.json debe verificar la huella del módulo administrativo.")
+    if not any(asset.get("url") == "./src/js/panel-domain.js" for asset in assets):
+        fail("version.json debe verificar la huella del módulo de colaboración por panel.")
     if not any(asset.get("url") == "./src/js/p2p-durability.js" for asset in assets):
         fail("version.json debe verificar la huella del módulo de durabilidad local.")
     if not any(asset.get("url") == "./src/js/p2p-tab-coordinator.js" for asset in assets):

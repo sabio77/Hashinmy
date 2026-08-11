@@ -62,6 +62,13 @@ import {
   resolvePurchaseProjectionLinks,
   sumMoneyValues
 } from './project-domain.js';
+import {
+  PANEL_INVITATION_RESOURCE_TYPE,
+  aggregatePanelMembers,
+  buildProjectPanels,
+  groupPendingInvitations,
+  panelDisplayName
+} from './panel-domain.js';
 
 const CACHED_USER_STORAGE_KEY = scopedStorageKey('semilla_authenticated_user');
 const state = {
@@ -70,6 +77,10 @@ const state = {
   busy: false,
   p2pBusy: false,
   selectedSpaceId: '',
+  selectedPanelOwnerUserId: '',
+  inviteScope: 'project',
+  accessScope: 'project',
+  invitationGroups: new Map(),
   renderSequence: 0,
   p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
   projects: new Map(),
@@ -103,7 +114,7 @@ const elements = {
   devicesButton: byId('devices-button'), devicesDialog: byId('devices-dialog'), deviceList: byId('device-list'), deviceStatus: byId('device-status'), deviceConfirmPanel: byId('device-confirm-panel'), deviceConfirmMessage: byId('device-confirm-message'), deviceConfirmButton: byId('device-confirm-button'), deviceConfirmCancel: byId('device-confirm-cancel'),
   localNetworkButton: byId('local-network-button'), localNetworkDialog: byId('local-network-dialog'), localNetworkState: byId('local-network-state'), localNetworkInput: byId('local-network-input'), localNetworkOutput: byId('local-network-output'), localNetworkCreateOffer: byId('local-network-create-offer'), localNetworkAcceptOffer: byId('local-network-accept-offer'), localNetworkCompleteAnswer: byId('local-network-complete-answer'), localNetworkCopy: byId('local-network-copy'), localNetworkPeers: byId('local-network-peers'), localNetworkStatus: byId('local-network-status'),
   dashboardView: byId('dashboard-view'), projectView: byId('project-view'), dashboardStatus: byId('dashboard-status'), projectStatus: byId('project-status'),
-  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
+  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), dashboardEyebrow: byId('dashboard-eyebrow'), dashboardTitle: byId('dashboard-title'), dashboardDescription: byId('dashboard-description'), dashboardToolbar: byId('dashboard-toolbar'), newProjectButton: byId('new-project-button'), backToPanelsButton: byId('back-to-panels-button'), panelInviteButton: byId('panel-invite-button'), panelMembersButton: byId('panel-members-button'), panelLeaveButton: byId('panel-leave-button'), backButton: byId('back-to-dashboard-button'),
   projectName: byId('project-name'), projectDescription: byId('project-description'), projectAddress: byId('project-address'), projectMemberSummary: byId('project-member-summary'), projectReplicaHealth: byId('project-replica-health'),
   projectMetrics: byId('project-metrics'), budgetProgressValue: byId('budget-progress-value'), budgetProgressLabel: byId('budget-progress-label'),
   inviteCollaboratorButton: byId('invite-collaborator-button'), manageAccessButton: byId('manage-access-button'), editProjectButton: byId('edit-project-button'), addPurchaseButton: byId('add-purchase-button'), addIncomeButton: byId('add-income-button'), addProjectionButton: byId('add-projection-button'),
@@ -111,7 +122,7 @@ const elements = {
   projectDialog: byId('project-dialog'), projectForm: byId('project-form'), projectFormMode: byId('project-form-mode'), projectDialogTitle: byId('project-dialog-title'), projectNameInput: byId('project-name-input'), projectDescriptionInput: byId('project-description-input'), projectAddressInput: byId('project-address-input'), projectBudgetInput: byId('project-budget-input'), projectFormStatus: byId('project-form-status'), projectSubmitButton: byId('project-submit-button'),
   recordDialog: byId('record-dialog'), recordForm: byId('record-form'), recordTypeInput: byId('record-type-input'), recordDialogEyebrow: byId('record-dialog-eyebrow'), recordDialogTitle: byId('record-dialog-title'), recordDescriptionInput: byId('record-description-input'), recordInvoiceInput: byId('record-invoice-input'), recordAmountInput: byId('record-amount-input'), recordDateInput: byId('record-date-input'), recordProjectionInput: byId('record-projection-input'), invoiceField: byId('invoice-field'), projectionLinkField: byId('projection-link-field'), recordDateLabel: byId('record-date-label'), recordAmountLabel: byId('record-amount-label'), recordFormStatus: byId('record-form-status'), recordSubmitButton: byId('record-submit-button'),
   inviteDialog: byId('invite-dialog'), inviteForm: byId('invite-form'), inviteEmailInput: byId('invite-email-input'), inviteStatus: byId('invite-status'), inviteSubmitButton: byId('invite-submit-button'), invitationsDialog: byId('invitations-dialog'),
-  accessDialog: byId('access-dialog'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel'),
+  accessDialog: byId('access-dialog'), accessEyebrow: byId('access-eyebrow'), accessTitle: byId('access-title'), accessDescription: byId('access-description'), accessMemberList: byId('access-member-list'), accessStatus: byId('access-status'), accessOwnerActions: byId('access-owner-actions'), deleteProjectButton: byId('delete-project-button'), accessConfirmPanel: byId('access-confirm-panel'), accessConfirmMessage: byId('access-confirm-message'), accessConfirmButton: byId('access-confirm-button'), accessConfirmCancel: byId('access-confirm-cancel'),
   trashButton: byId('trash-button'), trashCount: byId('trash-count'), trashDialog: byId('trash-dialog'), trashList: byId('trash-list'), trashStatus: byId('trash-status'),
   actionMenuDialog: byId('action-menu-dialog'), actionMenuTitle: byId('action-menu-title'), actionMenuContext: byId('action-menu-context'), actionMenuList: byId('action-menu-list'), actionMenuStatus: byId('action-menu-status'), actionMenuConfirmPanel: byId('action-menu-confirm-panel'), actionMenuConfirmTitle: byId('action-menu-confirm-title'), actionMenuConfirmMessage: byId('action-menu-confirm-message'), actionMenuConfirmButton: byId('action-menu-confirm-button'), actionMenuConfirmCancel: byId('action-menu-confirm-cancel')
 };
@@ -136,6 +147,48 @@ function isSelectedProjectOwner() {
 function spaceUserCan(space = null, permission = '') { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user && hasPermission(space, state.user.userId, permission)); }
 function userCan(permission) { return spaceUserCan(selectedSpace(), permission); }
 function isSpaceOwner(space = null) { return Boolean(space && !isAuthorizationUnconfirmed(space) && state.user?.userId && space.ownerUserId === state.user.userId); }
+
+function projectPanels() {
+  return buildProjectPanels([...state.projects.values()], state.user || {}, { spaces: state.p2pState.spaces || [] });
+}
+function selectedPanelData() {
+  const ownerUserId = String(state.selectedPanelOwnerUserId || '').trim();
+  return ownerUserId ? projectPanels().find((panel) => panel.ownerUserId === ownerUserId) || null : null;
+}
+function panelProjectValues(panel = null) {
+  return Array.isArray(panel?.projects) ? panel.projects.filter((item) => !item?.project?.isTrashed) : [];
+}
+function panelPendingSpaces(panel = null) {
+  return Array.isArray(panel?.pendingSpaces) ? panel.pendingSpaces.filter((space) => space?.spaceId) : [];
+}
+function panelSpaceValues(panel = null) {
+  const spaces = new Map();
+  for (const projectData of panelProjectValues(panel)) {
+    if (projectData?.space?.spaceId) spaces.set(projectData.space.spaceId, projectData.space);
+  }
+  for (const space of panelPendingSpaces(panel)) {
+    if (space?.spaceId && !spaces.has(space.spaceId)) spaces.set(space.spaceId, space);
+  }
+  return [...spaces.values()];
+}
+function panelCanManage(panel = null) {
+  return Boolean(panel?.isOwn && state.user?.userId && panel.ownerUserId === state.user.userId);
+}
+function openPanel(ownerUserId = '') {
+  const cleanOwner = String(ownerUserId || '').trim();
+  if (!cleanOwner) return;
+  state.selectedPanelOwnerUserId = cleanOwner;
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  renderDashboard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showPanelDirectory() {
+  state.selectedPanelOwnerUserId = '';
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  renderDashboard();
+}
 function replicaHealthForSpace(spaceId = '') {
   const cleanSpaceId = String(spaceId || '').trim();
   const health = state.p2pState.replicaHealth?.[cleanSpaceId];
@@ -434,6 +487,10 @@ function requestStorageProtection(options = {}) {
 function resetUserScopedInterface() {
   state.renderSequence += 1;
   state.selectedSpaceId = '';
+  state.selectedPanelOwnerUserId = '';
+  state.inviteScope = 'project';
+  state.accessScope = 'project';
+  state.invitationGroups.clear();
   state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
@@ -556,11 +613,11 @@ async function recoverMissingProjectCards(spaceIds = []) {
         elements.dashboardStatus,
         pendingRecoveryCount > 0
           ? pendingRecoveryCount === 1
-            ? t('p2p.missingProjectRecoveryPending', 'El espacio compartido incompleto se ocultó mientras otra réplica envía una copia válida.')
-            : t('p2p.missingProjectsRecoveryPending', 'Los espacios compartidos incompletos se ocultaron mientras otras réplicas envían copias válidas.')
+            ? t('p2p.missingProjectRecoveryPending', 'El proyecto compartido permanece visible mientras otra réplica envía una copia válida.')
+            : t('p2p.missingProjectsRecoveryPending', 'Los proyectos compartidos permanecen visibles mientras otras réplicas envían copias válidas.')
           : unresolved.length === 1
-            ? t('p2p.missingProjectHidden', 'Se retiró de la vista un espacio compartido incompleto porque no existe una copia recuperable en este momento.')
-            : t('p2p.missingProjectsHidden', 'Se retiraron de la vista los espacios compartidos incompletos que no tienen una copia recuperable en este momento.'),
+            ? t('p2p.missingProjectHidden', 'El proyecto compartido permanece visible en modo de sincronización; todavía no existe una copia completa recuperable.')
+            : t('p2p.missingProjectsHidden', 'Los proyectos compartidos permanecen visibles en modo de sincronización hasta que exista una copia completa recuperable.'),
         'warning'
       );
     } else {
@@ -576,7 +633,7 @@ async function recoverMissingProjectCards(spaceIds = []) {
   } catch (error) {
     setStatus(
       elements.dashboardStatus,
-      error?.message || t('p2p.missingProjectDeferred', 'El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.'),
+      error?.message || t('p2p.missingProjectDeferred', 'El proyecto compartido permanece visible en modo de sincronización y se completará cuando una réplica válida pueda recuperarlo.'),
       'warning'
     );
     return false;
@@ -605,9 +662,9 @@ async function refreshProjects() {
   if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
-function renderPortfolioMetrics() {
+function renderPortfolioMetrics(projectValues = null) {
   elements.portfolioMetrics.replaceChildren();
-  const projects = [...state.projects.values()].filter((item) => !item.project.isTrashed);
+  const projects = (Array.isArray(projectValues) ? projectValues : [...state.projects.values()]).filter((item) => !item.project.isTrashed);
   const totalCapital = sumMoneyValues(projects, (item) => item.metrics.totalCapital);
   const totalPurchases = sumMoneyValues(projects, (item) => item.metrics.totalPurchases);
   const available = sumMoneyValues(projects, (item) => item.metrics.availableCapital);
@@ -686,34 +743,91 @@ function lifecycleStatusMessage(transaction = null) {
     : '';
 }
 
-function renderDashboard() {
-  renderPortfolioMetrics();
-  elements.projectList.replaceChildren();
-  const allProjects = [...state.projects.values()]
-    .filter((item) => !item.project.isTrashed)
-    .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
-  const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
-  const projects = normalizedFilter
-    ? allProjects.filter((item) => projectMatchesFilter(item.project, normalizedFilter))
-    : allProjects;
-  if (elements.projectFilterInput && elements.projectFilterInput.value !== state.projectFilterQuery) {
-    elements.projectFilterInput.value = state.projectFilterQuery;
+function setDashboardMode(panel = null) {
+  const filterToolbar = elements.projectFilterInput?.closest('.project-filter-toolbar');
+  const inPanel = Boolean(panel);
+  elements.backToPanelsButton?.classList.toggle('hidden', !inPanel);
+  elements.newProjectButton?.classList.toggle('hidden', !inPanel || !panelCanManage(panel));
+  elements.panelInviteButton?.classList.toggle('hidden', !inPanel || !panelCanManage(panel) || !panelProjectValues(panel).length);
+  elements.panelMembersButton?.classList.toggle('hidden', !inPanel || !panelCanManage(panel) || !panelSpaceValues(panel).length);
+  elements.panelLeaveButton?.classList.toggle('hidden', !inPanel || panelCanManage(panel) || !panelSpaceValues(panel).length);
+  filterToolbar?.classList.toggle('hidden', !inPanel);
+  if (!inPanel) {
+    if (elements.dashboardEyebrow) elements.dashboardEyebrow.textContent = t('dashboard.panelsEyebrow', 'Espacios de trabajo');
+    if (elements.dashboardTitle) elements.dashboardTitle.textContent = t('dashboard.panels', 'Paneles');
+    if (elements.dashboardDescription) elements.dashboardDescription.textContent = t('dashboard.panelsDescription', 'Tus paneles propios y los paneles en los que participas, separados por propietario.');
+    return;
   }
+  const displayName = panelDisplayName(panel, state.user || {});
+  if (elements.dashboardEyebrow) elements.dashboardEyebrow.textContent = panel.isOwn ? t('dashboard.ownPanel', 'Panel propio') : t('dashboard.sharedPanel', 'Panel compartido');
+  if (elements.dashboardTitle) elements.dashboardTitle.textContent = panel.isOwn ? t('dashboard.myProjects', 'Mis proyectos') : displayName;
+  if (elements.dashboardDescription) elements.dashboardDescription.textContent = panel.isOwn
+    ? t('dashboard.ownPanelDescription', 'Proyectos creados por tu cuenta y sincronizados en tus dispositivos y participantes autorizados.')
+    : t('dashboard.sharedPanelDescription', 'Solo aparecen los proyectos de este panel para los que tu cuenta conserva autorización.');
+}
+
+function renderPanelDirectory() {
+  const panels = projectPanels();
+  setDashboardMode(null);
+  renderPortfolioMetrics([...state.projects.values()].filter((item) => !item.project.isTrashed));
+  elements.projectList.replaceChildren();
+  if (!panels.length) {
+    const empty = document.createElement('div'); empty.className = 'empty-state';
+    empty.innerHTML = `<strong>${t('dashboard.noPanels', 'Aún no hay paneles')}</strong><p>${t('dashboard.noPanelsDescription', 'Tu panel personal aparecerá aquí al iniciar sesión.')}</p>`;
+    elements.projectList.append(empty);
+    return;
+  }
+  for (const panel of panels) {
+    const projects = panelProjectValues(panel);
+    const pendingSpaces = panelPendingSpaces(panel);
+    const authorizedProjectCount = projects.length + pendingSpaces.length;
+    const card = document.createElement('article'); card.className = 'project-card panel-card'; card.dataset.panelType = panel.isOwn ? 'own' : 'shared';
+    const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'project-card-main'; openButton.dataset.openPanel = panel.ownerUserId;
+    const header = document.createElement('div'); header.className = 'project-card-header';
+    const titleWrap = document.createElement('div');
+    const title = document.createElement('h3'); title.textContent = panel.isOwn ? t('dashboard.myPanel', 'Mi panel') : panelDisplayName(panel, state.user || {});
+    const owner = document.createElement('p'); owner.textContent = panel.isOwn
+      ? t('dashboard.ownerYou', 'Propietario: tú')
+      : `${t('dashboard.owner', 'Propietario')}: ${panel.ownerProfile?.email || panel.ownerProfile?.displayName || t('project.participant', 'Participante')}`;
+    titleWrap.append(title, owner);
+    const badge = document.createElement('span'); badge.className = 'panel-type-badge'; badge.textContent = panel.isOwn ? t('dashboard.ownBadge', 'Propio') : t('dashboard.invitedBadge', 'Invitado');
+    header.append(titleWrap, badge);
+    const description = document.createElement('p');
+    description.textContent = authorizedProjectCount
+      ? `${t('dashboard.panelProjectSummary', '{count} proyectos disponibles en este panel.').replace('{count}', String(authorizedProjectCount))}${pendingSpaces.length ? ` ${t('p2p.missingProjectsSearching', 'Buscando copias válidas de los proyectos compartidos incompletos…')}` : ''}`
+      : t('dashboard.emptyOwnPanel', 'Este panel todavía no tiene proyectos. Entra para crear el primero.');
+    const metrics = document.createElement('div'); metrics.className = 'project-card-metrics';
+    metrics.innerHTML = `<div><span>${t('dashboard.totalProjects', 'Proyectos')}</span><strong>${authorizedProjectCount}</strong></div><div><span>${t('project.participants', 'Participantes')}</span><strong>${Math.max(1, panel.memberUserIds?.length || 0)}</strong></div>`;
+    openButton.append(header, description, metrics);
+    card.append(openButton);
+    elements.projectList.append(card);
+  }
+}
+
+function renderSelectedPanel(panel) {
+  setDashboardMode(panel);
+  const allProjects = panelProjectValues(panel);
+  const pendingSpaces = panelPendingSpaces(panel);
+  renderPortfolioMetrics(allProjects);
+  elements.projectList.replaceChildren();
+  const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
+  const projects = normalizedFilter ? allProjects.filter((item) => projectMatchesFilter(item.project, normalizedFilter)) : allProjects;
+  if (elements.projectFilterInput && elements.projectFilterInput.value !== state.projectFilterQuery) elements.projectFilterInput.value = state.projectFilterQuery;
   if (elements.projectFilterClear) elements.projectFilterClear.hidden = !normalizedFilter;
   if (elements.projectFilterSummary) {
     elements.projectFilterSummary.hidden = !normalizedFilter;
     elements.projectFilterSummary.textContent = normalizedFilter
-      ? t('dashboard.filterResults', '{shown} de {total} proyectos coinciden')
-        .replace('{shown}', String(projects.length))
-        .replace('{total}', String(allProjects.length))
+      ? t('dashboard.filterResults', '{shown} de {total} proyectos coinciden').replace('{shown}', String(projects.length)).replace('{total}', String(allProjects.length))
       : '';
   }
-  if (!allProjects.length) {
+  if (!allProjects.length && !pendingSpaces.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
-    empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`;
+    empty.innerHTML = panel.isOwn
+      ? `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`
+      : `<strong>${t('dashboard.sharedPanelEmpty', 'Ya no tienes proyectos en este panel')}</strong><p>${t('dashboard.sharedPanelEmptyDescription', 'El propietario puede volver a darte acceso a proyectos específicos cuando lo necesite.')}</p>`;
     elements.projectList.append(empty); return;
   }
-  if (!projects.length) {
+  if (!projects.length && (normalizedFilter || !pendingSpaces.length)) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
     empty.innerHTML = `<strong>${t('dashboard.filterNoResultsTitle', 'No hay proyectos coincidentes')}</strong><p>${t('dashboard.filterNoResultsDescription', 'Prueba con otra palabra del nombre, la descripción o la dirección.')}</p>`;
     elements.projectList.append(empty); return;
@@ -746,6 +860,50 @@ function renderDashboard() {
     card.append(openButton, menu);
     elements.projectList.append(card);
   }
+  if (!normalizedFilter) {
+    for (const space of pendingSpaces) {
+      const card = document.createElement('article'); card.className = 'project-card'; card.dataset.syncing = 'true';
+      const replicaRecoveryPending = isReplicaRecoveryPending(space);
+      if (isAuthorizationUnconfirmed(space)) card.dataset.authorization = 'unconfirmed';
+      const content = document.createElement('div'); content.className = 'project-card-main'; content.setAttribute('role', 'status'); content.setAttribute('aria-live', 'polite');
+      const header = document.createElement('div'); header.className = 'project-card-header';
+      const titleWrap = document.createElement('div');
+      const title = document.createElement('h3'); title.textContent = t('project.defaultName', 'Proyecto compartido');
+      const detail = document.createElement('p'); detail.textContent = replicaRecoveryPending
+        ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.')
+        : t('p2p.missingProjectSearching', 'Buscando una copia válida del proyecto compartido…');
+      const recovery = document.createElement('span'); recovery.className = 'authorization-badge'; recovery.textContent = t('p2p.replicaRecoveryBadge', 'Sincronizando'); recovery.title = replicaRecoveryPending
+        ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.')
+        : t('p2p.missingProjectDeferred', 'El proyecto compartido permanece visible en modo de sincronización y se completará cuando una réplica válida pueda recuperarlo.');
+      titleWrap.append(title, detail, recovery);
+      const cardSignals = document.createElement('div'); cardSignals.className = 'project-card-signals';
+      cardSignals.append(replicaHealthBadge(space.spaceId, true));
+      const members = document.createElement('span'); members.className = 'count-badge'; members.textContent = String(space.members?.length || 1); members.title = t('project.participants', 'Participantes'); cardSignals.append(members);
+      header.append(titleWrap, cardSignals);
+      const recoveryDescription = document.createElement('p'); recoveryDescription.textContent = recovery.title;
+      const health = replicaHealthPresentation(space.spaceId);
+      const metrics = document.createElement('div'); metrics.className = 'project-card-metrics';
+      metrics.innerHTML = `<div><span>${t('project.participants', 'Participantes')}</span><strong>${Math.max(1, space.members?.length || 0)}</strong></div><div><span>${health.label}</span><strong>${health.summary}</strong></div>`;
+      content.append(header, recoveryDescription, metrics);
+      card.append(content);
+      elements.projectList.append(card);
+    }
+  }
+}
+
+function renderDashboard() {
+  const selectedOwner = String(state.selectedPanelOwnerUserId || '').trim();
+  if (!selectedOwner) {
+    renderPanelDirectory();
+    return;
+  }
+  const panel = selectedPanelData();
+  if (!panel) {
+    state.selectedPanelOwnerUserId = '';
+    renderPanelDirectory();
+    return;
+  }
+  renderSelectedPanel(panel);
 }
 
 function queueInvitationIntent(invitationId = '') {
@@ -753,6 +911,15 @@ function queueInvitationIntent(invitationId = '') {
   if (!normalized) return false;
   state.pendingInvitationId = normalized;
   return true;
+}
+
+function invitationGroupForInvitationId(invitationId = '') {
+  const normalized = normalizeInvitationIntentId(invitationId);
+  if (!normalized) return null;
+  for (const group of state.invitationGroups.values()) {
+    if ((group.invitations || []).some((invitation) => invitation.invitationId === normalized)) return group;
+  }
+  return null;
 }
 
 function revealPendingInvitationIntent() {
@@ -763,8 +930,11 @@ function revealPendingInvitationIntent() {
   if (!invitation || !state.user) return false;
 
   if (!elements.invitationsDialog?.open) openDialog(elements.invitationsDialog);
-  const acceptButton = [...elements.invitationList.querySelectorAll('button[data-invitation-id][data-decision="accept"]')]
-    .find((button) => button.dataset.invitationId === invitation.invitationId);
+  const group = invitationGroupForInvitationId(invitation.invitationId);
+  const acceptButton = group
+    ? [...elements.invitationList.querySelectorAll('button[data-invitation-group-id][data-decision="accept"]')]
+      .find((button) => button.dataset.invitationGroupId === group.key)
+    : null;
   window.requestAnimationFrame(() => acceptButton?.focus({ preventScroll: true }));
   clearInvitationIntentFromUrl();
   state.pendingInvitationId = '';
@@ -794,14 +964,28 @@ async function refreshInvitationIntent(invitationId = '') {
 }
 
 function renderInvitations() {
-  const pending = (state.p2pState.invitations?.received || []).filter((invitation) => invitation.status === 'pending');
-  elements.invitationCount.textContent = String(pending.length); elements.invitationCount.hidden = pending.length === 0; elements.invitationList.replaceChildren();
-  if (!pending.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = t('invite.none', 'No tienes invitaciones pendientes.'); elements.invitationList.append(empty); return; }
-  for (const invitation of pending) {
+  const groups = groupPendingInvitations(state.p2pState.invitations?.received || []);
+  state.invitationGroups = new Map(groups.map((group) => [group.key, group]));
+  const pendingCount = groups.reduce((count, group) => count + (group.kind === 'panel' ? 1 : group.invitations.length), 0);
+  elements.invitationCount.textContent = String(pendingCount); elements.invitationCount.hidden = pendingCount === 0; elements.invitationList.replaceChildren();
+  if (!groups.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = t('invite.none', 'No tienes invitaciones pendientes.'); elements.invitationList.append(empty); return; }
+  for (const group of groups) {
+    const invitation = group.invitations[0] || {};
     const item = document.createElement('article'); item.className = 'invitation-item';
-    const content = document.createElement('div'); const title = document.createElement('h3'); title.textContent = invitation.title || t('project.defaultName', 'Proyecto compartido'); const sender = document.createElement('p'); sender.textContent = invitation.inviter?.displayName || invitation.inviter?.email || t('invite.someone', 'Un colaborador'); content.append(title, sender);
+    const content = document.createElement('div'); const title = document.createElement('h3');
+    title.textContent = group.kind === 'panel'
+      ? t('invite.panelTitle', 'Invitación a panel completo')
+      : invitation.title || t('project.defaultName', 'Proyecto compartido');
+    const sender = document.createElement('p');
+    const senderLabel = invitation.inviter?.displayName || invitation.inviter?.email || t('invite.someone', 'Un colaborador');
+    sender.textContent = group.kind === 'panel'
+      ? t('invite.panelSummary', '{sender} te invitó a {count} proyectos de su panel.').replace('{sender}', senderLabel).replace('{count}', String(group.invitations.length))
+      : senderLabel;
+    content.append(title, sender);
     const actions = document.createElement('div'); actions.className = 'invitation-actions';
-    for (const [decision, label, className] of [['reject', t('invite.reject', 'Rechazar'), 'button button-ghost button-compact'], ['accept', t('invite.accept', 'Aceptar'), 'button button-primary button-compact']]) { const button = document.createElement('button'); button.type = 'button'; button.className = className; button.dataset.invitationId = invitation.invitationId; button.dataset.decision = decision; button.textContent = label; actions.append(button); }
+    for (const [decision, label, className] of [['reject', t('invite.reject', 'Rechazar'), 'button button-ghost button-compact'], ['accept', t('invite.accept', 'Aceptar'), 'button button-primary button-compact']]) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = className; button.dataset.invitationGroupId = group.key; button.dataset.decision = decision; button.textContent = label; actions.append(button);
+    }
     item.append(content, actions); elements.invitationList.append(item);
   }
   revealPendingInvitationIntent();
@@ -939,7 +1123,7 @@ function clearAccessConfirmation() {
     elements.accessConfirmButton.classList.remove('button-primary');
   }
 }
-function renderAccessManagement() {
+function renderProjectAccessManagement() {
   const data = selectedProjectData();
   if (!elements.accessMemberList) return;
   elements.accessMemberList.replaceChildren();
@@ -971,14 +1155,92 @@ function renderAccessManagement() {
   }
   if (!elements.accessMemberList.children.length) elements.accessMemberList.append(emptyRecord(t('access.noMembers', 'No hay participantes disponibles.')));
 }
+function renderPanelAccessManagement() {
+  const panel = selectedPanelData();
+  if (!elements.accessMemberList) return;
+  elements.accessMemberList.replaceChildren();
+  elements.accessOwnerActions?.classList.add('hidden');
+  if (elements.accessEyebrow) elements.accessEyebrow.textContent = t('access.panelEyebrow', 'Acceso del panel');
+  if (elements.accessTitle) elements.accessTitle.textContent = t('access.panelTitle', 'Participantes del panel');
+  if (elements.accessDescription) elements.accessDescription.textContent = t('access.panelDescription', 'La participación se calcula sobre los proyectos de este panel. Al retirar a una persona, pierde el acceso a todos los proyectos del panel donde participaba.');
+  if (!panel || !state.user) return;
+  const members = aggregatePanelMembers(panel);
+  for (const member of members) {
+    const item = document.createElement('article'); item.className = 'access-member';
+    const content = document.createElement('div');
+    const title = document.createElement('h3'); title.textContent = memberLabel(member);
+    const role = document.createElement('span'); role.className = 'access-role'; role.textContent = member.userId === panel.ownerUserId ? t('access.owner', 'Propietario') : t('access.member', 'Participante'); title.append(role);
+    const profileEmail = String(member.profile?.email || '').trim();
+    const details = document.createElement('p');
+    details.textContent = [
+      profileEmail && profileEmail !== memberLabel(member) ? profileEmail : '',
+      t('access.panelProjectCount', '{count} proyectos con acceso').replace('{count}', String(member.projectSpaceIds.length))
+    ].filter(Boolean).join(' · ');
+    content.append(title, details);
+    const actions = document.createElement('div'); actions.className = 'access-member-actions';
+    if (panelCanManage(panel) && member.userId !== state.user.userId) {
+      actions.append(accessActionButton('revoke-panel', member.userId, t('access.revokePanel', 'Retirar del panel'), true));
+    } else if (!panelCanManage(panel) && member.userId === state.user.userId) {
+      actions.append(accessActionButton('leave-panel', member.userId, t('access.leavePanel', 'Abandonar panel'), true));
+    }
+    item.append(content, actions);
+    elements.accessMemberList.append(item);
+  }
+  if (!elements.accessMemberList.children.length) elements.accessMemberList.append(emptyRecord(t('access.noMembers', 'No hay participantes disponibles.')));
+}
+
+function renderAccessManagement() {
+  if (state.accessScope === 'panel') return renderPanelAccessManagement();
+  if (elements.accessEyebrow) elements.accessEyebrow.textContent = t('access.eyebrow', 'Control de acceso');
+  if (elements.accessTitle) elements.accessTitle.textContent = t('access.title', 'Participantes del proyecto');
+  if (elements.accessDescription) elements.accessDescription.textContent = t('access.description', 'Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.');
+  return renderProjectAccessManagement();
+}
+
 function openAccessManagement() {
   if (!selectedProjectData()) return;
+  state.accessScope = 'project';
   clearAccessConfirmation();
   setStatus(elements.accessStatus, '');
   renderAccessManagement();
   openDialog(elements.accessDialog);
 }
+
+function openPanelAccessManagement(options = {}) {
+  const panel = selectedPanelData();
+  if (!panel || !panelSpaceValues(panel).length) return;
+  state.accessScope = 'panel';
+  clearAccessConfirmation();
+  setStatus(elements.accessStatus, '');
+  renderAccessManagement();
+  openDialog(elements.accessDialog);
+  if (options.prepareLeave === true && !panelCanManage(panel)) prepareAccessAction('leave-panel', state.user?.userId || '');
+}
 function prepareAccessAction(action = '', userId = '') {
+  if (state.accessScope === 'panel') {
+    const panel = selectedPanelData();
+    if (!panel || state.p2pBusy) return;
+    const member = aggregatePanelMembers(panel).find((candidate) => candidate.userId === userId) || null;
+    const isRevoke = action === 'revoke-panel' && panelCanManage(panel) && member && member.userId !== state.user?.userId;
+    const isLeave = action === 'leave-panel' && !panelCanManage(panel) && userId === state.user?.userId;
+    if (!isRevoke && !isLeave) return;
+    const panelSpaces = panelSpaceValues(panel);
+    const spaceIds = isRevoke
+      ? member.projectSpaceIds.filter((spaceId) => panelSpaces.some((space) => space.spaceId === spaceId && space.ownerUserId === state.user?.userId))
+      : panelSpaces.map((space) => space.spaceId);
+    if (!spaceIds.length) return;
+    const label = isRevoke ? memberLabel(member) : panelDisplayName(panel, state.user || {});
+    state.pendingAccessAction = { action, userId, spaceIds, panelOwnerUserId: panel.ownerUserId, label };
+    elements.accessConfirmMessage.textContent = isRevoke
+      ? t('access.revokePanelConfirm', '{name} perderá el acceso a todos los proyectos de este panel donde participa.').replace('{name}', label)
+      : t('access.leavePanelConfirm', 'Perderás acceso a todos los proyectos visibles de este panel y sus copias locales serán retiradas de este dispositivo.');
+    elements.accessConfirmButton.textContent = isRevoke ? t('access.revokePanelConfirmButton', 'Retirar') : t('access.leavePanelConfirmButton', 'Abandonar panel');
+    elements.accessConfirmButton.classList.add('button-danger');
+    elements.accessConfirmButton.classList.remove('button-primary');
+    elements.accessConfirmPanel.classList.remove('hidden');
+    elements.accessConfirmButton.focus();
+    return;
+  }
   const data = selectedProjectData();
   if (!data || state.p2pBusy) return;
   const isProjectDeletion = action === 'delete-project';
@@ -1013,6 +1275,42 @@ async function executeAccessAction() {
   setP2PBusy(true); setStatus(elements.accessStatus, t('access.processing', 'Aplicando cambio de acceso…'));
   try {
     let result = null;
+    if (['revoke-panel', 'leave-panel'].includes(pending.action)) {
+      const failures = [];
+      let completed = 0;
+      for (const spaceId of pending.spaceIds || []) {
+        try {
+          if (pending.action === 'revoke-panel') await semillaP2P.revoke(spaceId, pending.userId);
+          else await semillaP2P.leave(spaceId);
+          completed += 1;
+        } catch (error) {
+          failures.push({ spaceId, error });
+        }
+      }
+      applyP2PState(semillaP2P.bootstrapState);
+      await refreshProjects();
+      clearAccessConfirmation();
+      closeDialog(elements.accessDialog);
+      if (pending.action === 'leave-panel') state.selectedPanelOwnerUserId = '';
+      renderDashboard();
+      if (failures.length) {
+        setStatus(
+          elements.dashboardStatus,
+          t('access.panelPartial', '{completed} cambios se aplicaron y {failed} quedaron pendientes. Abre el panel para reintentar los proyectos restantes.')
+            .replace('{completed}', String(completed)).replace('{failed}', String(failures.length)),
+          'warning'
+        );
+      } else {
+        setStatus(
+          elements.dashboardStatus,
+          pending.action === 'leave-panel'
+            ? t('access.leftPanelSuccess', 'Abandonaste el panel y se retiraron de este dispositivo los proyectos a los que tenías acceso.')
+            : t('access.revokedPanelSuccess', 'El participante fue retirado de todos los proyectos del panel donde tenía acceso.'),
+          'success'
+        );
+      }
+      return;
+    }
     if (pending.action === 'revoke') result = await semillaP2P.revoke(pending.spaceId, pending.userId);
     if (pending.action === 'transfer') result = await semillaP2P.transfer(pending.spaceId, pending.userId);
     if (pending.action === 'leave') result = await semillaP2P.leave(pending.spaceId);
@@ -2073,15 +2371,138 @@ function openTrashDialog() {
   openDialog(elements.trashDialog);
 }
 
-function openInviteForm() { if (!selectedProjectData()) return; elements.inviteForm.reset(); const read = elements.inviteForm.querySelector('input[value="read"]'); if (read) read.checked = true; const add = elements.inviteForm.querySelector('input[value="add"]'); if (add) add.checked = true; const projection = elements.inviteForm.querySelector('input[value="projection"]'); if (projection) projection.checked = true; setStatus(elements.inviteStatus, ''); openDialog(elements.inviteDialog); elements.inviteEmailInput.focus(); }
-async function submitInvitation(event) {
-  event.preventDefault(); if (state.p2pBusy) return; const data = selectedProjectData(); const email = String(elements.inviteEmailInput.value || '').trim(); const permissions = normalizeCollaborationPermissions([...elements.inviteForm.querySelectorAll('input[name="permission"]:checked')].map((input) => input.value)); if (!data || !email) return;
-  setP2PBusy(true); setStatus(elements.inviteStatus, t('invite.sending', 'Enviando invitación…'));
-  try { const result = await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: 'admin.project', permissions }); applyP2PState(semillaP2P.bootstrapState); closeDialog(elements.inviteDialog); setStatus(elements.projectStatus, result.reused ? t('invite.alreadyPending', 'La invitación ya estaba pendiente.') : t('invite.sent', 'Invitación enviada correctamente.'), 'success'); }
-  catch (error) { setStatus(elements.inviteStatus, error?.message || t('invite.error', 'No se pudo enviar la invitación.'), 'error'); }
-  finally { setP2PBusy(false); }
+function openInviteForm(scope = 'project') {
+  const panel = selectedPanelData();
+  if (scope === 'panel') {
+    if (!panelCanManage(panel) || !panelProjectValues(panel).length) return;
+    state.inviteScope = 'panel';
+  } else {
+    if (!selectedProjectData()) return;
+    state.inviteScope = 'project';
+  }
+  elements.inviteForm.reset();
+  const read = elements.inviteForm.querySelector('input[value="read"]'); if (read) read.checked = true;
+  const add = elements.inviteForm.querySelector('input[value="add"]'); if (add) add.checked = true;
+  const projection = elements.inviteForm.querySelector('input[value="projection"]'); if (projection) projection.checked = true;
+  setStatus(elements.inviteStatus, '');
+  openDialog(elements.inviteDialog);
+  elements.inviteEmailInput.focus();
 }
-async function respondInvitation(event) { const button = event.target.closest('button[data-invitation-id]'); if (!button || state.p2pBusy) return; setP2PBusy(true); try { const result = await semillaP2P.respondToInvitation(button.dataset.invitationId, button.dataset.decision); const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, button.dataset.decision); const accessRevoked = result?.accessRevoked === true; const replicaPending = result?.replicaPending === true; applyP2PState(semillaP2P.bootstrapState); if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog); const message = accessRevoked ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.') : replicaPending ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.') : canonicalDecision === 'accept' ? t('invite.accepted', 'Invitación aceptada.') : t('invite.rejected', 'Invitación rechazada.'); setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success'); } catch (error) { setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error'); } finally { setP2PBusy(false); } }
+
+async function submitInvitation(event) {
+  event.preventDefault(); if (state.p2pBusy) return;
+  const email = String(elements.inviteEmailInput.value || '').trim();
+  const permissions = normalizeCollaborationPermissions([...elements.inviteForm.querySelectorAll('input[name="permission"]:checked')].map((input) => input.value));
+  if (!email) return;
+  const panel = state.inviteScope === 'panel' ? selectedPanelData() : null;
+  const data = state.inviteScope === 'panel' ? null : selectedProjectData();
+  if (state.inviteScope === 'panel' && (!panelCanManage(panel) || !panelProjectValues(panel).length)) return;
+  if (state.inviteScope !== 'panel' && !data) return;
+
+  setP2PBusy(true); setStatus(elements.inviteStatus, t('invite.sending', 'Enviando invitación…'));
+  try {
+    if (state.inviteScope === 'panel') {
+      const projects = panelProjectValues(panel);
+      let reused = 0;
+      let alreadyMembers = 0;
+      let created = 0;
+      const failures = [];
+      for (const projectData of projects) {
+        try {
+          const result = await semillaP2P.invite(email, {
+            spaceId: projectData.space.spaceId,
+            resourceType: PANEL_INVITATION_RESOURCE_TYPE,
+            permissions
+          });
+          if (result?.reused) reused += 1;
+          else created += 1;
+        } catch (error) {
+          if (isSessionChangedError(error)) throw error;
+          if (Number(error?.status || 0) === 409 && error?.code === 'P2P_INVITATION_RECIPIENT_MEMBER') {
+            alreadyMembers += 1;
+            continue;
+          }
+          failures.push({ spaceId: projectData.space.spaceId, error });
+        }
+      }
+      const completed = created + reused + alreadyMembers;
+      if (!completed && failures.length) throw failures[0].error;
+      applyP2PState(semillaP2P.bootstrapState);
+      closeDialog(elements.inviteDialog);
+      if (failures.length) {
+        setStatus(
+          elements.dashboardStatus,
+          t('invite.panelPartialSent', 'Se procesaron {completed} proyectos del panel y {failed} no pudieron invitarse. Puedes repetir la invitación para completar solo los pendientes.')
+            .replace('{completed}', String(completed)).replace('{failed}', String(failures.length)),
+          'warning'
+        );
+      } else if (alreadyMembers === projects.length) {
+        setStatus(elements.dashboardStatus, t('invite.panelAlreadyMember', 'Esta cuenta ya participa en todos los proyectos de este panel.'), 'success');
+      } else if (reused === projects.length) {
+        setStatus(elements.dashboardStatus, t('invite.panelAlreadyPending', 'La invitación al panel ya estaba pendiente para todos los proyectos.'), 'success');
+      } else if (reused + alreadyMembers === projects.length) {
+        setStatus(elements.dashboardStatus, t('invite.panelAlreadyCovered', 'La cuenta ya participa en algunos proyectos y las invitaciones de los demás ya estaban pendientes.'), 'success');
+      } else {
+        setStatus(elements.dashboardStatus, t('invite.panelSent', 'Invitación al panel enviada. El destinatario la verá como una sola solicitud.'), 'success');
+      }
+      return;
+    }
+    const result = await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: 'admin.project', permissions });
+    applyP2PState(semillaP2P.bootstrapState); closeDialog(elements.inviteDialog);
+    setStatus(elements.projectStatus, result.reused ? t('invite.alreadyPending', 'La invitación ya estaba pendiente.') : t('invite.sent', 'Invitación enviada correctamente.'), 'success');
+  } catch (error) {
+    setStatus(elements.inviteStatus, error?.message || t('invite.error', 'No se pudo enviar la invitación.'), 'error');
+  } finally { setP2PBusy(false); }
+}
+
+async function respondInvitation(event) {
+  const button = event.target.closest('button[data-invitation-group-id]');
+  if (!button || state.p2pBusy) return;
+  const group = state.invitationGroups.get(button.dataset.invitationGroupId);
+  if (!group?.invitations?.length) return;
+  const decision = button.dataset.decision;
+  setP2PBusy(true);
+  try {
+    let replicaPending = false;
+    let accessRevoked = false;
+    let accepted = 0;
+    let responded = 0;
+    const failures = [];
+    for (const invitation of group.invitations) {
+      try {
+        const result = await semillaP2P.respondToInvitation(invitation.invitationId, decision);
+        const canonicalDecision = resolveCanonicalInvitationDecision(result?.invitation, decision);
+        if (canonicalDecision === 'accept') accepted += 1;
+        responded += 1;
+        replicaPending = replicaPending || result?.replicaPending === true;
+        accessRevoked = accessRevoked || result?.accessRevoked === true;
+      } catch (error) {
+        if (isSessionChangedError(error)) throw error;
+        failures.push({ invitationId: invitation.invitationId, error });
+      }
+    }
+    if (!responded && failures.length) throw failures[0].error;
+    applyP2PState(semillaP2P.bootstrapState);
+    if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
+    const message = failures.length
+      ? t('invite.panelResponsePartial', 'Se procesaron {completed} proyectos y {failed} siguen pendientes. Puedes repetir la respuesta para completar únicamente los restantes.')
+        .replace('{completed}', String(responded)).replace('{failed}', String(failures.length))
+      : accessRevoked
+        ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.')
+        : replicaPending
+          ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.')
+          : decision === 'accept' && group.kind === 'panel'
+            ? t('invite.panelAccepted', 'Panel aceptado. Sus proyectos autorizados se están sincronizando en esta cuenta.')
+            : decision === 'accept' && accepted
+              ? t('invite.accepted', 'Invitación aceptada.')
+              : t('invite.rejected', 'Invitación rechazada.');
+    setStatus(elements.dashboardStatus, message, failures.length || accessRevoked || replicaPending ? 'warning' : 'success');
+  } catch (error) {
+    applyP2PState(semillaP2P.bootstrapState);
+    setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');
+  } finally { setP2PBusy(false); }
+}
+
 function renderLocalNetworkStatus(detail = null) {
   const status = detail?.status || semillaP2P.getLocalNetworkStatus();
   if (elements.localNetworkButton) elements.localNetworkButton.hidden = status.enabled !== true;
@@ -2313,7 +2734,7 @@ elements.localNetworkCopy?.addEventListener('click', copyLocalNetworkCode);
 elements.deviceList?.addEventListener('click', (event) => { const button = event.target.closest('button[data-device-retire]'); if (button) prepareDeviceRetirement(button.dataset.deviceRetire); });
 elements.deviceConfirmButton?.addEventListener('click', executeDeviceRetirement); elements.deviceConfirmCancel?.addEventListener('click', clearDeviceConfirmation);
 elements.protectStorageButton?.addEventListener('click', () => requestStorageProtection({ announce: true }));
-elements.newProjectButton?.addEventListener('click', () => { requestStorageProtection(); openProjectForm('create'); }); elements.projectForm?.addEventListener('submit', submitProject); elements.editProjectButton?.addEventListener('click', () => openProjectForm('edit'));
+elements.newProjectButton?.addEventListener('click', () => { if (!panelCanManage(selectedPanelData())) return; requestStorageProtection(); openProjectForm('create'); }); elements.projectForm?.addEventListener('submit', submitProject); elements.editProjectButton?.addEventListener('click', () => openProjectForm('edit'));
 elements.projectFilterInput?.addEventListener('input', (event) => {
   state.projectFilterQuery = String(event.currentTarget?.value || '').slice(0, 300);
   renderDashboard();
@@ -2336,10 +2757,16 @@ elements.projectFilterClear?.addEventListener('click', () => {
 elements.projectList?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope]');
   if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
+  const panel = event.target.closest('button[data-open-panel]');
+  if (panel) { openPanel(panel.dataset.openPanel); return; }
   const open = event.target.closest('button[data-open-project]');
   if (open) openProject(open.dataset.openProject);
 });
 elements.backButton?.addEventListener('click', showDashboard);
+elements.backToPanelsButton?.addEventListener('click', showPanelDirectory);
+elements.panelInviteButton?.addEventListener('click', () => openInviteForm('panel'));
+elements.panelMembersButton?.addEventListener('click', () => openPanelAccessManagement());
+elements.panelLeaveButton?.addEventListener('click', () => openPanelAccessManagement({ prepareLeave: true }));
 elements.addPurchaseButton?.addEventListener('click', () => openRecordForm('purchase')); elements.addIncomeButton?.addEventListener('click', () => openRecordForm('income')); elements.addProjectionButton?.addEventListener('click', () => openRecordForm('projection')); elements.recordForm?.addEventListener('submit', submitRecord);
 [elements.purchaseList, elements.projectionList, elements.incomeList].forEach((list) => list?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope]');
@@ -2353,7 +2780,7 @@ elements.trashList?.addEventListener('click', (event) => {
 elements.actionMenuList?.addEventListener('click', handleActionMenuSelection);
 elements.actionMenuConfirmButton?.addEventListener('click', executeActionMenuConfirmation);
 elements.actionMenuConfirmCancel?.addEventListener('click', clearActionMenuConfirmation);
-elements.inviteCollaboratorButton?.addEventListener('click', openInviteForm); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
+elements.inviteCollaboratorButton?.addEventListener('click', () => openInviteForm('project')); elements.inviteForm?.addEventListener('submit', submitInvitation); elements.invitationsButton?.addEventListener('click', () => openDialog(elements.invitationsDialog)); elements.invitationList?.addEventListener('click', respondInvitation);
 elements.manageAccessButton?.addEventListener('click', openAccessManagement);
 elements.accessMemberList?.addEventListener('click', (event) => {
   const cancel = event.target.closest('button[data-permission-cancel]');

@@ -67,13 +67,19 @@
       <section id="dashboard-view" class="view-stack">
         <div class="section-heading">
           <div>
-            <p class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
-            <h2 data-i18n="dashboard.projects">Proyectos</h2>
-            <p class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
+            <p id="dashboard-eyebrow" class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
+            <h2 id="dashboard-title" data-i18n="dashboard.panels">Paneles</h2>
+            <p id="dashboard-description" class="section-description" data-i18n="dashboard.panelsDescription">Tus paneles propios y los paneles en los que participas, separados por propietario.</p>
           </div>
-          <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
-            <span aria-hidden="true">+</span>
-          </button>
+          <div id="dashboard-toolbar" class="dashboard-toolbar">
+            <button id="back-to-panels-button" class="button button-ghost button-compact hidden" type="button" data-i18n="dashboard.backToPanels">← Paneles</button>
+            <button id="panel-invite-button" class="button button-secondary button-compact hidden" type="button" data-i18n="dashboard.invitePanel">Invitar al panel</button>
+            <button id="panel-members-button" class="button button-secondary button-compact hidden" type="button" data-i18n="dashboard.panelMembers">Participantes</button>
+            <button id="panel-leave-button" class="button button-danger button-compact hidden" type="button" data-i18n="dashboard.leavePanel">Abandonar panel</button>
+            <button id="new-project-button" class="add-project-button hidden" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
         </div>
 
         <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
@@ -274,8 +280,8 @@
 
   <dialog id="access-dialog" class="modal-card modal-wide">
     <div class="modal-form">
-      <div class="modal-heading"><div><p class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
-      <p class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
+      <div class="modal-heading"><div><p id="access-eyebrow" class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 id="access-title" data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
+      <p id="access-description" class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
       <div id="access-member-list" class="access-member-list"></div>
       <section id="access-owner-actions" class="access-owner-actions hidden">
         <div>

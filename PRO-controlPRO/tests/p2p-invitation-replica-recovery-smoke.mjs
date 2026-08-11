@@ -220,7 +220,7 @@ assert.match(realtimeMethod, /authorizationState: requiresSnapshotRecovery \? 'u
 assert.match(realtimeMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'El replay no protege una réplica que ya estaba confirmada.');
 assert.match(realtimeMethod, /await saveControlStateAtomically\(committedControlState\)/);
 assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'realtime-invitation' \}\)/);
-assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: 'force' \}\)/, 'Una aceptación remota no fuerza snapshot para esta réplica.');
+assert.match(realtimeMethod, /requestSnapshots: 'force',[\s\S]*snapshotSpaceIds: cleanSpaceId \? \[cleanSpaceId\] : \[\]/, 'Una aceptación remota debe forzar snapshot únicamente para el espacio recién autorizado.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
 assert.match(realtimeMethod, /allowReplicaPending: true/, 'La aceptación remota bloquearía la cola antes de recibir el snapshot que debe completarla.');
@@ -243,7 +243,7 @@ const responseStart = inviteEnd + 1;
 const responseEnd = clientSource.indexOf('\n  async leave(', responseStart);
 const responseMethod = clientSource.slice(responseStart, responseEnd);
 assert.match(responseMethod, /canonicalDecision === 'accept'/);
-assert.match(responseMethod, /requestSnapshots: 'force'/, 'El dispositivo que acepta no fuerza su propia recuperación.');
+assert.match(responseMethod, /requestSnapshots: 'force',[\s\S]*snapshotSpaceIds: acceptedSpaceId \? \[acceptedSpaceId\] : \[\]/, 'El dispositivo que acepta debe recuperar únicamente el espacio recién autorizado.');
 assert.match(responseMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación local no confirma su réplica contra el bootstrap autoritativo.');
 assert.match(responseMethod, /P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED/, 'La aceptación local no distingue una réplica todavía no confirmada.');
 assert.match(responseMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación local ignora el watermark de recuperación local.');
