@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
-  "releaseId": "semilla-appweb-pwa@1.10.24+2026-08-08-192",
-  "version": "1.10.24",
-  "build": "2026-08-08-192",
-  "releasedAt": "2026-08-08T13:30:00-05:00",
+  "releaseId": "semilla-appweb-pwa@1.9.98+2026-08-04-159",
+  "version": "1.9.98",
+  "build": "2026-08-04-159",
+  "releasedAt": "2026-08-04T20:47:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -27,8 +27,8 @@
   "criticalAssets": [
     {
       "url": "./index.html",
-      "sha256": "330cd02bc7dc4ca2d374253e61b2832e44f31868c872a96fe104fa4d82c7867e",
-      "bytes": 28382
+      "sha256": "08637cb3f2cd24ec58fca75dd8a57aa67708e42726d0bd2e216d8ecaa40cbb2e",
+      "bytes": 27547
     },
     {
       "url": "./offline.html",
@@ -42,18 +42,18 @@
     },
     {
       "url": "./sw.js",
-      "sha256": "4124eb15b7760ea4ae733a20b97e73cc9e79f19c3f74a0d3b1118ff7d4076b75",
-      "bytes": 34148
+      "sha256": "731ff35152016367d3f3faee523f62dcaababf0141c104d777282a3e5aa9b9af",
+      "bytes": 34121
     },
     {
       "url": "./src/css/app.css",
-      "sha256": "f3e08cc0f30c67dab41c8419487a52f4166d9fd4a3e3b490918f340ecd58b084",
-      "bytes": 40863
+      "sha256": "b8be46936663c8e3db73eaa6d0606ca5f2ea59472ca1aceebddf990f94f54c1f",
+      "bytes": 37981
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "dc3593beae5e13369b73ec4fa8fd2b4a176c00c2a47c687f74bf808dc84211fa",
-      "bytes": 5296
+      "sha256": "33ab6844264e417d27bd2f732aafd8dc5114788d81d869f3b0af64a205144906",
+      "bytes": 5264
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -62,8 +62,8 @@
     },
     {
       "url": "./src/js/config.js",
-      "sha256": "60a102aeb4ae1af7ed40ec8b4d00f5c6c26ee5665c6ef75fbde91b6ef4ae48da",
-      "bytes": 7001
+      "sha256": "2692671f349c033226ccb975ecec03e31fa90156f5a8df2a35bcd6a75616ed6d",
+      "bytes": 6939
     },
     {
       "url": "./src/js/application-scope.js",
@@ -72,18 +72,18 @@
     },
     {
       "url": "./src/js/api.js",
-      "sha256": "059a0e8e69d57eff15bae56df9a2fc5d57c9e944b6b3959263ff862a3563904c",
-      "bytes": 8863
+      "sha256": "0a3be4b3ba39ddf51ec5c937d395694d114354e412606be2538734bffb028df1",
+      "bytes": 6105
     },
     {
       "url": "./src/js/firebase-auth.js",
-      "sha256": "7536badc5e6a7c74307665c35cdd6ed96684bfd68e0dc839a9ee8d193a823821",
-      "bytes": 4833
+      "sha256": "9f06349cdae270f836f64dbb5052ad2489501e48acaee74400f4c5458550bcc0",
+      "bytes": 4406
     },
     {
       "url": "./src/js/p2p-storage.js",
-      "sha256": "03a5e7c7198fa10003ef6651fddd9e9902c43d7ec49fc61d851452629ec2cb8f",
-      "bytes": 89119
+      "sha256": "7782574b8b175ec2aebc3f6edb041713432b28236dec88ec3076a4760c220882",
+      "bytes": 86648
     },
     {
       "url": "./src/js/p2p-durability.js",
@@ -92,8 +92,8 @@
     },
     {
       "url": "./src/js/p2p-crypto.js",
-      "sha256": "3de8cfeaf1e9526f75a269c99573d765e6efd270d73d2c3fe96849d2fcb505a8",
-      "bytes": 48863
+      "sha256": "fa00f15ad092557bbf4b2295b8cd7e9c3b648319a3d04d75ec10c5c905a9c1da",
+      "bytes": 46703
     },
     {
       "url": "./src/js/p2p-tab-coordinator.js",
@@ -102,13 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "a613401459faa96fab371e4bbc66dc8e4b8182302cbd19f2a7435de4bc73a623",
-      "bytes": 448889
-    },
-    {
-      "url": "./src/js/p2p-audit.js",
-      "sha256": "5636103ba640d7cc4b5d4d13d0b551546eccc833a8a4f08851293a0bcdebe85f",
-      "bytes": 10200
+      "sha256": "57fe7a7fbd78b58ba652371f3b5fb13ed8caa4d7f959b015f3c7ec6b7b54064f",
+      "bytes": 379985
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -122,13 +117,13 @@
     },
     {
       "url": "./src/js/p2p-invitation-intent.js",
-      "sha256": "7d19a8d94daef74cffdddc09dff12e4e543e1cf9ef78e79feb3f544a13f0a079",
-      "bytes": 6479
+      "sha256": "c91cf4fbad6a66e073236dd67565461997ddd2ed6c285d58a6185424afaa4602",
+      "bytes": 2512
     },
     {
       "url": "./src/js/project-domain.js",
-      "sha256": "bde5dbb0edff747ab492c7e94d7834bfb41670d938d141098d8d051bca6ccea6",
-      "bytes": 29410
+      "sha256": "aa8582df5611d3283ceeb63534a2cb713f8a4e9f09d0951e23597273c2d2c2ad",
+      "bytes": 19139
     },
     {
       "url": "./src/js/device-management.js",
@@ -157,23 +152,23 @@
     },
     {
       "url": "./src/js/pwa-update-manager.js",
-      "sha256": "660c0d5ff004e829856859c95b215c1622ea13ca0765f1451b1ecef4df66a941",
-      "bytes": 22660
+      "sha256": "86a3988f059672d89eee7e8929abb964551b1bdb50660dc86a404a82b443c29d",
+      "bytes": 22203
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "5ec2c637f09a0a640408f35d8c521dce95687e5019e6c2da74ba607a89b8b1b9",
-      "bytes": 197471
+      "sha256": "d8b8b91d7e87ca316f3f5f992efb5d05012f5f84880acf012a788d52b12496c8",
+      "bytes": 176188
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "146d1645696cc0581887f9113f35040b87141e239773ea4640baceb9c34220e9",
+      "sha256": "59281921d6d026fb784fb6fb67ed0146a3d4b6a676a4da2cf6b87705d8d0ebeb",
       "bytes": 981
     },
     {
       "url": "./textX/app/es.json",
-      "sha256": "d64a0a213076ade6cd152bec6e773cb200c06b2e9c16ced078575456b04a6798",
-      "bytes": 31821
+      "sha256": "0626c9b550e348b2731f00de83a1ff00860cf65cb03913241104d9979a602b24",
+      "bytes": 28867
     },
     {
       "url": "./textX/seo/es.json",
@@ -182,8 +177,8 @@
     },
     {
       "url": "./textX/app/ar.json",
-      "sha256": "3cc7eea2ee667f71df6b16cb41148693331c638612b42ccb71ff5ce66ce8db44",
-      "bytes": 38583
+      "sha256": "b7cc310a0f26ca15ff49f989106baebddd1254567de221b86cb38643d150a227",
+      "bytes": 34845
     },
     {
       "url": "./textX/seo/ar.json",
@@ -192,8 +187,8 @@
     },
     {
       "url": "./textX/app/en.json",
-      "sha256": "1d0d4f41fd942fc9391ab2b7072677d60f6b435e0abcd7d9559699051301cbbc",
-      "bytes": 30017
+      "sha256": "606ed385b2531bf1f4792c699300149b7f0a35b471e00808a3da4a61af0b3e48",
+      "bytes": 27125
     },
     {
       "url": "./textX/seo/en.json",

@@ -63,10 +63,6 @@ export function validateSnapshotBudgetMetadata(payload = {}, options = {}) {
   const chunkCount = Number(payload.chunkCount);
   const snapshotByteCount = Number(payload.snapshotByteCount);
   const chunkByteCount = payload.chunkByteCount === undefined ? null : Number(payload.chunkByteCount);
-  const measuredChunkByteCount = Number.isInteger(Number(options.measuredChunkByteCount))
-    && Number(options.measuredChunkByteCount) >= 0
-    ? Number(options.measuredChunkByteCount)
-    : (Array.isArray(payload.entities) ? jsonByteLength(payload.entities) : null);
   if (!Number.isInteger(chunkCount) || chunkCount < 1 || chunkCount > maxChunks) {
     return { valid: false, reason: 'snapshot_chunk_limit_exceeded' };
   }
@@ -82,8 +78,8 @@ export function validateSnapshotBudgetMetadata(payload = {}, options = {}) {
   }
   if (
     chunkByteCount !== null
-    && measuredChunkByteCount !== null
-    && chunkByteCount !== measuredChunkByteCount
+    && Array.isArray(payload.entities)
+    && chunkByteCount !== jsonByteLength(payload.entities)
   ) {
     return { valid: false, reason: 'snapshot_chunk_byte_count_mismatch' };
   }
@@ -477,25 +473,18 @@ export function planSpaceReconciliation(
     const spaceId = cleanSpaceId(space.spaceId);
     const existing = existingBySpaceId.get(spaceId) || null;
     if (pendingReplicaSet.has(spaceId)) {
-      const authorizationUnconfirmedAt = existing?.authorizationUnconfirmedAt
-        || space.authorizationUnconfirmedAt
-        || new Date().toISOString();
       return {
         ...space,
         authorizationState: 'unconfirmed',
         authorizationPendingReason: 'replica_recovery',
-        authorizationUnconfirmedAt,
-        replicaBootstrapMode: 'minimal',
-        replicaStaleAt: existing?.replicaStaleAt || space.replicaStaleAt || authorizationUnconfirmedAt,
-        replicaRefreshRequestedAt: existing?.replicaRefreshRequestedAt || space.replicaRefreshRequestedAt || ''
+        authorizationUnconfirmedAt: existing?.authorizationUnconfirmedAt
+          || space.authorizationUnconfirmedAt
+          || new Date().toISOString()
       };
     }
     const confirmed = { ...space, authorizationState: 'confirmed' };
     delete confirmed.authorizationPendingReason;
     delete confirmed.authorizationUnconfirmedAt;
-    delete confirmed.replicaBootstrapMode;
-    delete confirmed.replicaStaleAt;
-    delete confirmed.replicaRefreshRequestedAt;
     return confirmed;
   });
   return {
@@ -608,7 +597,6 @@ async function replaceSpacesInStores(stores = {}, spaces = [], options = {}) {
   return {
     removedSpaceIds,
     preservedSpaceIds: reconciliation.preservedSpaceIds,
-    pendingReplicaSpaceIds: reconciliation.pendingReplicaSpaceIds,
     purged,
     spaces: reconciledSpaces || []
   };
@@ -1146,27 +1134,7 @@ function materializeEntityState(state = {}) {
   };
 }
 
-function isCanonicalAdminProjectRootValue(value = null) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const initialBudget = Number(value.initialBudget);
-  return Boolean(String(value.name || '').trim())
-    && Object.prototype.hasOwnProperty.call(value, 'initialBudget')
-    && Number.isFinite(initialBudget)
-    && initialBudget > 0
-    && Boolean(String(value.createdAt || value.updatedAt || '').trim());
-}
-
-function canAuthoritativeSnapshotRepairProjectRoot(state = {}, operation = {}) {
-  if (String(operation.type || '').trim() !== 'entity.put'
-    || String(operation.entityType || '').trim() !== 'admin.project'
-    || String(operation.entityId || '').trim() !== 'project'
-    || !state.confirmedExists
-    || state.confirmedDeleted) return false;
-  return !isCanonicalAdminProjectRootValue(state.confirmedValue)
-    && isCanonicalAdminProjectRootValue(operation.payload?.value);
-}
-
-function reduceEntityRecord(existing = null, event = {}, options = {}) {
+function reduceEntityRecord(existing = null, event = {}) {
   const operation = event.operation || {};
   if (!isEntityOperation(operation)) {
     return {
@@ -1187,8 +1155,7 @@ function reduceEntityRecord(existing = null, event = {}, options = {}) {
   const incomingSequence = normalizeSequence(event.spaceSequence);
   const incomingStateRevision = normalizeSequence(event.stateRevision);
   const incomingCanonicalRevision = incomingStateRevision || incomingSequence;
-  const authoritativeSnapshot = options.authoritativeSnapshot === true;
-  const optimistic = Boolean(event.optimistic) || (!incomingCanonicalRevision && !authoritativeSnapshot);
+  const optimistic = Boolean(event.optimistic) || !incomingCanonicalRevision;
   const operationId = operationIdOf(operation);
 
   if (optimistic) {
@@ -1208,13 +1175,7 @@ function reduceEntityRecord(existing = null, event = {}, options = {}) {
   state.pendingOperations = state.pendingOperations.filter((entry) => operationIdOf(entry.operation) !== operationId);
   const removedPending = state.pendingOperations.length !== pendingBefore;
   const existingCanonicalRevision = normalizeSequence(state.confirmedStateRevision || state.confirmedSpaceSequence);
-  const repairInvalidProjectRoot = authoritativeSnapshot
-    && existingCanonicalRevision > incomingCanonicalRevision
-    && canAuthoritativeSnapshotRepairProjectRoot(state, operation);
-  const staleCanonical = authoritativeSnapshot
-    ? existingCanonicalRevision > incomingCanonicalRevision && !repairInvalidProjectRoot
-    : existingCanonicalRevision >= incomingCanonicalRevision;
-  if (staleCanonical) {
+  if (existingCanonicalRevision >= incomingCanonicalRevision) {
     return {
       applied: removedPending,
       entity: materializeEntityState(state),
@@ -1320,7 +1281,7 @@ function reconcileEntityMissingFromSnapshot(existing = null, sourceStateRevision
   };
 }
 
-async function applyEntityOperation(store, event = {}, options = {}) {
+async function applyEntityOperation(store, event = {}) {
   const operation = event.operation || {};
   const key = entityKey(event.spaceId, operation.entityType, operation.entityId);
   const existing = await requestToPromise(store.get(key));
@@ -1340,7 +1301,7 @@ async function applyEntityOperation(store, event = {}, options = {}) {
       operation: { ...operation, referenceConflicts }
     };
   }
-  const result = reduceEntityRecord(existing, guardedEvent, options);
+  const result = reduceEntityRecord(existing, guardedEvent);
   if (result.entity) await requestToPromise(store.put(result.entity));
   else if (result.applied) await requestToPromise(store.delete(key));
   const dependent = await applyDependentDeletes(store, guardedEvent, result, sourceWasActive);
@@ -1500,13 +1461,7 @@ async function stageSnapshotChunk(event = {}) {
   const entityCount = Number(payload.entityCount);
   const sourceStateRevision = Number(payload.sourceStateRevision);
   const entities = Array.isArray(payload.entities) ? payload.entities : [];
-  const measuredTransportChunkByteCount = Number(event?.transportSnapshotChunkByteCount);
-  const budget = validateSnapshotBudgetMetadata(payload, {
-    measuredChunkByteCount: Number.isInteger(measuredTransportChunkByteCount)
-      && measuredTransportChunkByteCount >= 0
-      ? measuredTransportChunkByteCount
-      : undefined
-  });
+  const budget = validateSnapshotBudgetMetadata(payload);
   if (
     !snapshotKey
     || !budget.valid
@@ -1662,7 +1617,7 @@ async function finalizeSnapshot(event = {}) {
             : { value: source.value }
         }
       };
-      const itemResult = await applyEntityOperation(stores[STORES.entities], snapshotEvent, { authoritativeSnapshot: true });
+      const itemResult = await applyEntityOperation(stores[STORES.entities], snapshotEvent);
       maxStateRevision = Math.max(maxStateRevision, Number(itemResult.maxStateRevision || 0));
       if (itemResult.applied) applied += 1;
     }

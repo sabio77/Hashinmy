@@ -14,7 +14,7 @@ const helperSource = source
   .slice(helperStart, helperEnd)
   .replaceAll('export function ', 'function ');
 
-const harness = `${helperSource}\nexport { assertCanonicalOperationEnvelope, assertCanonicalControlEnvelope, assertRealtimeEventEnvelope, buildRejectedControlRecoveryGap, assertRealtimeSequenceContinuity };`;
+const harness = `${helperSource}\nexport { assertCanonicalOperationEnvelope, assertCanonicalControlEnvelope, assertRealtimeEventEnvelope, assertRealtimeSequenceContinuity };`;
 const module = await import(`data:text/javascript;base64,${Buffer.from(harness).toString('base64')}`);
 
 const event = (deviceSequence, overrides = {}) => ({
@@ -38,17 +38,14 @@ const controlEvent = (eventType, overrides = {}) => ({
 });
 
 const publicKey = { kty: 'EC', crv: 'P-256', x: 'x'.repeat(43), y: 'y'.repeat(43) };
-const invitation = (status = 'created', overrides = {}) => ({
+const invitation = (status = 'created') => ({
   invitationId: `inv_${status}`,
   spaceId: 'space_control_1',
   inviterUserId: 'user_inviter_1',
   recipientUserId: 'user_recipient_1',
   recipientEmail: 'persona@example.com',
   permissions: ['read', 'add'],
-  role: 'member',
-  accessScope: 'project',
-  status,
-  ...overrides
+  status
 });
 const space = {
   spaceId: 'space_control_1',
@@ -74,17 +71,6 @@ const spaceAfterInviterExit = {
       permissions: ['read', 'add', 'delete', 'projection', 'invite', 'write']
     },
     { userId: 'user_recipient_1', role: 'member', permissions: ['read', 'add'] }
-  ]
-};
-
-const elevatedPermissions = ['read', 'add', 'delete', 'projection', 'invite', 'write'];
-const spaceWithElevatedGrant = {
-  spaceId: 'space_control_1',
-  ownerUserId: 'user_owner_1',
-  members: [
-    { userId: 'user_owner_1', role: 'owner', permissions: elevatedPermissions },
-    { userId: 'user_manager_1', role: 'manager', permissions: elevatedPermissions },
-    { userId: 'user_recipient_1', role: 'admin', accessScope: 'portfolio', permissions: elevatedPermissions }
   ]
 };
 
@@ -138,46 +124,12 @@ assert.equal(module.assertRealtimeEventEnvelope({
   resetToSequence: 3
 }, { gap: true }).resetToSequence, 3);
 
-let rejectedLegacyControl = null;
-const legacyRevocation = controlEvent('p2p.membership.revoked', {
-  deviceSequence: 18,
-  deliverySequence: 2018,
-  data: { spaceId: 'space_control_1' }
-});
-try {
-  module.assertRealtimeEventEnvelope(legacyRevocation);
-} catch (error) {
-  rejectedLegacyControl = error;
-}
-assert.equal(rejectedLegacyControl?.code, 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE');
-const legacyRecoveryGap = module.buildRejectedControlRecoveryGap(legacyRevocation, rejectedLegacyControl);
-assert.equal(legacyRecoveryGap?.eventType, 'p2p.delivery.gap');
-assert.equal(legacyRecoveryGap?.currentSequence, 18);
-assert.equal(legacyRecoveryGap?.reason, 'invalid_control_envelope');
-assert.equal(legacyRecoveryGap?.cursorResetRequired, false);
-assert.equal(legacyRecoveryGap?.poisonedReason, 'membership-revoked');
-assert.equal(
-  module.buildRejectedControlRecoveryGap(legacyRevocation, new Error('otro fallo')),
-  null,
-  'Una falla no canónica no debe convertirse en una brecha que avance el cursor.'
-);
-
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
   actorUserId: 'user_owner_1',
   data: {
     space,
     targetUserId: 'user_recipient_1',
     permissions: ['read', 'add']
-  }
-})).eventType, 'p2p.membership.changed');
-assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
-  actorUserId: 'user_manager_1',
-  data: {
-    space: spaceWithElevatedGrant,
-    targetUserId: 'user_recipient_1',
-    permissions: elevatedPermissions,
-    role: 'admin',
-    accessScope: 'portfolio'
   }
 })).eventType, 'p2p.membership.changed');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked', {
@@ -198,21 +150,10 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.acc
   actorUserId: 'user_recipient_1',
   data: { invitation: invitation('accepted'), space: spaceAfterInviterExit }
 })).eventType, 'p2p.invitation.accepted');
-assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
-  actorUserId: 'user_recipient_1',
-  data: {
-    invitation: invitation('accepted', { role: 'admin', accessScope: 'portfolio', permissions: elevatedPermissions }),
-    space: spaceWithElevatedGrant
-  }
-})).eventType, 'p2p.invitation.accepted');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rejected', {
   actorUserId: 'user_recipient_1',
   data: { invitation: invitation('rejected'), space: null }
 })).eventType, 'p2p.invitation.rejected');
-assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
-  actorUserId: 'user_inviter_1',
-  data: { invitation: invitation('cancelled'), space: null }
-})).eventType, 'p2p.invitation.cancelled');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
   actorUserId: 'user_requester_1',
   sourceDeviceId: 'device_requester_0001',
@@ -250,33 +191,6 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
     currentStateRevision: 5
   }
 })).eventType, 'p2p.snapshot.request');
-assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
-  actorUserId: 'user_requester_1',
-  sourceDeviceId: 'device_requester_0001',
-  data: {
-    requestId: 'snapshot_forced_same_revision_1',
-    requestDeviceId: 'device_requester_0001',
-    requestUserId: 'user_requester_1',
-    spaceId: 'space_control_1',
-    reason: 'forced',
-    localStateRevision: 5,
-    currentStateRevision: 5
-  }
-})).eventType, 'p2p.snapshot.request');
-assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.declined', {
-  actorUserId: 'user_source_1',
-  sourceDeviceId: 'device_source_000001',
-  data: {
-    requestId: 'snapshot_request_declined_1',
-    requestDeviceId: 'device_requester_0001',
-    requestUserId: 'user_requester_1',
-    sourceDeviceId: 'device_source_000001',
-    spaceId: 'space_control_1',
-    reason: 'canonical_project_root_missing',
-    remainingSources: 0,
-    retryAvailable: true
-  }
-})).eventType, 'p2p.snapshot.declined');
 
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked')),
@@ -361,21 +275,6 @@ assert.throws(
   'Un evento de permisos contradictorio siguió reemplazando el estado canónico local.'
 );
 assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.changed', {
-    actorUserId: 'user_inviter_1',
-    data: {
-      space,
-      targetUserId: 'user_recipient_1',
-      permissions: ['read', 'add'],
-      role: 'member',
-      accessScope: 'project'
-    }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'membership-changed',
-  'Un miembro sin facultad administrativa siguió pudiendo reemplazar permisos mediante un evento realtime.'
-);
-assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
     actorUserId: 'user_recipient_1',
     data: { invitation: invitation('accepted'), space: null }
@@ -397,18 +296,6 @@ assert.throws(
   'Una aceptación sin el invitado dentro de la membresía siguió cerrándose como válida.'
 );
 assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.accepted', {
-    actorUserId: 'user_recipient_1',
-    data: {
-      invitation: invitation('accepted', { role: 'manager', accessScope: 'portfolio', permissions: elevatedPermissions }),
-      space: spaceWithElevatedGrant
-    }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'invitation-accepted-space',
-  'Una aceptación con rol distinto al persistido siguió avanzando el cursor del cliente.'
-);
-assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.rejected', {
     actorUserId: 'user_recipient_1',
     data: { invitation: invitation('rejected'), space }
@@ -416,24 +303,6 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'invitation-rejected-space',
   'Una invitación rechazada con un espacio adjunto siguió creando un estado local ambiguo.'
-);
-assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
-    actorUserId: 'user_recipient_1',
-    data: { invitation: invitation('cancelled'), space: null }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'invitation-actor',
-  'Una cancelación atribuida al invitado siguió avanzando el cursor del cliente.'
-);
-assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.invitation.cancelled', {
-    actorUserId: 'user_inviter_1',
-    data: { invitation: invitation('cancelled'), space }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'invitation-cancelled-space',
-  'Una cancelación con grafo de membresía siguió creando un estado local ambiguo.'
 );
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.key.request', {
@@ -469,43 +338,6 @@ assert.throws(
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
     && error.reason === 'snapshot-request',
   'Una solicitud de snapshot sin brecha real siguió consumiendo trabajo y cursor.'
-);
-assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
-    actorUserId: 'user_requester_1',
-    sourceDeviceId: 'device_requester_0001',
-    data: {
-      requestId: 'snapshot_request_older_remote',
-      requestDeviceId: 'device_requester_0001',
-      requestUserId: 'user_requester_1',
-      spaceId: 'space_control_1',
-      reason: 'forced',
-      localStateRevision: 6,
-      currentStateRevision: 5
-    }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'snapshot-request',
-  'Una reparación forzada aceptó una réplica remota más antigua que la local.'
-);
-assert.throws(
-  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.declined', {
-    actorUserId: 'user_source_1',
-    sourceDeviceId: 'device_source_000001',
-    data: {
-      requestId: 'snapshot_request_declined_bad',
-      requestDeviceId: 'device_requester_0001',
-      requestUserId: 'user_requester_1',
-      sourceDeviceId: 'device_other_000001',
-      spaceId: 'space_control_1',
-      reason: 'source_revision_behind',
-      remainingSources: 0,
-      retryAvailable: true
-    }
-  })),
-  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
-    && error.reason === 'snapshot-declined',
-  'El cliente aceptó un descarte de snapshot atribuido a otro dispositivo fuente.'
 );
 
 assert.throws(

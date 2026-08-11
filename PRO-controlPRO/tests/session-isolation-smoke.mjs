@@ -10,9 +10,8 @@ class MemoryStorage {
 }
 
 class FakeWindow {
-  constructor(localStorageRef = new MemoryStorage()) {
-    this.localStorage = localStorageRef;
-    this.sessionStorage = new MemoryStorage();
+  constructor() {
+    this.localStorage = new MemoryStorage();
     this.APP_SEED_CONFIG = { backendUrl: 'https://backend.example.test' };
     this.location = { hostname: 'app.example.test' };
     this.listeners = new Map();
@@ -30,15 +29,13 @@ class FakeWindow {
   clearTimeout(timer) { globalThis.clearTimeout(timer); }
 }
 
-const sharedLocalStorage = new MemoryStorage();
-const windowRef = new FakeWindow(sharedLocalStorage);
+const windowRef = new FakeWindow();
 globalThis.window = windowRef;
 
 const api = await import(`../src/js/api.js?session-isolation=${Date.now()}`);
 const {
   SESSION_CHANGED_ERROR_CODE,
   SESSION_STORAGE_KEY,
-  SESSION_WINDOW_STATE_KEY,
   apiPost,
   clearSessionToken,
   getSessionToken,
@@ -52,33 +49,10 @@ windowRef.dispatchStorage(SESSION_STORAGE_KEY, 'token_anterior', 'token_nuevo');
 windowRef.dispatchStorage('otra_clave', 'a', 'b');
 unsubscribe();
 if (observedChanges.length !== 1 || observedChanges[0].previousToken !== 'token_anterior' || observedChanges[0].token !== 'token_nuevo') {
-  throw new Error('Un contexto todavía no fijado dejó de detectar la sesión persistida disponible.');
+  throw new Error('Los cambios de sesión entre ventanas no se detectaron de forma aislada.');
 }
 
 setSessionToken('token_cuenta_a');
-if (windowRef.sessionStorage.getItem(SESSION_STORAGE_KEY) !== 'token_cuenta_a'
-  || windowRef.sessionStorage.getItem(SESSION_WINDOW_STATE_KEY) !== 'active') {
-  throw new Error('La cuenta activa no quedó fijada al contexto de esta ventana.');
-}
-const secondWindow = new FakeWindow(sharedLocalStorage);
-globalThis.window = secondWindow;
-if (getSessionToken() !== 'token_cuenta_a') {
-  throw new Error('Una ventana nueva no heredó la sesión persistida para conservar el acceso normal de la PWA.');
-}
-setSessionToken('token_cuenta_b');
-if (getSessionToken() !== 'token_cuenta_b') throw new Error('La segunda ventana no pudo adoptar una cuenta independiente.');
-globalThis.window = windowRef;
-if (getSessionToken() !== 'token_cuenta_a') {
-  throw new Error('Cambiar de cuenta en otra ventana sustituyó la sesión del invitador que debía seguir conectado como réplica fuente.');
-}
-const activeWindowChanges = [];
-const unsubscribeActive = subscribeSessionTokenChanges((change) => activeWindowChanges.push(change), { windowRef });
-windowRef.dispatchStorage(SESSION_STORAGE_KEY, 'token_cuenta_a', 'token_cuenta_b');
-unsubscribeActive();
-if (activeWindowChanges.length !== 0 || getSessionToken() !== 'token_cuenta_a') {
-  throw new Error('Un evento storage de otra pestaña todavía puede cambiar una sesión ya fijada en esta ventana.');
-}
-
 let resolveAuthenticatedFetch;
 let authenticatedHeaders;
 globalThis.fetch = (_url, options = {}) => {
@@ -284,11 +258,9 @@ if (recreatedBindingMessage?.userId !== 'user_push_recreated'
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [clientSource, appSource, firebaseSource, apiSource] = await Promise.all([
+const [clientSource, appSource] = await Promise.all([
   fs.readFile(path.join(root, 'src/js/p2p-client.js'), 'utf8'),
-  fs.readFile(path.join(root, 'src/js/app.js'), 'utf8'),
-  fs.readFile(path.join(root, 'src/js/firebase-auth.js'), 'utf8'),
-  fs.readFile(path.join(root, 'src/js/api.js'), 'utf8')
+  fs.readFile(path.join(root, 'src/js/app.js'), 'utf8')
 ]);
 for (const required of [
   'sessionToken: getSessionToken()',
@@ -308,19 +280,6 @@ for (const required of [
   'clearSessionToken(logoutToken)'
 ]) {
   if (!appSource.includes(required)) throw new Error(`Falta la transición segura de cuenta en la interfaz: ${required}`);
-}
-
-if (!apiSource.includes('window.sessionStorage?.getItem(SESSION_STORAGE_KEY)')
-  || !apiSource.includes("state === 'active' || state === 'signed_out'")) {
-  throw new Error('El token de memoriaBACKEND volvió a depender de un único localStorage compartido entre cuentas abiertas.');
-}
-if (!appSource.includes('sessionStorage.getItem(CACHED_USER_STORAGE_KEY)')
-  || !appSource.includes('sessionStorage.getItem(ACTIVE_PANEL_STORAGE_KEY)')) {
-  throw new Error('La interfaz todavía comparte entre cuentas abiertas el usuario cacheado o el panel activo.');
-}
-if (!firebaseSource.includes('browserSessionPersistence')
-  || !firebaseSource.includes('await sdk.setPersistence(auth, sdk.browserSessionPersistence)')) {
-  throw new Error('Firebase todavía puede propagar el cambio de cuenta a otra ventana que actúa como réplica P2P.');
 }
 
 const logoutSource = appSource.slice(appSource.indexOf('async function logout()'), appSource.indexOf('function openProjectForm'));

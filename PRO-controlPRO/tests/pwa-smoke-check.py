@@ -38,7 +38,6 @@ REQUIRED_FILES = [
     "src/js/p2p-crypto.js",
     "src/js/p2p-tab-coordinator.js",
     "src/js/p2p-client.js",
-    "src/js/p2p-audit.js",
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
@@ -67,11 +66,9 @@ REQUIRED_FILES = [
     "tests/p2p-multitab-smoke.mjs",
     "tests/session-isolation-smoke.mjs",
     "tests/p2p-invitation-intent-smoke.mjs",
-    "tests/p2p-audit-flow-smoke.mjs",
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
     "tests/project-domain-smoke.mjs",
-    "tests/panel-actions-ui-smoke.mjs",
     "tests/p2p-trash-lifecycle-smoke.mjs",
     "_headers",
 ]
@@ -105,7 +102,6 @@ JAVASCRIPT_FILES = [
     "src/js/p2p-crypto.js",
     "src/js/p2p-tab-coordinator.js",
     "src/js/p2p-client.js",
-    "src/js/p2p-audit.js",
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
@@ -409,21 +405,6 @@ def assert_project_domain() -> None:
         fail(f"Falló el dominio administrativo: {result.stderr.strip() or result.stdout.strip()}")
 
 
-def assert_panel_actions() -> None:
-    node = shutil.which("node")
-    if not node:
-        print("ADVERTENCIA: node no está disponible; se omite prueba del menú y participantes de panel.", file=sys.stderr)
-        return
-    result = subprocess.run(
-        [node, str(ROOT / "tests" / "panel-actions-ui-smoke.mjs")],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        fail(f"Falló el menú o la gestión de participantes del panel: {result.stderr.strip() or result.stdout.strip()}")
-
-
 def assert_invitation_notification_intent() -> None:
     node = shutil.which("node")
     if not node:
@@ -480,7 +461,6 @@ def assert_snapshot_request_liveness() -> None:
         js_root = tmp_root / "src" / "js"
         js_root.mkdir(parents=True)
         shutil.copy2(ROOT / "src" / "js" / "p2p-client.js", js_root / "p2p-client.js")
-        shutil.copy2(ROOT / "src" / "js" / "p2p-audit.js", js_root / "p2p-audit.js")
         shutil.copy2(ROOT / "src" / "js" / "p2p-permissions.js", js_root / "p2p-permissions.js")
         shutil.copy2(ROOT / "src" / "js" / "application-scope.js", js_root / "application-scope.js")
         shutil.copy2(ROOT / "src" / "js" / "p2p-invitation-intent.js", js_root / "p2p-invitation-intent.js")
@@ -1330,7 +1310,6 @@ def main() -> None:
     assert_multitab_coordination()
     assert_session_isolation()
     assert_project_domain()
-    assert_panel_actions()
     assert_trash_lifecycle()
     assert_invitation_notification_intent()
     assert_control_mutation_atomicity()
@@ -1419,12 +1398,6 @@ def main() -> None:
 
     config = (ROOT / "src/js/config.js").read_text(encoding="utf-8")
     manager = (ROOT / "src/js/pwa-update-manager.js").read_text(encoding="utf-8")
-    for required in ["runtimeVersionChanged", "serverVersionKey !== state.currentVersionKey"]:
-        if required not in manager:
-            fail(
-                "pwa-update-manager.js debe comparar version.json contra el release realmente "
-                f"ejecutado por la pestaña para recuperar runtimes PWA obsoletos: {required}"
-            )
     p2p_client = (ROOT / "src/js/p2p-client.js").read_text(encoding="utf-8")
     for required in ["enqueueEvent(payload)", "this.eventPipeline", "this.eventPipelineBlocked", "Math.max(this.lastProcessedSequence, sequence)", "stateRevisions", "snapshotChunksByBytes", "replaceBootstrapControlState", "saveControlStateAtomically", "snapshotRecoveryRequired", "reconcileSnapshotRecovery", "p2p:snapshot-source-error", "p2p:snapshot-source-deferred", "pendingForSpace", "hasOptimisticEntities", "queueWhenOffline: false", "request.expiresAt", "enqueueOptimisticOperation", "enqueueOptimisticOperationBatch", "enqueueOutboxBatch", "publishBatch", "publish-batch", "revertRejectedOutboxBatch", "abortBatchOnFailure", "P2P_BATCH_CANCELLED", "rejectOutboxOperation", "p2p:operation-reverted", "isPermanentOutboxRejection", "orderedSourceConfirmation", "normalizePublishDeliveryIntent", "P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN", "includeSourceDevice: deliveryIntent.includeSourceDevice", "'entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom'", "operationType: entity.operationType", "purgeLocalSpace", "p2p.membership.revoked", "p2p.space.deleted", "async deleteSpace(", "'/api/p2p/access/delete'", "async leave(", "async revoke(", "async updatePermissions(", "async transfer(", "requestId: String(options.requestId || options.clientRequestId || '').trim()", "async createSpace(options = {})", "error.p2pQueued = true", "normalizeDeleteReferenceGuards", "referenceGuards: normalizedReferenceGuards", "pendingAtomicEventBatches", "collectAtomicTransportBatch", "handleEventBatch", "applyDecryptedOperationEventBatch", "event-batch-assembly"]:
         if required not in p2p_client:
@@ -1599,28 +1572,8 @@ def main() -> None:
         fail("Render debe impedir un despliegue de producción sin APP_BACKEND_URL.")
     if not re.search(r'(?ms)^\s*- key: sinBACKEND\s*\n\s*value: ["\']false["\']\s*$', render):
         fail("sinBACKEND debe quedar desactivado por defecto en Render para conservar el flujo normal con memoriaBACKEND.")
-    if not re.search(
-        r"(?ms)^\s*- path: /src/\*\s*\n\s*name: Cache-Control\s*\n\s*value: [^\n]*no-cache[^\n]*must-revalidate",
-        render,
-    ):
-        fail(
-            "Render debe revalidar /src/* para impedir que una navegación cargue módulos JS/CSS "
-            "de releases distintos y deje proyectos compartidos atascados en sincronización."
-        )
 
     generator = (ROOT / "tools/generate-release.py").read_text(encoding="utf-8")
-    for forbidden in ['args.build or current.get("build")', 'args.released_at or current.get("releasedAt")']:
-        if forbidden in generator:
-            fail(
-                "tools/generate-release.py no debe reutilizar la identidad del release anterior "
-                f"durante un deploy automático: {forbidden}"
-            )
-    for required in ['args.build or datetime.now(timezone.utc)', 'args.released_at or iso_now()']:
-        if required not in generator:
-            fail(
-                "tools/generate-release.py debe generar build/releasedAt nuevos en cada ejecución CI/CD: "
-                f"{required}"
-            )
     for needle in ["discover_languages", "textX/app/*.json", "metadata_precache_urls", "update_metadata_file", "update_config_file", "update_runtime_config_file", "normalize_backend_url", "--require-backend", "render_environment", "os.environ.get(\"sinBACKEND\")", "APP_SIN_BACKEND", "discover_prompt_assets", "validate_language_key_parity", "codeSource", "src/js/application-scope.js", "src/js/skeleton-screen.js", "src/js/p2p-durability.js", "src/js/p2p-tab-coordinator.js", "src/js/p2p-invitation-intent.js", "src/js/p2p-permissions.js"]:
         if needle not in generator:
             fail(f"tools/generate-release.py no conserva autodetección/sincronización robusta: {needle}")

@@ -6,7 +6,7 @@ export const PROJECTION_ENTITY_TYPE = 'admin.projection';
 export const PROJECTION_LINK_ENTITY_TYPE = 'admin.projection-link';
 export const ADMIN_PROJECT_PERMISSION_PROFILE = 'admin-project-v1';
 
-export const COLLABORATION_PERMISSIONS = Object.freeze(['read', 'add', 'delete', 'projection', 'invite']);
+export const COLLABORATION_PERMISSIONS = Object.freeze(['read', 'add', 'delete', 'projection']);
 export const COLLABORATION_ROLES = Object.freeze(['manager', 'admin', 'individual', 'member']);
 export const INDIVIDUAL_EDIT_WINDOW_MS = 60 * 60 * 1000;
 export const MAX_MONEY_VALUE = Number.MAX_SAFE_INTEGER;
@@ -258,20 +258,6 @@ export function activeEntityValue(entity = null) {
   return entity.value && typeof entity.value === 'object' ? entity.value : null;
 }
 
-export function isCanonicalProjectRootValue(value = null) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const name = cleanText(value.name || '', 120);
-  if (!name) return false;
-  const initialBudget = moneyValue(value.initialBudget);
-  // La interfaz solo crea proyectos con presupuesto inicial mayor que cero. Algunas
-  // versiones antiguas llegaron a persistir una raíz de control con el rótulo privado
-  // del espacio, initialBudget=0 y timestamp; esa forma no contiene datos funcionales
-  // y no puede habilitar una card ni certificar que la réplica ya fue recuperada.
-  return Object.prototype.hasOwnProperty.call(value, 'initialBudget')
-    && initialBudget > 0
-    && Boolean(cleanText(value.createdAt || value.updatedAt || '', 60));
-}
-
 export function isTrashedValue(value = null) {
   return Boolean(cleanText(value && typeof value === 'object' ? value.trashedAt : '', 60));
 }
@@ -304,16 +290,11 @@ export function projectRecord(space = {}, entities = []) {
     && !candidate.deleted
   ));
   const value = activeEntityValue(entity) || {};
-  const canonicalName = cleanText(value.name || '', 120);
-  const loaded = Boolean(entity && isCanonicalProjectRootValue(value));
   return {
     spaceId: space.spaceId || '',
     ownerUserId: space.ownerUserId || '',
     members: Array.isArray(space.members) ? space.members : [],
-    // Un root mínimo o una entidad parcial nunca se presenta como proyecto cargado.
-    // Evita mostrar el título técnico "Espacio compartido" con métricas 0 mientras
-    // el snapshot real todavía está en tránsito.
-    name: canonicalName || 'Proyecto sin nombre',
+    name: cleanText(value.name || space.title || 'Proyecto sin nombre', 120),
     description: cleanText(value.description || '', 900),
     address: cleanText(value.address || '', 240),
     initialBudget: moneyValue(value.initialBudget),
@@ -323,7 +304,7 @@ export function projectRecord(space = {}, entities = []) {
     trashedBy: cleanText(value.trashedBy || '', 180),
     restoredAt: cleanText(value.restoredAt || '', 60),
     isTrashed: isTrashedValue(value),
-    loaded,
+    loaded: Boolean(entity),
     _entity: entity || null
   };
 }
@@ -463,223 +444,4 @@ export function normalizeCollaborationPermissions(input = []) {
   const values = new Set((Array.isArray(input) ? input : []).map((value) => String(value || '').toLowerCase()));
   values.add('read');
   return COLLABORATION_PERMISSIONS.filter((permission) => values.has(permission));
-}
-
-export function sharedOwnerPanelId(ownerUserId = '') {
-  const normalizedOwnerUserId = cleanText(ownerUserId, 140);
-  return normalizedOwnerUserId ? `__shared_owner_panel__:${normalizedOwnerUserId}` : '';
-}
-
-function projectOwnerProfile(data = {}) {
-  const ownerUserId = cleanText(data?.space?.ownerUserId || '', 140);
-  if (!ownerUserId) return null;
-  return (Array.isArray(data?.space?.members) ? data.space.members : [])
-    .find((member) => cleanText(member?.userId || '', 140) === ownerUserId)?.profile || null;
-}
-
-function projectPortfolioId(data = {}) {
-  return cleanText(data?.space?.governanceSpaceId || data?.project?.portfolioSpaceId || '', 140);
-}
-
-/**
- * Construye las vistas de panel únicamente a partir de espacios autorizados.
- *
- * Un usuario invitado a uno o varios proyectos no necesita ser miembro del
- * espacio administrativo del panel. En ese caso se crea una vista virtual con
- * la misma identidad del portfolio (o, para proyectos legacy, del propietario)
- * y solo se agregan los proyectos que ya están presentes en su bootstrap.
- * Esto evita mezclar propietarios diferentes y jamás revela proyectos para los
- * que la cuenta no recibió membresía.
- */
-export function buildProjectPanelScopes(input = {}) {
-  const spaces = Array.isArray(input.spaces) ? input.spaces : [];
-  const projects = Array.isArray(input.projects) ? input.projects : [];
-  const currentUserId = cleanText(input.currentUserId || '', 140);
-  const activePanelId = cleanText(input.activePanelId || '', 220);
-  const portfolioResourceType = cleanText(input.portfolioResourceType || 'admin.portfolio', 80) || 'admin.portfolio';
-  const personalPanelId = cleanText(input.personalPanelId || '__personal_panel__', 220) || '__personal_panel__';
-  const sharedProjectsPanelId = cleanText(input.sharedProjectsPanelId || '__shared_projects_panel__', 220) || '__shared_projects_panel__';
-  const portfolioHeads = input.portfolioHeads && typeof input.portfolioHeads === 'object' && !Array.isArray(input.portfolioHeads)
-    ? input.portfolioHeads
-    : {};
-  const portfolioSpacesById = new Map(spaces
-    .filter((space) => space?.resourceType === portfolioResourceType)
-    .map((space) => [cleanText(space?.spaceId || '', 140), space])
-    .filter(([spaceId]) => spaceId));
-
-  const scopes = spaces
-    .filter((space) => space?.resourceType === portfolioResourceType && (
-      space?.authorizationState !== 'unconfirmed'
-      || space?.authorizationPendingReason === 'replica_recovery'
-    ))
-    .map((space) => ({
-      id: cleanText(space?.spaceId || '', 140),
-      type: 'portfolio',
-      space,
-      ownerUserId: cleanText(space?.ownerUserId || '', 140),
-      ownerProfile: projectOwnerProfile({ space }),
-      owned: cleanText(space?.ownerUserId || '', 140) === currentUserId,
-      projects: []
-    }))
-    .filter((scope) => scope.id);
-  const scopesById = new Map(scopes.map((scope) => [scope.id, scope]));
-  const scopesByOwner = new Map();
-  for (const scope of scopes) {
-    if (!scope.ownerUserId) continue;
-    const ownerScopes = scopesByOwner.get(scope.ownerUserId) || [];
-    ownerScopes.push(scope);
-    scopesByOwner.set(scope.ownerUserId, ownerScopes);
-  }
-
-  const personalProjects = [];
-  const ungroupedSharedProjects = [];
-
-  const resolveActualOwnerScope = (ownerUserId = '') => {
-    const candidates = scopesByOwner.get(ownerUserId) || [];
-    return candidates.find((scope) => scope.id === activePanelId)
-      || candidates.find((scope) => scope.owned)
-      || candidates[0]
-      || null;
-  };
-
-  const resolveVirtualScope = (data = {}, portfolioId = '', ownerUserId = '') => {
-    const virtualId = portfolioId || sharedOwnerPanelId(ownerUserId);
-    if (!virtualId) return null;
-    let scope = scopesById.get(virtualId);
-    if (!scope) {
-      scope = {
-        id: virtualId,
-        type: 'shared-portfolio',
-        space: null,
-        ownerUserId,
-        ownerProfile: projectOwnerProfile(data),
-        owned: false,
-        projects: []
-      };
-      scopes.push(scope);
-      scopesById.set(virtualId, scope);
-    } else if (!scope.ownerProfile) {
-      scope.ownerProfile = projectOwnerProfile(data);
-    }
-    return scope;
-  };
-
-  for (const data of projects) {
-    const spaceId = cleanText(data?.space?.spaceId || '', 140);
-    if (!spaceId) continue;
-    const ownerUserId = cleanText(data?.space?.ownerUserId || data?.project?.portfolioOwnerUserId || '', 140);
-    const portfolioId = projectPortfolioId(data);
-    const ownedProject = Boolean(currentUserId && cleanText(data?.space?.ownerUserId || '', 140) === currentUserId);
-
-    if (portfolioId && scopesById.has(portfolioId)) {
-      scopesById.get(portfolioId).projects.push(data);
-      continue;
-    }
-
-    const ownerScope = resolveActualOwnerScope(ownerUserId);
-    if (!portfolioId && ownerScope && (ownerScope.owned || !portfolioHeads?.[ownerScope.id])) {
-      ownerScope.projects.push(data);
-      continue;
-    }
-
-    if (ownedProject) {
-      personalProjects.push(data);
-      continue;
-    }
-
-    const virtualScope = resolveVirtualScope(data, portfolioId, ownerUserId);
-    if (virtualScope) virtualScope.projects.push(data);
-    else ungroupedSharedProjects.push(data);
-  }
-
-  if (!scopes.some((scope) => scope.owned) || personalProjects.length) {
-    scopes.push({
-      id: personalPanelId,
-      type: 'personal',
-      space: null,
-      ownerUserId: currentUserId,
-      ownerProfile: null,
-      owned: true,
-      projects: personalProjects
-    });
-  }
-  if (ungroupedSharedProjects.length) {
-    scopes.push({
-      id: sharedProjectsPanelId,
-      type: 'shared',
-      space: null,
-      ownerUserId: '',
-      ownerProfile: null,
-      owned: false,
-      projects: ungroupedSharedProjects
-    });
-  }
-
-  for (const scope of scopes) {
-    const rawHead = portfolioHeads?.[scope.id];
-    const head = rawHead && typeof rawHead === 'object' && !Array.isArray(rawHead) ? rawHead : null;
-    scope.portfolioHead = head;
-    scope.panelRevisionCode = cleanText(head?.revisionCode || '', 180);
-    scope.replicaRevisionCode = cleanText(head?.replicaRevisionCode || '', 180);
-    scope.expectedProjectSpaceIds = [];
-    scope.missingProjectSpaceIds = [];
-    scope.staleProjectSpaceIds = [];
-    scope.unexpectedProjectSpaceIds = [];
-    scope.syncComplete = true;
-    if (!head) continue;
-
-    const expectedProjectSpaceIds = Array.from(new Set((Array.isArray(head.managedSpaceIds) ? head.managedSpaceIds : [])
-      .map((spaceId) => cleanText(spaceId || '', 140))
-      .filter(Boolean)));
-    const expectedProjectSet = new Set(expectedProjectSpaceIds);
-    const projectBySpaceId = new Map(scope.projects
-      .map((data) => [cleanText(data?.space?.spaceId || '', 140), data])
-      .filter(([spaceId]) => spaceId));
-    const panelSpace = portfolioSpacesById.get(scope.id) || scope.space || null;
-    const stateRevisions = head.stateRevisions && typeof head.stateRevisions === 'object' && !Array.isArray(head.stateRevisions)
-      ? head.stateRevisions
-      : {};
-    const requiredRevisionSpaceIds = [scope.id, ...expectedProjectSpaceIds];
-    const revisionVectorComplete = requiredRevisionSpaceIds.every((spaceId) => (
-      Object.prototype.hasOwnProperty.call(stateRevisions, spaceId)
-      && Number.isFinite(Number(stateRevisions[spaceId]))
-      && Number(stateRevisions[spaceId]) >= 0
-    ));
-    const projectCount = Math.max(0, Math.floor(Number(head.projectCount || 0)));
-    const headMatchesPanel = head.syncDeferred !== true
-      && cleanText(head.portfolioSpaceId || '', 140) === scope.id
-      && Boolean(scope.replicaRevisionCode)
-      && projectCount === expectedProjectSpaceIds.length
-      && revisionVectorComplete;
-    const panelAuthorizationConfirmed = Boolean(panelSpace && panelSpace.authorizationState !== 'unconfirmed');
-    const missingProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => !projectBySpaceId.has(spaceId));
-    const staleProjectSpaceIds = expectedProjectSpaceIds.filter((spaceId) => {
-      const data = projectBySpaceId.get(spaceId);
-      return Boolean(data) && (data?.project?.loaded !== true || data?.space?.authorizationState === 'unconfirmed');
-    });
-    const unexpectedProjectSpaceIds = [...projectBySpaceId.keys()].filter((spaceId) => !expectedProjectSet.has(spaceId));
-
-    scope.expectedProjectSpaceIds = expectedProjectSpaceIds;
-    scope.missingProjectSpaceIds = missingProjectSpaceIds;
-    scope.staleProjectSpaceIds = staleProjectSpaceIds;
-    scope.unexpectedProjectSpaceIds = unexpectedProjectSpaceIds;
-    scope.syncComplete = Boolean(
-      headMatchesPanel
-      && panelAuthorizationConfirmed
-      && missingProjectSpaceIds.length === 0
-      && staleProjectSpaceIds.length === 0
-      && unexpectedProjectSpaceIds.length === 0
-    );
-  }
-
-  return scopes.sort((left, right) => {
-    const rank = (scope) => scope.type === 'personal' || scope.owned
-      ? 0
-      : scope.type === 'portfolio' || scope.type === 'shared-portfolio'
-        ? 1
-        : 2;
-    const rankDifference = rank(left) - rank(right);
-    if (rankDifference) return rankDifference;
-    return String(left.id || '').localeCompare(String(right.id || ''));
-  });
 }

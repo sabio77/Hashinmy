@@ -51,17 +51,6 @@ assert.deepEqual(planLocalSnapshotRequests(
   { space_a: 8, space_b: 9, space_c: 1 }
 ), [{ spaceId: 'space_a', localStateRevision: 4, remoteStateRevision: 8 }]);
 
-assert.deepEqual(planLocalSnapshotRequests(
-  { legacy_project: 0 },
-  { legacy_project: 0 },
-  { forceSpaceIds: ['legacy_project'] }
-), [{
-  spaceId: 'legacy_project',
-  localStateRevision: 0,
-  remoteStateRevision: 0,
-  forceRecovery: true
-}], 'Una réplica mínima legacy con revisión 0 debe poder pedir snapshot por Wi-Fi aunque ambos watermarks sean iguales.');
-
 for (const expected of [
   "type: 'p2p.sin.control'",
   "type: 'p2p.sin.snapshot'",
@@ -69,9 +58,6 @@ for (const expected of [
   "action === 'snapshot.request'",
   'verifySignedLocalEnvelope',
   'resolveRecoveryRequirement(spaceId, sourceStateRevision)',
-  "space.authorizationState === 'unconfirmed' && !this.isSpaceReplicaRecoveryPending(spaceId)",
-  'forceRecovery: plan.forceRecovery === true',
-  'await this.confirmRecoveredReplicaAuthorization(spaceId, sessionContext)',
   'this.localTransport?.sendTo?.(sessionId, body)'
 ]) {
   assert.ok(source.includes(expected), `Falta la protección de recuperación local: ${expected}`);

@@ -365,16 +365,7 @@
 
     var serverVersionKey = normalizeVersion(payload);
     var storedVersionKey = localStorage.getItem(storageKeys.version) || '';
-
-    // localStorage es compartido entre pestañas. Otra pestaña puede registrar primero el
-    // release nuevo y ocultar el desfase de una pestaña que todavía ejecuta un bundle viejo.
-    // La fuente de verdad para decidir la recarga es el release embebido en ESTA ejecución.
-    var runtimeVersionChanged = Boolean(
-      serverVersionKey
-      && state.currentVersionKey
-      && serverVersionKey !== state.currentVersionKey
-    );
-    var versionChanged = runtimeVersionChanged;
+    var versionChanged = false;
 
     if (!storedVersionKey) {
       localStorage.setItem(storageKeys.version, serverVersionKey || state.currentVersionKey);

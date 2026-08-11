@@ -106,10 +106,6 @@ function randomBytes(length = 16) {
   return bytes;
 }
 
-function jsonByteLength(value) {
-  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
-}
-
 export function canonicalizeP2PLocalValue(value) {
   if (value === null || typeof value !== 'object') {
     const encoded = JSON.stringify(value);
@@ -994,48 +990,13 @@ export async function encryptOperationForTransport(spaceId = '', operation = {})
 export async function decryptOperationEvent(event = {}) {
   if (event.eventType !== 'p2p.operation') return event;
   const operation = event.operation || {};
-  if (operation.type === 'snapshot.complete') {
-    const requiresEncryption = operation.encrypted === true
-      || Number(operation.encryptionVersion || 0) === ENCRYPTION_VERSION;
-    if (requiresEncryption) {
-      const keyId = String(operation.keyId || '').trim();
-      if (!keyId || !(await hasSpaceKey(event.spaceId, keyId))) {
-        throw createMissingKeyError(event.spaceId, keyId);
-      }
-    }
-    return event;
-  }
   if (operation.type === 'snapshot.chunk') {
-    const transportEntities = Array.isArray(operation.payload?.entities) ? operation.payload.entities : [];
-    const transportSnapshotChunkByteCount = jsonByteLength(transportEntities);
-    const declaredChunkByteCount = Number(operation.payload?.chunkByteCount);
-    if (Number.isInteger(declaredChunkByteCount)
-      && declaredChunkByteCount > 0
-      && declaredChunkByteCount !== transportSnapshotChunkByteCount) {
-      throw createRejectedEncryptedPayloadError(
-        'El snapshot cifrado declara un tamaño distinto del fragmento recibido.',
-        'snapshot_chunk_byte_count_mismatch'
-      );
-    }
     const entities = [];
     const requiresEncryption = operation.encrypted === true || Number(operation.encryptionVersion || 0) === ENCRYPTION_VERSION;
-    const canonicalSnapshotEntity = (source = {}, value = null) => {
-      // `encrypted`, `encryptionVersion` y `keyId` existen solo durante el transporte.
-      // El digest autoritativo se calcula sobre la entidad canónica antes de cifrarla;
-      // conservar estos campos tras descifrar haría que toda copia cifrada fallara la
-      // verificación de integridad aunque AES-GCM hubiese autenticado correctamente.
-      const {
-        encrypted: _transportEncrypted,
-        encryptionVersion: _transportEncryptionVersion,
-        keyId: _transportKeyId,
-        ...canonical
-      } = source && typeof source === 'object' ? source : {};
-      return { ...canonical, value };
-    };
-    for (const source of transportEntities) {
+    for (const source of Array.isArray(operation.payload?.entities) ? operation.payload.entities : []) {
       const encryptedValue = encryptedPayloadShape(source?.value || {});
       if (source.deleted) {
-        entities.push(canonicalSnapshotEntity(source, null));
+        entities.push({ ...source, value: null });
         continue;
       }
       if (!encryptedValue) {
@@ -1045,7 +1006,7 @@ export async function decryptOperationEvent(event = {}) {
             'snapshot_entity_unprotected'
           );
         }
-        entities.push(canonicalSnapshotEntity(source, source?.value));
+        entities.push(source);
         continue;
       }
       const value = await decryptJson(event.spaceId, source.value, (keyId) => [
@@ -1057,14 +1018,10 @@ export async function decryptOperationEvent(event = {}) {
         Number(source.stateRevision || source.spaceSequence || 0),
         source.operationType || ''
       ].join('|'));
-      entities.push(canonicalSnapshotEntity(source, value));
+      entities.push({ ...source, value });
     }
     return {
       ...event,
-      // El presupuesto del snapshot se declara sobre los bytes transportados (cifrados).
-      // Después de descifrar, `entities` ocupa menos bytes; conservar la medida real del
-      // transporte evita que IndexedDB confunda esa diferencia esperada con corrupción.
-      transportSnapshotChunkByteCount,
       operation: {
         ...operation,
         payload: { ...(operation.payload || {}), entities }

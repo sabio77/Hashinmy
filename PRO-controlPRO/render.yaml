@@ -32,11 +32,6 @@ services:
       - path: /src/js/app-metadata.js
         name: Cache-Control
         value: no-store, no-cache, must-revalidate, max-age=0
-      # La política de caché de producción también debe cubrir los módulos fuente.
-      # Revalidarlos evita mezclar JavaScript/CSS de releases distintos durante la recuperación P2P.
-      - path: /src/*
-        name: Cache-Control
-        value: no-cache, max-age=0, must-revalidate
       - path: /assets/*
         name: Cache-Control
         value: no-cache, max-age=0, must-revalidate

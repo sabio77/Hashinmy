@@ -29,8 +29,6 @@ class TestClient {
     this.lastAcceptedStreamSequence = 0;
     this.lastProcessedSequence = 0;
     this.pendingAckReplicaSpaceIds = new Set();
-    this.bootstrapState = { spaces: [{ spaceId: 'space_membership_1' }] };
-    this.user = { userId: 'user_existing_member' };
     this.acks = [];
   }
   captureSessionContext() { return { deviceId: 'device_membership_0001' }; }
