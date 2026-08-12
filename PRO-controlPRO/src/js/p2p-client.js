@@ -7604,7 +7604,8 @@ export class SemillaP2PClient {
       spaceId: options.spaceId || '',
       resourceType: options.resourceType || 'generic',
       permissions: options.permissions || ['read', 'write'],
-      requestId: String(options.requestId || options.clientRequestId || '').trim()
+      requestId: String(options.requestId || options.clientRequestId || '').trim(),
+      requireBatchRelease: options.requireBatchRelease === true
     });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
@@ -7666,6 +7667,18 @@ export class SemillaP2PClient {
     return data;
   }
 
+  async releaseInvitationBatch(invitationIds = []) {
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const normalizedIds = Array.from(new Set((Array.isArray(invitationIds) ? invitationIds : [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)));
+    if (!normalizedIds.length) return { released: 0, invitationIds: [] };
+    const result = await apiPost('/api/p2p/invitations/release-batch', { invitationIds: normalizedIds });
+    this.assertSessionContext(sessionContext);
+    return result;
+  }
+
   async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -7717,6 +7730,10 @@ export class SemillaP2PClient {
             });
           }
           this.assertSessionContext(sessionContext);
+        } else if (data.transientMaterialConsumed === true) {
+          const activeKeyId = String(data.space?.activeEncryptionKeyId || '').trim();
+          stagedImported = Boolean(activeKeyId && await hasSpaceKey(acceptedSpaceId, activeKeyId));
+          this.assertSessionContext(sessionContext);
         }
         if (stagedImported && data.stagedBootstrapSnapshot) {
           data.bootstrapSnapshotResult = await this.applyInvitationBootstrapSnapshot(
@@ -7739,6 +7756,7 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
       this.assertSessionContext(sessionContext);
+      const acceptedLocalStateRevision = Math.max(0, Number(localStateRevisions?.[acceptedSpaceId] || 0));
       const replicaState = assertAcceptedInvitationReplicaState(
         state,
         acceptedSpaceId,
@@ -7746,7 +7764,7 @@ export class SemillaP2PClient {
           code: 'P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED',
           message: 'La invitación fue aceptada, pero el backend todavía no confirmó la membresía de este dispositivo.',
           invitationId: data.invitation?.invitationId,
-          localStateRevision: localStateRevisions?.[acceptedSpaceId],
+          localStateRevision: acceptedLocalStateRevision,
           recoveryRequirements: this.recoveryRequirements,
           allowReplicaPending: true
         }
@@ -7754,6 +7772,38 @@ export class SemillaP2PClient {
       data.space = replicaState.space || null;
       data.accessRevoked = replicaState.explicitlyRevoked;
       data.replicaPending = replicaState.replicaPending;
+
+      // Solo después de importar la AES, materializar el snapshot Redis y confirmar
+      // que la réplica ya está utilizable se autoriza al backend a destruir todo el
+      // material temporal de la invitación. La prueba pequeña queda idempotente para
+      // que un reintento HTTP no vuelva a exigir un escrow que ya fue consumido.
+      if (!data.accessRevoked
+        && !data.replicaPending
+        && data.bootstrapSnapshotResult
+        && data.stagedBootstrapSnapshot?.snapshotDigest) {
+        try {
+          data.invitationAcceptanceCompletion = await apiPost('/api/p2p/crypto/invitation-acceptance-complete', {
+            deviceId: this.deviceId,
+            invitationId: String(data.invitation?.invitationId || '').trim(),
+            keyId: String(data.stagedBootstrapSnapshot?.keyId || data.space?.activeEncryptionKeyId || '').trim(),
+            keyEpoch: Math.max(0, Number(data.stagedBootstrapSnapshot?.keyEpoch || data.space?.encryptionKeyEpoch || 0)),
+            snapshotDigest: String(data.stagedBootstrapSnapshot?.snapshotDigest || '').trim(),
+            sourceStateRevision: Math.max(
+              acceptedLocalStateRevision,
+              Math.max(0, Number(data.stagedBootstrapSnapshot?.sourceStateRevision || 0))
+            )
+          });
+          data.transientMaterialConsumed = data.invitationAcceptanceCompletion?.complete === true;
+          this.assertSessionContext(sessionContext);
+        } catch (error) {
+          if (this.isSessionContextChangedError(error)) throw error;
+          dispatch('p2p:invitation-transient-cleanup-deferred', {
+            invitationId: String(data.invitation?.invitationId || '').trim(),
+            spaceId: acceptedSpaceId,
+            error
+          });
+        }
+      }
     } else {
       await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;

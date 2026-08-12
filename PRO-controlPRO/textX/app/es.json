@@ -292,7 +292,7 @@
     "panelAccepted": "Panel aceptado. Sus proyectos autorizados se están sincronizando en esta cuenta.",
     "panelAlreadyMember": "Esta cuenta ya participa en todos los proyectos de este panel.",
     "panelAlreadyCovered": "La cuenta ya participa en algunos proyectos y las invitaciones de los demás ya estaban pendientes.",
-    "panelPartialSent": "Se procesaron {completed} proyectos del panel y {failed} no pudieron invitarse. Puedes repetir la invitación para completar solo los pendientes.",
+    "panelPartialSent": "Se prepararon {completed} proyectos del panel y {failed} todavía no pudieron prepararse. La invitación del panel no se enviará hasta que todos queden listos; repite la acción para completar solo los pendientes.",
     "panelResponsePartial": "Se procesaron {completed} proyectos y {failed} siguen pendientes. Puedes repetir la respuesta para completar únicamente los restantes."
   },
   "permissions": {

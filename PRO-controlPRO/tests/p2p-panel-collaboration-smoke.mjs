@@ -80,3 +80,7 @@ assert.match(
   /async leave\(spaceId = ''\)[\s\S]*!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)[\s\S]*!this\.isSpaceReplicaRecoveryPending\(cleanSpaceId\)[\s\S]*this\.assertSpaceAuthorizationConfirmed\(cleanSpaceId\)/,
   'un invitado debe poder abandonar un proyecto/panel mientras la membresía ya está confirmada y solo falta recuperar la réplica'
 );
+
+assert.match(appSource, /const invitationIds = \[\];[\s\S]*requireBatchRelease: true[\s\S]*invitationIds\.push\(result\.invitation\.invitationId\)[\s\S]*if \(!failures\.length && invitationIds\.length\)[\s\S]*releaseInvitationBatch\(invitationIds\)/, 'el panel debe marcar sus invitaciones como lote y no liberar ninguna notificación hasta que todos los proyectos se hayan preparado sin fallos');
+assert.ok(p2pClientSource.includes('requireBatchRelease: options.requireBatchRelease === true'), 'el cliente debe conservar explícitamente la política de liberación por lote');
+assert.ok(p2pClientSource.includes("/api/p2p/invitations/release-batch"), 'el cliente P2P debe exponer la liberación del lote preparado');

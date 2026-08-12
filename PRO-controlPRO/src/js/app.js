@@ -2406,14 +2406,17 @@ async function submitInvitation(event) {
       let reused = 0;
       let alreadyMembers = 0;
       let created = 0;
+      const invitationIds = [];
       const failures = [];
       for (const projectData of projects) {
         try {
           const result = await semillaP2P.invite(email, {
             spaceId: projectData.space.spaceId,
             resourceType: PANEL_INVITATION_RESOURCE_TYPE,
-            permissions
+            permissions,
+            requireBatchRelease: true
           });
+          if (result?.invitation?.invitationId) invitationIds.push(result.invitation.invitationId);
           if (result?.reused) reused += 1;
           else created += 1;
         } catch (error) {
@@ -2427,12 +2430,15 @@ async function submitInvitation(event) {
       }
       const completed = created + reused + alreadyMembers;
       if (!completed && failures.length) throw failures[0].error;
+      if (!failures.length && invitationIds.length) {
+        await semillaP2P.releaseInvitationBatch(invitationIds);
+      }
       applyP2PState(semillaP2P.bootstrapState);
       closeDialog(elements.inviteDialog);
       if (failures.length) {
         setStatus(
           elements.dashboardStatus,
-          t('invite.panelPartialSent', 'Se procesaron {completed} proyectos del panel y {failed} no pudieron invitarse. Puedes repetir la invitación para completar solo los pendientes.')
+          t('invite.panelPartialSent', 'Se prepararon {completed} proyectos del panel y {failed} todavía no pudieron prepararse. La invitación del panel no se enviará hasta que todos queden listos; repite la acción para completar solo los pendientes.')
             .replace('{completed}', String(completed)).replace('{failed}', String(failures.length)),
           'warning'
         );

@@ -9,6 +9,7 @@ const required = [
   "'/api/p2p/crypto/invitation-key-targets'",
   "'/api/p2p/crypto/invitation-key-stage'",
   "'/api/p2p/crypto/invitation-bootstrap-stage'",
+  "'/api/p2p/crypto/invitation-acceptance-complete'",
   'stageInvitationBootstrapSnapshot',
   'applyInvitationBootstrapSnapshot',
   'stageInvitationKeyForRecipient',
@@ -41,9 +42,13 @@ const importIndex = respondSource.indexOf('await importSpaceKeyEnvelope(accepted
 const bootstrapApplyIndex = respondSource.indexOf('await this.applyInvitationBootstrapSnapshot(');
 const fallbackIndex = respondSource.indexOf('await this.requestSpaceKey(acceptedSpaceId');
 const refreshIndex = respondSource.indexOf('await this.refreshBootstrap({');
+const replicaValidationIndex = respondSource.indexOf('assertAcceptedInvitationReplicaState(');
+const cleanupIndex = respondSource.indexOf("await apiPost('/api/p2p/crypto/invitation-acceptance-complete'");
 if (importIndex < 0 || bootstrapApplyIndex < 0 || fallbackIndex < 0 || refreshIndex < 0
-  || importIndex > bootstrapApplyIndex || bootstrapApplyIndex > fallbackIndex || fallbackIndex > refreshIndex) {
-  throw new Error('Al aceptar debe importar la AES, materializar el snapshot Redis, dejar P2P como fallback y reconciliar después.');
+  || replicaValidationIndex < 0 || cleanupIndex < 0
+  || importIndex > bootstrapApplyIndex || bootstrapApplyIndex > fallbackIndex || fallbackIndex > refreshIndex
+  || refreshIndex > replicaValidationIndex || replicaValidationIndex > cleanupIndex) {
+  throw new Error('Al aceptar debe importar la AES, materializar el snapshot Redis, reconciliar/validar la réplica y solo entonces destruir el material temporal.');
 }
 if (!/apiPost\('\/api\/p2p\/invitations\/respond', \{ invitationId, decision, deviceId: this\.deviceId \}\)/.test(respondSource)) {
   throw new Error('La aceptación debe identificar el dispositivo para recuperar su sobre ECDH específico.');
@@ -70,4 +75,4 @@ if ((bootstrapApplySource.match(/snapshotByteCount: decryptedSnapshotByteCount/g
   throw new Error('Fragmentos y cierre del snapshot deben usar el mismo total descifrado para evitar missing_snapshot_chunks.');
 }
 
-console.log('OK: el cliente conserva snapshot + clave antes de anunciar la invitación y, al aceptar, importa la AES y materializa la copia Redis antes de cualquier fallback P2P.');
+console.log('OK: el cliente conserva snapshot + clave antes de anunciar, los materializa al aceptar y confirma su consumo solo después de validar la réplica local.');
