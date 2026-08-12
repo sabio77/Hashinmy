@@ -82,8 +82,8 @@
     },
     {
       "url": "./src/js/p2p-storage.js",
-      "sha256": "7782574b8b175ec2aebc3f6edb041713432b28236dec88ec3076a4760c220882",
-      "bytes": 86648
+      "sha256": "773b50931767f5d72b063039867c4cb1465b0bdf05c7eb134568f48d001253ef",
+      "bytes": 87172
     },
     {
       "url": "./src/js/p2p-durability.js",
@@ -92,8 +92,8 @@
     },
     {
       "url": "./src/js/p2p-crypto.js",
-      "sha256": "579971689ea052f9368c09baf619c49567833fd34b718737b6da8bf8802faec6",
-      "bytes": 46396
+      "sha256": "bb2b7842dfbc0f78b197f1ec36bd7c5ba2a9caaf6adde7615cdbc6138bddc54e",
+      "bytes": 46953
     },
     {
       "url": "./src/js/p2p-tab-coordinator.js",
@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "4323462151be0a0fa715aa5f261dfa79813bb50a384bd58bfcb9f40b4408f3ef",
-      "bytes": 404575
+      "sha256": "0e3c43154cae7a91926967164acae69db338d806524fb9ced5e44983998e09bc",
+      "bytes": 417241
     },
     {
       "url": "./src/js/p2p-permissions.js",

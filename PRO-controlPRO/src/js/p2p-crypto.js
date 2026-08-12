@@ -982,6 +982,11 @@ export async function encryptOperationForTransport(spaceId = '', operation = {})
   return { ...operation, payload, encrypted: true, encryptionVersion: ENCRYPTION_VERSION, keyId: keyRecord.keyId };
 }
 
+function canonicalSnapshotEntity(source = {}, value = null) {
+  const { encrypted: _encrypted, encryptionVersion: _encryptionVersion, keyId: _keyId, ...canonical } = source || {};
+  return { ...canonical, value };
+}
+
 export async function decryptOperationEvent(event = {}) {
   if (event.eventType !== 'p2p.operation') return event;
   const operation = event.operation || {};
@@ -991,7 +996,7 @@ export async function decryptOperationEvent(event = {}) {
     for (const source of Array.isArray(operation.payload?.entities) ? operation.payload.entities : []) {
       const encryptedValue = encryptedPayloadShape(source?.value || {});
       if (source.deleted) {
-        entities.push({ ...source, value: null });
+        entities.push(requiresEncryption ? canonicalSnapshotEntity(source, null) : { ...source, value: null });
         continue;
       }
       if (!encryptedValue) {
@@ -1013,7 +1018,7 @@ export async function decryptOperationEvent(event = {}) {
         Number(source.stateRevision || source.spaceSequence || 0),
         source.operationType || ''
       ].join('|'));
-      entities.push({ ...source, value });
+      entities.push(canonicalSnapshotEntity(source, value));
     }
     const decryptedChunkByteCount = new TextEncoder().encode(JSON.stringify(entities)).byteLength;
     return {

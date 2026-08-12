@@ -364,14 +364,22 @@ if (!cryptoLayer.isRejectedEncryptedPayloadError(tamperError)
 }
 
 await cryptoLayer.setP2PCryptoContext(source.userId, source.deviceId);
-const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [{
+const canonicalSnapshotEntities = [{
   entityType: 'admin.project',
   entityId: 'project_000001',
   value: { name: 'Proyecto cifrado', budget: 42000000 },
   stateRevision: 7,
   operationType: 'entity.put',
   deleted: false
-}]);
+}, {
+  entityType: 'admin.purchase',
+  entityId: 'purchase_deleted_000001',
+  value: null,
+  stateRevision: 8,
+  operationType: 'entity.delete',
+  deleted: true
+}];
+const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, canonicalSnapshotEntities);
 await cryptoLayer.setP2PCryptoContext(guest.userId, guest.deviceId);
 const encryptedSnapshotChunkBytes = new TextEncoder().encode(JSON.stringify(snapshotEntities)).byteLength;
 const snapshotEvent = await cryptoLayer.decryptOperationEvent({
@@ -392,6 +400,12 @@ if (snapshotEvent.operation.payload.entities[0]?.value?.budget !== 42000000
   || snapshotEvent.operation.payload.transportChunkByteCount !== encryptedSnapshotChunkBytes
   || snapshotEvent.operation.payload.chunkByteCount !== decryptedSnapshotChunkBytes) {
   throw new Error('El snapshot cifrado no preservó por separado el presupuesto de transporte y el tamaño local descifrado.');
+}
+if (JSON.stringify(snapshotEvent.operation.payload.entities) !== JSON.stringify(canonicalSnapshotEntities)
+  || snapshotEvent.operation.payload.entities.some((entity) => (
+    'encrypted' in entity || 'encryptionVersion' in entity || 'keyId' in entity
+  ))) {
+  throw new Error('El snapshot descifrado conservó metadatos de transporte y alteró el digest canónico necesario para recuperar una invitación.');
 }
 
 const delayedSpaceId = 'space_delayed_key_000001';

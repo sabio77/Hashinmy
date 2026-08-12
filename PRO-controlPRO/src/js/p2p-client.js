@@ -5258,6 +5258,8 @@ export class SemillaP2PClient {
 
     const requestId = `invitation_bootstrap:${invitationId}`;
     const actorUserId = String(invitation?.inviterUserId || '').trim() || 'invitation-bootstrap';
+    const decryptedChunks = [];
+    let decryptedSnapshotByteCount = 0;
     for (let index = 0; index < chunks.length; index += 1) {
       this.assertSessionContext(sessionContext);
       const chunk = chunks[index] || {};
@@ -5292,7 +5294,39 @@ export class SemillaP2PClient {
       };
       const decrypted = await decryptOperationEvent(event);
       this.assertSessionContext(sessionContext);
-      const staged = await applyP2PEvent(decrypted);
+      const decryptedChunkByteCount = Number(decrypted?.operation?.payload?.chunkByteCount);
+      if (!Number.isInteger(decryptedChunkByteCount) || decryptedChunkByteCount < 2) {
+        const error = new Error('La copia temporal de la invitación produjo un fragmento descifrado con tamaño inválido.');
+        error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
+        throw error;
+      }
+      decryptedSnapshotByteCount += decryptedChunkByteCount;
+      if (decryptedSnapshotByteCount > this.snapshotMaxBytes) {
+        const error = new Error('La copia temporal descifrada de la invitación supera el tamaño seguro permitido.');
+        error.code = 'P2P_SNAPSHOT_TOO_LARGE';
+        throw error;
+      }
+      decryptedChunks.push(decrypted);
+    }
+
+    // El snapshot guardado en Redis declara tamaños de transporte cifrado. Después
+    // de descifrar, IndexedDB valida los bytes del JSON canónico en claro; mezclar
+    // ambos tamaños hace que una copia completa termine como missing_snapshot_chunks.
+    // Primero desciframos todos los fragmentos, calculamos el total canónico y solo
+    // entonces los materializamos con metadatos coherentes entre chunk y complete.
+    for (const decrypted of decryptedChunks) {
+      this.assertSessionContext(sessionContext);
+      const canonicalChunk = {
+        ...decrypted,
+        operation: {
+          ...(decrypted.operation || {}),
+          payload: {
+            ...(decrypted.operation?.payload || {}),
+            snapshotByteCount: decryptedSnapshotByteCount
+          }
+        }
+      };
+      const staged = await applyP2PEvent(canonicalChunk);
       this.assertSessionContext(sessionContext);
       if (!staged?.staged || staged?.snapshotIncomplete) {
         const error = new Error('No se pudo aplicar un fragmento de la copia temporal de la invitación.');
@@ -5322,7 +5356,7 @@ export class SemillaP2PClient {
           requestId,
           chunkCount: chunks.length,
           entityCount,
-          snapshotByteCount,
+          snapshotByteCount: decryptedSnapshotByteCount,
           sourceStateRevision,
           snapshotDigest
         }

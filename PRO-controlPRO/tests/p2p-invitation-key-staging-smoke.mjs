@@ -49,4 +49,25 @@ if (!/apiPost\('\/api\/p2p\/invitations\/respond', \{ invitationId, decision, de
   throw new Error('La aceptación debe identificar el dispositivo para recuperar su sobre ECDH específico.');
 }
 
+
+const bootstrapApplyStart = source.indexOf('  async applyInvitationBootstrapSnapshot(');
+const bootstrapApplyEnd = source.indexOf('\n  async replayDeferredEncryptedEvents(', bootstrapApplyStart);
+if (bootstrapApplyStart < 0 || bootstrapApplyEnd <= bootstrapApplyStart) {
+  throw new Error('No se encontró la materialización local del snapshot temporal de invitación.');
+}
+const bootstrapApplySource = source.slice(bootstrapApplyStart, bootstrapApplyEnd);
+const decryptLoopIndex = bootstrapApplySource.indexOf('const decryptedChunks = []');
+const canonicalTotalIndex = bootstrapApplySource.indexOf('decryptedSnapshotByteCount += decryptedChunkByteCount');
+const stageCanonicalIndex = bootstrapApplySource.indexOf('for (const decrypted of decryptedChunks)');
+if (decryptLoopIndex < 0 || canonicalTotalIndex < 0 || stageCanonicalIndex < 0
+  || decryptLoopIndex > canonicalTotalIndex || canonicalTotalIndex > stageCanonicalIndex) {
+  throw new Error('El snapshot de invitación debe descifrarse completo y recalcular sus bytes canónicos antes de materializar fragmentos.');
+}
+if (!bootstrapApplySource.includes('snapshotByteCount: decryptedSnapshotByteCount')) {
+  throw new Error('La validación local todavía mezcla el tamaño cifrado de Redis con el tamaño canónico descifrado.');
+}
+if ((bootstrapApplySource.match(/snapshotByteCount: decryptedSnapshotByteCount/g) || []).length < 2) {
+  throw new Error('Fragmentos y cierre del snapshot deben usar el mismo total descifrado para evitar missing_snapshot_chunks.');
+}
+
 console.log('OK: el cliente conserva snapshot + clave antes de anunciar la invitación y, al aceptar, importa la AES y materializa la copia Redis antes de cualquier fallback P2P.');
