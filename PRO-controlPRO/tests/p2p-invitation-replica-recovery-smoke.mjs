@@ -214,15 +214,13 @@ const realtimeStart = clientSource.indexOf("    } else if (event.eventType?.star
 const realtimeEnd = clientSource.indexOf('\n    } else {', realtimeStart);
 assert.ok(realtimeStart >= 0 && realtimeEnd > realtimeStart, 'No se encontró la aplicación realtime de invitaciones.');
 const realtimeMethod = clientSource.slice(realtimeStart, realtimeEnd);
-assert.match(realtimeMethod, /const invitationAccepted = event\.eventType === 'p2p\.invitation\.accepted'/, 'La rama realtime dejó de identificar explícitamente una aceptación.');
-assert.match(realtimeMethod, /acceptedForCurrentUser[\s\S]*event\.actorUserId[\s\S]*sessionContext\.userId/, 'La recuperación forzada se ejecutaría también en cuentas que no fueron las que aceptaron.');
-assert.match(realtimeMethod, /requiresSnapshotRecovery = acceptedForCurrentUser/, 'La recuperación inicial debe quedar acotada a los dispositivos de la cuenta invitada.');
+assert.match(realtimeMethod, /requiresSnapshotRecovery\s*=\s*event\.eventType\s*===\s*'p2p\.invitation\.accepted'/);
 assert.match(realtimeMethod, /prepareCommittedControlState\(/, 'El evento de invitación no prepara una frontera durable de autorización.');
 assert.match(realtimeMethod, /authorizationState: requiresSnapshotRecovery \? 'unconfirmed' : 'confirmed'/, 'Una aceptación remota todavía se persiste como confirmada antes del bootstrap.');
 assert.match(realtimeMethod, /currentSpaces: this\.bootstrapState\.spaces \|\| \[\]/, 'El replay no protege una réplica que ya estaba confirmada.');
 assert.match(realtimeMethod, /await saveControlStateAtomically\(committedControlState\)/);
 assert.match(realtimeMethod, /this\.applyCommittedControlState\(committedControlState, \{ source: 'realtime-invitation' \}\)/);
-assert.match(realtimeMethod, /requestSnapshots: 'force',[\s\S]*snapshotSpaceIds: cleanSpaceId \? \[cleanSpaceId\] : \[\]/, 'Una aceptación remota debe forzar snapshot únicamente para el espacio recién autorizado.');
+assert.match(realtimeMethod, /await this\.refreshBootstrap\(\{ requestSnapshots: 'force' \}\)/, 'Una aceptación remota no fuerza snapshot para esta réplica.');
 assert.match(realtimeMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación remota no usa la validación común de réplica.');
 assert.match(realtimeMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación remota ignora el watermark de recuperación local.');
 assert.match(realtimeMethod, /allowReplicaPending: true/, 'La aceptación remota bloquearía la cola antes de recibir el snapshot que debe completarla.');
@@ -232,31 +230,7 @@ const acceptedBranchStart = realtimeMethod.indexOf('      if (requiresSnapshotRe
 const acceptedBranchEnd = realtimeMethod.indexOf('      } else {', acceptedBranchStart);
 assert.ok(acceptedBranchStart >= 0 && acceptedBranchEnd > acceptedBranchStart);
 const acceptedBranch = realtimeMethod.slice(acceptedBranchStart, acceptedBranchEnd);
-assert.match(acceptedBranch, /requestSpaceKey\(cleanSpaceId, '', \{ force: true \}\)/, 'Una invitación cifrada no solicita la clave antes de pedir su snapshot.');
-assert.ok(
-  acceptedBranch.indexOf('requestSpaceKey(cleanSpaceId') < acceptedBranch.indexOf('this.refreshBootstrap({'),
-  'La recuperación realtime solicita el snapshot antes de preparar la clave cifrada.'
-);
-const acceptedCriticalBootstrap = acceptedBranch.slice(acceptedBranch.indexOf('const state = await this.refreshBootstrap({'));
-assert.doesNotMatch(acceptedCriticalBootstrap, /refreshBootstrap\(\{[\s\S]*?\}\)\.catch\(/, 'La recuperación crítica de una invitación aceptada todavía absorbe el fallo y permite avanzar el ACK.');
-
-const snapshotControlBranchStart = clientSource.indexOf("    } else if (event.eventType === 'p2p.snapshot.request') {");
-const snapshotControlBranchEnd = clientSource.indexOf("    } else if (event.eventType === 'p2p.lifecycle.progress') {", snapshotControlBranchStart);
-assert.ok(snapshotControlBranchStart >= 0 && snapshotControlBranchEnd > snapshotControlBranchStart, 'No se encontró la rama realtime que atiende snapshot-request.');
-const snapshotControlBranch = clientSource.slice(snapshotControlBranchStart, snapshotControlBranchEnd);
-assert.match(snapshotControlBranch, /const retryScheduled = sent \? false : this\.scheduleSnapshotSourceRetry\(event\)/, 'Una fuente temporalmente ocupada todavía consume el snapshot-request sin programar reintento local.');
-assert.match(snapshotControlBranch, /this\.isSnapshotSourceRetryableError\(error\)/, 'Los fallos transitorios al servir un snapshot no se clasifican antes de decidir su reintento.');
-assert.match(snapshotControlBranch, /retryable \? this\.scheduleSnapshotSourceRetry\(event\) : false/, 'Un fallo transitorio de transporte todavía puede perder la única concesión dirigida del invitado.');
-
-const snapshotRetryStart = clientSource.indexOf('  scheduleSnapshotSourceRetry(requestEvent = {})');
-const snapshotRetryEnd = clientSource.indexOf('\n  snapshotSourceRejectionScope(', snapshotRetryStart);
-assert.ok(snapshotRetryStart >= 0 && snapshotRetryEnd > snapshotRetryStart, 'No se encontró el reintento local acotado para una fuente de snapshot.');
-const snapshotRetryMethods = clientSource.slice(clientSource.indexOf('  snapshotSourceRetryKey(', snapshotRetryStart - 9000), snapshotRetryEnd);
-assert.match(snapshotRetryMethods, /pendingSnapshotSourceRetries/, 'Los reintentos de snapshot no se deduplican por concesión.');
-assert.match(snapshotRetryMethods, /expiresAtMs/, 'El reintento de snapshot no queda acotado por el vencimiento de la concesión.');
-assert.match(snapshotRetryMethods, /await this\.sendSnapshot\(entry\.event\)/, 'El propietario no vuelve a intentar servir la misma concesión cuando su réplica ya está lista.');
-assert.match(snapshotRetryMethods, /P2P_SNAPSHOT_TOO_LARGE/, 'Un error determinista de tamaño podría entrar en un bucle de reintentos.');
-assert.match(clientSource, /this\.clearSnapshotSourceRetries\(\)/, 'Los timers de snapshot pueden sobrevivir al cierre o cambio de sesión.');
+assert.doesNotMatch(acceptedBranch, /\.catch\(/, 'La recuperación crítica de una invitación aceptada todavía absorbe el fallo y permite avanzar el ACK.');
 
 const inviteStart = clientSource.indexOf("  async invite(email = '', options = {})");
 const inviteEnd = clientSource.indexOf('\n  async respondToInvitation(', inviteStart);
@@ -269,17 +243,7 @@ const responseStart = inviteEnd + 1;
 const responseEnd = clientSource.indexOf('\n  async leave(', responseStart);
 const responseMethod = clientSource.slice(responseStart, responseEnd);
 assert.match(responseMethod, /canonicalDecision === 'accept'/);
-assert.match(responseMethod, /requestSpaceKey\(acceptedSpaceId, '', \{ force: true \}\)/, 'La aceptación local cifrada no solicita su clave antes del snapshot.');
-assert.ok(
-  responseMethod.indexOf('requestSpaceKey(acceptedSpaceId') < responseMethod.indexOf("requestSnapshots: 'force'"),
-  'La aceptación local solicita el snapshot antes de preparar la clave cifrada.'
-);
-assert.equal(
-  (responseMethod.match(/requestSpaceKey\(acceptedSpaceId/g) || []).length,
-  1,
-  'La aceptación local conserva una solicitud de clave tardía duplicada.'
-);
-assert.match(responseMethod, /requestSnapshots: 'force',[\s\S]*snapshotSpaceIds: acceptedSpaceId \? \[acceptedSpaceId\] : \[\]/, 'El dispositivo que acepta debe recuperar únicamente el espacio recién autorizado.');
+assert.match(responseMethod, /requestSnapshots: 'force'/, 'El dispositivo que acepta no fuerza su propia recuperación.');
 assert.match(responseMethod, /assertAcceptedInvitationReplicaState\(/, 'La aceptación local no confirma su réplica contra el bootstrap autoritativo.');
 assert.match(responseMethod, /P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED/, 'La aceptación local no distingue una réplica todavía no confirmada.');
 assert.match(responseMethod, /recoveryRequirements: this\.recoveryRequirements/, 'La aceptación local ignora el watermark de recuperación local.');
@@ -301,18 +265,6 @@ assert.match(clientSource, /membershipUnconfirmed/, 'El modo de recuperación no
 assert.match(clientSource, /!this\.isSpaceAuthorizationConfirmed\(cleanSpaceId\)[\s\S]*!this\.isSpaceReplicaRecoveryPending\(cleanSpaceId\)/, 'La réplica aceptada no puede solicitar su clave cifrada y queda bloqueada antes de aplicar el snapshot.');
 assert.match(clientSource, /confirmRecoveredReplicaAuthorization\(/, 'No existe promoción durable después de completar la réplica.');
 assert.match(clientSource, /p2p:replica-recovery-confirmed/, 'La interfaz no recibe la transición que habilita la edición.');
-
-const sendSnapshotStart = clientSource.indexOf('  async sendSnapshot(requestEvent = {})');
-const sendSnapshotEnd = clientSource.indexOf('\n  async ', sendSnapshotStart + 10);
-assert.ok(sendSnapshotStart >= 0 && sendSnapshotEnd > sendSnapshotStart, 'No se encontró la respuesta local a solicitudes de snapshot.');
-const sendSnapshotMethod = clientSource.slice(sendSnapshotStart, sendSnapshotEnd);
-assert.ok(
-  sendSnapshotMethod.indexOf('await this.flushOutbox()') < sendSnapshotMethod.indexOf('const localStateRevisions = await listStateRevisions([spaceId])'),
-  'La fuente sigue fijando su revisión antes de vaciar operaciones pendientes y puede producir un snapshot obsoleto.'
-);
-assert.match(sendSnapshotMethod, /if \(localStateRevision < requestedStateRevision\)/, 'La fuente dejó de rechazar una réplica realmente atrasada.');
-assert.doesNotMatch(sendSnapshotMethod, /localStateRevision !== requestedStateRevision/, 'La fuente todavía rechaza una revisión legítimamente más nueva que la solicitud.');
-assert.doesNotMatch(sendSnapshotMethod, /reason: 'source_revision_advanced'/, 'La fuente todavía se bloquea por haber avanzado mientras sincronizaba su outbox.');
 
 const appSource = fs.readFileSync(path.join(root, 'src', 'js', 'app.js'), 'utf8');
 assert.match(appSource, /result\?\.accessRevoked === true/, 'La interfaz no distingue una aceptación seguida por revocación.');

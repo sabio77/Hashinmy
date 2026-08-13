@@ -62,39 +62,28 @@ export function validateSnapshotBudgetMetadata(payload = {}, options = {}) {
   const maxChunks = Math.max(1, Number(options.snapshotMaxChunks || snapshotStorageMaxChunks));
   const chunkCount = Number(payload.chunkCount);
   const snapshotByteCount = Number(payload.snapshotByteCount);
-  const transportChunkByteCount = payload.transportChunkByteCount === undefined
-    ? (payload.chunkByteCount === undefined ? null : Number(payload.chunkByteCount))
-    : Number(payload.transportChunkByteCount);
-  const localChunkByteCount = payload.chunkByteCount === undefined ? null : Number(payload.chunkByteCount);
+  const chunkByteCount = payload.chunkByteCount === undefined ? null : Number(payload.chunkByteCount);
   if (!Number.isInteger(chunkCount) || chunkCount < 1 || chunkCount > maxChunks) {
     return { valid: false, reason: 'snapshot_chunk_limit_exceeded' };
   }
   if (!Number.isInteger(snapshotByteCount) || snapshotByteCount < 2 || snapshotByteCount > maxBytes) {
     return { valid: false, reason: 'snapshot_byte_limit_exceeded' };
   }
-  if (transportChunkByteCount !== null && (
-    !Number.isInteger(transportChunkByteCount)
-    || transportChunkByteCount < 2
-    || transportChunkByteCount > snapshotByteCount
+  if (chunkByteCount !== null && (
+    !Number.isInteger(chunkByteCount)
+    || chunkByteCount < 2
+    || chunkByteCount > snapshotByteCount
   )) {
     return { valid: false, reason: 'snapshot_chunk_byte_count_invalid' };
   }
-  if (Array.isArray(payload.entities)) {
-    const actualLocalBytes = jsonByteLength(payload.entities);
-    const declaredLocalBytes = payload.transportChunkByteCount === undefined
-      ? transportChunkByteCount
-      : localChunkByteCount;
-    if (!Number.isInteger(declaredLocalBytes) || declaredLocalBytes !== actualLocalBytes) {
-      return { valid: false, reason: 'snapshot_chunk_byte_count_mismatch' };
-    }
+  if (
+    chunkByteCount !== null
+    && Array.isArray(payload.entities)
+    && chunkByteCount !== jsonByteLength(payload.entities)
+  ) {
+    return { valid: false, reason: 'snapshot_chunk_byte_count_mismatch' };
   }
-  return {
-    valid: true,
-    chunkCount,
-    snapshotByteCount,
-    chunkByteCount: transportChunkByteCount,
-    localChunkByteCount
-  };
+  return { valid: true, chunkCount, snapshotByteCount, chunkByteCount };
 }
 
 function normalizeStorageUserId(value = '') {

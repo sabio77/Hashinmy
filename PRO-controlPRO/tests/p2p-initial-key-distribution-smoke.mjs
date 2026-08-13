@@ -17,7 +17,7 @@ function extractMethod(startMarker, endMarker) {
 
 const distributeMethodSource = extractMethod(
   "  async distributeSpaceKey(spaceId = '', keyId = '') {",
-  "\n  async stageInvitationKeyForRecipient("
+  "\n  async replayDeferredEncryptedEvents("
 );
 const createSpaceMethodSource = extractMethod(
   '  async createSpace(options = {}) {',

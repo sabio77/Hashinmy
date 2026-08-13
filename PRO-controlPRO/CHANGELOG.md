@@ -1,10 +1,10 @@
 # Changelog
 
-## 1.9.92 - 2026-08-10
+## 1.9.91 - 2026-08-12
 
-- Reforzada la continuidad del stream SSE en PWA móviles: la apertura HTTP nativa del `EventSource` cuenta ahora como actividad de transporte, evitando reciclar una conexión válida solo porque `p2p_ready` se retrase detrás del proxy o del backend.
-- Al volver de `pageshow` o de segundo plano, la pestaña líder revalida sin polling el liveness del stream y recicla conexiones `OPEN` silenciosas o `CONNECTING` vencidas; `openRealtime()` tampoco reutiliza una fuente zombie durante una recuperación `online`.
-- El timeout de apertura conserva su instante original al rearmarse tras una suspensión, por lo que un temporizador congelado no concede otros 20 segundos completos a una conexión ya vencida. Se ampliaron las regresiones SSE sin modificar el contrato de memoriaBACKEND ni la sincronización local opcional.
+- Corregido el punto débil de creación parcial de invitaciones de panel: si el envío se interrumpe después de crear solo algunos proyectos, una recarga o cambio a otro dispositivo de la misma cuenta ya no genera automáticamente un grupo incompatible.
+- `invitePanel()` detecta en el bootstrap las invitaciones pendientes compatibles por correo, conjunto de proyectos, permisos y manifiesto esperado, reutiliza el mismo `invitationGroupId` y crea únicamente los proyectos faltantes.
+- Los grupos nuevos incorporan una huella del conjunto exacto de proyectos y la reanudación automática exige que coincida; así un cambio concurrente en la composición del panel no puede completar un manifiesto distinto. También se rechazan grupos vencidos, decisiones respondidas, permisos distintos, proyectos ajenos o duplicados, sin alterar la aceptación agrupada, el cifrado escrow ni la sincronización existente.
 
 ## 1.9.90 - 2026-08-04
 

@@ -74,10 +74,6 @@ const DEFAULT_SNAPSHOT_MAX_CHUNKS = 500;
 const SNAPSHOT_EVENT_SAFETY_BYTES = 12 * 1024;
 const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1200;
-const REALTIME_HEARTBEAT_DEFAULT_MS = 25000;
-const REALTIME_CONNECT_TIMEOUT_MS = 20000;
-const REALTIME_WATCHDOG_MIN_MS = 45000;
-const REALTIME_WATCHDOG_FACTOR = 3.2;
 const SERVER_RETRY_FALLBACK_MS = 5000;
 const SERVER_RETRY_MAX_MS = 60 * 60 * 1000;
 const ACK_BATCH_DELAY_MS = 250;
@@ -90,13 +86,14 @@ const TAB_STATE_REQUEST_RETRY_BASE_MS = 1500;
 const TAB_STATE_REQUEST_RETRY_MAX_MS = 12000;
 const TAB_STATE_REQUEST_TARGETED_RETRY_LIMIT = 3;
 const KEY_ENVELOPE_REJECTION_TTL_MS = 5 * 60 * 1000;
+const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
+const INVITATION_SOURCE_SYNC_WAIT_MS = 8 * 1000;
+const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 2;
+const PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS = 5;
 const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_REJECTION_RETRY_MS = 5 * 1000;
-const SNAPSHOT_SOURCE_RETRY_BASE_MS = 750;
-const SNAPSHOT_SOURCE_RETRY_MAX_MS = 8000;
-const SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS = 750;
 const LOCAL_CONTROL_MAX_AGE_MS = 10 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_TTL_MS = 2 * 60 * 1000;
 const LOCAL_SNAPSHOT_REQUEST_MAX = 64;
@@ -186,6 +183,123 @@ export function normalizeSnapshotSpaceIds(values = [], maximum = 1000) {
     .map((value) => String(value || '').trim().slice(0, 140))
     .filter(Boolean)))
     .slice(0, limit);
+}
+
+function normalizedPanelInvitationPermissions(values = []) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)))
+    .sort();
+}
+
+export function panelInvitationManifestFingerprint(spaceIds = []) {
+  const canonical = normalizeSnapshotSpaceIds(spaceIds, 300).sort().join('|');
+  if (!canonical) return '';
+  let left = 0x811c9dc5;
+  let right = 0x9e3779b9;
+  for (let index = 0; index < canonical.length; index += 1) {
+    const code = canonical.charCodeAt(index);
+    left = Math.imul(left ^ code, 0x01000193) >>> 0;
+    right = Math.imul((right + code + index) >>> 0, 0x85ebca6b) >>> 0;
+    right ^= right >>> 13;
+  }
+  return `${left.toString(16).padStart(8, '0')}${(right >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+function panelInvitationGroupFingerprint(groupId = '') {
+  const match = /^panel_invite_([0-9a-f]{16})_/i.exec(String(groupId || '').trim());
+  return match ? match[1].toLowerCase() : '';
+}
+
+export function resumablePanelInvitationGroup(sentInvitations = [], options = {}) {
+  const recipientEmail = String(options.recipientEmail || options.email || '').trim().toLowerCase();
+  const requestedSpaceIds = normalizeSnapshotSpaceIds(options.spaceIds, 300);
+  const explicitGroupId = String(options.invitationGroupId || '').trim();
+  if (!recipientEmail || !requestedSpaceIds.length) return null;
+
+  const requestedSpaceSet = new Set(requestedSpaceIds);
+  const expectedCount = requestedSpaceIds.length;
+  const expectedManifestFingerprint = panelInvitationManifestFingerprint(requestedSpaceIds);
+  const requestedPermissions = normalizedPanelInvitationPermissions(options.permissions || ['read', 'write']);
+  const groups = new Map();
+  for (const invitation of Array.isArray(sentInvitations) ? sentInvitations : []) {
+    if (String(invitation?.invitationScope || '').trim().toLowerCase() !== 'panel') continue;
+    if (String(invitation?.recipientEmail || '').trim().toLowerCase() !== recipientEmail) continue;
+    const groupId = String(invitation?.invitationGroupId || '').trim();
+    if (!groupId || (explicitGroupId && groupId !== explicitGroupId)) continue;
+    if (!explicitGroupId && panelInvitationGroupFingerprint(groupId) !== expectedManifestFingerprint) continue;
+    if (!groups.has(groupId)) groups.set(groupId, []);
+    groups.get(groupId).push(invitation);
+  }
+
+  const now = Date.now();
+  const candidates = [];
+  for (const [groupId, invitations] of groups) {
+    const bySpaceId = new Map();
+    let compatible = invitations.length > 0;
+    let newestAt = 0;
+    for (const invitation of invitations) {
+      const spaceId = String(invitation?.spaceId || '').trim();
+      const expiresAt = Date.parse(String(invitation?.expiresAt || ''));
+      const status = String(invitation?.status || '').trim().toLowerCase();
+      const declaredExpectedCount = Math.max(0, Math.floor(Number(invitation?.invitationGroupExpectedCount || 0)));
+      const permissions = normalizedPanelInvitationPermissions(invitation?.permissions || []);
+      if (
+        status !== 'pending'
+        || (Number.isFinite(expiresAt) && expiresAt <= now)
+        || declaredExpectedCount !== expectedCount
+        || !spaceId
+        || !requestedSpaceSet.has(spaceId)
+        || bySpaceId.has(spaceId)
+        || JSON.stringify(permissions) !== JSON.stringify(requestedPermissions)
+      ) {
+        compatible = false;
+        break;
+      }
+      bySpaceId.set(spaceId, invitation);
+      newestAt = Math.max(
+        newestAt,
+        Date.parse(String(invitation?.updatedAt || invitation?.createdAt || '')) || 0
+      );
+    }
+    if (!compatible || bySpaceId.size > expectedCount) continue;
+    candidates.push({ groupId, bySpaceId, newestAt });
+  }
+
+  if (!candidates.length) return null;
+  candidates.sort((left, right) => (right.bySpaceId.size - left.bySpaceId.size) || (right.newestAt - left.newestAt));
+  const selected = candidates[0];
+  return {
+    invitationGroupId: selected.groupId,
+    invitations: requestedSpaceIds.map((spaceId) => selected.bySpaceId.get(spaceId)).filter(Boolean),
+    existingSpaceIds: requestedSpaceIds.filter((spaceId) => selected.bySpaceId.has(spaceId)),
+    missingSpaceIds: requestedSpaceIds.filter((spaceId) => !selected.bySpaceId.has(spaceId)),
+    expectedCount
+  };
+}
+
+export function panelInvitationResponseRetryDelay(error = null, attempt = 0) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  if (error?.sessionChanged === true || code === 'APP_SESSION_CHANGED') return 0;
+
+  const status = Number(error?.status || 0);
+  const retryableGroupCodes = new Set([
+    'P2P_INVITATION_GROUP_RESPONSE_IN_PROGRESS',
+    'P2P_INVITATION_RESPONSE_IN_PROGRESS',
+    'P2P_INVITATION_GROUP_LOCK_LOST',
+    'P2P_INVITATION_GROUP_INCOMPLETE'
+  ]);
+  const transportRetryable = !status || status >= 500 || [408, 425].includes(status);
+  const retryAfterSeconds = Number(error?.retryAfterSeconds || 0);
+  const shortRateLimit = status === 429
+    && (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0 || retryAfterSeconds <= 8);
+  if (!retryableGroupCodes.has(code) && !transportRetryable && !shortRateLimit) return 0;
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.min(8000, Math.max(1000, Math.ceil(retryAfterSeconds * 1000)));
+  }
+  const normalizedAttempt = Math.min(3, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(2800, 350 * (2 ** normalizedAttempt));
 }
 
 function createId(prefix = 'id') {
@@ -379,7 +493,6 @@ function realtimeProtocolError(message = '', code = 'P2P_REALTIME_EVENT_INVALID_
 
 const CANONICAL_STATE_OPERATION_TYPES = new Set(['entity.put', 'entity.patch', 'entity.trash', 'entity.restore', 'entity.purge', 'entity.delete', 'custom']);
 const CANONICAL_SNAPSHOT_OPERATION_TYPES = new Set(['snapshot.chunk', 'snapshot.complete']);
-const SNAPSHOT_RECOVERY_REASONS = new Set(['state_gap', 'forced', 'new_device']);
 const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.key.request',
   'p2p.key.envelope',
@@ -506,22 +619,15 @@ export function assertCanonicalControlEnvelope(event = {}) {
     const requestDeviceId = String(data.requestDeviceId || '').trim();
     const requestUserId = String(data.requestUserId || '').trim();
     const dataSpaceId = String(data.spaceId || '').trim();
-    const recoveryReason = String(data.reason || '').trim().toLowerCase() || 'state_gap';
-    const requiresRevisionGap = recoveryReason !== 'forced';
     if (
       !sourceDeviceId
       || !requestId
       || requestDeviceId !== sourceDeviceId
       || requestUserId !== actorUserId
       || dataSpaceId !== spaceId
-      || !SNAPSHOT_RECOVERY_REASONS.has(recoveryReason)
       || !isSafeRevision(data.localStateRevision)
-      || !isSafeRevision(data.currentStateRevision)
-      || data.currentStateRevision < data.localStateRevision
-      || (requiresRevisionGap && (
-        !isSafeRevision(data.currentStateRevision, { positive: true })
-        || data.currentStateRevision <= data.localStateRevision
-      ))
+      || !isSafeRevision(data.currentStateRevision, { positive: true })
+      || data.currentStateRevision <= data.localStateRevision
     ) invalid('snapshot-request');
     return event;
   }
@@ -1360,27 +1466,19 @@ export class SemillaP2PClient {
     this.deviceId = '';
     this.deviceEncryptionPublicKey = null;
     this.keyRequestTimes = new Map();
+    this.invitationEscrowRecoveryAttempts = new Map();
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
     this.rejectedSnapshotSources = new Map();
-    this.pendingSnapshotSourceRetries = new Map();
     this.user = null;
     this.eventSource = null;
     this.openPromise = null;
     this.manualClose = false;
     this.retryCount = 0;
     this.retryTimer = 0;
-    this.realtimeConnectTimer = 0;
-    this.realtimeConnectStartedAt = 0;
-    this.realtimeWatchdogTimer = 0;
-    this.realtimeLastActivityAt = 0;
-    this.realtimeHeartbeatIntervalMs = REALTIME_HEARTBEAT_DEFAULT_MS;
     this.serverRetryTimer = 0;
     this.serverRetryDueAt = 0;
     this.serverRetryStage = '';
-    this.connectivityRetryTimer = 0;
-    this.connectivityRetryDueAt = 0;
-    this.connectivityRetryStage = '';
     this.ackTimer = 0;
     this.ackPromise = null;
     this.ackGeneration = 0;
@@ -1444,10 +1542,6 @@ export class SemillaP2PClient {
     this.boundOnline = () => {
       this.recoverOnline().catch((error) => dispatch('p2p:error', { error, stage: 'recover' }));
     };
-    this.boundRealtimeResume = (event = {}) => {
-      if (event?.type === 'visibilitychange' && globalThis.document?.visibilityState === 'hidden') return;
-      this.revalidateRealtimeOnResume(event?.type || 'resume');
-    };
     this.boundRateLimited = (event = {}) => {
       const detail = event?.detail || {};
       this.scheduleServerRecovery(detail.error, detail.path || 'rate-limit');
@@ -1457,6 +1551,8 @@ export class SemillaP2PClient {
     this.localTransportSession = null;
     this.localCapabilityAuthority = null;
     this.localCapability = null;
+    this.invitationEscrowAuthority = null;
+    this.invitationEscrowMaxBytes = 0;
     this.localCapabilityRefreshTimer = 0;
     this.localCapabilityRefreshDueAt = 0;
     this.localCapabilityRefreshAttempt = 0;
@@ -3976,11 +4072,7 @@ export class SemillaP2PClient {
     this.clearLocalCapabilityRefreshTimer();
     this.clearLifecycleFinalizationObserver();
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
-    this.clearRealtimeConnectTimeout();
-    this.realtimeConnectStartedAt = 0;
-    this.clearRealtimeWatchdog();
     this.clearServerRecoveryTimer();
-    this.clearConnectivityRecoveryTimer();
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
@@ -4113,13 +4205,6 @@ export class SemillaP2PClient {
     this.serverRetryStage = '';
   }
 
-  clearConnectivityRecoveryTimer() {
-    if (this.connectivityRetryTimer) window.clearTimeout(this.connectivityRetryTimer);
-    this.connectivityRetryTimer = 0;
-    this.connectivityRetryDueAt = 0;
-    this.connectivityRetryStage = '';
-  }
-
   scheduleServerRecovery(error = null, stage = 'rate-limit') {
     const rateLimitCode = String(error?.code || '').trim().toUpperCase();
     const serverDirected = Number(error?.retryAfterSeconds || 0) > 0
@@ -4129,7 +4214,6 @@ export class SemillaP2PClient {
     if (!this.isSessionContextCurrent(sessionContext)) return false;
     const delay = retryAfterMilliseconds(error);
     const dueAt = Date.now() + delay;
-    this.clearConnectivityRecoveryTimer();
     if (this.serverRetryTimer) {
       if (this.serverRetryDueAt >= dueAt) return true;
       window.clearTimeout(this.serverRetryTimer);
@@ -4165,62 +4249,6 @@ export class SemillaP2PClient {
       || !status
       || status >= 500
       || [401, 408, 425, 429].includes(status);
-  }
-
-  scheduleConnectivityRecovery(error = null, stage = 'transport-retry') {
-    if (this.scheduleServerRecovery(error, stage)) return true;
-    if (this.serverRetryTimer) return true;
-    if (
-      !this.isRetryableTransportError(error)
-      || this.manualClose
-      || !this.started
-      || !this.realtimeLeader
-      || !getSessionToken()
-    ) return false;
-
-    const sessionContext = this.captureSessionContext();
-    if (!this.isSessionContextCurrent(sessionContext)) return false;
-
-    const delay = Math.min(30000, RETRY_BASE_MS * (2 ** Math.min(this.retryCount, 5)));
-    const dueAt = Date.now() + delay;
-    if (this.connectivityRetryTimer) {
-      if (this.connectivityRetryDueAt > 0 && this.connectivityRetryDueAt <= dueAt) return true;
-      window.clearTimeout(this.connectivityRetryTimer);
-    }
-
-    this.retryCount += 1;
-    this.connectivityRetryDueAt = dueAt;
-    this.connectivityRetryStage = String(stage || 'transport-retry').slice(0, 180);
-    dispatch('p2p:connection', {
-      state: 'connecting',
-      reason: 'transport-retry',
-      deviceId: sessionContext.deviceId,
-      retryInMs: delay,
-      retryAt: dueAt,
-      stage: this.connectivityRetryStage
-    });
-
-    this.connectivityRetryTimer = window.setTimeout(() => {
-      this.connectivityRetryTimer = 0;
-      this.connectivityRetryDueAt = 0;
-      this.connectivityRetryStage = '';
-      if (!this.isSessionContextCurrent(sessionContext)) return;
-      if (navigator.onLine === false) {
-        dispatch('p2p:connection', {
-          state: 'disconnected',
-          deviceId: sessionContext.deviceId,
-          reason: 'offline'
-        });
-        return;
-      }
-      this.recoverOnline().catch((recoveryError) => {
-        if (this.isSessionContextChangedError(recoveryError)) return;
-        if (!this.scheduleConnectivityRecovery(recoveryError, 'transport-retry')) {
-          dispatch('p2p:error', { error: recoveryError, stage: 'transport-retry' });
-        }
-      });
-    }, delay);
-    return true;
   }
 
   isPermanentOutboxRejection(error = null) {
@@ -4687,165 +4715,6 @@ export class SemillaP2PClient {
     this.rejectedKeyEnvelopeRetryTimers.clear();
   }
 
-  snapshotSourceRetryKey(requestEvent = {}) {
-    const request = requestEvent?.data || {};
-    const requestId = String(request.requestId || '').trim().slice(0, 180);
-    const requestDeviceId = String(request.requestDeviceId || '').trim().slice(0, 180);
-    const spaceId = String(request.spaceId || requestEvent?.spaceId || '').trim().slice(0, 140);
-    return requestId && requestDeviceId && spaceId
-      ? `${requestId}|${requestDeviceId}|${spaceId}`
-      : '';
-  }
-
-  snapshotSourceRetryExpiresAt(requestEvent = {}) {
-    const explicitExpiry = Date.parse(String(requestEvent?.data?.expiresAt || ''));
-    if (Number.isFinite(explicitExpiry)) return explicitExpiry;
-    return Date.now() + Math.max(30000, Number(this.snapshotGrantTtlSeconds || 600) * 1000);
-  }
-
-  snapshotSourceRetryDelay(attempt = 0, expiresAtMs = 0) {
-    const exponent = Math.min(5, Math.max(0, Math.floor(Number(attempt || 0))));
-    const planned = Math.min(SNAPSHOT_SOURCE_RETRY_MAX_MS, SNAPSHOT_SOURCE_RETRY_BASE_MS * (2 ** exponent));
-    const remaining = Number(expiresAtMs || 0) - Date.now() - SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS;
-    if (!Number.isFinite(remaining) || remaining <= 0) return 0;
-    return Math.max(250, Math.min(planned, remaining));
-  }
-
-  isSnapshotSourceRetryableError(error = null) {
-    const code = String(error?.code || '').trim();
-    if (code === 'P2P_SPACE_KEY_MISSING') return true;
-    if (code === 'P2P_SNAPSHOT_TOO_LARGE') return false;
-    const status = Number(error?.status || 0);
-    if ([400, 403, 404, 409, 410, 413, 422].includes(status)) return false;
-    return this.isRetryableTransportError(error);
-  }
-
-  clearSnapshotSourceRetry(requestEventOrKey = '') {
-    const key = typeof requestEventOrKey === 'string'
-      ? requestEventOrKey
-      : this.snapshotSourceRetryKey(requestEventOrKey);
-    if (!key) return false;
-    const entry = this.pendingSnapshotSourceRetries.get(key);
-    if (!entry) return false;
-    if (entry.timer) window.clearTimeout(entry.timer);
-    this.pendingSnapshotSourceRetries.delete(key);
-    return true;
-  }
-
-  clearSnapshotSourceRetries() {
-    for (const entry of this.pendingSnapshotSourceRetries.values()) {
-      if (entry?.timer) window.clearTimeout(entry.timer);
-    }
-    this.pendingSnapshotSourceRetries.clear();
-  }
-
-  armSnapshotSourceRetry(entry = null) {
-    if (!entry || this.pendingSnapshotSourceRetries.get(entry.key) !== entry || entry.timer || entry.inFlight) return false;
-    const delay = this.snapshotSourceRetryDelay(entry.attempt, entry.expiresAtMs);
-    if (!delay) {
-      this.clearSnapshotSourceRetry(entry.key);
-      dispatch('p2p:snapshot-source-retry-expired', {
-        event: entry.event,
-        requestId: entry.requestId,
-        spaceId: entry.spaceId,
-        attempts: entry.attempt
-      });
-      return false;
-    }
-
-    entry.timer = window.setTimeout(async () => {
-      entry.timer = 0;
-      if (this.pendingSnapshotSourceRetries.get(entry.key) !== entry) return;
-      if (!this.isSessionContextCurrent(entry.sessionContext) || this.manualClose || !this.started) {
-        this.clearSnapshotSourceRetry(entry.key);
-        return;
-      }
-      if (Date.now() >= entry.expiresAtMs - SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) {
-        this.clearSnapshotSourceRetry(entry.key);
-        return;
-      }
-      if (!this.realtimeLeader || !navigator.onLine || !getSessionToken()) {
-        entry.attempt += 1;
-        this.armSnapshotSourceRetry(entry);
-        return;
-      }
-
-      entry.inFlight = true;
-      try {
-        const sent = await this.sendSnapshot(entry.event);
-        this.assertSessionContext(entry.sessionContext);
-        if (sent) {
-          this.clearSnapshotSourceRetry(entry.key);
-          dispatch('p2p:snapshot-source-recovered', {
-            event: entry.event,
-            requestId: entry.requestId,
-            spaceId: entry.spaceId,
-            attempts: entry.attempt + 1
-          });
-          return;
-        }
-        entry.attempt += 1;
-      } catch (error) {
-        if (this.isSessionContextChangedError(error)) {
-          this.clearSnapshotSourceRetry(entry.key);
-          return;
-        }
-        const retryable = this.isSnapshotSourceRetryableError(error);
-        dispatch('p2p:snapshot-source-error', {
-          event: entry.event,
-          error,
-          retryable,
-          retryScheduled: retryable,
-          stage: 'source-retry'
-        });
-        if (!retryable) {
-          this.clearSnapshotSourceRetry(entry.key);
-          return;
-        }
-        entry.attempt += 1;
-      } finally {
-        entry.inFlight = false;
-      }
-
-      if (this.pendingSnapshotSourceRetries.get(entry.key) === entry) this.armSnapshotSourceRetry(entry);
-    }, delay);
-    return true;
-  }
-
-  scheduleSnapshotSourceRetry(requestEvent = {}) {
-    const key = this.snapshotSourceRetryKey(requestEvent);
-    const request = requestEvent?.data || {};
-    const requestDeviceId = String(request.requestDeviceId || '').trim();
-    const requestId = String(request.requestId || '').trim();
-    const spaceId = String(request.spaceId || requestEvent?.spaceId || '').trim();
-    if (
-      !key
-      || !requestDeviceId
-      || requestDeviceId === String(this.deviceId || '').trim()
-      || !this.started
-      || this.manualClose
-    ) return false;
-    const existing = this.pendingSnapshotSourceRetries.get(key);
-    if (existing) return true;
-    const expiresAtMs = this.snapshotSourceRetryExpiresAt(requestEvent);
-    if (expiresAtMs <= Date.now() + SNAPSHOT_SOURCE_RETRY_EXPIRY_MARGIN_MS) return false;
-    const sessionContext = this.captureSessionContext();
-    if (!this.isSessionContextCurrent(sessionContext)) return false;
-    const entry = {
-      key,
-      event: requestEvent,
-      requestId,
-      spaceId,
-      expiresAtMs,
-      attempt: 0,
-      timer: 0,
-      inFlight: false,
-      sessionContext
-    };
-    this.pendingSnapshotSourceRetries.set(key, entry);
-    return this.armSnapshotSourceRetry(entry);
-  }
-
   scheduleRejectedKeyEnvelopeRetry(spaceId = '', keyId = '', keyEpoch = 0) {
     const scope = this.keyEnvelopeRejectionScope(spaceId, keyId, keyEpoch);
     if (!scope || this.rejectedKeyEnvelopeRetryTimers.has(scope)) return false;
@@ -5041,349 +4910,6 @@ export class SemillaP2PClient {
       failures,
       complete
     };
-  }
-
-  async stageInvitationKeyForRecipient(invitation = {}) {
-    const invitationId = String(invitation?.invitationId || '').trim();
-    const spaceId = String(invitation?.spaceId || '').trim();
-    if (!invitationId || !spaceId || !this.started || !getSessionToken()) return null;
-    this.assertSpaceAuthorizationConfirmed(spaceId);
-    const targets = await apiPost('/api/p2p/crypto/invitation-key-targets', {
-      deviceId: this.deviceId,
-      invitationId
-    });
-    const keyId = String(targets.keyId || '').trim();
-    const keyEpoch = Math.max(0, Number(targets.keyEpoch || 0));
-    const recipientDevices = Array.isArray(targets.recipientDevices) ? targets.recipientDevices : [];
-    const escrowRecipient = targets.escrowRecipient && typeof targets.escrowRecipient === 'object'
-      ? targets.escrowRecipient
-      : null;
-    if (!keyId) {
-      const error = new Error('La invitación no tiene una clave activa para preparar el descifrado inmediato.');
-      error.code = 'P2P_INVITATION_KEY_AUTHORITY_PENDING';
-      error.status = 409;
-      throw error;
-    }
-    if (!escrowRecipient?.deviceId || !escrowRecipient?.encryptionPublicKey) {
-      const error = new Error('El backend no publicó la autoridad de escrow necesaria para aceptar la invitación desde un dispositivo nuevo.');
-      error.code = 'P2P_INVITATION_ESCROW_NOT_CONFIGURED';
-      error.status = 503;
-      throw error;
-    }
-    if (!(await hasSpaceKey(spaceId, keyId))) {
-      await this.ensureCurrentSpaceKey(spaceId, { requireAuthority: true, requestIfMissing: false });
-    }
-    const escrowEnvelope = await createSpaceKeyEnvelope(spaceId, escrowRecipient, { keyId });
-    if (!recipientDevices.length) {
-      const staged = await apiPost('/api/p2p/crypto/invitation-key-stage', {
-        deviceId: this.deviceId,
-        invitationId,
-        envelopes: [],
-        escrowEnvelope
-      });
-      if (staged.complete !== true || staged.escrowStaged !== true) {
-        const error = new Error('La clave temporal de la invitación no quedó protegida en Redis para un futuro dispositivo del invitado.');
-        error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
-        error.status = 503;
-        error.retryable = true;
-        error.staging = staged;
-        throw error;
-      }
-      return {
-        ...staged,
-        pendingRecipientDevice: true
-      };
-    }
-    const envelopes = await createSpaceKeyEnvelopes(spaceId, recipientDevices, { keyId });
-    if (envelopes.length !== recipientDevices.length) {
-      const error = new Error('No se pudo preparar la clave para todos los dispositivos registrados del invitado.');
-      error.code = 'P2P_INVITATION_KEY_STAGING_INCOMPLETE';
-      error.status = 409;
-      error.retryable = true;
-      throw error;
-    }
-    const staged = await apiPost('/api/p2p/crypto/invitation-key-stage', {
-      deviceId: this.deviceId,
-      invitationId,
-      envelopes,
-      escrowEnvelope
-    });
-    if (Number(staged.staged || 0) !== recipientDevices.length
-      || staged.escrowStaged !== true
-      || staged.complete !== true) {
-      const error = new Error('La clave temporal de la invitación no quedó preparada para todos los dispositivos del invitado.');
-      error.code = 'P2P_INVITATION_KEY_STAGING_INCOMPLETE';
-      error.status = 503;
-      error.retryable = true;
-      error.staging = staged;
-      throw error;
-    }
-    return staged;
-  }
-
-  async stageInvitationBootstrapSnapshot(invitation = {}) {
-    const invitationId = String(invitation?.invitationId || '').trim();
-    const spaceId = String(invitation?.spaceId || '').trim();
-    if (!invitationId || !spaceId || !this.started || !getSessionToken()) return null;
-    this.assertSpaceAuthorizationConfirmed(spaceId);
-
-    this.recoveryRequirements = await getRecoveryRequirements();
-    const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
-    if (unresolvedRecoveryRevision) {
-      const error = new Error('Este dispositivo todavía está recuperando el proyecto y no puede preparar una invitación con una copia incompleta.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_SOURCE_PENDING';
-      error.status = 409;
-      error.retryable = true;
-      throw error;
-    }
-
-    let pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
-    if (pendingForSpace.length && navigator.onLine && getSessionToken()) {
-      await this.flushOutbox().catch((error) => {
-        if (this.isSessionContextChangedError(error)) throw error;
-        return null;
-      });
-      pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
-    }
-
-    const localEntities = await listEntities(spaceId);
-    const optimisticEntities = localEntities.filter((entity) => entity?.optimistic === true);
-    if (pendingForSpace.length || optimisticEntities.length) {
-      const error = new Error('El proyecto tiene cambios locales pendientes y todavía no puede congelar una copia segura para la invitación.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_SOURCE_DIRTY';
-      error.status = 409;
-      error.retryable = true;
-      error.pendingOperations = pendingForSpace.length;
-      error.optimisticEntities = optimisticEntities.length;
-      throw error;
-    }
-
-    const activeKey = await getActiveSpaceKey(spaceId);
-    const authoritativeSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === spaceId) || {};
-    const activeKeyId = String(authoritativeSpace.activeEncryptionKeyId || activeKey?.keyId || '').trim();
-    const keyEpoch = Math.max(0, Number(authoritativeSpace.encryptionKeyEpoch ?? activeKey?.keyEpoch ?? 0));
-    if (!activeKey?.keyId || activeKey.keyId !== activeKeyId) {
-      const error = new Error('La clave local del proyecto todavía no coincide con la autoridad necesaria para preparar la invitación.');
-      error.code = 'P2P_INVITATION_KEY_AUTHORITY_PENDING';
-      error.status = 409;
-      error.retryable = true;
-      throw error;
-    }
-
-    const localStateRevisions = await listStateRevisions([spaceId]);
-    const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
-    const entities = sortSnapshotEntities(localEntities.map((entity) => ({
-      entityType: entity.entityType,
-      entityId: entity.entityId,
-      value: entity.value,
-      deleted: Boolean(entity.deleted),
-      operationId: entity.operationId,
-      operationType: entity.operationType || (entity.deleted ? 'entity.delete' : 'entity.put'),
-      spaceSequence: Number(entity.spaceSequence || 0),
-      stateRevision: Number(entity.stateRevision || entity.spaceSequence || 0),
-      updatedAt: entity.updatedAt || ''
-    })));
-    const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
-      maximum,
-      Number(entity.stateRevision || entity.spaceSequence || 0)
-    ), 0);
-    const sourceStateRevision = Math.max(entityStateRevision, localStateRevision);
-    const snapshotDigest = await sha256Hex(JSON.stringify(entities));
-    const transportEntities = await encryptSnapshotEntities(spaceId, entities);
-    const chunks = snapshotChunksByBytes(transportEntities, this.eventMaxBytes);
-    if (chunks.length > this.snapshotMaxChunks) {
-      const error = new Error('La copia cifrada de la invitación necesita demasiados fragmentos. Reduce o divide la información del proyecto.');
-      error.code = 'P2P_SNAPSHOT_TOO_LARGE';
-      throw error;
-    }
-    const chunkByteCounts = chunks.map((chunk) => jsonByteLength(chunk));
-    const snapshotByteCount = chunkByteCounts.reduce((total, bytes) => total + bytes, 0);
-    if (snapshotByteCount > this.snapshotMaxBytes) {
-      const error = new Error('La copia cifrada de la invitación supera el tamaño seguro temporal. Reduce o divide la información del proyecto.');
-      error.code = 'P2P_SNAPSHOT_TOO_LARGE';
-      throw error;
-    }
-
-    const staged = await apiPost('/api/p2p/crypto/invitation-bootstrap-stage', {
-      deviceId: this.deviceId,
-      invitationId,
-      snapshot: {
-        keyId: activeKeyId,
-        keyEpoch,
-        sourceStateRevision,
-        snapshotDigest,
-        entityCount: entities.length,
-        snapshotByteCount,
-        chunks: chunks.map((chunk, index) => ({
-          chunkIndex: index,
-          chunkCount: chunks.length,
-          chunkByteCount: chunkByteCounts[index],
-          entities: chunk
-        }))
-      }
-    });
-    if (staged.complete !== true || Number(staged.chunkCount || 0) !== chunks.length) {
-      const error = new Error('El backend no confirmó la copia cifrada temporal necesaria para abrir el proyecto al aceptar.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_INCOMPLETE';
-      error.status = 503;
-      error.retryable = true;
-      throw error;
-    }
-    return staged;
-  }
-
-  async applyInvitationBootstrapSnapshot(spaceId = '', snapshot = {}, invitation = {}, sessionContext = this.captureSessionContext()) {
-    this.assertSessionContext(sessionContext);
-    const cleanSpaceId = String(spaceId || '').trim();
-    const invitationId = String(invitation?.invitationId || '').trim();
-    const sourceDeviceId = String(snapshot?.sourceDeviceId || '').trim();
-    const keyId = String(snapshot?.keyId || '').trim();
-    const keyEpoch = Math.max(0, Number(snapshot?.keyEpoch || 0));
-    const sourceStateRevision = Math.max(0, Number(snapshot?.sourceStateRevision || 0));
-    const snapshotDigest = String(snapshot?.snapshotDigest || '').trim();
-    const entityCount = Math.max(0, Number(snapshot?.entityCount || 0));
-    const snapshotByteCount = Math.max(0, Number(snapshot?.snapshotByteCount || 0));
-    const chunks = Array.isArray(snapshot?.chunks) ? snapshot.chunks : [];
-    if (!cleanSpaceId || !invitationId || !sourceDeviceId || !keyId || !snapshotDigest || !chunks.length) {
-      const error = new Error('La copia temporal de la invitación está incompleta.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
-      throw error;
-    }
-    const activeKey = await getActiveSpaceKey(cleanSpaceId);
-    if (!activeKey || activeKey.keyId !== keyId || Math.max(0, Number(activeKey.keyEpoch || 0)) !== keyEpoch) {
-      const error = new Error('La copia temporal de la invitación no corresponde a la clave importada por este dispositivo.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_KEY_MISMATCH';
-      throw error;
-    }
-
-    const requestId = `invitation_bootstrap:${invitationId}`;
-    const actorUserId = String(invitation?.inviterUserId || '').trim() || 'invitation-bootstrap';
-    const decryptedChunks = [];
-    let decryptedSnapshotByteCount = 0;
-    for (let index = 0; index < chunks.length; index += 1) {
-      this.assertSessionContext(sessionContext);
-      const chunk = chunks[index] || {};
-      const event = {
-        eventId: `${requestId}:chunk:${index}`,
-        eventType: 'p2p.operation',
-        spaceId: cleanSpaceId,
-        actorUserId,
-        sourceDeviceId,
-        spaceSequence: 1,
-        stateRevision: 0,
-        operation: {
-          operationId: `${requestId}:chunk:${index}`,
-          type: 'snapshot.chunk',
-          entityType: '__snapshot__',
-          entityId: `${requestId}:${index}`,
-          encrypted: true,
-          encryptionVersion: 1,
-          keyId,
-          payload: {
-            requestId,
-            chunkIndex: index,
-            chunkCount: chunks.length,
-            entityCount,
-            snapshotByteCount,
-            chunkByteCount: Math.max(0, Number(chunk.chunkByteCount || 0)),
-            sourceStateRevision,
-            snapshotDigest,
-            entities: Array.isArray(chunk.entities) ? chunk.entities : []
-          }
-        }
-      };
-      const decrypted = await decryptOperationEvent(event);
-      this.assertSessionContext(sessionContext);
-      const decryptedChunkByteCount = Number(decrypted?.operation?.payload?.chunkByteCount);
-      if (!Number.isInteger(decryptedChunkByteCount) || decryptedChunkByteCount < 2) {
-        const error = new Error('La copia temporal de la invitación produjo un fragmento descifrado con tamaño inválido.');
-        error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
-        throw error;
-      }
-      decryptedSnapshotByteCount += decryptedChunkByteCount;
-      if (decryptedSnapshotByteCount > this.snapshotMaxBytes) {
-        const error = new Error('La copia temporal descifrada de la invitación supera el tamaño seguro permitido.');
-        error.code = 'P2P_SNAPSHOT_TOO_LARGE';
-        throw error;
-      }
-      decryptedChunks.push(decrypted);
-    }
-
-    // El snapshot guardado en Redis declara tamaños de transporte cifrado. Después
-    // de descifrar, IndexedDB valida los bytes del JSON canónico en claro; mezclar
-    // ambos tamaños hace que una copia completa termine como missing_snapshot_chunks.
-    // Primero desciframos todos los fragmentos, calculamos el total canónico y solo
-    // entonces los materializamos con metadatos coherentes entre chunk y complete.
-    for (const decrypted of decryptedChunks) {
-      this.assertSessionContext(sessionContext);
-      const canonicalChunk = {
-        ...decrypted,
-        operation: {
-          ...(decrypted.operation || {}),
-          payload: {
-            ...(decrypted.operation?.payload || {}),
-            snapshotByteCount: decryptedSnapshotByteCount
-          }
-        }
-      };
-      const staged = await applyP2PEvent(canonicalChunk);
-      this.assertSessionContext(sessionContext);
-      if (!staged?.staged || staged?.snapshotIncomplete) {
-        const error = new Error('No se pudo aplicar un fragmento de la copia temporal de la invitación.');
-        error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
-        error.result = staged;
-        throw error;
-      }
-    }
-
-    const completeEvent = {
-      eventId: `${requestId}:complete`,
-      eventType: 'p2p.operation',
-      spaceId: cleanSpaceId,
-      actorUserId,
-      sourceDeviceId,
-      spaceSequence: 1,
-      stateRevision: 0,
-      operation: {
-        operationId: `${requestId}:complete`,
-        type: 'snapshot.complete',
-        entityType: '__snapshot__',
-        entityId: requestId,
-        encrypted: true,
-        encryptionVersion: 1,
-        keyId,
-        payload: {
-          requestId,
-          chunkCount: chunks.length,
-          entityCount,
-          snapshotByteCount: decryptedSnapshotByteCount,
-          sourceStateRevision,
-          snapshotDigest
-        }
-      }
-    };
-    const result = await applyP2PEvent(completeEvent);
-    this.assertSessionContext(sessionContext);
-    if (result?.snapshotIncomplete) {
-      const error = new Error('La copia temporal de la invitación no superó la validación de integridad local.');
-      error.code = 'P2P_INVITATION_BOOTSTRAP_INVALID';
-      error.result = result;
-      throw error;
-    }
-    this.recoveryRequirements = await resolveRecoveryRequirement(cleanSpaceId, sourceStateRevision);
-    this.assertSessionContext(sessionContext);
-    dispatch('p2p:snapshot-complete', {
-      event: completeEvent,
-      result,
-      invitationBootstrap: true,
-      recoveryRequirements: this.recoveryRequirements
-    });
-    dispatch('p2p:operation', {
-      event: completeEvent,
-      result,
-      invitationBootstrap: true
-    });
-    return result;
   }
 
   async replayDeferredEncryptedEvents(spaceId = '', sessionContext = this.captureSessionContext()) {
@@ -5736,6 +5262,19 @@ export class SemillaP2PClient {
         await this.persistLocalCapabilityState(data.localCapabilityAuthority, data.localCapability, sessionContext);
         this.assertSessionContext(sessionContext);
       }
+      if (Object.prototype.hasOwnProperty.call(data, 'invitationEscrowAuthority')) {
+        const authority = data.invitationEscrowAuthority && typeof data.invitationEscrowAuthority === 'object'
+          ? data.invitationEscrowAuthority
+          : null;
+        this.invitationEscrowAuthority = authority?.enabled === true
+          && Number(authority?.schemaVersion || 0) === 1
+          && authority?.algorithm === 'ECDH-P256+HKDF-SHA256+A256GCM'
+          && String(authority?.deviceId || '').trim()
+          && authority?.publicKey
+          ? authority
+          : null;
+        this.invitationEscrowMaxBytes = Math.max(0, Number(authority?.maxBytes || 0));
+      }
       const lifecycleTransactions = Array.isArray(data.lifecycleTransactions)
         ? data.lifecycleTransactions.filter((transaction) => transaction && typeof transaction === 'object')
         : [];
@@ -5815,19 +5354,66 @@ export class SemillaP2PClient {
           reason: 'accepted_replica_behind'
         });
       }
+      const escrowRecoveredSpaceIds = new Set();
       for (const space of this.bootstrapState.spaces) {
-        if (space?.authorizationState === 'unconfirmed') continue;
-        if (Math.max(0, Number(space?.encryptionVersion || 0)) < 1) continue;
+        const encrypted = Math.max(0, Number(space?.encryptionVersion || 0)) >= 1;
+        const replicaRecoveryPending = space?.authorizationState === 'unconfirmed'
+          && space?.authorizationPendingReason === 'replica_recovery';
+        if (replicaRecoveryPending && encrypted) {
+          const recovered = await this.recoverAcceptedInvitationBootstrap(
+            space,
+            invitations.received,
+            sessionContext,
+            { forceSnapshot: true }
+          ).catch((error) => {
+            if (this.isSessionContextChangedError(error)) throw error;
+            dispatch('p2p:invitation-bootstrap-recovery-deferred', {
+              spaceId: space.spaceId,
+              error
+            });
+            return { recovered: false, reason: 'request-failed' };
+          });
+          this.assertSessionContext(sessionContext);
+          if (recovered?.recovered === true) escrowRecoveredSpaceIds.add(String(space.spaceId || '').trim());
+          continue;
+        }
+        if (space?.authorizationState === 'unconfirmed' || !encrypted) continue;
+        const activeKeyId = String(space?.activeEncryptionKeyId || '').trim();
+        const localKeyAvailable = await hasSpaceKey(space.spaceId, activeKeyId);
+        this.assertSessionContext(sessionContext);
+        if (!localKeyAvailable) {
+          await this.recoverAcceptedInvitationBootstrap(
+            space,
+            invitations.received,
+            sessionContext
+          ).catch((error) => {
+            if (this.isSessionContextChangedError(error)) throw error;
+            dispatch('p2p:invitation-bootstrap-recovery-deferred', {
+              spaceId: space.spaceId,
+              error
+            });
+            return { recovered: false, reason: 'request-failed' };
+          });
+          this.assertSessionContext(sessionContext);
+        }
         await this.ensureCurrentSpaceKey(space.spaceId).catch((error) => {
           dispatch('p2p:crypto-locked', { spaceId: space.spaceId, error });
           return false;
         });
         this.assertSessionContext(sessionContext);
       }
+      const recoveryLocalStateRevisions = escrowRecoveredSpaceIds.size
+        ? await listStateRevisions(this.recoveryEligibleSpaceIds())
+        : (context.localStateRevisions || {});
+      this.assertSessionContext(sessionContext);
       await this.syncRecoveryRequirements({
-        localStateRevisions: context.localStateRevisions || {}
+        localStateRevisions: recoveryLocalStateRevisions
       }, sessionContext);
       this.assertSessionContext(sessionContext);
+      for (const spaceId of escrowRecoveredSpaceIds) {
+        await this.confirmRecoveredReplicaAuthorization(spaceId, sessionContext);
+        this.assertSessionContext(sessionContext);
+      }
       if (this.snapshotRecoveryRequired) {
         this.scheduleSnapshotRecovery(
           this.snapshotRecoveryDelay(this.bootstrapState.snapshotRequests),
@@ -6011,10 +5597,10 @@ export class SemillaP2PClient {
     this.ackPromise = null;
     this.ackRetryCount = 0;
     this.pendingReplicaHealthSpaceIds.clear();
+    this.invitationEscrowRecoveryAttempts.clear();
     this.rejectedKeyEnvelopeSources.clear();
     this.clearRejectedKeyEnvelopeRetryTimers();
     this.rejectedSnapshotSources.clear();
-    this.clearSnapshotSourceRetries();
     const sessionContext = this.captureSessionContext();
 
     try {
@@ -6029,12 +5615,8 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       if (this.snapshotRecoveryRequired) this.scheduleSnapshotRecovery(SNAPSHOT_RECOVERY_FALLBACK_MS);
       window.removeEventListener('online', this.boundOnline);
-      window.removeEventListener('pageshow', this.boundRealtimeResume);
-      globalThis.document?.removeEventListener?.('visibilitychange', this.boundRealtimeResume);
       window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
       window.addEventListener('online', this.boundOnline);
-      window.addEventListener('pageshow', this.boundRealtimeResume);
-      globalThis.document?.addEventListener?.('visibilitychange', this.boundRealtimeResume);
       window.addEventListener('p2p:rate-limited', this.boundRateLimited);
       this.tabCoordinationReady = false;
       this.realtimeLeader = await this.tabCoordinator.start({
@@ -6075,7 +5657,7 @@ export class SemillaP2PClient {
           if (this.isSessionContextCurrent(sessionContext)) await this.stop();
           throw error;
         }
-        this.scheduleConnectivityRecovery(error, 'bootstrap-start');
+        this.scheduleServerRecovery(error, 'bootstrap-start');
       }
 
       this.assertSessionContext(sessionContext);
@@ -6103,7 +5685,6 @@ export class SemillaP2PClient {
         }
       } else if (!backendReady) {
         dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, localOnly: true });
-        if (!this.realtimeLeader) this.requestTabState('startup-backend-unavailable');
       } else {
         dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, sharedTab: true });
         this.requestTabState('startup-follower');
@@ -6161,8 +5742,6 @@ export class SemillaP2PClient {
     this.clearAtomicTransportBatchTimer();
     this.pendingAtomicEventBatches.clear();
     window.removeEventListener('online', this.boundOnline);
-    window.removeEventListener('pageshow', this.boundRealtimeResume);
-    globalThis.document?.removeEventListener?.('visibilitychange', this.boundRealtimeResume);
     window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
     this.unbindTabRelays();
     const pendingTabCoordinator = this.tabCoordinator.stop().catch(() => null);
@@ -6170,11 +5749,7 @@ export class SemillaP2PClient {
     const pendingLeadership = options.skipLeadershipWait ? Promise.resolve() : this.leadershipTask;
     this.leadershipTask = Promise.resolve();
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
-    this.clearRealtimeConnectTimeout();
-    this.realtimeConnectStartedAt = 0;
-    this.clearRealtimeWatchdog();
     this.clearServerRecoveryTimer();
-    this.clearConnectivityRecoveryTimer();
     if (this.ackTimer) window.clearTimeout(this.ackTimer);
     if (this.replicaHealthTimer) window.clearTimeout(this.replicaHealthTimer);
     if (this.snapshotRecoveryTimer) window.clearTimeout(this.snapshotRecoveryTimer);
@@ -6183,7 +5758,6 @@ export class SemillaP2PClient {
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds.clear();
     this.pendingAckReplicaSpaceIds.clear();
-    this.clearSnapshotSourceRetries();
     this.ackGeneration += 1;
     this.ackPromise = null;
     this.ackRetryCount = 0;
@@ -6217,7 +5791,10 @@ export class SemillaP2PClient {
       this.deviceSigningPublicKey = null;
       this.localCapabilityAuthority = null;
       this.localCapability = null;
+      this.invitationEscrowAuthority = null;
+      this.invitationEscrowMaxBytes = 0;
       this.keyRequestTimes.clear();
+      this.invitationEscrowRecoveryAttempts.clear();
       this.rejectedKeyEnvelopeSources.clear();
       this.clearRejectedKeyEnvelopeRetryTimers();
       this.rejectedSnapshotSources.clear();
@@ -6277,14 +5854,13 @@ export class SemillaP2PClient {
       });
       this.assertSessionContext(sessionContext);
       this.clearServerRecoveryTimer();
-      this.clearConnectivityRecoveryTimer();
       return true;
     } catch (error) {
       if (isDeviceIdentityConflict(error)) {
         return this.restartWithFreshDeviceIdentity(error);
       }
       if (this.isSessionContextChangedError(error)) return false;
-      if (this.scheduleConnectivityRecovery(error, 'recover-online')) return false;
+      if (this.scheduleServerRecovery(error, 'recover-online')) return false;
       throw error;
     }
   }
@@ -6294,152 +5870,7 @@ export class SemillaP2PClient {
     this.pendingAtomicEventBatches.clear();
     this.eventPipelineBlocked = true;
     dispatch('p2p:error', { error, stage });
-    this.scheduleReconnect(stage);
-  }
-
-  clearRealtimeConnectTimeout() {
-    if (this.realtimeConnectTimer) window.clearTimeout(this.realtimeConnectTimer);
-    this.realtimeConnectTimer = 0;
-  }
-
-  armRealtimeConnectTimeout(source = this.eventSource, sessionContext = this.captureSessionContext()) {
-    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
-    this.clearRealtimeConnectTimeout();
-    if (!this.realtimeConnectStartedAt) this.realtimeConnectStartedAt = Date.now();
-    const expectedSource = source;
-    const expectedGeneration = Number(sessionContext.generation);
-    const dueIn = Math.max(250, (this.realtimeConnectStartedAt + REALTIME_CONNECT_TIMEOUT_MS) - Date.now());
-    this.realtimeConnectTimer = window.setTimeout(() => {
-      this.realtimeConnectTimer = 0;
-      if (
-        this.manualClose
-        || !this.started
-        || !this.realtimeLeader
-        || this.eventSource !== expectedSource
-        || !this.isSessionContextCurrent(sessionContext)
-        || Number(sessionContext.generation) !== expectedGeneration
-      ) return;
-      const error = new Error('El stream no confirmó la conexión dentro del tiempo seguro. Se abrirá una conexión nueva automáticamente.');
-      error.code = 'P2P_REALTIME_CONNECT_TIMEOUT';
-      error.retryable = true;
-      dispatch('p2p:error', { error, stage: 'realtime-connect-timeout', timeoutMs: REALTIME_CONNECT_TIMEOUT_MS });
-      this.scheduleReconnect('realtime-connect-timeout');
-    }, dueIn);
-    return true;
-  }
-
-  realtimeSourceRequiresRecycle(source = this.eventSource) {
-    if (!source) return true;
-    const openState = Number(globalThis.EventSource?.OPEN ?? 1);
-    const connectingState = Number(globalThis.EventSource?.CONNECTING ?? 0);
-    const closedState = Number(globalThis.EventSource?.CLOSED ?? 2);
-    const readyState = Number(source.readyState);
-    const now = Date.now();
-    if (readyState === closedState) return true;
-    if (readyState === connectingState) {
-      return this.realtimeConnectStartedAt > 0
-        && (now - this.realtimeConnectStartedAt) >= REALTIME_CONNECT_TIMEOUT_MS;
-    }
-    if (readyState === openState) {
-      return this.realtimeLastActivityAt > 0
-        && (now - this.realtimeLastActivityAt) >= this.realtimeWatchdogDelay();
-    }
-    return false;
-  }
-
-  revalidateRealtimeOnResume(reason = 'resume') {
-    if (
-      this.manualClose
-      || !this.started
-      || !this.tabCoordinationReady
-      || !this.realtimeLeader
-      || !getSessionToken()
-      || navigator.onLine === false
-      || globalThis.document?.visibilityState === 'hidden'
-    ) return false;
-
-    const sessionContext = this.captureSessionContext();
-    if (!this.isSessionContextCurrent(sessionContext)) return false;
-    const source = this.eventSource;
-    const openState = Number(globalThis.EventSource?.OPEN ?? 1);
-    const connectingState = Number(globalThis.EventSource?.CONNECTING ?? 0);
-
-    if (!source || this.realtimeSourceRequiresRecycle(source)) {
-      if (source) this.scheduleReconnect(`realtime-${reason}-stale`);
-      else this.openRealtime().catch((error) => {
-        if (this.isSessionContextChangedError(error)) return;
-        if (!this.scheduleConnectivityRecovery(error, `realtime-${reason}`)) {
-          dispatch('p2p:error', { error, stage: 'realtime-resume' });
-        }
-      });
-      return true;
-    }
-
-    if (Number(source.readyState) === connectingState) {
-      this.armRealtimeConnectTimeout(source, sessionContext);
-      return true;
-    }
-    if (Number(source.readyState) === openState) {
-      this.armRealtimeWatchdog(source, sessionContext);
-      return true;
-    }
-    return false;
-  }
-
-  clearRealtimeWatchdog() {
-    if (this.realtimeWatchdogTimer) window.clearTimeout(this.realtimeWatchdogTimer);
-    this.realtimeWatchdogTimer = 0;
-    this.realtimeLastActivityAt = 0;
-  }
-
-  realtimeWatchdogDelay() {
-    return Math.max(
-      REALTIME_WATCHDOG_MIN_MS,
-      Math.ceil(Math.max(1000, Number(this.realtimeHeartbeatIntervalMs || REALTIME_HEARTBEAT_DEFAULT_MS)) * REALTIME_WATCHDOG_FACTOR)
-    );
-  }
-
-  armRealtimeWatchdog(source = this.eventSource, sessionContext = this.captureSessionContext()) {
-    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
-    if (this.realtimeWatchdogTimer) window.clearTimeout(this.realtimeWatchdogTimer);
-    const expectedSource = source;
-    const expectedGeneration = Number(sessionContext.generation);
-    const delay = this.realtimeWatchdogDelay();
-    const dueIn = Math.max(250, (this.realtimeLastActivityAt + delay) - Date.now());
-    this.realtimeWatchdogTimer = window.setTimeout(() => {
-      this.realtimeWatchdogTimer = 0;
-      if (
-        this.manualClose
-        || !this.started
-        || !this.realtimeLeader
-        || this.eventSource !== expectedSource
-        || !this.isSessionContextCurrent(sessionContext)
-        || Number(sessionContext.generation) !== expectedGeneration
-      ) return;
-      const silentFor = Date.now() - this.realtimeLastActivityAt;
-      if (silentFor < delay) {
-        this.armRealtimeWatchdog(expectedSource, sessionContext);
-        return;
-      }
-      const error = new Error('El stream dejó de responder aunque el dispositivo mantiene conectividad. Se abrirá una conexión nueva automáticamente.');
-      error.code = 'P2P_REALTIME_STALE';
-      error.retryable = true;
-      dispatch('p2p:error', { error, stage: 'realtime-stale', silentForMs: silentFor });
-      this.scheduleReconnect('realtime-stale');
-    }, dueIn);
-    return true;
-  }
-
-  touchRealtimeActivity(source = this.eventSource, sessionContext = this.captureSessionContext(), heartbeatIntervalMs = 0) {
-    if (!source || this.eventSource !== source || !this.realtimeLeader || !this.isSessionContextCurrent(sessionContext)) return false;
-    this.clearRealtimeConnectTimeout();
-    this.realtimeConnectStartedAt = 0;
-    const reportedHeartbeat = Math.max(0, Number(heartbeatIntervalMs || 0));
-    if (reportedHeartbeat >= 1000 && reportedHeartbeat <= 120000) {
-      this.realtimeHeartbeatIntervalMs = reportedHeartbeat;
-    }
-    this.realtimeLastActivityAt = Date.now();
-    return this.armRealtimeWatchdog(source, sessionContext);
+    this.scheduleReconnect();
   }
 
   async openRealtime() {
@@ -6447,14 +5878,7 @@ export class SemillaP2PClient {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     if (this.openPromise) return this.openPromise;
-    if (this.eventSource && this.eventSource.readyState !== EventSource.CLOSED) {
-      if (!this.realtimeSourceRequiresRecycle(this.eventSource)) return this.eventSource;
-      this.clearRealtimeConnectTimeout();
-      this.realtimeConnectStartedAt = 0;
-      this.clearRealtimeWatchdog();
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    if (this.eventSource && this.eventSource.readyState !== EventSource.CLOSED) return this.eventSource;
 
     const opening = (async () => {
       if (this.eventPipelineBlocked) {
@@ -6476,47 +5900,17 @@ export class SemillaP2PClient {
       const token = encodeURIComponent(tokenData.realtimeToken || '');
       if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
       const source = new EventSource(`${getBackendUrl()}/api/p2p/realtime/stream?realtimeToken=${token}&cursor=${encodeURIComponent(cursor)}&p2pApplication=${encodeURIComponent(P2P_APPLICATION_ID)}`);
-      this.eventSource = source;
-      this.realtimeConnectStartedAt = Date.now();
-      dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, reason: 'stream-opening' });
-      this.armRealtimeConnectTimeout(source, sessionContext);
       const isCurrentSource = () => this.realtimeLeader
         && this.eventSource === source
         && this.isSessionContextCurrent(sessionContext);
-      source.onopen = () => {
+      source.addEventListener('p2p_ready', () => {
         if (!isCurrentSource()) {
           source.close();
           return;
         }
-        this.touchRealtimeActivity(source, sessionContext);
-        dispatch('p2p:connection', { state: 'connecting', deviceId: sessionContext.deviceId, reason: 'transport-open' });
-      };
-      source.addEventListener('p2p_ready', (event) => {
-        if (!isCurrentSource()) {
-          source.close();
-          return;
-        }
-        let heartbeatIntervalMs = REALTIME_HEARTBEAT_DEFAULT_MS;
-        try {
-          const payload = JSON.parse(event.data || '{}');
-          heartbeatIntervalMs = Number(payload.heartbeatIntervalMs || REALTIME_HEARTBEAT_DEFAULT_MS);
-        } catch {}
         this.retryCount = 0;
-        this.touchRealtimeActivity(source, sessionContext, heartbeatIntervalMs);
         this.scheduleAck(this.lastProcessedSequence, { immediate: true });
         dispatch('p2p:connection', { state: 'connected', deviceId: sessionContext.deviceId });
-      });
-      source.addEventListener('p2p_heartbeat', (event) => {
-        if (!isCurrentSource()) {
-          source.close();
-          return;
-        }
-        let heartbeatIntervalMs = 0;
-        try {
-          const payload = JSON.parse(event.data || '{}');
-          heartbeatIntervalMs = Number(payload.heartbeatIntervalMs || 0);
-        } catch {}
-        this.touchRealtimeActivity(source, sessionContext, heartbeatIntervalMs);
       });
       source.addEventListener('p2p_gap', (event) => {
         if (!isCurrentSource()) {
@@ -6525,7 +5919,6 @@ export class SemillaP2PClient {
         }
         try {
           const payload = JSON.parse(event.data || '{}');
-          this.touchRealtimeActivity(source, sessionContext);
           const gapEvent = {
             ...payload,
             eventId: payload.eventId || createId('gap'),
@@ -6555,7 +5948,6 @@ export class SemillaP2PClient {
         }
         try {
           const payload = JSON.parse(event.data || '{}');
-          this.touchRealtimeActivity(source, sessionContext);
           assertRealtimeEventEnvelope(payload);
           this.enqueueEvent(payload).catch(() => null);
         } catch (error) {
@@ -6578,14 +5970,12 @@ export class SemillaP2PClient {
           source.close();
           return;
         }
-        this.clearRealtimeConnectTimeout();
-        this.clearRealtimeWatchdog();
-        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'stream-error' });
+        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId });
         if (this.manualClose || !getSessionToken()) {
           source.close();
           return;
         }
-        this.scheduleReconnect('stream-error');
+        this.scheduleReconnect();
       };
       try {
         this.assertSessionContext(sessionContext);
@@ -6597,62 +5987,32 @@ export class SemillaP2PClient {
         source.close();
         throw error;
       }
+      this.eventSource = source;
       return source;
     })();
 
     this.openPromise = opening;
     try {
       return await opening;
-    } catch (error) {
-      if (this.isSessionContextChangedError(error)) throw error;
-      this.clearRealtimeConnectTimeout();
-      this.realtimeConnectStartedAt = 0;
-      this.clearRealtimeWatchdog();
-      if (this.eventSource) this.eventSource.close();
-      this.eventSource = null;
-      if (this.scheduleServerRecovery(error, 'realtime-open')) return null;
-      if (this.isRetryableTransportError(error)) {
-        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'realtime-open' });
-        this.scheduleReconnect('realtime-open');
-        return null;
-      }
-      throw error;
     } finally {
       if (this.openPromise === opening) this.openPromise = null;
     }
   }
 
-  scheduleReconnect(reason = 'realtime') {
-    if (this.manualClose || !this.started || !this.realtimeLeader) return;
+  scheduleReconnect() {
+    if (this.retryTimer || this.manualClose || !this.started || !this.realtimeLeader) return;
     const sessionContext = this.captureSessionContext();
     if (!this.isSessionContextCurrent(sessionContext)) return;
-    this.clearRealtimeConnectTimeout();
-    this.realtimeConnectStartedAt = 0;
-    this.clearRealtimeWatchdog();
     if (this.eventSource) this.eventSource.close();
     this.eventSource = null;
-    if (navigator.onLine === false) {
-      dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId, reason: 'offline' });
-      return;
-    }
-    // Aunque ya exista un backoff pendiente, el stream actual debe cerrarse.
-    // Si se conserva un EventSource nuevo en CONNECTING, el timer anterior lo ve
-    // como conexión vigente y puede dejarlo bloqueado indefinidamente.
-    if (this.retryTimer) return;
     const delay = Math.min(30000, RETRY_BASE_MS * (2 ** Math.min(this.retryCount, 5)));
     this.retryCount += 1;
-    dispatch('p2p:connection', {
-      state: 'disconnected',
-      deviceId: sessionContext.deviceId,
-      reason: String(reason || 'realtime').slice(0, 80),
-      retryInMs: delay
-    });
     this.retryTimer = window.setTimeout(() => {
       this.retryTimer = 0;
-      if (!this.isSessionContextCurrent(sessionContext) || navigator.onLine === false) return;
+      if (!this.isSessionContextCurrent(sessionContext)) return;
       this.openRealtime().catch((error) => {
         if (this.isSessionContextChangedError(error)) return;
-        this.scheduleReconnect('realtime-retry');
+        this.scheduleReconnect();
       });
     }, delay);
   }
@@ -7148,18 +6508,13 @@ export class SemillaP2PClient {
       try {
         const sent = await this.sendSnapshot(event);
         this.assertSessionContext(sessionContext);
-        const retryScheduled = sent ? false : this.scheduleSnapshotSourceRetry(event);
-        if (sent) this.clearSnapshotSourceRetry(event);
-        dispatch('p2p:snapshot-source', { event, sent, retryScheduled });
+        dispatch('p2p:snapshot-source', { event, sent });
       } catch (error) {
         if (this.isSessionContextChangedError(error)) throw error;
-        const retryable = this.isSnapshotSourceRetryableError(error);
-        const retryScheduled = retryable ? this.scheduleSnapshotSourceRetry(event) : false;
         dispatch('p2p:snapshot-source-error', {
           event,
           error,
-          retryable,
-          retryScheduled
+          retryable: this.isRetryableTransportError(error)
         });
       }
     } else if (event.eventType === 'p2p.lifecycle.progress') {
@@ -7297,10 +6652,7 @@ export class SemillaP2PClient {
       await this.fenceBootstrapResponses(sessionContext);
       const invitation = event.data?.invitation;
       const space = event.data?.space;
-      const invitationAccepted = event.eventType === 'p2p.invitation.accepted';
-      const acceptedForCurrentUser = invitationAccepted
-        && String(event.actorUserId || '').trim() === String(sessionContext.userId || '').trim();
-      const requiresSnapshotRecovery = acceptedForCurrentUser;
+      const requiresSnapshotRecovery = event.eventType === 'p2p.invitation.accepted';
       const committedControlState = prepareCommittedControlState({
         spaces: space ? [space] : [],
         invitations: invitation ? [invitation] : []
@@ -7314,16 +6666,9 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
 
       if (requiresSnapshotRecovery) {
-        const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
-        if (cleanSpaceId && Math.max(0, Number(space?.encryptionVersion || 0)) >= 1) {
-          await this.requestSpaceKey(cleanSpaceId, '', { force: true }).catch(() => false);
-          this.assertSessionContext(sessionContext);
-        }
-        const state = await this.refreshBootstrap({
-          requestSnapshots: 'force',
-          snapshotSpaceIds: cleanSpaceId ? [cleanSpaceId] : []
-        });
+        const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
         this.assertSessionContext(sessionContext);
+        const cleanSpaceId = String(space?.spaceId || event.spaceId || '').trim();
         const localStateRevisions = await listStateRevisions([cleanSpaceId]);
         this.assertSessionContext(sessionContext);
         const replicaState = assertAcceptedInvitationReplicaState(state, cleanSpaceId, {
@@ -7531,6 +6876,375 @@ export class SemillaP2PClient {
     }, delay);
   }
 
+  async waitForInvitationSourceRevision(
+    spaceId = '',
+    targetRevision = 0,
+    sessionContext = this.captureSessionContext(),
+    timeoutMs = INVITATION_SOURCE_SYNC_WAIT_MS
+  ) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    const requiredRevision = Math.max(0, Number(targetRevision || 0));
+    if (!cleanSpaceId || requiredRevision <= 0) return true;
+
+    const localIsCurrent = async () => {
+      const revisions = await listStateRevisions([cleanSpaceId]);
+      this.assertSessionContext(sessionContext);
+      return Math.max(0, Number(revisions?.[cleanSpaceId] || 0)) >= requiredRevision;
+    };
+    if (await localIsCurrent()) return true;
+
+    const safeTimeoutMs = Math.max(1000, Number(timeoutMs || INVITATION_SOURCE_SYNC_WAIT_MS));
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let checking = false;
+      let timer = 0;
+      const eventNames = ['p2p:snapshot-complete', 'p2p:operation', 'p2p:state'];
+      const cleanup = () => {
+        if (timer) window.clearTimeout(timer);
+        for (const eventName of eventNames) window.removeEventListener(eventName, onSignal);
+      };
+      const finish = (value, error = null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve(value);
+      };
+      const onSignal = (event) => {
+        if (settled || checking) return;
+        const eventSpaceId = String(
+          event?.detail?.event?.spaceId
+          || event?.detail?.spaceId
+          || ''
+        ).trim();
+        if (eventSpaceId && eventSpaceId !== cleanSpaceId) return;
+        checking = true;
+        localIsCurrent().then((current) => {
+          if (current) finish(true);
+        }).catch((error) => {
+          if (this.isSessionContextChangedError(error)) finish(false, error);
+        }).finally(() => {
+          checking = false;
+        });
+      };
+      for (const eventName of eventNames) window.addEventListener(eventName, onSignal);
+      timer = window.setTimeout(() => finish(false), safeTimeoutMs);
+      onSignal({ detail: {} });
+    });
+  }
+
+  async ensureInvitationSourceCurrent(spaceId = '', sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId) return { current: true, localStateRevision: 0, backendStateRevision: 0 };
+
+    await this.refreshBootstrap({
+      requestSnapshots: 'force',
+      snapshotSpaceIds: [cleanSpaceId]
+    });
+    this.assertSessionContext(sessionContext);
+
+    const revisions = await listStateRevisions([cleanSpaceId]);
+    this.assertSessionContext(sessionContext);
+    let localStateRevision = Math.max(0, Number(revisions?.[cleanSpaceId] || 0));
+    const backendStateRevision = Math.max(0, Number(this.bootstrapState?.stateRevisions?.[cleanSpaceId] || 0));
+    if (localStateRevision >= backendStateRevision) {
+      return { current: true, localStateRevision, backendStateRevision };
+    }
+
+    const synchronized = await this.waitForInvitationSourceRevision(
+      cleanSpaceId,
+      backendStateRevision,
+      sessionContext
+    );
+    this.assertSessionContext(sessionContext);
+    if (synchronized) {
+      const refreshed = await listStateRevisions([cleanSpaceId]);
+      this.assertSessionContext(sessionContext);
+      localStateRevision = Math.max(0, Number(refreshed?.[cleanSpaceId] || 0));
+      if (localStateRevision >= backendStateRevision) {
+        return { current: true, localStateRevision, backendStateRevision };
+      }
+    }
+
+    const error = new Error('Este dispositivo todavía está recuperando la versión más reciente del proyecto. La invitación no se enviará con una copia desactualizada.');
+    error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING';
+    error.status = 409;
+    error.spaceId = cleanSpaceId;
+    error.localStateRevision = localStateRevision;
+    error.backendStateRevision = backendStateRevision;
+    throw error;
+  }
+
+  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (!cleanSpaceId || !this.spaceRequiresEncryption(cleanSpaceId)) return null;
+    const authority = this.invitationEscrowAuthority;
+    if (!authority?.publicKey || !String(authority?.deviceId || '').trim()) {
+      const error = new Error('memoriaBACKEND no tiene configurada la entrega cifrada inmediata para invitaciones.');
+      error.code = 'P2P_INVITATION_ESCROW_UNAVAILABLE';
+      error.status = 503;
+      error.spaceId = cleanSpaceId;
+      throw error;
+    }
+
+    const activeKey = await this.ensureCurrentSpaceKey(cleanSpaceId, { requireAuthority: true });
+    this.assertSessionContext(sessionContext);
+    if (navigator.onLine && getSessionToken()) {
+      await this.flushOutbox();
+      this.assertSessionContext(sessionContext);
+    }
+    const [pending, localEntities, stateRevisions] = await Promise.all([
+      listOutbox(),
+      listEntities(cleanSpaceId),
+      listStateRevisions([cleanSpaceId])
+    ]);
+    this.assertSessionContext(sessionContext);
+    const pendingForSpace = (pending || []).filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === cleanSpaceId);
+    const optimisticCount = (localEntities || []).filter((entity) => entity?.optimistic === true).length;
+    if (pendingForSpace.length || optimisticCount) {
+      const error = new Error('Hay cambios locales pendientes de confirmar. Sincronízalos antes de crear una invitación para que la copia inicial sea consistente.');
+      error.code = 'P2P_INVITATION_ESCROW_PENDING';
+      error.status = 409;
+      error.spaceId = cleanSpaceId;
+      error.pendingOperations = pendingForSpace.length;
+      error.optimisticEntities = optimisticCount;
+      throw error;
+    }
+
+    const entities = canonicalLocalSnapshotEntities(localEntities).map((entity, index) => ({
+      ...entity,
+      operationId: String(entity.operationId || '').trim()
+        || `invitation-seed:${index}:${entity.entityType}:${entity.entityId}:${Math.max(0, Number(entity.stateRevision || 0))}`
+    }));
+    const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
+      maximum,
+      Math.max(0, Number(entity.stateRevision || entity.spaceSequence || 0))
+    ), 0);
+    const sourceStateRevision = Math.max(entityStateRevision, Math.max(0, Number(stateRevisions?.[cleanSpaceId] || 0)));
+    const snapshotDigest = await sha256Hex(JSON.stringify(entities));
+    this.assertSessionContext(sessionContext);
+    const transportEntities = await encryptSnapshotEntities(cleanSpaceId, entities);
+    this.assertSessionContext(sessionContext);
+    const keyEnvelope = await createSpaceKeyEnvelope(cleanSpaceId, {
+      deviceId: String(authority.deviceId || '').trim(),
+      encryptionPublicKey: authority.publicKey
+    }, { keyId: activeKey.keyId });
+    this.assertSessionContext(sessionContext);
+    const escrow = {
+      schemaVersion: 1,
+      spaceId: cleanSpaceId,
+      sourceDeviceId: sessionContext.deviceId,
+      keyId: activeKey.keyId,
+      keyEpoch: Math.max(0, Number(activeKey.keyEpoch || this.spaceEncryptionAuthority(cleanSpaceId).keyEpoch || 0)),
+      sourceStateRevision,
+      snapshotDigest,
+      entityCount: entities.length,
+      entities: transportEntities,
+      keyEnvelope,
+      createdAt: new Date().toISOString()
+    };
+    const maximumBytes = Math.max(0, Number(this.invitationEscrowMaxBytes || authority.maxBytes || 0));
+    if (!maximumBytes || jsonByteLength(escrow) > maximumBytes) {
+      const error = new Error('La copia cifrada inicial del proyecto supera el tamaño permitido para una invitación inmediata.');
+      error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
+      error.status = 413;
+      error.spaceId = cleanSpaceId;
+      throw error;
+    }
+    return escrow;
+  }
+
+  async applyInvitationBootstrapEscrow(escrow = null, space = null, invitation = null, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    if (!escrow || typeof escrow !== 'object') return { applied: false, reason: 'missing' };
+    const spaceId = String(space?.spaceId || invitation?.spaceId || '').trim();
+    if (!spaceId || String(escrow.spaceId || '').trim() !== spaceId) {
+      const error = new Error('La copia inicial de la invitación pertenece a otro proyecto.');
+      error.code = 'P2P_INVITATION_ESCROW_SCOPE_MISMATCH';
+      error.status = 409;
+      throw error;
+    }
+    if (Number(escrow.schemaVersion || 0) !== 1 || !Array.isArray(escrow.entities) || !escrow.keyEnvelope) {
+      const error = new Error('La copia cifrada inicial de la invitación está incompleta.');
+      error.code = 'P2P_INVITATION_ESCROW_INVALID';
+      error.status = 409;
+      throw error;
+    }
+
+    const imported = await importSpaceKeyEnvelope(spaceId, escrow.keyEnvelope, {
+      keyEpoch: Math.max(0, Number(escrow.keyEpoch || space?.encryptionKeyEpoch || 0))
+    });
+    this.assertSessionContext(sessionContext);
+    if (imported?.imported !== true) {
+      const error = new Error('La clave cifrada de la invitación no pudo vincularse con este dispositivo.');
+      error.code = 'P2P_INVITATION_ESCROW_KEY_NOT_IMPORTED';
+      error.status = 409;
+      throw error;
+    }
+
+    const transportChunks = snapshotChunksByBytes(escrow.entities, this.eventMaxBytes);
+    if (transportChunks.length > this.snapshotMaxChunks) {
+      const error = new Error('La copia inicial de la invitación necesita demasiados fragmentos para reconstruirse de forma segura.');
+      error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
+      error.status = 413;
+      throw error;
+    }
+    const requestId = `invitation_escrow_${String(invitation?.invitationId || '').replace(/[^a-zA-Z0-9._:-]/g, '_').slice(0, 140) || Date.now()}`;
+    const sourceDeviceId = String(escrow.sourceDeviceId || 'invitation_escrow').trim();
+    const sourceStateRevision = Math.max(0, Number(escrow.sourceStateRevision || 0));
+    const entityCount = Math.max(0, Number(escrow.entityCount || 0));
+    const snapshotDigest = String(escrow.snapshotDigest || '').trim();
+    const decryptedChunkEvents = [];
+    for (let index = 0; index < transportChunks.length; index += 1) {
+      const encryptedEvent = {
+        eventType: 'p2p.operation',
+        spaceId,
+        sourceDeviceId,
+        actorUserId: String(invitation?.inviterUserId || space?.ownerUserId || '').trim(),
+        spaceSequence: sourceStateRevision,
+        stateRevision: sourceStateRevision,
+        optimistic: false,
+        operation: {
+          operationId: `${requestId}:chunk:${index}`,
+          type: 'snapshot.chunk',
+          entityType: '__snapshot__',
+          entityId: `${requestId}:${index}`,
+          encrypted: true,
+          encryptionVersion: 1,
+          keyId: String(escrow.keyId || '').trim(),
+          payload: {
+            requestId,
+            chunkIndex: index,
+            chunkCount: transportChunks.length,
+            entityCount,
+            snapshotByteCount: 2,
+            chunkByteCount: 2,
+            sourceStateRevision,
+            snapshotDigest,
+            entities: transportChunks[index]
+          }
+        }
+      };
+      decryptedChunkEvents.push(await decryptOperationEvent(encryptedEvent));
+      this.assertSessionContext(sessionContext);
+    }
+    const chunkByteCounts = decryptedChunkEvents.map((event) => jsonByteLength(event.operation?.payload?.entities || []));
+    const snapshotByteCount = chunkByteCounts.reduce((total, bytes) => total + bytes, 0);
+    if (snapshotByteCount > this.snapshotMaxBytes) {
+      const error = new Error('La copia inicial descifrada supera el tamaño seguro de almacenamiento local.');
+      error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
+      error.status = 413;
+      throw error;
+    }
+    for (let index = 0; index < decryptedChunkEvents.length; index += 1) {
+      const event = decryptedChunkEvents[index];
+      event.operation.payload.snapshotByteCount = snapshotByteCount;
+      event.operation.payload.chunkByteCount = chunkByteCounts[index];
+      const staged = await applyP2PEvent(event);
+      this.assertSessionContext(sessionContext);
+      if (staged?.snapshotIncomplete) {
+        const error = new Error('No se pudo preparar la copia inicial cifrada de la invitación.');
+        error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
+        error.status = 409;
+        throw error;
+      }
+    }
+    const completed = await applyP2PEvent({
+      eventType: 'p2p.operation',
+      spaceId,
+      sourceDeviceId,
+      actorUserId: String(invitation?.inviterUserId || space?.ownerUserId || '').trim(),
+      spaceSequence: sourceStateRevision,
+      stateRevision: sourceStateRevision,
+      optimistic: false,
+      operation: {
+        operationId: `${requestId}:complete`,
+        type: 'snapshot.complete',
+        entityType: '__snapshot__',
+        entityId: requestId,
+        encrypted: true,
+        encryptionVersion: 1,
+        keyId: String(escrow.keyId || '').trim(),
+        payload: {
+          requestId,
+          chunkCount: decryptedChunkEvents.length,
+          entityCount,
+          snapshotByteCount,
+          sourceStateRevision,
+          snapshotDigest
+        }
+      }
+    });
+    this.assertSessionContext(sessionContext);
+    if (completed?.snapshotIncomplete) {
+      const error = new Error('La copia inicial cifrada de la invitación no superó la validación de integridad.');
+      error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
+      error.status = 409;
+      error.reason = completed.reason || '';
+      throw error;
+    }
+    await resolveRecoveryRequirement(spaceId, sourceStateRevision).catch(() => false);
+    this.assertSessionContext(sessionContext);
+    dispatch('p2p:invitation-bootstrap-applied', {
+      invitationId: String(invitation?.invitationId || '').trim(),
+      spaceId,
+      sourceStateRevision,
+      entityCount
+    });
+    return { applied: true, sourceStateRevision, entityCount, result: completed };
+  }
+
+  async recoverAcceptedInvitationBootstrap(space = null, receivedInvitations = [], sessionContext = this.captureSessionContext(), options = {}) {
+    this.assertSessionContext(sessionContext);
+    const spaceId = String(space?.spaceId || '').trim();
+    if (!spaceId || Math.max(0, Number(space?.encryptionVersion || 0)) < 1) return { recovered: false, reason: 'not-encrypted' };
+    const activeKeyId = String(space?.activeEncryptionKeyId || '').trim();
+    const localKeyAvailable = await hasSpaceKey(spaceId, activeKeyId);
+    this.assertSessionContext(sessionContext);
+    // Una aceptación puede interrumpirse después de importar la clave pero antes de
+    // materializar el snapshot cifrado. En recuperación de réplica debemos reusar el
+    // escrow aunque la clave ya exista; de lo contrario el panel vuelve a depender de
+    // otra réplica conectada justo cuando Redis todavía conserva la copia inicial.
+    if (localKeyAvailable && options.forceSnapshot !== true) return { recovered: false, reason: 'key-present' };
+
+    const invitation = (Array.isArray(receivedInvitations) ? receivedInvitations : [])
+      .filter((candidate) => String(candidate?.spaceId || '').trim() === spaceId
+        && String(candidate?.status || '').trim().toLowerCase() === 'accepted')
+      .sort((left, right) => (Date.parse(right?.respondedAt || right?.updatedAt || right?.createdAt || '') || 0)
+        - (Date.parse(left?.respondedAt || left?.updatedAt || left?.createdAt || '') || 0))[0];
+    if (!invitation?.invitationId) return { recovered: false, reason: 'accepted-invitation-missing' };
+    const invitationId = String(invitation.invitationId || '').trim();
+    const lastAttemptAt = Math.max(0, Number(this.invitationEscrowRecoveryAttempts.get(invitationId) || 0));
+    if (lastAttemptAt && Date.now() - lastAttemptAt < INVITATION_ESCROW_RECOVERY_RETRY_MS) {
+      return { recovered: false, reason: 'cooldown', invitationId, spaceId };
+    }
+    this.invitationEscrowRecoveryAttempts.set(invitationId, Date.now());
+
+    const data = await apiPost('/api/p2p/invitations/respond', {
+      invitationId,
+      decision: 'accept',
+      deviceId: sessionContext.deviceId
+    });
+    this.assertSessionContext(sessionContext);
+    if (!data?.bootstrapEscrow) return { recovered: false, reason: 'escrow-expired' };
+    await this.applyInvitationBootstrapEscrow(
+      data.bootstrapEscrow,
+      data.space || space,
+      data.invitation || invitation,
+      sessionContext
+    );
+    this.assertSessionContext(sessionContext);
+    dispatch('p2p:invitation-bootstrap-recovered', {
+      invitationId,
+      spaceId,
+      deviceId: sessionContext.deviceId
+    });
+    return { recovered: true, invitationId, spaceId };
+  }
+
   async createSpace(options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
@@ -7596,17 +7310,47 @@ export class SemillaP2PClient {
     const requestedSpaceId = String(options.spaceId || '').trim();
     if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
-    if (requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1) {
+    const encryptedExistingSpace = requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1;
+    let bootstrapEscrow = null;
+    if (encryptedExistingSpace) {
+      await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
+      this.assertSessionContext(sessionContext);
       await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true });
+      this.assertSessionContext(sessionContext);
+      bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext);
+      this.assertSessionContext(sessionContext);
     }
-    const data = await apiPost('/api/p2p/invitations/create', {
-      email,
-      spaceId: options.spaceId || '',
-      resourceType: options.resourceType || 'generic',
-      permissions: options.permissions || ['read', 'write'],
-      requestId: String(options.requestId || options.clientRequestId || '').trim(),
-      requireBatchRelease: options.requireBatchRelease === true
-    });
+    let data = null;
+    for (let attempt = 0; attempt < INVITATION_SOURCE_CREATE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        data = await apiPost('/api/p2p/invitations/create', {
+          email,
+          spaceId: options.spaceId || '',
+          resourceType: options.resourceType || 'generic',
+          permissions: options.permissions || ['read', 'write'],
+          requestId: String(options.requestId || options.clientRequestId || '').trim(),
+          invitationScope: String(options.invitationScope || 'project').trim().toLowerCase(),
+          invitationGroupId: String(options.invitationGroupId || '').trim(),
+          invitationGroupExpectedCount: Math.max(0, Math.floor(Number(options.invitationGroupExpectedCount || 0))),
+          bootstrapEscrow
+        });
+        break;
+      } catch (error) {
+        this.assertSessionContext(sessionContext);
+        const staleSnapshot = error?.code === 'P2P_INVITATION_ESCROW_STALE_STATE';
+        if (!encryptedExistingSpace || !staleSnapshot || attempt >= INVITATION_SOURCE_CREATE_MAX_ATTEMPTS - 1) throw error;
+        await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
+        this.assertSessionContext(sessionContext);
+        bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext);
+        this.assertSessionContext(sessionContext);
+      }
+    }
+    if (!data) {
+      const error = new Error('No se pudo crear la invitación con una copia inicial vigente.');
+      error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING';
+      error.status = 409;
+      throw error;
+    }
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const invitationSpace = data.space
@@ -7620,27 +7364,6 @@ export class SemillaP2PClient {
         invitationSpace.activeEncryptionKeyId || ''
       );
       data.space = activation.space || invitationSpace;
-      this.assertSessionContext(sessionContext);
-    }
-    const encryptedInvitationSpace = data.space || invitationSpace;
-    if (data.invitation?.status === 'pending' && Math.max(0, Number(encryptedInvitationSpace?.encryptionVersion || 0)) >= 1) {
-      try {
-        // La copia cifrada se conserva antes de liberar la invitación. Después se
-        // prepara la AES; el backend solo despacha la notificación cuando ambos
-        // materiales temporales están listos en Redis.
-        data.bootstrapStaging = await this.stageInvitationBootstrapSnapshot(data.invitation);
-        this.assertSessionContext(sessionContext);
-        data.keyStaging = await this.stageInvitationKeyForRecipient(data.invitation);
-      } catch (error) {
-        dispatch('p2p:key-distribution-pending', {
-          spaceId: String(data.invitation?.spaceId || '').trim(),
-          invitationId: String(data.invitation?.invitationId || '').trim(),
-          stage: 'invitation-create',
-          bootstrapStaging: data.bootstrapStaging || null,
-          error
-        });
-        throw error;
-      }
       this.assertSessionContext(sessionContext);
     }
     const committedControlState = prepareCommittedControlState({
@@ -7667,22 +7390,235 @@ export class SemillaP2PClient {
     return data;
   }
 
-  async releaseInvitationBatch(invitationIds = []) {
+  async invitePanel(email = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    const normalizedIds = Array.from(new Set((Array.isArray(invitationIds) ? invitationIds : [])
-      .map((value) => String(value || '').trim())
+    const requestedIds = Array.from(new Set((Array.isArray(options.spaceIds) ? options.spaceIds : [])
+      .map((spaceId) => String(spaceId || '').trim())
       .filter(Boolean)));
-    if (!normalizedIds.length) return { released: 0, invitationIds: [] };
-    const result = await apiPost('/api/p2p/invitations/release-batch', { invitationIds: normalizedIds });
+    if (!requestedIds.length) throw new Error('El panel no tiene proyectos para compartir.');
+    const ownedSpaces = requestedIds.map((spaceId) => {
+      const space = (this.bootstrapState.spaces || []).find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
+      if (!space) throw new Error('Uno de los proyectos del panel ya no está disponible.');
+      if (String(space.ownerUserId || '').trim() !== String(this.user?.userId || '').trim()) {
+        const error = new Error('Solo el propietario puede compartir el panel completo.');
+        error.code = 'P2P_PANEL_INVITE_OWNER_REQUIRED';
+        error.status = 403;
+        throw error;
+      }
+      this.assertSpaceAuthorizationConfirmed(spaceId);
+      return space;
+    });
+    const requestedPermissions = options.permissions || ['read', 'write'];
+    const resumePlan = resumablePanelInvitationGroup(
+      this.bootstrapState.invitations?.sent || [],
+      {
+        recipientEmail: email,
+        spaceIds: ownedSpaces.map((space) => space.spaceId),
+        permissions: requestedPermissions,
+        invitationGroupId: options.invitationGroupId || ''
+      }
+    );
+    const invitationGroupId = String(
+      options.invitationGroupId
+      || resumePlan?.invitationGroupId
+      || createId(`panel_invite_${panelInvitationManifestFingerprint(ownedSpaces.map((space) => space.spaceId))}`)
+    ).trim();
+    const resumedBySpaceId = new Map((resumePlan?.invitationGroupId === invitationGroupId
+      ? resumePlan.invitations
+      : [])
+      .map((invitation) => [String(invitation?.spaceId || '').trim(), invitation])
+      .filter(([spaceId]) => Boolean(spaceId)));
+    const results = [];
+    for (let index = 0; index < ownedSpaces.length; index += 1) {
+      const space = ownedSpaces[index];
+      const resumedInvitation = resumedBySpaceId.get(space.spaceId) || null;
+      if (resumedInvitation) {
+        results.push({ invitation: resumedInvitation, space, reused: true, resumed: true });
+        continue;
+      }
+      try {
+        const result = await this.invite(email, {
+          spaceId: space.spaceId,
+          resourceType: space.resourceType || 'admin.project',
+          permissions: requestedPermissions,
+          requestId: `${invitationGroupId}:${space.spaceId}`,
+          invitationScope: 'panel',
+          invitationGroupId,
+          invitationGroupExpectedCount: ownedSpaces.length
+        });
+        this.assertSessionContext(sessionContext);
+        results.push(result);
+      } catch (error) {
+        error.panelInvitationGroupId = invitationGroupId;
+        error.completedPanelInvitations = results.map((result) => result?.invitation).filter(Boolean);
+        error.remainingPanelSpaceIds = ownedSpaces.slice(index).map((candidate) => candidate.spaceId);
+        throw error;
+      }
+    }
+    return {
+      invitationScope: 'panel',
+      invitationGroupId,
+      invitations: results.map((result) => result?.invitation).filter(Boolean),
+      reused: results.length > 0 && results.every((result) => result?.reused === true),
+      resumed: resumedBySpaceId.size > 0,
+      spaceIds: ownedSpaces.map((space) => space.spaceId)
+    };
+  }
+
+  async respondToInvitationGroup(invitationIds = [], decision = 'accept') {
+    const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    return result;
+    const ids = Array.from(new Set((Array.isArray(invitationIds) ? invitationIds : [])
+      .map((invitationId) => String(invitationId || '').trim())
+      .filter(Boolean)));
+    if (!ids.length) throw new Error('No hay invitaciones de panel pendientes para responder.');
+
+    const responseRequest = {
+      invitationIds: ids,
+      decision,
+      deviceId: sessionContext.deviceId
+    };
+    let data = null;
+    for (let attempt = 0; attempt < PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        data = await apiPost('/api/p2p/invitations/respond-group', responseRequest);
+        break;
+      } catch (error) {
+        this.assertSessionContext(sessionContext);
+        const retryDelayMs = panelInvitationResponseRetryDelay(error, attempt);
+        if (!retryDelayMs || attempt >= PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS - 1) throw error;
+        dispatch('p2p:invitation-group-resume', {
+          invitationIds: ids,
+          decision,
+          attempt: attempt + 1,
+          retryDelayMs,
+          reason: String(error?.code || error?.message || 'transport').slice(0, 180)
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs));
+        this.assertSessionContext(sessionContext);
+      }
+    }
+    if (!data) {
+      const error = new Error('No se pudo reanudar de forma segura la respuesta agrupada del panel.');
+      error.code = 'P2P_INVITATION_GROUP_RESUME_FAILED';
+      error.status = 503;
+      throw error;
+    }
+    this.assertSessionContext(sessionContext);
+    await this.fenceBootstrapResponses(sessionContext);
+
+    const results = Array.isArray(data?.results) ? data.results : [];
+    if (!results.length) throw new Error('El backend no devolvió las invitaciones del panel respondido.');
+    const invitations = results.map((result) => result?.invitation).filter(Boolean);
+    const spaces = results.map((result) => result?.space).filter(Boolean);
+    if (invitations.length !== results.length) {
+      const error = new Error('El backend devolvió una respuesta de panel incompleta.');
+      error.code = 'P2P_INVITATION_GROUP_INCOMPLETE';
+      error.status = 502;
+      throw error;
+    }
+    const canonicalDecisions = invitations.map((invitation) => resolveCanonicalInvitationDecision(invitation, decision));
+    const accepting = canonicalDecisions.every((value) => value === 'accept');
+    const rejecting = canonicalDecisions.every((value) => value === 'reject');
+    if (!accepting && !rejecting) {
+      const error = new Error('El panel quedó con decisiones incompatibles entre dispositivos.');
+      error.code = 'P2P_INVITATION_GROUP_DECISION_CONFLICT';
+      error.status = 409;
+      throw error;
+    }
+
+    const committedControlState = prepareCommittedControlState({ spaces, invitations }, {
+      authorizationState: accepting ? 'unconfirmed' : 'confirmed',
+      currentSpaces: this.bootstrapState.spaces || []
+    });
+    await saveControlStateAtomically(committedControlState);
+    this.assertSessionContext(sessionContext);
+    this.applyCommittedControlState(committedControlState, { source: 'local-invitation-group-response' });
+    this.assertSessionContext(sessionContext);
+
+    let accessRevoked = false;
+    let replicaPending = false;
+    if (accepting) {
+      // Primero materializa todas las semillas cifradas del panel. Solo después se ejecuta
+      // un bootstrap autoritativo, evitando que cada proyecto exponga un panel intermedio.
+      for (const result of results) {
+        if (result?.bootstrapEscrow && result?.space) {
+          await this.applyInvitationBootstrapEscrow(
+            result.bootstrapEscrow,
+            result.space,
+            result.invitation,
+            sessionContext
+          );
+          this.assertSessionContext(sessionContext);
+        }
+      }
+
+      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
+      this.assertSessionContext(sessionContext);
+      const acceptedSpaceIds = Array.from(new Set(results
+        .map((result) => String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim())
+        .filter(Boolean)));
+      const localStateRevisions = await listStateRevisions(acceptedSpaceIds);
+      this.assertSessionContext(sessionContext);
+
+      for (const result of results) {
+        const acceptedSpaceId = String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim();
+        if (!acceptedSpaceId) continue;
+        const replicaState = assertAcceptedInvitationReplicaState(
+          state,
+          acceptedSpaceId,
+          {
+            code: 'P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED',
+            message: 'El panel fue aceptado, pero el backend todavía no confirmó todas sus réplicas en este dispositivo.',
+            invitationId: result?.invitation?.invitationId,
+            localStateRevision: localStateRevisions?.[acceptedSpaceId],
+            recoveryRequirements: this.recoveryRequirements,
+            allowReplicaPending: true
+          }
+        );
+        result.space = replicaState.space || null;
+        result.accessRevoked = replicaState.explicitlyRevoked;
+        result.replicaPending = replicaState.replicaPending;
+        accessRevoked = accessRevoked || replicaState.explicitlyRevoked;
+        replicaPending = replicaPending || replicaState.replicaPending;
+      }
+
+      for (const result of results) {
+        if (result?.space && Math.max(0, Number(result.space.encryptionVersion || 0)) >= 1) {
+          await this.requestSpaceKey(result.space.spaceId, '', { force: true }).catch(() => false);
+          this.assertSessionContext(sessionContext);
+        }
+      }
+    } else {
+      await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+        if (this.isSessionContextChangedError(error)) throw error;
+        dispatch('p2p:bootstrap-deferred', {
+          error,
+          stage: 'local-invitation-group-response',
+          invitationGroupId: String(data?.invitationGroupId || '').trim()
+        });
+        return this.bootstrapState;
+      });
+    }
+
+    return {
+      ...data,
+      results,
+      invitations: results.map((result) => result?.invitation).filter(Boolean),
+      accessRevoked,
+      replicaPending
+    };
   }
 
   async respondToInvitation(invitationId = '', decision = 'accept') {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    const data = await apiPost('/api/p2p/invitations/respond', { invitationId, decision, deviceId: this.deviceId });
+    const data = await apiPost('/api/p2p/invitations/respond', {
+      invitationId,
+      decision,
+      deviceId: sessionContext.deviceId
+    });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
@@ -7698,65 +7634,20 @@ export class SemillaP2PClient {
     this.applyCommittedControlState(committedControlState, { source: 'local-invitation-response' });
     this.assertSessionContext(sessionContext);
     if (canonicalDecision === 'accept') {
-      const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
-      if (acceptedSpaceId && Math.max(0, Number(data.space?.encryptionVersion || 0)) >= 1) {
-        let stagedImported = false;
-        if (data.stagedKeyEnvelope) {
-          try {
-            const imported = await importSpaceKeyEnvelope(acceptedSpaceId, data.stagedKeyEnvelope, {
-              keyEpoch: Math.max(0, Number(data.stagedKeyEpoch || data.space?.encryptionKeyEpoch || 0))
-            });
-            stagedImported = imported?.imported === true;
-            if (stagedImported) {
-              this.clearRejectedKeyEnvelopeSources(
-                acceptedSpaceId,
-                String(data.stagedKeyEnvelope?.keyId || '').trim(),
-                Math.max(0, Number(data.stagedKeyEpoch || data.space?.encryptionKeyEpoch || 0))
-              );
-              dispatch('p2p:key-shared', {
-                spaceId: acceptedSpaceId,
-                targetDeviceId: this.deviceId,
-                source: String(data.stagedKeySource || '').trim() || 'invitation-redis-staging'
-              });
-            }
-          } catch (error) {
-            dispatch('p2p:key-envelope-rejected', {
-              spaceId: acceptedSpaceId,
-              keyId: String(data.stagedKeyEnvelope?.keyId || '').trim(),
-              keyEpoch: Math.max(0, Number(data.stagedKeyEpoch || 0)),
-              sourceDeviceId: String(data.stagedKeyEnvelope?.senderDeviceId || '').trim(),
-              reason: error?.reason || 'invitation_staged_envelope_invalid',
-              requestError: error
-            });
-          }
-          this.assertSessionContext(sessionContext);
-        } else if (data.transientMaterialConsumed === true) {
-          const activeKeyId = String(data.space?.activeEncryptionKeyId || '').trim();
-          stagedImported = Boolean(activeKeyId && await hasSpaceKey(acceptedSpaceId, activeKeyId));
-          this.assertSessionContext(sessionContext);
-        }
-        if (stagedImported && data.stagedBootstrapSnapshot) {
-          data.bootstrapSnapshotResult = await this.applyInvitationBootstrapSnapshot(
-            acceptedSpaceId,
-            data.stagedBootstrapSnapshot,
-            data.invitation,
-            sessionContext
-          );
-          this.assertSessionContext(sessionContext);
-        }
-        if (!stagedImported) {
-          await this.requestSpaceKey(acceptedSpaceId, '', { force: true }).catch(() => false);
-          this.assertSessionContext(sessionContext);
-        }
+      if (data.bootstrapEscrow && data.space) {
+        await this.applyInvitationBootstrapEscrow(
+          data.bootstrapEscrow,
+          data.space,
+          data.invitation,
+          sessionContext
+        );
+        this.assertSessionContext(sessionContext);
       }
-      const state = await this.refreshBootstrap({
-        requestSnapshots: 'force',
-        snapshotSpaceIds: acceptedSpaceId ? [acceptedSpaceId] : []
-      });
+      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
       this.assertSessionContext(sessionContext);
+      const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
       this.assertSessionContext(sessionContext);
-      const acceptedLocalStateRevision = Math.max(0, Number(localStateRevisions?.[acceptedSpaceId] || 0));
       const replicaState = assertAcceptedInvitationReplicaState(
         state,
         acceptedSpaceId,
@@ -7764,7 +7655,7 @@ export class SemillaP2PClient {
           code: 'P2P_LOCAL_INVITATION_REPLICA_UNCONFIRMED',
           message: 'La invitación fue aceptada, pero el backend todavía no confirmó la membresía de este dispositivo.',
           invitationId: data.invitation?.invitationId,
-          localStateRevision: acceptedLocalStateRevision,
+          localStateRevision: localStateRevisions?.[acceptedSpaceId],
           recoveryRequirements: this.recoveryRequirements,
           allowReplicaPending: true
         }
@@ -7772,38 +7663,6 @@ export class SemillaP2PClient {
       data.space = replicaState.space || null;
       data.accessRevoked = replicaState.explicitlyRevoked;
       data.replicaPending = replicaState.replicaPending;
-
-      // Solo después de importar la AES, materializar el snapshot Redis y confirmar
-      // que la réplica ya está utilizable se autoriza al backend a destruir todo el
-      // material temporal de la invitación. La prueba pequeña queda idempotente para
-      // que un reintento HTTP no vuelva a exigir un escrow que ya fue consumido.
-      if (!data.accessRevoked
-        && !data.replicaPending
-        && data.bootstrapSnapshotResult
-        && data.stagedBootstrapSnapshot?.snapshotDigest) {
-        try {
-          data.invitationAcceptanceCompletion = await apiPost('/api/p2p/crypto/invitation-acceptance-complete', {
-            deviceId: this.deviceId,
-            invitationId: String(data.invitation?.invitationId || '').trim(),
-            keyId: String(data.stagedBootstrapSnapshot?.keyId || data.space?.activeEncryptionKeyId || '').trim(),
-            keyEpoch: Math.max(0, Number(data.stagedBootstrapSnapshot?.keyEpoch || data.space?.encryptionKeyEpoch || 0)),
-            snapshotDigest: String(data.stagedBootstrapSnapshot?.snapshotDigest || '').trim(),
-            sourceStateRevision: Math.max(
-              acceptedLocalStateRevision,
-              Math.max(0, Number(data.stagedBootstrapSnapshot?.sourceStateRevision || 0))
-            )
-          });
-          data.transientMaterialConsumed = data.invitationAcceptanceCompletion?.complete === true;
-          this.assertSessionContext(sessionContext);
-        } catch (error) {
-          if (this.isSessionContextChangedError(error)) throw error;
-          dispatch('p2p:invitation-transient-cleanup-deferred', {
-            invitationId: String(data.invitation?.invitationId || '').trim(),
-            spaceId: acceptedSpaceId,
-            error
-          });
-        }
-      }
     } else {
       await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
@@ -7816,6 +7675,10 @@ export class SemillaP2PClient {
       });
     }
     this.assertSessionContext(sessionContext);
+    if (canonicalDecision === 'accept' && data.space && Math.max(0, Number(data.space.encryptionVersion || 0)) >= 1) {
+      await this.requestSpaceKey(data.space.spaceId, '', { force: true }).catch(() => false);
+      this.assertSessionContext(sessionContext);
+    }
     return data;
   }
 
@@ -7824,10 +7687,7 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
     if (!cleanSpaceId) throw new Error('Falta el espacio que deseas abandonar.');
-    if (!this.isSpaceAuthorizationConfirmed(cleanSpaceId)
-      && !this.isSpaceReplicaRecoveryPending(cleanSpaceId)) {
-      this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
-    }
+    this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
     const data = await apiPost('/api/p2p/access/leave', { spaceId: cleanSpaceId });
     this.assertSessionContext(sessionContext);
     await this.fenceBootstrapResponses(sessionContext);
@@ -8930,17 +8790,25 @@ export class SemillaP2PClient {
     const expiresAt = Date.parse(request.expiresAt || '');
     if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 1000) return false;
 
+    const localStateRevisions = await listStateRevisions([spaceId]);
+    this.assertSessionContext(sessionContext);
+    const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
     const requestedStateRevision = Math.max(0, Number(request.currentStateRevision || 0));
     this.recoveryRequirements = await getRecoveryRequirements();
     this.assertSessionContext(sessionContext);
     const unresolvedRecoveryRevision = Math.max(0, Number(this.recoveryRequirements?.[spaceId] || 0));
-    if (unresolvedRecoveryRevision) {
+    if (unresolvedRecoveryRevision || localStateRevision !== requestedStateRevision) {
       dispatch('p2p:snapshot-source-deferred', {
         requestId,
         spaceId,
+        localStateRevision,
         requestedStateRevision,
         unresolvedRecoveryRevision,
-        reason: 'source_recovery_pending'
+        reason: unresolvedRecoveryRevision
+          ? 'source_recovery_pending'
+          : localStateRevision < requestedStateRevision
+            ? 'source_revision_behind'
+            : 'source_revision_advanced'
       });
       return false;
     }
@@ -8955,21 +8823,6 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       pendingForSpace = (await listOutbox()).filter((item) => String(item?.spaceId || '').trim() === spaceId);
       this.assertSessionContext(sessionContext);
-    }
-
-    const localStateRevisions = await listStateRevisions([spaceId]);
-    this.assertSessionContext(sessionContext);
-    const localStateRevision = Math.max(0, Number(localStateRevisions?.[spaceId] || 0));
-    if (localStateRevision < requestedStateRevision) {
-      dispatch('p2p:snapshot-source-deferred', {
-        requestId,
-        spaceId,
-        localStateRevision,
-        requestedStateRevision,
-        unresolvedRecoveryRevision: 0,
-        reason: 'source_revision_behind'
-      });
-      return false;
     }
 
     const localEntities = await listEntities(spaceId);

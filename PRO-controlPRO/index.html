@@ -67,19 +67,13 @@
       <section id="dashboard-view" class="view-stack">
         <div class="section-heading">
           <div>
-            <p id="dashboard-eyebrow" class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
-            <h2 id="dashboard-title" data-i18n="dashboard.panels">Paneles</h2>
-            <p id="dashboard-description" class="section-description" data-i18n="dashboard.panelsDescription">Tus paneles propios y los paneles en los que participas, separados por propietario.</p>
+            <p class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
+            <h2 data-i18n="dashboard.panels">Paneles y proyectos</h2>
+            <p class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
           </div>
-          <div id="dashboard-toolbar" class="dashboard-toolbar">
-            <button id="back-to-panels-button" class="button button-ghost button-compact hidden" type="button" data-i18n="dashboard.backToPanels">← Paneles</button>
-            <button id="panel-invite-button" class="button button-secondary button-compact hidden" type="button" data-i18n="dashboard.invitePanel">Invitar al panel</button>
-            <button id="panel-members-button" class="button button-secondary button-compact hidden" type="button" data-i18n="dashboard.panelMembers">Participantes</button>
-            <button id="panel-leave-button" class="button button-danger button-compact hidden" type="button" data-i18n="dashboard.leavePanel">Abandonar panel</button>
-            <button id="new-project-button" class="add-project-button hidden" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
-              <span aria-hidden="true">+</span>
-            </button>
-          </div>
+          <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
+            <span aria-hidden="true">+</span>
+          </button>
         </div>
 
         <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
@@ -182,7 +176,8 @@
 
   <dialog id="invite-dialog" class="modal-card">
     <form id="invite-form" class="modal-form">
-      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.eyebrow">Colaboración segura</p><h2 data-i18n="invite.title">Invitar participante</h2></div><button class="icon-button" type="button" data-close-dialog="invite-dialog" aria-label="Cerrar">×</button></div>
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="invite.eyebrow">Colaboración segura</p><h2 id="invite-dialog-title" data-i18n="invite.title">Invitar participante</h2></div><button class="icon-button" type="button" data-close-dialog="invite-dialog" aria-label="Cerrar">×</button></div>
+      <p id="invite-dialog-description" class="section-description" data-i18n="invite.projectDescription">Comparte únicamente este proyecto con los permisos seleccionados.</p>
       <label><span data-i18n="invite.email">Correo de Google</span><input id="invite-email-input" type="email" maxlength="254" autocomplete="email" required /></label>
       <fieldset class="permission-grid"><legend data-i18n="invite.permissions">Permisos</legend>
         <label><input type="checkbox" name="permission" value="read" checked disabled /><span data-i18n="invite.read">Lectura</span></label>
@@ -278,10 +273,19 @@
     </div>
   </dialog>
 
+  <dialog id="panel-access-dialog" class="modal-card modal-wide">
+    <div class="modal-form">
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="panel.accessEyebrow">Control del panel</p><h2 data-i18n="panel.accessTitle">Participantes del panel</h2></div><button class="icon-button" type="button" data-close-dialog="panel-access-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="panel.accessDescription">Administra el acceso agregado de los participantes a todos los proyectos de este panel.</p>
+      <div id="panel-access-list" class="access-member-list"></div>
+      <p id="panel-access-status" class="inline-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <dialog id="access-dialog" class="modal-card modal-wide">
     <div class="modal-form">
-      <div class="modal-heading"><div><p id="access-eyebrow" class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 id="access-title" data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
-      <p id="access-description" class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
+      <div class="modal-heading"><div><p class="eyebrow" data-i18n="access.eyebrow">Control de acceso</p><h2 data-i18n="access.title">Participantes del proyecto</h2></div><button class="icon-button" type="button" data-close-dialog="access-dialog" aria-label="Cerrar">×</button></div>
+      <p class="section-description" data-i18n="access.description">Administra quién conserva acceso al proyecto y quién es responsable de su propiedad.</p>
       <div id="access-member-list" class="access-member-list"></div>
       <section id="access-owner-actions" class="access-owner-actions hidden">
         <div>

@@ -55,29 +55,6 @@ if (validateSnapshotBudgetMetadata({
   throw new Error('El almacenamiento local confió en un tamaño declarado que no coincide con el fragmento recibido.');
 }
 
-const decryptedEntities = [{ entityType: 'admin.project', entityId: 'project_1', value: { budget: 10 } }];
-const localBytes = new TextEncoder().encode(JSON.stringify(decryptedEntities)).byteLength;
-const encryptedBudget = localBytes + 128;
-const encryptedValid = validateSnapshotBudgetMetadata({
-  chunkCount: 1,
-  snapshotByteCount: encryptedBudget,
-  transportChunkByteCount: encryptedBudget,
-  chunkByteCount: localBytes,
-  entities: decryptedEntities
-});
-if (!encryptedValid.valid || encryptedValid.chunkByteCount !== encryptedBudget) {
-  throw new Error('El almacenamiento confundió el tamaño local descifrado con el presupuesto cifrado de transporte.');
-}
-if (validateSnapshotBudgetMetadata({
-  chunkCount: 1,
-  snapshotByteCount: encryptedBudget,
-  transportChunkByteCount: encryptedBudget,
-  chunkByteCount: localBytes + 1,
-  entities: decryptedEntities
-}).reason !== 'snapshot_chunk_byte_count_mismatch') {
-  throw new Error('El almacenamiento dejó de verificar el tamaño real de las entidades después del descifrado.');
-}
-
 const client = fs.readFileSync(path.join(root, 'src/js/p2p-client.js'), 'utf8');
 for (const marker of [
   'snapshotTransferMaxBytes',

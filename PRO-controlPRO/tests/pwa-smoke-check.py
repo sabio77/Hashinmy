@@ -41,7 +41,6 @@ REQUIRED_FILES = [
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
-    "src/js/panel-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
@@ -63,10 +62,11 @@ REQUIRED_FILES = [
     "tests/p2p-multitab-smoke.mjs",
     "tests/session-isolation-smoke.mjs",
     "tests/p2p-invitation-intent-smoke.mjs",
+    "tests/p2p-invitation-escrow-smoke.mjs",
+    "tests/p2p-panel-sharing-smoke.mjs",
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
     "tests/project-domain-smoke.mjs",
-    "tests/p2p-panel-collaboration-smoke.mjs",
     "tests/p2p-trash-lifecycle-smoke.mjs",
     "_headers",
 ]
@@ -94,7 +94,6 @@ JAVASCRIPT_FILES = [
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
     "src/js/project-domain.js",
-    "src/js/panel-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
     "src/js/asset-loader.js",
@@ -380,21 +379,6 @@ def assert_project_domain() -> None:
         fail(f"Falló el dominio administrativo: {result.stderr.strip() or result.stdout.strip()}")
 
 
-def assert_panel_collaboration_domain() -> None:
-    node = shutil.which("node")
-    if not node:
-        print("ADVERTENCIA: node no está disponible; se omite prueba de colaboración por panel.", file=sys.stderr)
-        return
-    result = subprocess.run(
-        [node, str(ROOT / "tests" / "p2p-panel-collaboration-smoke.mjs")],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        fail(f"Falló la colaboración agrupada por panel: {result.stderr.strip() or result.stdout.strip()}")
-
-
 def assert_invitation_notification_intent() -> None:
     node = shutil.which("node")
     if not node:
@@ -409,6 +393,21 @@ def assert_invitation_notification_intent() -> None:
     if result.returncode != 0:
         fail(f"Falló el enlace Push de invitaciones: {result.stderr.strip() or result.stdout.strip()}")
 
+
+
+def assert_invitation_escrow_bootstrap() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba de semilla cifrada de invitaciones.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "p2p-invitation-escrow-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló la semilla cifrada de invitaciones: {result.stderr.strip() or result.stdout.strip()}")
 
 def assert_control_mutation_atomicity() -> None:
     node = shutil.which("node")
@@ -569,12 +568,6 @@ client.lastProcessedSequence = 6;
 client.lastAcceptedStreamSequence = 6;
 let acknowledged = 0;
 client.scheduleAck = (sequence) => { acknowledged = sequence; };
-let snapshotRetrySchedules = 0;
-const scheduleSnapshotSourceRetry = client.scheduleSnapshotSourceRetry.bind(client);
-client.scheduleSnapshotSourceRetry = () => {
-  snapshotRetrySchedules += 1;
-  return true;
-};
 client.sendSnapshot = async () => {
   const error = new Error('Concesión vencida');
   error.status = 403;
@@ -600,49 +593,6 @@ await client.handleEvent({
 if (acknowledged !== 7) throw new Error('La solicitud fallida no avanzó el ACK del stream.');
 if (!dispatched.some((event) => event.type === 'p2p:snapshot-source-error')) {
   throw new Error('No se aisló el error de la fuente de snapshot.');
-}
-if (snapshotRetrySchedules !== 0) {
-  throw new Error('Una concesión de snapshot rechazada de forma terminal programó reintentos inútiles.');
-}
-
-client.scheduleSnapshotSourceRetry = scheduleSnapshotSourceRetry;
-
-const deferredClient = new SemillaP2PClient();
-deferredClient.started = true;
-deferredClient.manualClose = false;
-deferredClient.deviceId = 'dev_source_000001';
-deferredClient.lastProcessedSequence = 6;
-deferredClient.lastAcceptedStreamSequence = 6;
-let deferredAcknowledged = 0;
-deferredClient.scheduleAck = (sequence) => { deferredAcknowledged = sequence; };
-deferredClient.scheduleSnapshotSourceRetry = () => {
-  snapshotRetrySchedules += 1;
-  return true;
-};
-deferredClient.sendSnapshot = async () => false;
-await deferredClient.handleEvent({
-  eventId: 'evt_snapshot_deferred',
-  eventType: 'p2p.snapshot.request',
-  deviceSequence: 7,
-  spaceId: 'space_1',
-  actorUserId: 'user_target_000001',
-  sourceDeviceId: 'dev_target_000001',
-  data: {
-    requestId: 'snapshot_deferred',
-    requestDeviceId: 'dev_target_000001',
-    requestUserId: 'user_target_000001',
-    spaceId: 'space_1',
-    localStateRevision: 1,
-    currentStateRevision: 2,
-    expiresAt: new Date(Date.now() + 60000).toISOString()
-  }
-});
-if (deferredAcknowledged !== 7) throw new Error('La solicitud diferida bloqueó el ACK del stream.');
-if (snapshotRetrySchedules !== 1) {
-  throw new Error('Una fuente temporalmente ocupada perdió el snapshot-request sin programar reintento local.');
-}
-if (!dispatched.some((event) => event.type === 'p2p:snapshot-source' && event.detail?.retryScheduled === true)) {
-  throw new Error('No se informó que la recuperación diferida quedó programada sin bloquear el stream.');
 }
 
 client.sendSnapshot = SemillaP2PClient.prototype.sendSnapshot.bind(client);
@@ -1349,9 +1299,9 @@ def main() -> None:
     assert_multitab_coordination()
     assert_session_isolation()
     assert_project_domain()
-    assert_panel_collaboration_domain()
     assert_trash_lifecycle()
     assert_invitation_notification_intent()
+    assert_invitation_escrow_bootstrap()
     assert_control_mutation_atomicity()
     assert_retry_after_recovery()
     assert_application_scope()
@@ -1539,8 +1489,6 @@ def main() -> None:
         fail("El alcance por aplicación debe formar parte del precache offline.")
     if "./src/js/project-domain.js" not in metadata_text:
         fail("El módulo administrativo importado debe formar parte del precache offline.")
-    if "./src/js/panel-domain.js" not in metadata_text:
-        fail("El módulo de colaboración por panel debe formar parte del precache offline.")
     if "./src/js/p2p-durability.js" not in metadata_text:
         fail("El módulo de durabilidad local debe formar parte del precache offline.")
     if "./src/js/p2p-tab-coordinator.js" not in metadata_text:
@@ -1551,8 +1499,6 @@ def main() -> None:
         fail("version.json debe verificar la huella del alcance por aplicación.")
     if not any(asset.get("url") == "./src/js/project-domain.js" for asset in assets):
         fail("version.json debe verificar la huella del módulo administrativo.")
-    if not any(asset.get("url") == "./src/js/panel-domain.js" for asset in assets):
-        fail("version.json debe verificar la huella del módulo de colaboración por panel.")
     if not any(asset.get("url") == "./src/js/p2p-durability.js" for asset in assets):
         fail("version.json debe verificar la huella del módulo de durabilidad local.")
     if not any(asset.get("url") == "./src/js/p2p-tab-coordinator.js" for asset in assets):
