@@ -33,6 +33,16 @@ import {
 } from './p2p-storage.js';
 import { resolveCanonicalInvitationDecision } from './p2p-invitation-intent.js';
 import {
+  createInvitationAuditTraceId,
+  invitationAuditEntitySummary,
+  invitationAuditEntityComparison,
+  invitationAuditEscrowSummary,
+  invitationAuditError,
+  invitationAuditLog,
+  maskInvitationAuditEmail,
+  XXXsenXXX
+} from './p2p-invitation-audit.js';
+import {
   setP2PCryptoContext,
   closeP2PCryptoContext,
   ensureDeviceEncryptionIdentity,
@@ -5369,7 +5379,10 @@ export class SemillaP2PClient {
             space,
             invitations.received,
             sessionContext,
-            { forceSnapshot: true }
+            {
+              forceSnapshot: true,
+              auditTraceId: String(context.auditTraceId || '').trim()
+            }
           ).catch((error) => {
             if (this.isSessionContextChangedError(error)) throw error;
             dispatch('p2p:invitation-bootstrap-recovery-deferred', {
@@ -5390,7 +5403,8 @@ export class SemillaP2PClient {
           await this.recoverAcceptedInvitationBootstrap(
             space,
             invitations.received,
-            sessionContext
+            sessionContext,
+            { auditTraceId: String(context.auditTraceId || '').trim() }
           ).catch((error) => {
             if (this.isSessionContextChangedError(error)) throw error;
             dispatch('p2p:invitation-bootstrap-recovery-deferred', {
@@ -5517,7 +5531,7 @@ export class SemillaP2PClient {
     return this.bootstrapMinimumApplicableSequence;
   }
 
-  async fetchBootstrap(requestSnapshots = false) {
+  async fetchBootstrap(requestSnapshots = false, auditContext = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const requestSequence = ++this.bootstrapRequestSequence;
@@ -5538,7 +5552,9 @@ export class SemillaP2PClient {
       sessionContext
     );
     this.assertSessionContext(sessionContext);
-    const data = await apiPost('/api/p2p/bootstrap', {
+    const auditTraceId = String(auditContext?.auditTraceId || '').trim();
+    const auditSource = String(auditContext?.auditSource || auditContext?.source || '').trim();
+    const bootstrapRequest = {
       device: this.device,
       requestSnapshots,
       snapshotSpaceIds,
@@ -5546,9 +5562,58 @@ export class SemillaP2PClient {
       lifecycleReceipts,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
         ? {}
-        : this.snapshotSourceExclusionsBySpace()
-    });
+        : this.snapshotSourceExclusionsBySpace(),
+      ...(auditTraceId ? { auditTraceId } : {})
+    };
+    if (auditTraceId) {
+      invitationAuditLog('frontend.bootstrap.request', {
+        auditTraceId,
+        auditSource,
+        requestSequence,
+        requestSnapshots,
+        requestedSnapshotSpaceCount: snapshotSpaceIds.length,
+        localSpaceCount: localSpaces.length,
+        stateRevisionCount: Object.keys(stateRevisions || {}).length,
+        deviceId: sessionContext.deviceId,
+        ...XXXsenXXX({
+          bootstrapRequest,
+          localSpaces,
+          stateRevisions,
+          lifecycleReceipts
+        })
+      });
+    }
+    let data = null;
+    try {
+      data = await apiPost('/api/p2p/bootstrap', bootstrapRequest);
+    } catch (error) {
+      if (auditTraceId) {
+        invitationAuditLog('frontend.bootstrap.backend-error', {
+          auditTraceId,
+          auditSource,
+          requestSequence,
+          deviceId: sessionContext.deviceId,
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ bootstrapRequest, error })
+        });
+      }
+      throw error;
+    }
     this.assertSessionContext(sessionContext);
+    if (auditTraceId) {
+      invitationAuditLog('frontend.bootstrap.backend-response', {
+        auditTraceId,
+        auditSource,
+        requestSequence,
+        deviceId: sessionContext.deviceId,
+        spaceCount: Array.isArray(data?.spaces) ? data.spaces.length : 0,
+        receivedInvitationCount: Array.isArray(data?.invitations?.received) ? data.invitations.received.length : 0,
+        sentInvitationCount: Array.isArray(data?.invitations?.sent) ? data.invitations.sent.length : 0,
+        snapshotRequestCount: Array.isArray(data?.snapshotRequests) ? data.snapshotRequests.length : 0,
+        revokedSpaceCount: Array.isArray(data?.revokedSpaceIds) ? data.revokedSpaceIds.length : 0,
+        ...XXXsenXXX({ bootstrapRequest, backendBootstrapResponse: data })
+      });
+    }
 
     const applyTask = this.bootstrapApplyQueue.then(async () => {
       this.assertSessionContext(sessionContext);
@@ -5560,14 +5625,38 @@ export class SemillaP2PClient {
       try {
         const state = await this.applyBootstrapData(data, {
           sessionContext,
-          localStateRevisions: stateRevisions
+          localStateRevisions: stateRevisions,
+          auditTraceId,
+          auditSource
         });
         this.assertSessionContext(sessionContext);
         this.bootstrapAppliedSequence = requestSequence;
+        if (auditTraceId) {
+          invitationAuditLog('frontend.bootstrap.applied', {
+            auditTraceId,
+            auditSource,
+            requestSequence,
+            deviceId: sessionContext.deviceId,
+            spaceCount: Array.isArray(state?.spaces) ? state.spaces.length : 0,
+            recoveryRequirementCount: Object.keys(this.recoveryRequirements || {}).length,
+            ...XXXsenXXX({ backendBootstrapResponse: data, appliedBootstrapState: state })
+          });
+        }
         return state;
       } catch (error) {
         if (error?.p2pBootstrapControlStateCommitted === true) {
           this.bootstrapAppliedSequence = Math.max(this.bootstrapAppliedSequence, requestSequence);
+        }
+        if (auditTraceId) {
+          invitationAuditLog('frontend.bootstrap.apply-error', {
+            auditTraceId,
+            auditSource,
+            requestSequence,
+            deviceId: sessionContext.deviceId,
+            controlStateCommitted: error?.p2pBootstrapControlStateCommitted === true,
+            error: invitationAuditError(error),
+            ...XXXsenXXX({ backendBootstrapResponse: data, bootstrapState: this.bootstrapState, error })
+          });
         }
         throw error;
       }
@@ -5816,23 +5905,25 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [] } = {}) {
+  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [], auditTraceId = '', auditSource = '' } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
     this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
-    const state = await this.fetchBootstrap(snapshotMode);
+    const state = await this.fetchBootstrap(snapshotMode, { auditTraceId, auditSource });
     this.assertSessionContext(sessionContext);
     dispatch('p2p:state', { state });
     return state;
   }
 
-  async recoverMissingProjectRoots(spaceIds = []) {
+  async recoverMissingProjectRoots(spaceIds = [], auditContext = {}) {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
     return this.refreshBootstrap({
       requestSnapshots: 'force',
-      snapshotSpaceIds: normalizedSpaceIds
+      snapshotSpaceIds: normalizedSpaceIds,
+      auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+      auditSource: String(auditContext?.source || auditContext?.auditSource || 'missing-project-root-recovery').trim()
     });
   }
 
@@ -6982,7 +7073,7 @@ export class SemillaP2PClient {
     throw error;
   }
 
-  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext()) {
+  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext(), auditContext = {}) {
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
     if (!cleanSpaceId || !this.spaceRequiresEncryption(cleanSpaceId)) return null;
@@ -7057,27 +7148,82 @@ export class SemillaP2PClient {
       error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
       error.status = 413;
       error.spaceId = cleanSpaceId;
+      invitationAuditLog('frontend.escrow.rejected', {
+        auditTraceId: String(auditContext.auditTraceId || '').trim(),
+        spaceId: cleanSpaceId,
+        deviceId: sessionContext.deviceId,
+        maximumBytes,
+        actualBytes: jsonByteLength(escrow),
+        entities: invitationAuditEntitySummary(entities),
+        escrow: invitationAuditEscrowSummary(escrow),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ canonicalPlaintextEntities: entities, encryptedBootstrapEscrow: escrow })
+      });
       throw error;
     }
+    invitationAuditLog('frontend.escrow.built', {
+      auditTraceId: String(auditContext.auditTraceId || '').trim(),
+      invitationScope: String(auditContext.invitationScope || '').trim(),
+      invitationGroupId: String(auditContext.invitationGroupId || '').trim(),
+      spaceId: cleanSpaceId,
+      deviceId: sessionContext.deviceId,
+      bytes: jsonByteLength(escrow),
+      entities: invitationAuditEntitySummary(entities),
+      escrow: invitationAuditEscrowSummary(escrow),
+      ...XXXsenXXX({
+        canonicalPlaintextEntities: entities,
+        encryptedBootstrapEscrow: escrow
+      })
+    });
     return escrow;
   }
 
-  async applyInvitationBootstrapEscrow(escrow = null, space = null, invitation = null, sessionContext = this.captureSessionContext()) {
+  async applyInvitationBootstrapEscrow(escrow = null, space = null, invitation = null, sessionContext = this.captureSessionContext(), auditContext = {}) {
     this.assertSessionContext(sessionContext);
     if (!escrow || typeof escrow !== 'object') return { applied: false, reason: 'missing' };
     const spaceId = String(space?.spaceId || invitation?.spaceId || '').trim();
+    const auditTraceId = String(auditContext.auditTraceId || '').trim();
     if (!spaceId || String(escrow.spaceId || '').trim() !== spaceId) {
       const error = new Error('La copia inicial de la invitación pertenece a otro proyecto.');
       error.code = 'P2P_INVITATION_ESCROW_SCOPE_MISMATCH';
       error.status = 409;
+      invitationAuditLog('frontend.escrow.scope-mismatch', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        expectedSpaceId: spaceId,
+        escrowSpaceId: String(escrow?.spaceId || '').trim(),
+        deviceId: sessionContext.deviceId,
+        escrow: invitationAuditEscrowSummary(escrow),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ invitation, space, encryptedBootstrapEscrow: escrow })
+      });
       throw error;
     }
     if (Number(escrow.schemaVersion || 0) !== 1 || !Array.isArray(escrow.entities) || !escrow.keyEnvelope) {
       const error = new Error('La copia cifrada inicial de la invitación está incompleta.');
       error.code = 'P2P_INVITATION_ESCROW_INVALID';
       error.status = 409;
+      invitationAuditLog('frontend.escrow.invalid', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        escrow: invitationAuditEscrowSummary(escrow),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ invitation, space, encryptedBootstrapEscrow: escrow })
+      });
       throw error;
     }
+
+    invitationAuditLog('frontend.escrow.apply.begin', {
+      auditTraceId,
+      invitationId: String(invitation?.invitationId || '').trim(),
+      invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+      spaceId,
+      deviceId: sessionContext.deviceId,
+      escrow: invitationAuditEscrowSummary(escrow),
+      ...XXXsenXXX({ invitation, space, encryptedBootstrapEscrow: escrow })
+    });
 
     const imported = await importSpaceKeyEnvelope(spaceId, escrow.keyEnvelope, {
       keyEpoch: Math.max(0, Number(escrow.keyEpoch || space?.encryptionKeyEpoch || 0))
@@ -7087,6 +7233,16 @@ export class SemillaP2PClient {
       const error = new Error('La clave cifrada de la invitación no pudo vincularse con este dispositivo.');
       error.code = 'P2P_INVITATION_ESCROW_KEY_NOT_IMPORTED';
       error.status = 409;
+      invitationAuditLog('frontend.escrow.key-import-failed', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        imported,
+        escrow: invitationAuditEscrowSummary(escrow),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ imported, keyEnvelope: escrow?.keyEnvelope, encryptedBootstrapEscrow: escrow })
+      });
       throw error;
     }
 
@@ -7095,6 +7251,15 @@ export class SemillaP2PClient {
       const error = new Error('La copia inicial de la invitación necesita demasiados fragmentos para reconstruirse de forma segura.');
       error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
       error.status = 413;
+      invitationAuditLog('frontend.escrow.chunk-limit', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        chunkCount: transportChunks.length,
+        maximumChunks: this.snapshotMaxChunks,
+        error: invitationAuditError(error)
+      });
       throw error;
     }
     const requestId = `invitation_escrow_${String(invitation?.invitationId || '').replace(/[^a-zA-Z0-9._:-]/g, '_').slice(0, 140) || Date.now()}`;
@@ -7136,12 +7301,34 @@ export class SemillaP2PClient {
       decryptedChunkEvents.push(await decryptOperationEvent(encryptedEvent));
       this.assertSessionContext(sessionContext);
     }
+    const decryptedEntities = decryptedChunkEvents.flatMap((event) => Array.isArray(event.operation?.payload?.entities) ? event.operation.payload.entities : []);
+    invitationAuditLog('frontend.escrow.decrypted', {
+      auditTraceId,
+      invitationId: String(invitation?.invitationId || '').trim(),
+      invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+      spaceId,
+      deviceId: sessionContext.deviceId,
+      entities: invitationAuditEntitySummary(decryptedEntities),
+      expectedEntityCount: entityCount,
+      snapshotDigest,
+      sourceStateRevision,
+      ...XXXsenXXX({ decryptedChunkEvents, decryptedEntities })
+    });
     const chunkByteCounts = decryptedChunkEvents.map((event) => jsonByteLength(event.operation?.payload?.entities || []));
     const snapshotByteCount = chunkByteCounts.reduce((total, bytes) => total + bytes, 0);
     if (snapshotByteCount > this.snapshotMaxBytes) {
       const error = new Error('La copia inicial descifrada supera el tamaño seguro de almacenamiento local.');
       error.code = 'P2P_INVITATION_ESCROW_TOO_LARGE';
       error.status = 413;
+      invitationAuditLog('frontend.escrow.byte-limit', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        snapshotByteCount,
+        maximumBytes: this.snapshotMaxBytes,
+        error: invitationAuditError(error)
+      });
       throw error;
     }
     for (let index = 0; index < decryptedChunkEvents.length; index += 1) {
@@ -7154,6 +7341,17 @@ export class SemillaP2PClient {
         const error = new Error('No se pudo preparar la copia inicial cifrada de la invitación.');
         error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
         error.status = 409;
+        invitationAuditLog('frontend.escrow.chunk-incomplete', {
+          auditTraceId,
+          invitationId: String(invitation?.invitationId || '').trim(),
+          spaceId,
+          deviceId: sessionContext.deviceId,
+          chunkIndex: index,
+          chunkCount: decryptedChunkEvents.length,
+          staged,
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ decryptedChunkEvent: event, staged, encryptedBootstrapEscrow: escrow })
+        });
         throw error;
       }
     }
@@ -7189,6 +7387,56 @@ export class SemillaP2PClient {
       error.code = 'P2P_INVITATION_ESCROW_INCOMPLETE';
       error.status = 409;
       error.reason = completed.reason || '';
+      invitationAuditLog('frontend.escrow.complete-incomplete', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        completed,
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ decryptedChunkEvents, decryptedEntities, encryptedBootstrapEscrow: escrow, completed })
+      });
+      throw error;
+    }
+
+    const persistedEntities = await listEntities(spaceId);
+    this.assertSessionContext(sessionContext);
+    const persistenceComparison = invitationAuditEntityComparison(decryptedEntities, persistedEntities);
+    invitationAuditLog('frontend.escrow.persisted', {
+      auditTraceId,
+      invitationId: String(invitation?.invitationId || '').trim(),
+      invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+      spaceId,
+      deviceId: sessionContext.deviceId,
+      expected: invitationAuditEntitySummary(decryptedEntities),
+      persisted: invitationAuditEntitySummary(persistedEntities),
+      comparison: persistenceComparison,
+      storageResult: completed,
+      ...XXXsenXXX({
+        expectedDecryptedEntities: decryptedEntities,
+        persistedIndexedDbEntities: persistedEntities,
+        storageResult: completed
+      })
+    });
+    if (!persistenceComparison.complete || persistenceComparison.projectRoot.complete !== true) {
+      const error = new Error('La copia inicial fue descifrada, pero no quedó persistida de forma completa en el dispositivo invitado.');
+      error.code = 'P2P_INVITATION_ESCROW_PERSISTENCE_MISMATCH';
+      error.status = 409;
+      error.reason = persistenceComparison.projectRoot.complete !== true ? 'project_root_missing_after_persist' : 'entity_persistence_mismatch';
+      invitationAuditLog('frontend.escrow.persistence-mismatch', {
+        auditTraceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        comparison: persistenceComparison,
+        error: invitationAuditError(error),
+        ...XXXsenXXX({
+          expectedDecryptedEntities: decryptedEntities,
+          persistedIndexedDbEntities: persistedEntities,
+          storageResult: completed
+        })
+      });
       throw error;
     }
     await resolveRecoveryRequirement(spaceId, sourceStateRevision).catch(() => false);
@@ -7199,13 +7447,39 @@ export class SemillaP2PClient {
       sourceStateRevision,
       entityCount
     });
+    invitationAuditLog('frontend.escrow.apply.complete', {
+      auditTraceId,
+      invitationId: String(invitation?.invitationId || '').trim(),
+      invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+      spaceId,
+      deviceId: sessionContext.deviceId,
+      sourceStateRevision,
+      entityCount,
+      completed,
+      ...XXXsenXXX({
+        invitation,
+        space,
+        encryptedBootstrapEscrow: escrow,
+        decryptedEntities,
+        persistedIndexedDbEntities: persistedEntities
+      })
+    });
     return { applied: true, sourceStateRevision, entityCount, result: completed };
   }
 
   async recoverAcceptedInvitationBootstrap(space = null, receivedInvitations = [], sessionContext = this.captureSessionContext(), options = {}) {
     this.assertSessionContext(sessionContext);
     const spaceId = String(space?.spaceId || '').trim();
-    if (!spaceId || Math.max(0, Number(space?.encryptionVersion || 0)) < 1) return { recovered: false, reason: 'not-encrypted' };
+    const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('invitation_recovery');
+    if (!spaceId || Math.max(0, Number(space?.encryptionVersion || 0)) < 1) {
+      invitationAuditLog('frontend.recovery.skipped', {
+        auditTraceId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        reason: 'not-encrypted'
+      });
+      return { recovered: false, reason: 'not-encrypted' };
+    }
     const activeKeyId = String(space?.activeEncryptionKeyId || '').trim();
     const localKeyAvailable = await hasSpaceKey(spaceId, activeKeyId);
     this.assertSessionContext(sessionContext);
@@ -7213,36 +7487,131 @@ export class SemillaP2PClient {
     // materializar el snapshot cifrado. En recuperación de réplica debemos reusar el
     // escrow aunque la clave ya exista; de lo contrario el panel vuelve a depender de
     // otra réplica conectada justo cuando Redis todavía conserva la copia inicial.
-    if (localKeyAvailable && options.forceSnapshot !== true) return { recovered: false, reason: 'key-present' };
+    if (localKeyAvailable && options.forceSnapshot !== true) {
+      invitationAuditLog('frontend.recovery.skipped', {
+        auditTraceId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        activeKeyId,
+        localKeyAvailable,
+        reason: 'key-present'
+      });
+      return { recovered: false, reason: 'key-present' };
+    }
 
     const invitation = (Array.isArray(receivedInvitations) ? receivedInvitations : [])
       .filter((candidate) => String(candidate?.spaceId || '').trim() === spaceId
         && String(candidate?.status || '').trim().toLowerCase() === 'accepted')
       .sort((left, right) => (Date.parse(right?.respondedAt || right?.updatedAt || right?.createdAt || '') || 0)
         - (Date.parse(left?.respondedAt || left?.updatedAt || left?.createdAt || '') || 0))[0];
-    if (!invitation?.invitationId) return { recovered: false, reason: 'accepted-invitation-missing' };
+    if (!invitation?.invitationId) {
+      invitationAuditLog('frontend.recovery.skipped', {
+        auditTraceId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        activeKeyId,
+        localKeyAvailable,
+        receivedInvitationCount: Array.isArray(receivedInvitations) ? receivedInvitations.length : 0,
+        reason: 'accepted-invitation-missing'
+      });
+      return { recovered: false, reason: 'accepted-invitation-missing' };
+    }
     const invitationId = String(invitation.invitationId || '').trim();
     const lastAttemptAt = Math.max(0, Number(this.invitationEscrowRecoveryAttempts.get(invitationId) || 0));
     if (lastAttemptAt && Date.now() - lastAttemptAt < INVITATION_ESCROW_RECOVERY_RETRY_MS) {
+      invitationAuditLog('frontend.recovery.cooldown', {
+        auditTraceId,
+        invitationId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        lastAttemptAt,
+        retryAfterMs: Math.max(0, INVITATION_ESCROW_RECOVERY_RETRY_MS - (Date.now() - lastAttemptAt))
+      });
       return { recovered: false, reason: 'cooldown', invitationId, spaceId };
     }
     this.invitationEscrowRecoveryAttempts.set(invitationId, Date.now());
 
-    const data = await apiPost('/api/p2p/invitations/respond', {
+    invitationAuditLog('frontend.recovery.begin', {
+      auditTraceId,
       invitationId,
-      decision: 'accept',
-      deviceId: sessionContext.deviceId
+      invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+      spaceId,
+      deviceId: sessionContext.deviceId,
+      activeKeyId,
+      localKeyAvailable,
+      forceSnapshot: options.forceSnapshot === true
     });
+
+    let data = null;
+    try {
+      data = await apiPost('/api/p2p/invitations/respond', {
+        invitationId,
+        decision: 'accept',
+        deviceId: sessionContext.deviceId,
+        auditTraceId
+      });
+    } catch (error) {
+      invitationAuditLog('frontend.recovery.error', {
+        auditTraceId,
+        invitationId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        stage: 'backend-response',
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ invitation, space, error })
+      });
+      throw error;
+    }
     this.assertSessionContext(sessionContext);
-    if (!data?.bootstrapEscrow) return { recovered: false, reason: 'escrow-expired' };
-    await this.applyInvitationBootstrapEscrow(
-      data.bootstrapEscrow,
-      data.space || space,
-      data.invitation || invitation,
-      sessionContext
-    );
+    invitationAuditLog('frontend.recovery.backend-response', {
+      auditTraceId,
+      invitationId: String(data?.invitation?.invitationId || invitationId).trim(),
+      spaceId: String(data?.space?.spaceId || data?.invitation?.spaceId || spaceId).trim(),
+      status: String(data?.invitation?.status || '').trim(),
+      backendSpacePresent: Boolean(data?.space),
+      escrow: invitationAuditEscrowSummary(data?.bootstrapEscrow),
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ backendResponse: data, acceptedInvitation: invitation, currentSpace: space })
+    });
+    if (!data?.bootstrapEscrow) {
+      invitationAuditLog('frontend.recovery.escrow-missing', {
+        auditTraceId,
+        invitationId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        reason: 'escrow-expired'
+      });
+      return { recovered: false, reason: 'escrow-expired' };
+    }
+    try {
+      await this.applyInvitationBootstrapEscrow(
+        data.bootstrapEscrow,
+        data.space || space,
+        data.invitation || invitation,
+        sessionContext,
+        { auditTraceId }
+      );
+    } catch (error) {
+      invitationAuditLog('frontend.recovery.error', {
+        auditTraceId,
+        invitationId,
+        spaceId,
+        deviceId: sessionContext.deviceId,
+        stage: 'apply-escrow',
+        escrow: invitationAuditEscrowSummary(data?.bootstrapEscrow),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ backendResponse: data, invitation, space, error })
+      });
+      throw error;
+    }
     this.assertSessionContext(sessionContext);
     dispatch('p2p:invitation-bootstrap-recovered', {
+      invitationId,
+      spaceId,
+      deviceId: sessionContext.deviceId
+    });
+    invitationAuditLog('frontend.recovery.complete', {
+      auditTraceId,
       invitationId,
       spaceId,
       deviceId: sessionContext.deviceId
@@ -7312,7 +7681,19 @@ export class SemillaP2PClient {
   async invite(email = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
+    const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('invite');
     const requestedSpaceId = String(options.spaceId || '').trim();
+    invitationAuditLog('frontend.invite.begin', {
+      auditTraceId,
+      recipientEmail: maskInvitationAuditEmail(email),
+      spaceId: requestedSpaceId,
+      invitationScope: String(options.invitationScope || 'project').trim().toLowerCase(),
+      invitationGroupId: String(options.invitationGroupId || '').trim(),
+      invitationGroupExpectedCount: Math.max(0, Math.floor(Number(options.invitationGroupExpectedCount || 0))),
+      permissions: Array.isArray(options.permissions) ? options.permissions : ['read', 'write'],
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ recipientEmail: String(email || ''), inviteOptions: options })
+    });
     if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
     const encryptedExistingSpace = requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1;
@@ -7322,7 +7703,7 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true });
       this.assertSessionContext(sessionContext);
-      bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext);
+      bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext, { auditTraceId, invitationScope: options.invitationScope || 'project', invitationGroupId: options.invitationGroupId || '' });
       this.assertSessionContext(sessionContext);
     }
     let data = null;
@@ -7330,6 +7711,7 @@ export class SemillaP2PClient {
       try {
         data = await apiPost('/api/p2p/invitations/create', {
           email,
+          auditTraceId,
           spaceId: options.spaceId || '',
           resourceType: options.resourceType || 'generic',
           permissions: options.permissions || ['read', 'write'],
@@ -7342,11 +7724,19 @@ export class SemillaP2PClient {
         break;
       } catch (error) {
         this.assertSessionContext(sessionContext);
+        invitationAuditLog('frontend.invite.backend-error', {
+          auditTraceId,
+          attempt: attempt + 1,
+          spaceId: requestedSpaceId,
+          recipientEmail: maskInvitationAuditEmail(email),
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ recipientEmail: String(email || ''), inviteOptions: options, sourceBootstrapEscrow: bootstrapEscrow, error })
+        });
         const staleSnapshot = error?.code === 'P2P_INVITATION_ESCROW_STALE_STATE';
         if (!encryptedExistingSpace || !staleSnapshot || attempt >= INVITATION_SOURCE_CREATE_MAX_ATTEMPTS - 1) throw error;
         await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
         this.assertSessionContext(sessionContext);
-        bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext);
+        bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext, { auditTraceId, invitationScope: options.invitationScope || 'project', invitationGroupId: options.invitationGroupId || '' });
         this.assertSessionContext(sessionContext);
       }
     }
@@ -7357,6 +7747,17 @@ export class SemillaP2PClient {
       throw error;
     }
     this.assertSessionContext(sessionContext);
+    invitationAuditLog('frontend.invite.backend-response', {
+      auditTraceId,
+      invitationId: String(data?.invitation?.invitationId || '').trim(),
+      invitationGroupId: String(data?.invitation?.invitationGroupId || options.invitationGroupId || '').trim(),
+      spaceId: String(data?.space?.spaceId || data?.invitation?.spaceId || requestedSpaceId).trim(),
+      reused: data?.reused === true,
+      backendSpacePresent: Boolean(data?.space),
+      backendInvitationStatus: String(data?.invitation?.status || '').trim(),
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ backendResponse: data, sourceBootstrapEscrow: bootstrapEscrow })
+    });
     await this.fenceBootstrapResponses(sessionContext);
     const invitationSpace = data.space
       || (this.bootstrapState.spaces || []).find((space) => space?.spaceId === (options.spaceId || data.invitation?.spaceId));
@@ -7392,12 +7793,21 @@ export class SemillaP2PClient {
       return this.bootstrapState;
     });
     this.assertSessionContext(sessionContext);
+    invitationAuditLog('frontend.invite.complete', {
+      auditTraceId,
+      invitationId: String(data?.invitation?.invitationId || '').trim(),
+      invitationGroupId: String(data?.invitation?.invitationGroupId || options.invitationGroupId || '').trim(),
+      spaceId: String(data?.space?.spaceId || data?.invitation?.spaceId || requestedSpaceId).trim(),
+      reused: data?.reused === true,
+      deviceId: sessionContext.deviceId
+    });
     return data;
   }
 
   async invitePanel(email = '', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
+    const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('panel_invite');
     const requestedIds = Array.from(new Set((Array.isArray(options.spaceIds) ? options.spaceIds : [])
       .map((spaceId) => String(spaceId || '').trim())
       .filter(Boolean)));
@@ -7429,6 +7839,17 @@ export class SemillaP2PClient {
       || resumePlan?.invitationGroupId
       || createId(`panel_invite_${panelInvitationManifestFingerprint(ownedSpaces.map((space) => space.spaceId))}`)
     ).trim();
+    invitationAuditLog('frontend.panel-invite.begin', {
+      auditTraceId,
+      invitationGroupId,
+      recipientEmail: maskInvitationAuditEmail(email),
+      expectedCount: ownedSpaces.length,
+      spaceIds: ownedSpaces.map((space) => space.spaceId),
+      permissions: requestedPermissions,
+      deviceId: sessionContext.deviceId,
+      resumed: Boolean(resumePlan?.invitationGroupId),
+      ...XXXsenXXX({ recipientEmail: String(email || ''), ownedSpaces, inviteOptions: options, resumePlan })
+    });
     const resumedBySpaceId = new Map((resumePlan?.invitationGroupId === invitationGroupId
       ? resumePlan.invitations
       : [])
@@ -7450,7 +7871,8 @@ export class SemillaP2PClient {
           requestId: `${invitationGroupId}:${space.spaceId}`,
           invitationScope: 'panel',
           invitationGroupId,
-          invitationGroupExpectedCount: ownedSpaces.length
+          invitationGroupExpectedCount: ownedSpaces.length,
+          auditTraceId
         });
         this.assertSessionContext(sessionContext);
         results.push(result);
@@ -7461,6 +7883,16 @@ export class SemillaP2PClient {
         throw error;
       }
     }
+    invitationAuditLog('frontend.panel-invite.complete', {
+      auditTraceId,
+      invitationGroupId,
+      expectedCount: ownedSpaces.length,
+      invitationIds: results.map((result) => String(result?.invitation?.invitationId || '').trim()).filter(Boolean),
+      spaceIds: ownedSpaces.map((space) => space.spaceId),
+      reusedCount: results.filter((result) => result?.reused === true).length,
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ recipientEmail: String(email || ''), ownedSpaces, results })
+    });
     return {
       invitationScope: 'panel',
       invitationGroupId,
@@ -7471,9 +7903,10 @@ export class SemillaP2PClient {
     };
   }
 
-  async respondToInvitationGroup(invitationIds = [], decision = 'accept') {
+  async respondToInvitationGroup(invitationIds = [], decision = 'accept', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
+    const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('panel_response');
     const ids = Array.from(new Set((Array.isArray(invitationIds) ? invitationIds : [])
       .map((invitationId) => String(invitationId || '').trim())
       .filter(Boolean)));
@@ -7482,8 +7915,15 @@ export class SemillaP2PClient {
     const responseRequest = {
       invitationIds: ids,
       decision,
-      deviceId: sessionContext.deviceId
+      deviceId: sessionContext.deviceId,
+      auditTraceId
     };
+    invitationAuditLog('frontend.panel-response.begin', {
+      auditTraceId,
+      invitationIds: ids,
+      decision,
+      deviceId: sessionContext.deviceId
+    });
     let data = null;
     for (let attempt = 0; attempt < PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS; attempt += 1) {
       try {
@@ -7492,6 +7932,15 @@ export class SemillaP2PClient {
       } catch (error) {
         this.assertSessionContext(sessionContext);
         const retryDelayMs = panelInvitationResponseRetryDelay(error, attempt);
+        invitationAuditLog('frontend.panel-response.backend-error', {
+          auditTraceId,
+          invitationIds: ids,
+          decision,
+          attempt: attempt + 1,
+          retryDelayMs,
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ responseRequest, error })
+        });
         if (!retryDelayMs || attempt >= PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS - 1) throw error;
         dispatch('p2p:invitation-group-resume', {
           invitationIds: ids,
@@ -7511,6 +7960,19 @@ export class SemillaP2PClient {
       throw error;
     }
     this.assertSessionContext(sessionContext);
+    invitationAuditLog('frontend.panel-response.backend-response', {
+      auditTraceId,
+      invitationGroupId: String(data?.invitationGroupId || '').trim(),
+      resultCount: Array.isArray(data?.results) ? data.results.length : 0,
+      spaces: (Array.isArray(data?.results) ? data.results : []).map((result) => ({
+        invitationId: String(result?.invitation?.invitationId || '').trim(),
+        spaceId: String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim(),
+        status: String(result?.invitation?.status || '').trim(),
+        escrow: invitationAuditEscrowSummary(result?.bootstrapEscrow)
+      })),
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ backendResponse: data })
+    });
     await this.fenceBootstrapResponses(sessionContext);
 
     const results = Array.isArray(data?.results) ? data.results : [];
@@ -7553,13 +8015,14 @@ export class SemillaP2PClient {
             result.bootstrapEscrow,
             result.space,
             result.invitation,
-            sessionContext
+            sessionContext,
+            { auditTraceId }
           );
           this.assertSessionContext(sessionContext);
         }
       }
 
-      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
+      const state = await this.refreshBootstrap({ requestSnapshots: 'force', auditTraceId, auditSource: 'panel-invitation-response' });
       this.assertSessionContext(sessionContext);
       const acceptedSpaceIds = Array.from(new Set(results
         .map((result) => String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim())
@@ -7595,8 +8058,31 @@ export class SemillaP2PClient {
           this.assertSessionContext(sessionContext);
         }
       }
+      const localStateAudit = [];
+      for (const result of results) {
+        const spaceId = String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim();
+        if (!spaceId) continue;
+        const entities = await listEntities(spaceId).catch(() => []);
+        this.assertSessionContext(sessionContext);
+        localStateAudit.push({
+          invitationId: String(result?.invitation?.invitationId || '').trim(),
+          spaceId,
+          authorizationState: String(result?.space?.authorizationState || '').trim(),
+          authorizationPendingReason: String(result?.space?.authorizationPendingReason || '').trim(),
+          replicaPending: result?.replicaPending === true,
+          entities: invitationAuditEntitySummary(entities),
+          rawAudit: { invitation: result?.invitation, space: result?.space, entities }
+        });
+      }
+      invitationAuditLog('frontend.panel-response.local-state', {
+        auditTraceId,
+        invitationGroupId: String(data?.invitationGroupId || '').trim(),
+        deviceId: sessionContext.deviceId,
+        spaces: localStateAudit.map(({ rawAudit, ...summary }) => summary),
+        ...XXXsenXXX({ spaces: localStateAudit.map((item) => item.rawAudit) })
+      });
     } else {
-      await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+      await this.refreshBootstrap({ requestSnapshots: false, auditTraceId, auditSource: 'panel-invitation-response' }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
         dispatch('p2p:bootstrap-deferred', {
           error,
@@ -7607,6 +8093,21 @@ export class SemillaP2PClient {
       });
     }
 
+    invitationAuditLog('frontend.panel-response.complete', {
+      auditTraceId,
+      invitationGroupId: String(data?.invitationGroupId || '').trim(),
+      decision,
+      accessRevoked,
+      replicaPending,
+      spaces: results.map((result) => ({
+        invitationId: String(result?.invitation?.invitationId || '').trim(),
+        spaceId: String(result?.space?.spaceId || result?.invitation?.spaceId || '').trim(),
+        status: String(result?.invitation?.status || '').trim(),
+        replicaPending: result?.replicaPending === true,
+        accessRevoked: result?.accessRevoked === true
+      })),
+      deviceId: sessionContext.deviceId
+    });
     return {
       ...data,
       results,
@@ -7616,15 +8117,49 @@ export class SemillaP2PClient {
     };
   }
 
-  async respondToInvitation(invitationId = '', decision = 'accept') {
+  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
-    const data = await apiPost('/api/p2p/invitations/respond', {
-      invitationId,
+    const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('invitation_response');
+    invitationAuditLog('frontend.response.begin', {
+      auditTraceId,
+      invitationId: String(invitationId || '').trim(),
       decision,
       deviceId: sessionContext.deviceId
     });
+    let data = null;
+    const responseRequest = {
+      invitationId,
+      decision,
+      deviceId: sessionContext.deviceId,
+      auditTraceId
+    };
+    try {
+      data = await apiPost('/api/p2p/invitations/respond', responseRequest);
+    } catch (error) {
+      invitationAuditLog('frontend.response.backend-error', {
+        auditTraceId,
+        invitationId: String(invitationId || '').trim(),
+        decision,
+        deviceId: sessionContext.deviceId,
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ responseRequest, error })
+      });
+      throw error;
+    }
     this.assertSessionContext(sessionContext);
+    invitationAuditLog('frontend.response.backend-response', {
+      auditTraceId,
+      invitationId: String(data?.invitation?.invitationId || invitationId || '').trim(),
+      invitationGroupId: String(data?.invitation?.invitationGroupId || '').trim(),
+      spaceId: String(data?.space?.spaceId || data?.invitation?.spaceId || '').trim(),
+      status: String(data?.invitation?.status || '').trim(),
+      reused: data?.reused === true,
+      escrow: invitationAuditEscrowSummary(data?.bootstrapEscrow),
+      backendSpacePresent: Boolean(data?.space),
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ backendResponse: data })
+    });
     await this.fenceBootstrapResponses(sessionContext);
     const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
     const committedControlState = prepareCommittedControlState({
@@ -7644,11 +8179,12 @@ export class SemillaP2PClient {
           data.bootstrapEscrow,
           data.space,
           data.invitation,
-          sessionContext
+          sessionContext,
+          { auditTraceId }
         );
         this.assertSessionContext(sessionContext);
       }
-      const state = await this.refreshBootstrap({ requestSnapshots: 'force' });
+      const state = await this.refreshBootstrap({ requestSnapshots: 'force', auditTraceId, auditSource: 'invitation-response' });
       this.assertSessionContext(sessionContext);
       const acceptedSpaceId = String(data.space?.spaceId || data.invitation?.spaceId || '').trim();
       const localStateRevisions = await listStateRevisions([acceptedSpaceId]);
@@ -7669,7 +8205,7 @@ export class SemillaP2PClient {
       data.accessRevoked = replicaState.explicitlyRevoked;
       data.replicaPending = replicaState.replicaPending;
     } else {
-      await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
+      await this.refreshBootstrap({ requestSnapshots: false, auditTraceId, auditSource: 'invitation-response' }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
         dispatch('p2p:bootstrap-deferred', {
           error,
@@ -7684,6 +8220,33 @@ export class SemillaP2PClient {
       await this.requestSpaceKey(data.space.spaceId, '', { force: true }).catch(() => false);
       this.assertSessionContext(sessionContext);
     }
+    if (canonicalDecision === 'accept' && data.space) {
+      const acceptedSpaceId = String(data.space.spaceId || data.invitation?.spaceId || '').trim();
+      const persistedEntities = acceptedSpaceId ? await listEntities(acceptedSpaceId).catch(() => []) : [];
+      this.assertSessionContext(sessionContext);
+      invitationAuditLog('frontend.response.local-state', {
+        auditTraceId,
+        invitationId: String(data?.invitation?.invitationId || invitationId || '').trim(),
+        spaceId: acceptedSpaceId,
+        deviceId: sessionContext.deviceId,
+        authorizationState: String(data?.space?.authorizationState || '').trim(),
+        authorizationPendingReason: String(data?.space?.authorizationPendingReason || '').trim(),
+        replicaPending: data?.replicaPending === true,
+        entities: invitationAuditEntitySummary(persistedEntities),
+        ...XXXsenXXX({ invitation: data?.invitation, space: data?.space, persistedIndexedDbEntities: persistedEntities })
+      });
+    }
+    invitationAuditLog('frontend.response.complete', {
+      auditTraceId,
+      invitationId: String(data?.invitation?.invitationId || invitationId || '').trim(),
+      spaceId: String(data?.space?.spaceId || data?.invitation?.spaceId || '').trim(),
+      canonicalDecision,
+      accessRevoked: data?.accessRevoked === true,
+      replicaPending: data?.replicaPending === true,
+      authorizationState: String(data?.space?.authorizationState || '').trim(),
+      authorizationPendingReason: String(data?.space?.authorizationPendingReason || '').trim(),
+      deviceId: sessionContext.deviceId
+    });
     return data;
   }
 

@@ -40,6 +40,7 @@ REQUIRED_FILES = [
     "src/js/p2p-client.js",
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
+    "src/js/p2p-invitation-audit.js",
     "src/js/project-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
@@ -93,6 +94,7 @@ JAVASCRIPT_FILES = [
     "src/js/p2p-client.js",
     "src/js/p2p-permissions.js",
     "src/js/p2p-invitation-intent.js",
+    "src/js/p2p-invitation-audit.js",
     "src/js/project-domain.js",
     "src/js/skeleton-screen.js",
     "src/js/i18n.js",
@@ -453,6 +455,7 @@ def assert_snapshot_request_liveness() -> None:
         shutil.copy2(ROOT / "src" / "js" / "p2p-permissions.js", js_root / "p2p-permissions.js")
         shutil.copy2(ROOT / "src" / "js" / "application-scope.js", js_root / "application-scope.js")
         shutil.copy2(ROOT / "src" / "js" / "p2p-invitation-intent.js", js_root / "p2p-invitation-intent.js")
+        shutil.copy2(ROOT / "src" / "js" / "p2p-invitation-audit.js", js_root / "p2p-invitation-audit.js")
         (js_root / "p2p-crypto.js").write_text(
             """
 export const setP2PCryptoContext=async()=>{};
@@ -1474,8 +1477,9 @@ def main() -> None:
     for asset in assets:
         url = asset.get("url", "")
         expected = asset.get("sha256", "")
-        if not url or not expected:
-            fail("Cada criticalAsset debe tener url y sha256.")
+        expected_bytes = asset.get("bytes")
+        if not url or not expected or not isinstance(expected_bytes, int) or expected_bytes < 0:
+            fail("Cada criticalAsset debe tener url, sha256 y bytes válidos.")
         relative = url[2:] if url.startswith("./") else url.lstrip("/")
         file_path = ROOT / relative
         if not file_path.exists():
@@ -1483,6 +1487,9 @@ def main() -> None:
         actual = sha256(file_path)
         if actual != expected:
             fail(f"Huella incorrecta en {url}: {actual} != {expected}")
+        actual_bytes = file_path.stat().st_size
+        if actual_bytes != expected_bytes:
+            fail(f"Tamaño incorrecto en {url}: {actual_bytes} != {expected_bytes}")
 
     metadata_text = (ROOT / "src/js/app-metadata.js").read_text(encoding="utf-8")
     if "./src/js/application-scope.js" not in metadata_text:

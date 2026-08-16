@@ -30,6 +30,14 @@ import {
   resolveCanonicalInvitationDecision
 } from './p2p-invitation-intent.js';
 import {
+  createInvitationAuditTraceId,
+  invitationAuditEntitySummary,
+  invitationAuditError,
+  invitationAuditLog,
+  maskInvitationAuditEmail,
+  XXXsenXXX
+} from './p2p-invitation-audit.js';
+import {
   inspectStorageDurability,
   requestPersistentStorage,
   formatStorageBytes
@@ -87,6 +95,7 @@ const state = {
   invitationRefreshSequence: 0,
   missingProjectRecoveryActive: false,
   missingProjectRecoveryAt: new Map(),
+  missingProjectRecoveryAuditContext: {},
   projectFilterQuery: '',
   inviteContext: null,
   panelResponseInProgress: false,
@@ -526,7 +535,7 @@ function resolvedProjectData(space, entities) {
   };
 }
 
-async function recoverMissingProjectCards(spaceIds = []) {
+async function recoverMissingProjectCards(spaceIds = [], auditContext = state.missingProjectRecoveryAuditContext || {}) {
   if (state.missingProjectRecoveryActive || !state.user || !getSessionToken()) return false;
   const now = Date.now();
   const candidates = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
@@ -535,6 +544,12 @@ async function recoverMissingProjectCards(spaceIds = []) {
     .filter((spaceId) => now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) >= MISSING_PROJECT_RECOVERY_COOLDOWN_MS);
   if (!candidates.length) return false;
 
+  invitationAuditLog('frontend.ui.missing-project-recovery.begin', {
+    auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+    auditSource: String(auditContext?.source || '').trim(),
+    candidates,
+    ...XXXsenXXX({ bootstrapState: state.p2pState, account: state.user })
+  });
   state.missingProjectRecoveryActive = true;
   candidates.forEach((spaceId) => state.missingProjectRecoveryAt.set(spaceId, now));
   setStatus(
@@ -546,17 +561,39 @@ async function recoverMissingProjectCards(spaceIds = []) {
   );
 
   try {
-    const recoveryState = await semillaP2P.recoverMissingProjectRoots(candidates);
+    const recoveryState = await semillaP2P.recoverMissingProjectRoots(candidates, auditContext);
     const requestedRecoverySpaceIds = new Set((recoveryState?.snapshotRequests || [])
       .map((request) => String(request?.spaceId || '').trim())
       .filter(Boolean));
     const unresolved = [];
+    const recoveryAudit = [];
     for (const spaceId of candidates) {
       const space = state.p2pState.spaces.find((candidate) => candidate?.spaceId === spaceId) || null;
       if (!space) continue;
-      const entities = await semillaP2P.listEntities(spaceId).catch(() => []);
-      if (!projectRecord(space, entities).loaded) unresolved.push(spaceId);
+      let entities = [];
+      try {
+        entities = await semillaP2P.listEntities(spaceId);
+      } catch (error) {
+        invitationAuditLog('frontend.ui.missing-project-recovery.storage-error', {
+          auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+          spaceId,
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ space, error })
+        });
+      }
+      const loaded = projectRecord(space, entities).loaded;
+      recoveryAudit.push({ spaceId, loaded, entitySummary: invitationAuditEntitySummary(entities), rawAudit: { space, entities } });
+      if (!loaded) unresolved.push(spaceId);
     }
+    invitationAuditLog('frontend.ui.missing-project-recovery.result', {
+      auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+      auditSource: String(auditContext?.source || '').trim(),
+      candidates,
+      requestedSnapshotSpaceIds: [...requestedRecoverySpaceIds],
+      unresolved,
+      spaces: recoveryAudit.map(({ rawAudit, ...summary }) => summary),
+      ...XXXsenXXX({ recoveryState, spaces: recoveryAudit.map((item) => item.rawAudit) })
+    });
     if (unresolved.length) {
       const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
       setStatus(
@@ -581,6 +618,13 @@ async function recoverMissingProjectCards(spaceIds = []) {
     }
     return unresolved.length === 0;
   } catch (error) {
+    invitationAuditLog('frontend.ui.missing-project-recovery.error', {
+      auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+      auditSource: String(auditContext?.source || '').trim(),
+      candidates,
+      error: invitationAuditError(error),
+      ...XXXsenXXX({ error, bootstrapState: state.p2pState })
+    });
     setStatus(
       elements.dashboardStatus,
       error?.message || t('p2p.missingProjectDeferred', 'El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.'),
@@ -592,21 +636,75 @@ async function recoverMissingProjectCards(spaceIds = []) {
   }
 }
 
-async function refreshProjects() {
+async function refreshProjects(auditContext = {}) {
+  state.missingProjectRecoveryAuditContext = auditContext && typeof auditContext === 'object' ? auditContext : {};
   const renderSequence = ++state.renderSequence;
   const spaces = Array.isArray(state.p2pState.spaces) ? state.p2pState.spaces : [];
+  const hydrationAudit = [];
   const entries = await Promise.all(spaces.map(async (space) => {
-    const entities = await semillaP2P.listEntities(space.spaceId).catch(() => []);
-    return [space.spaceId, resolvedProjectData(space, entities)];
+    let entities = [];
+    try {
+      entities = await semillaP2P.listEntities(space.spaceId);
+    } catch (error) {
+      invitationAuditLog('frontend.ui.project-hydration.storage-error', {
+        auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+        auditSource: String(auditContext?.source || '').trim(),
+        spaceId: String(space?.spaceId || '').trim(),
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ space, error })
+      });
+    }
+    const data = resolvedProjectData(space, entities);
+    hydrationAudit.push({
+      spaceId: String(space?.spaceId || '').trim(),
+      ownerUserId: panelOwnerUserId(space),
+      authorizationState: String(space?.authorizationState || '').trim(),
+      authorizationPendingReason: String(space?.authorizationPendingReason || '').trim(),
+      projectRootLoaded: data.project.loaded,
+      projectRootEntityPresent: Boolean(data.project._entity),
+      projectRootValuePresent: Boolean(data.project._entity?.value && typeof data.project._entity.value === 'object'),
+      projectRoot: data.project.loaded ? {
+        name: data.project.name,
+        description: data.project.description,
+        address: data.project.address,
+        initialBudget: data.project.initialBudget,
+        createdAt: data.project.createdAt,
+        updatedAt: data.project.updatedAt
+      } : null,
+      entities: invitationAuditEntitySummary(entities),
+      rawAudit: { space, entities, resolvedProjectData: data }
+    });
+    return [space.spaceId, data];
   }));
+  invitationAuditLog('frontend.ui.project-hydration', {
+    auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+    auditSource: String(auditContext?.source || '').trim(),
+    userId: String(state.user?.userId || '').trim(),
+    spaceCount: spaces.length,
+    spaces: hydrationAudit.map(({ rawAudit, ...summary }) => summary),
+    ...XXXsenXXX({
+      account: state.user,
+      bootstrapSpaces: spaces,
+      hydratedSpaces: hydrationAudit.map((item) => item.rawAudit)
+    })
+  });
   if (renderSequence !== state.renderSequence) return;
   const missingProjectSpaceIds = entries
     .filter(([, data]) => !data.project.loaded)
     .map(([spaceId]) => spaceId);
+  invitationAuditLog('frontend.ui.project-root-check', {
+    auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+    auditSource: String(auditContext?.source || '').trim(),
+    userId: String(state.user?.userId || '').trim(),
+    expectedSpaceIds: spaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
+    loadedSpaceIds: entries.filter(([, data]) => data.project.loaded).map(([spaceId]) => spaceId),
+    missingProjectSpaceIds,
+    missingCount: missingProjectSpaceIds.length
+  });
   state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
   if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
-  renderDashboard();
+  renderDashboard(auditContext);
   renderTrash();
   if (state.selectedSpaceId) renderProject();
   if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
@@ -794,7 +892,7 @@ function createPanelCard(ownerUserId = '', projects = []) {
   return panel;
 }
 
-function renderDashboard() {
+function renderDashboard(auditContext = {}) {
   renderPortfolioMetrics();
   elements.projectList.replaceChildren();
   const allProjects = [...state.projects.values()]
@@ -823,6 +921,31 @@ function renderDashboard() {
     elements.projectList.append(empty); return;
   }
   const ownerIds = Array.from(new Set(projects.map((data) => panelOwnerUserId(data.space)).filter(Boolean)));
+  const panelAudit = ownerIds.map((ownerUserId) => {
+    const authoritativeSpaces = (state.p2pState.spaces || []).filter((space) => panelOwnerUserId(space) === ownerUserId);
+    const loadedProjects = projects.filter((data) => panelOwnerUserId(data.space) === ownerUserId);
+    const missingSpaceIds = authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter((spaceId) => spaceId && !state.projects.has(spaceId));
+    return {
+      ownerUserId,
+      authoritativeSpaceIds: authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
+      loadedSpaceIds: loadedProjects.map((data) => String(data?.space?.spaceId || '').trim()).filter(Boolean),
+      missingSpaceIds,
+      partiallyAccepted: partiallyAcceptedPanelInvitationForOwner(ownerUserId),
+      complete: panelIsComplete(ownerUserId)
+    };
+  });
+  invitationAuditLog('frontend.ui.panel-visibility', {
+    auditTraceId: String(auditContext?.auditTraceId || '').trim(),
+    auditSource: String(auditContext?.source || '').trim(),
+    userId: String(state.user?.userId || '').trim(),
+    panels: panelAudit,
+    ...XXXsenXXX({
+      account: state.user,
+      bootstrapSpaces: state.p2pState.spaces || [],
+      loadedProjects: [...state.projects.values()],
+      receivedInvitations: state.p2pState.invitations?.received || []
+    })
+  });
   let renderedPanels = 0;
   for (const ownerUserId of ownerIds) {
     if (!panelIsComplete(ownerUserId)) continue;
@@ -1315,7 +1438,7 @@ function openProject(spaceId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function applyP2PState(nextState = {}) {
+function applyP2PState(nextState = {}, auditContext = {}) {
   state.p2pState = {
     spaces: Array.isArray(nextState.spaces) ? nextState.spaces : [],
     invitations: {
@@ -1327,7 +1450,7 @@ function applyP2PState(nextState = {}) {
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
   };
   renderInvitations(); if (elements.devicesDialog?.open) renderDevices();
-  if (!state.panelResponseInProgress) refreshProjects().catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
+  if (!state.panelResponseInProgress) refreshProjects(auditContext).catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
 }
 
 async function loadPublicConfig() { if (state.firebaseWebConfig) return state.firebaseWebConfig; const data = await apiGet('/api/config'); if (String(data?.approvedApplication || '') !== P2P_APPLICATION_ID) { console.error('[semilla-auth] La aplicación aprobada por memoriaBACKEND no coincide con la carpeta pública.', { expected: P2P_APPLICATION_ID, received: data?.approvedApplication || '' }); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } const config = data?.firebaseWebConfig || {}; const error = getFirebaseWebConfigError(config); if (error) { console.error('[semilla-auth]', error); throw new Error(t('auth.serviceUnavailable', 'El servicio de acceso no está disponible.')); } state.firebaseWebConfig = config; return config; }
@@ -2251,10 +2374,33 @@ async function submitInvitation(event) {
   const permissions = normalizeCollaborationPermissions([...elements.inviteForm.querySelectorAll('input[name="permission"]:checked')].map((input) => input.value));
   if (!email || (context.scope === 'project' && !data) || (context.scope === 'panel' && !context.spaceIds?.length)) return;
   setP2PBusy(true); setStatus(elements.inviteStatus, t('invite.sending', 'Enviando invitación…'));
+  const auditTraceId = createInvitationAuditTraceId(context.scope === 'panel' ? 'ui_panel_invite' : 'ui_project_invite');
+  invitationAuditLog('frontend.ui.invite-submit', {
+    auditTraceId,
+    scope: context.scope,
+    recipientEmail: maskInvitationAuditEmail(email),
+    spaceIds: context.scope === 'panel' ? [...(context.spaceIds || [])] : [data?.space?.spaceId].filter(Boolean),
+    invitationGroupId: String(context.invitationGroupId || '').trim(),
+    permissions,
+    ...XXXsenXXX({ recipientEmail: email, inviteContext: context, selectedProject: data })
+  });
   try {
     const result = context.scope === 'panel'
-      ? await semillaP2P.invitePanel(email, { spaceIds: context.spaceIds, permissions, invitationGroupId: context.invitationGroupId || '' })
-      : await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: 'admin.project', permissions });
+      ? await semillaP2P.invitePanel(email, { spaceIds: context.spaceIds, permissions, invitationGroupId: context.invitationGroupId || '', auditTraceId })
+      : await semillaP2P.invite(email, { spaceId: data.space.spaceId, resourceType: 'admin.project', permissions, auditTraceId });
+    invitationAuditLog('frontend.ui.invite-submit-complete', {
+      auditTraceId,
+      scope: context.scope,
+      invitationGroupId: String(result?.invitationGroupId || result?.invitation?.invitationGroupId || '').trim(),
+      invitationIds: context.scope === 'panel'
+        ? (result?.invitations || []).map((invitation) => String(invitation?.invitationId || '').trim()).filter(Boolean)
+        : [String(result?.invitation?.invitationId || '').trim()].filter(Boolean),
+      spaceIds: context.scope === 'panel'
+        ? (result?.spaceIds || context.spaceIds || []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean)
+        : [String(result?.space?.spaceId || result?.invitation?.spaceId || data?.space?.spaceId || '').trim()].filter(Boolean),
+      reused: result?.reused === true,
+      ...XXXsenXXX({ result, bootstrapState: semillaP2P.bootstrapState })
+    });
     applyP2PState(semillaP2P.bootstrapState);
     closeDialog(elements.inviteDialog);
     state.inviteContext = null;
@@ -2264,6 +2410,13 @@ async function submitInvitation(event) {
       : (result.reused ? t('invite.alreadyPending', 'La invitación ya estaba pendiente.') : t('invite.sent', 'Invitación enviada correctamente.'));
     setStatus(targetStatus, message, 'success');
   } catch (error) {
+    invitationAuditLog('frontend.ui.invite-submit-error', {
+      auditTraceId,
+      scope: context.scope,
+      invitationGroupId: String(error?.panelInvitationGroupId || context.invitationGroupId || '').trim(),
+      error: invitationAuditError(error),
+      ...XXXsenXXX({ recipientEmail: email, inviteContext: context, error })
+    });
     if (context.scope === 'panel' && error?.panelInvitationGroupId) state.inviteContext.invitationGroupId = error.panelInvitationGroupId;
     setStatus(elements.inviteStatus, error?.message || t('invite.error', 'No se pudo enviar la invitación.'), 'error');
   } finally { setP2PBusy(false); }
@@ -2273,24 +2426,54 @@ async function respondInvitation(event) {
   const button = event.target.closest('button[data-invitation-id]'); if (!button || state.p2pBusy) return;
   const ids = Array.from(new Set(String(button.dataset.invitationIds || button.dataset.invitationId || '').split(',').map((value) => value.trim()).filter(Boolean)));
   const isPanelGroup = Boolean(button.dataset.invitationGroupId);
+  const auditTraceId = createInvitationAuditTraceId(isPanelGroup ? 'ui_panel_response' : 'ui_project_response');
+  invitationAuditLog('frontend.ui.response-click', {
+    auditTraceId,
+    invitationIds: ids,
+    invitationGroupId: String(button.dataset.invitationGroupId || '').trim(),
+    decision: String(button.dataset.decision || '').trim(),
+    isPanelGroup
+  });
   setP2PBusy(true);
   state.panelResponseInProgress = isPanelGroup;
   try {
     const result = isPanelGroup
-      ? await semillaP2P.respondToInvitationGroup(ids, button.dataset.decision)
-      : await semillaP2P.respondToInvitation(ids[0], button.dataset.decision);
+      ? await semillaP2P.respondToInvitationGroup(ids, button.dataset.decision, { auditTraceId })
+      : await semillaP2P.respondToInvitation(ids[0], button.dataset.decision, { auditTraceId });
     const invitation = isPanelGroup ? result?.invitations?.[0] : result?.invitation;
     const canonicalDecision = resolveCanonicalInvitationDecision(invitation, button.dataset.decision);
     const accessRevoked = result?.accessRevoked === true;
     const replicaPending = result?.replicaPending === true;
+    invitationAuditLog('frontend.ui.response-result', {
+      auditTraceId,
+      invitationIds: ids,
+      invitationGroupId: String(button.dataset.invitationGroupId || result?.invitationGroupId || '').trim(),
+      requestedDecision: String(button.dataset.decision || '').trim(),
+      canonicalDecision,
+      accessRevoked,
+      replicaPending,
+      bootstrapSpaceIds: (semillaP2P.bootstrapState?.spaces || []).map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
+      recoveryRequirements: semillaP2P.recoveryRequirements || {},
+      ...XXXsenXXX({ result, bootstrapState: semillaP2P.bootstrapState, recoveryRequirements: semillaP2P.recoveryRequirements || {} })
+    });
     state.panelResponseInProgress = false;
-    applyP2PState(semillaP2P.bootstrapState);
+    applyP2PState(semillaP2P.bootstrapState, { auditTraceId, source: 'invitation-response' });
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = accessRevoked ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.') : replicaPending ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.') : canonicalDecision === 'accept' ? (isPanelGroup ? t('panel.accepted', 'Panel aceptado y sincronizado.') : t('invite.accepted', 'Invitación aceptada.')) : (isPanelGroup ? t('panel.rejected', 'Invitación del panel rechazada.') : t('invite.rejected', 'Invitación rechazada.'));
     setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success');
   } catch (error) {
+    invitationAuditLog('frontend.ui.response-error', {
+      auditTraceId,
+      invitationIds: ids,
+      invitationGroupId: String(button.dataset.invitationGroupId || '').trim(),
+      decision: String(button.dataset.decision || '').trim(),
+      error: invitationAuditError(error),
+      bootstrapSpaceIds: (semillaP2P.bootstrapState?.spaces || []).map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
+      recoveryRequirements: semillaP2P.recoveryRequirements || {},
+      ...XXXsenXXX({ error, bootstrapState: semillaP2P.bootstrapState, recoveryRequirements: semillaP2P.recoveryRequirements || {} })
+    });
     state.panelResponseInProgress = false;
-    applyP2PState(semillaP2P.bootstrapState);
+    applyP2PState(semillaP2P.bootstrapState, { auditTraceId, source: 'invitation-response-error' });
     setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');
   } finally { state.panelResponseInProgress = false; setP2PBusy(false); }
 }

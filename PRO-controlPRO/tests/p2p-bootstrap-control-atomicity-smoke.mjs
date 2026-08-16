@@ -100,7 +100,7 @@ const applyModule = await import(`data:text/javascript;base64,${Buffer.from(appl
   assert.equal(client.eventMaxBytes, 65536);
 }
 
-const fetchStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false)');
+const fetchStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false');
 const fetchEnd = clientSource.indexOf('\n  async start(user = {})', fetchStart);
 assert.ok(fetchStart >= 0 && fetchEnd > fetchStart, 'No se encontró fetchBootstrap.');
 const fetchMethod = clientSource.slice(fetchStart, fetchEnd);

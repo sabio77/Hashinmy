@@ -281,7 +281,8 @@ export function projectRecord(space = {}, entities = []) {
     && candidate?.entityId === PROJECT_ENTITY_ID
     && !candidate.deleted
   ));
-  const value = activeEntityValue(entity) || {};
+  const activeValue = activeEntityValue(entity);
+  const value = activeValue || {};
   return {
     spaceId: space.spaceId || '',
     ownerUserId: space.ownerUserId || '',
@@ -296,7 +297,10 @@ export function projectRecord(space = {}, entities = []) {
     trashedBy: cleanText(value.trashedBy || '', 180),
     restoredAt: cleanText(value.restoredAt || '', 60),
     isTrashed: isTrashedValue(value),
-    loaded: Boolean(entity),
+    // Una entidad raíz sin `value` no representa un proyecto hidratado. Tratarla como
+    // cargada crea cards fantasma con la estructura correcta pero sin datos y evita que
+    // la recuperación P2P busque una copia íntegra.
+    loaded: Boolean(entity && activeValue),
     _entity: entity || null
   };
 }

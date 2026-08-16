@@ -27,6 +27,12 @@ import {
 const missingProject = projectRecord({ spaceId: 'space_missing', title: 'Espacio compartido' }, []);
 assert.equal(missingProject.loaded, false, 'Un espacio sin entidad raíz debe identificarse como incompleto.');
 
+const emptyRootProject = projectRecord(
+  { spaceId: 'space_empty_root', title: 'Espacio compartido' },
+  [{ spaceId: 'space_empty_root', entityType: 'admin.project', entityId: 'project', value: null, deleted: false }]
+);
+assert.equal(emptyRootProject.loaded, false, 'Una raíz admin.project sin value no debe crear una card vacía ni bloquear la recuperación P2P.');
+
 const project = normalizeProjectInput({ name: 'Obra Norte', initialBudget: '$100.000.000' });
 assert.equal(project.initialBudget, 100000000);
 assert.equal(project.name, 'Obra Norte');
@@ -221,6 +227,8 @@ assert.equal(appSource.includes('const today = localDateValue()'), true, 'El for
 assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false, 'La interfaz no debe volver a derivar fechas administrativas desde UTC.');
 assert.equal(appSource.includes('Math.abs(record.varianceAmount || 0)'), false, 'Math.abs no admite BigInt y no debe reaparecer en la ruta de renderizado monetario.');
 assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, data]) => data.project.loaded))'), true, 'La interfaz no debe materializar cards de espacios sin proyecto raíz.');
+assert.equal(appSource.includes('projectRootEntityPresent: Boolean(data.project._entity)'), true, 'La auditoría debe distinguir entidad raíz presente de proyecto realmente hidratado.');
+assert.equal(appSource.includes("projectRootValuePresent: Boolean(data.project._entity?.value && typeof data.project._entity.value === 'object')"), true, 'La auditoría debe indicar explícitamente si la raíz contiene datos utilizables.');
 assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica antes de permanecer ocultos.');
 assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFilter)'), true, 'La lista debe aplicar el filtro local sin consultar memoriaBACKEND.');
 assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');

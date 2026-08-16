@@ -16,10 +16,23 @@ for (const needle of [
   "invite.dataset.panelAction = 'invite'",
   'async function revokePanelParticipant(',
   'async function leavePanel(',
-  'semillaP2P.respondToInvitationGroup(ids, button.dataset.decision)',
+  'semillaP2P.respondToInvitationGroup(ids, button.dataset.decision, { auditTraceId })',
+  "applyP2PState(semillaP2P.bootstrapState, { auditTraceId, source: 'invitation-response' })",
+  'semillaP2P.recoverMissingProjectRoots(candidates, auditContext)',
+  'async function refreshProjects(auditContext = {})',
+  'function renderDashboard(auditContext = {})',
   "String(invitation.invitationScope || '').toLowerCase() === 'panel'"
 ]) {
   if (!app.includes(needle)) throw new Error(`La interfaz perdió la capacidad de panel: ${needle}`);
+}
+
+for (const needle of [
+  "invitationAuditLog('frontend.ui.project-hydration'",
+  "invitationAuditLog('frontend.ui.project-root-check'",
+  "invitationAuditLog('frontend.ui.panel-visibility'",
+  "auditTraceId: String(auditContext?.auditTraceId || '').trim()"
+]) {
+  if (!app.includes(needle)) throw new Error(`La trazabilidad de aceptación se perdió antes de renderizar el panel: ${needle}`);
 }
 
 for (const needle of [
@@ -130,8 +143,8 @@ for (const needle of [
   if (!app.includes(needle)) throw new Error(`La interfaz podría volver a aceptar un panel incompleto: ${needle}`);
 }
 
-const groupResponseStart = client.indexOf("  async respondToInvitationGroup(invitationIds = [], decision = 'accept') {");
-const groupResponseEnd = client.indexOf("\n  async respondToInvitation(invitationId = '', decision = 'accept') {", groupResponseStart);
+const groupResponseStart = client.indexOf("  async respondToInvitationGroup(invitationIds = [], decision = 'accept', options = {}) {");
+const groupResponseEnd = client.indexOf("\n  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {", groupResponseStart);
 if (groupResponseStart < 0 || groupResponseEnd <= groupResponseStart) throw new Error('No se pudo aislar respondToInvitationGroup().');
 const groupResponse = client.slice(groupResponseStart, groupResponseEnd);
 for (const needle of [
@@ -141,7 +154,7 @@ for (const needle of [
   "dispatch('p2p:invitation-group-resume'",
   'await saveControlStateAtomically(committedControlState)',
   'await this.applyInvitationBootstrapEscrow(',
-  "await this.refreshBootstrap({ requestSnapshots: 'force' })"
+  "await this.refreshBootstrap({ requestSnapshots: 'force'"
 ]) {
   if (!groupResponse.includes(needle)) throw new Error(`La respuesta de panel perdió su commit agrupado: ${needle}`);
 }

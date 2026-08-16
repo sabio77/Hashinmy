@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(currentFile), '..');
 const source = fs.readFileSync(path.join(root, 'src', 'js', 'p2p-client.js'), 'utf8');
 
 const fenceStart = source.indexOf('  async fenceBootstrapResponses(sessionContext = this.captureSessionContext())');
-const fetchStart = source.indexOf('  async fetchBootstrap(requestSnapshots = false)', fenceStart);
+const fetchStart = source.indexOf('  async fetchBootstrap(requestSnapshots = false', fenceStart);
 const methodEnd = source.indexOf('\n  async start(user = {})', fetchStart);
 assert.ok(fenceStart >= 0 && fetchStart > fenceStart && methodEnd > fetchStart, 'No se encontraron las barreras de bootstrap para validar concurrencia.');
 const methodsSource = source.slice(fenceStart, methodEnd);

@@ -37,9 +37,9 @@
 
   var metadata = Object.freeze({
     appName: 'Semilla App Web',
-    version: '1.9.93',
-    build: '2026-08-12-153',
-    releasedAt: '2026-08-12T20:16:00-05:00',
+    version: '1.9.95',
+    build: '2026-08-16-155',
+    releasedAt: '2026-08-16T18:38:00-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
@@ -71,6 +71,7 @@
       './src/js/p2p-permissions.js',
       './src/js/p2p-space-creation-intent.js',
       './src/js/p2p-invitation-intent.js',
+      './src/js/p2p-invitation-audit.js',
       './src/js/project-domain.js',
       './src/js/device-management.js',
       './src/js/skeleton-screen.js',

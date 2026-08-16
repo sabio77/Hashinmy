@@ -15,21 +15,31 @@ function extract(startMarker, endMarker) {
 
 const freshness = extract(
   '  async waitForInvitationSourceRevision(',
-  "\n  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext()) {"
+  "\n  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext(), auditContext = {}) {"
 );
 const build = extract(
-  "  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext()) {",
+  "  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext(), auditContext = {}) {",
   '\n  async applyInvitationBootstrapEscrow('
 );
 const apply = extract(
-  "  async applyInvitationBootstrapEscrow(escrow = null, space = null, invitation = null, sessionContext = this.captureSessionContext()) {",
+  "  async applyInvitationBootstrapEscrow(escrow = null, space = null, invitation = null, sessionContext = this.captureSessionContext(), auditContext = {}) {",
   '\n  async createSpace('
 );
 const invite = extract("  async invite(email = '', options = {}) {", '\n  async respondToInvitation(');
 const recover = extract('  async recoverAcceptedInvitationBootstrap(', '\n  async createSpace(');
-const respond = extract("  async respondToInvitation(invitationId = '', decision = 'accept') {", '\n  async leave(');
+const respond = extract("  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {", '\n  async leave(');
 const bootstrap = extract('  async applyBootstrapData(data = {}, context = {}) {', '\n  async refreshBootstrap(');
 
+
+for (const needle of [
+  "auditSource: 'invitation-response'",
+  "invitationAuditLog('frontend.bootstrap.request'",
+  "invitationAuditLog('frontend.bootstrap.backend-response'",
+  "invitationAuditLog('frontend.bootstrap.applied'",
+  "...(auditTraceId ? { auditTraceId } : {})"
+]) {
+  if (!source.includes(needle)) throw new Error(`La auditoría de aceptación perdió la correlación del bootstrap: ${needle}`);
+}
 
 for (const needle of [
   "requestSnapshots: 'force'",
@@ -80,6 +90,10 @@ for (const needle of [
   "status || '').trim().toLowerCase() === 'accepted'",
   "apiPost('/api/p2p/invitations/respond'",
   'deviceId: sessionContext.deviceId',
+  'auditTraceId',
+  "invitationAuditLog('frontend.recovery.begin'",
+  "invitationAuditLog('frontend.recovery.backend-response'",
+  "invitationAuditLog('frontend.recovery.complete'",
   'await this.applyInvitationBootstrapEscrow(',
   'options.forceSnapshot !== true'
 ]) {
@@ -92,7 +106,7 @@ if (!respond.includes('deviceId: sessionContext.deviceId')) {
   throw new Error('La aceptación ya no identifica el dispositivo que debe recibir la clave reenvuelta.');
 }
 const applyIndex = respond.indexOf('await this.applyInvitationBootstrapEscrow(');
-const bootstrapIndex = respond.indexOf("await this.refreshBootstrap({ requestSnapshots: 'force' })");
+const bootstrapIndex = respond.indexOf("await this.refreshBootstrap({ requestSnapshots: 'force'");
 if (applyIndex < 0 || bootstrapIndex < 0 || applyIndex > bootstrapIndex) {
   throw new Error('La aceptación vuelve a depender del bootstrap remoto antes de reconstruir la copia inicial local.');
 }
@@ -106,7 +120,7 @@ if (recoveryIndex < 0 || ensureIndex < 0 || recoveryIndex > ensureIndex) {
 }
 
 const pendingRecoveryIndex = bootstrap.indexOf("const replicaRecoveryPending = space?.authorizationState === 'unconfirmed'");
-const forcedEscrowIndex = bootstrap.indexOf('{ forceSnapshot: true }', pendingRecoveryIndex);
+const forcedEscrowIndex = bootstrap.indexOf('forceSnapshot: true', pendingRecoveryIndex);
 const unconfirmedSkipIndex = bootstrap.indexOf("if (space?.authorizationState === 'unconfirmed' || !encrypted) continue;", pendingRecoveryIndex);
 if (pendingRecoveryIndex < 0 || forcedEscrowIndex < 0 || unconfirmedSkipIndex < 0 || forcedEscrowIndex > unconfirmedSkipIndex) {
   throw new Error('Un espacio aceptado en replica_recovery vuelve a saltarse el escrow antes de depender de otra réplica.');
@@ -118,5 +132,35 @@ for (const needle of [
 ]) {
   if (!bootstrap.includes(needle)) throw new Error(`La recuperación tras una aceptación interrumpida perdió: ${needle}`);
 }
+for (const needle of [
+  "invitationAuditLog('frontend.escrow.built'",
+  "invitationAuditLog('frontend.escrow.decrypted'",
+  "invitationAuditLog('frontend.escrow.persisted'",
+  "invitationAuditLog('frontend.escrow.persistence-mismatch'",
+  "invitationAuditLog('frontend.escrow.apply.complete'"
+]) {
+  if (!build.concat(apply).includes(needle)) throw new Error(`La auditoría de escrow perdió la etapa: ${needle}`);
+}
+for (const needle of [
+  'auditTraceId,',
+  "invitationAuditLog('frontend.invite.begin'",
+  "invitationAuditLog('frontend.invite.backend-response'",
+  "invitationAuditLog('frontend.response.begin'",
+  "invitationAuditLog('frontend.response.backend-response'",
+  "invitationAuditLog('frontend.response.local-state'",
+  "invitationAuditLog('frontend.response.complete'"
+]) {
+  if (!invite.concat(respond).includes(needle)) throw new Error(`La trazabilidad end-to-end de invitaciones perdió: ${needle}`);
+}
+if (!respond.includes('auditTraceId')) {
+  throw new Error('La respuesta de invitación ya no envía auditTraceId al backend.');
+}
 
-console.log('OK: crear/aceptar invitaciones usa escrow cifrado y recupera también una aceptación interrumpida, incluso si la clave ya fue importada, antes de depender de otra réplica.');
+if (!source.includes("invitationAuditLog('frontend.panel-response.local-state'")) {
+  throw new Error('La aceptación agrupada perdió la auditoría del estado local final por proyecto.');
+}
+if (!apply.includes('invitationAuditEntityComparison(decryptedEntities, persistedEntities)')) {
+  throw new Error('La aceptación dejó de comparar la semilla descifrada contra lo realmente persistido en IndexedDB.');
+}
+
+console.log('OK: crear/aceptar invitaciones usa escrow cifrado, conserva trazabilidad estructurada y recupera también una aceptación interrumpida antes de depender de otra réplica.');
