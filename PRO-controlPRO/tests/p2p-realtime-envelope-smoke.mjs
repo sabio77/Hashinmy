@@ -179,6 +179,16 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.key.envelope',
     keyEpoch: 1
   }
 })).eventType, 'p2p.key.envelope');
+assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.replica.topology.changed', {
+  actorUserId: 'user_requester_1',
+  sourceDeviceId: 'device_requester_0001',
+  data: {
+    spaceId: 'space_control_1',
+    change: 'registered',
+    affectedUserId: 'user_requester_1',
+    affectedDeviceId: 'device_requester_0001'
+  }
+})).eventType, 'p2p.replica.topology.changed');
 assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.request', {
   actorUserId: 'user_requester_1',
   sourceDeviceId: 'device_requester_0001',
@@ -205,6 +215,21 @@ assert.equal(module.assertRealtimeEventEnvelope(controlEvent('p2p.snapshot.reque
   }
 })).eventType, 'p2p.snapshot.request');
 
+assert.throws(
+  () => module.assertRealtimeEventEnvelope(controlEvent('p2p.replica.topology.changed', {
+    actorUserId: 'user_requester_1',
+    sourceDeviceId: 'device_requester_0001',
+    data: {
+      spaceId: 'space_control_1',
+      change: 'registered',
+      affectedUserId: 'user_requester_1',
+      affectedDeviceId: 'device_other_000001'
+    }
+  })),
+  (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'
+    && error.reason === 'replica-topology-changed',
+  'Un alta de réplica atribuida a otro dispositivo siguió avanzando el cursor realtime.'
+);
 assert.throws(
   () => module.assertRealtimeEventEnvelope(controlEvent('p2p.membership.revoked')),
   (error) => error?.code === 'P2P_CANONICAL_CONTROL_INVALID_ENVELOPE'

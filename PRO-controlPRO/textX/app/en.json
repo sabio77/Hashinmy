@@ -120,8 +120,9 @@
     "single": "Single copy only",
     "unavailable": "No confirmed copy",
     "unknown": "Coverage pending confirmation",
-    "summary": "{confirmed}/{registered} copies up to date",
-    "detail": "{label}. {summary}. Data remains stored only on authorized devices."
+    "summary": "{present}/{registered} copies",
+    "detail": "{label}. {summary}. {freshness}. Data remains stored only on authorized devices.",
+    "freshness": "{confirmed}/{registered} up to date"
   },
   "storage": {
     "protect": "Protect data",

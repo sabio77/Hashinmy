@@ -120,8 +120,9 @@
     "single": "نسخة واحدة فقط",
     "unavailable": "لا توجد نسخة مؤكدة",
     "unknown": "التغطية بانتظار التأكيد",
-    "summary": "{confirmed}/{registered} نسخ محدثة",
-    "detail": "{label}. {summary}. تظل البيانات مخزنة فقط على الأجهزة المصرح بها."
+    "summary": "{present}/{registered} نسخ",
+    "detail": "{label}. {summary}. {freshness}. تظل البيانات مخزنة فقط على الأجهزة المصرح بها.",
+    "freshness": "{confirmed}/{registered} محدثة"
   },
   "storage": {
     "protect": "حماية البيانات",

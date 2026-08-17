@@ -410,10 +410,14 @@ function normalizeReplicaHealthMap(input = {}) {
       availableReplicas: nonnegativeInteger(rawHealth.availableReplicas),
       availableAccounts: nonnegativeInteger(rawHealth.availableAccounts),
       pendingAvailableReplicas: nonnegativeInteger(rawHealth.pendingAvailableReplicas),
+      presentReplicas: nonnegativeInteger(rawHealth.presentReplicas),
+      presentAccounts: nonnegativeInteger(rawHealth.presentAccounts),
+      missingReplicas: nonnegativeInteger(rawHealth.missingReplicas),
       onlineReplicas: nonnegativeInteger(rawHealth.onlineReplicas),
       currentDeviceRegistered: rawHealth.currentDeviceRegistered === true,
       currentDeviceConfirmed: typeof rawHealth.currentDeviceConfirmed === 'boolean' ? rawHealth.currentDeviceConfirmed : null,
       currentDeviceAvailable: typeof rawHealth.currentDeviceAvailable === 'boolean' ? rawHealth.currentDeviceAvailable : null,
+      currentDevicePresent: typeof rawHealth.currentDevicePresent === 'boolean' ? rawHealth.currentDevicePresent : null,
       currentDeviceOnline: rawHealth.currentDeviceOnline === true,
       displayState: ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(String(rawHealth.displayState || ''))
         ? String(rawHealth.displayState)
@@ -527,6 +531,7 @@ const CANONICAL_CONTROL_EVENT_TYPES = new Set([
   'p2p.key.request',
   'p2p.key.envelope',
   'p2p.snapshot.request',
+  'p2p.replica.topology.changed',
   'p2p.space.deleted',
   'p2p.membership.revoked',
   'p2p.membership.changed',
@@ -641,6 +646,21 @@ export function assertCanonicalControlEnvelope(event = {}) {
       || !isRecord(envelope.senderPublicKey)
       || !isSafeRevision(data.keyEpoch, { positive: true })
     ) invalid('key-envelope');
+    return event;
+  }
+
+  if (eventType === 'p2p.replica.topology.changed') {
+    const affectedUserId = String(data.affectedUserId || '').trim();
+    const affectedDeviceId = String(data.affectedDeviceId || '').trim();
+    const change = String(data.change || '').trim().toLowerCase();
+    if (
+      !sourceDeviceId
+      || String(data.spaceId || '').trim() !== spaceId
+      || affectedUserId !== actorUserId
+      || !affectedDeviceId
+      || !['registered', 'retired', 'removed'].includes(change)
+      || (change === 'registered' && affectedDeviceId !== sourceDeviceId)
+    ) invalid('replica-topology-changed');
     return event;
   }
 
@@ -5706,14 +5726,16 @@ export class SemillaP2PClient {
       .filter(Boolean)))
       .slice(0, 100);
     const targetSpaceIds = cleanSpaceIds.length ? cleanSpaceIds : this.readableSpaceIds();
-    const [localStateRevisions, localDeliverySequence] = await Promise.all([
+    const [localStateRevisions, localDeliverySequence, localSpaces] = await Promise.all([
       listStateRevisions(targetSpaceIds),
-      getMeta(`${CURSOR_META_PREFIX}${sessionContext.deviceId}`, 0)
+      getMeta(`${CURSOR_META_PREFIX}${sessionContext.deviceId}`, 0),
+      listSpaces()
     ]);
     this.assertSessionContext(sessionContext);
     const data = await apiPost('/api/p2p/replicas/health', {
       deviceId: sessionContext.deviceId,
       spaceIds: cleanSpaceIds,
+      replicaSpaceIds: localSpaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
       stateRevisions: localStateRevisions,
       deliverySequence: Math.max(0, Number(localDeliverySequence || 0))
     });
@@ -5941,6 +5963,7 @@ export class SemillaP2PClient {
       requestSnapshots,
       snapshotSpaceIds,
       knownSpaceIds,
+      replicaSpaceIds: localSpaceIds,
       stateRevisions,
       deliverySequence: Math.max(0, Number(localDeliverySequence || 0)),
       lifecycleReceipts,
@@ -7026,10 +7049,14 @@ export class SemillaP2PClient {
       await this.handleKeyRequestEvent(event, sessionContext);
     } else if (event.eventType === 'p2p.key.envelope') {
       await this.handleKeyEnvelopeEvent(event, sessionContext);
+    } else if (event.eventType === 'p2p.replica.topology.changed') {
+      if (event.spaceId) this.scheduleReplicaHealthRefresh([event.spaceId], { delayMs: 350 });
+      dispatch('p2p:replica-topology', { event });
     } else if (event.eventType === 'p2p.snapshot.request') {
       try {
         const sent = await this.sendSnapshot(event);
         this.assertSessionContext(sessionContext);
+        if (sent && event.spaceId) this.scheduleReplicaHealthRefresh([event.spaceId], { delayMs: 750 });
         dispatch('p2p:snapshot-source', { event, sent });
       } catch (error) {
         if (this.isSessionContextChangedError(error)) throw error;

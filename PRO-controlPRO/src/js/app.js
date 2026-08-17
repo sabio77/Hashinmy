@@ -161,12 +161,17 @@ function replicaHealthPresentation(spaceId = '') {
   const health = replicaHealthForSpace(spaceId);
   const preferredState = String(health.displayState || health.state || '');
   const stateName = ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(preferredState) ? preferredState : 'unknown';
-  // La card muestra copias realmente disponibles en instalaciones activas, mientras
-  // `confirmedReplicas` permanece separado como evidencia durable ACK/convergida.
-  // Así una instalación que ya está mostrando el proyecto nunca cae a un falso 0/N
-  // solo porque su prueba temporal de ACK esté siendo reconciliada.
+  // La card cuenta existencia de copias por separado de su frescura. Una copia puede
+  // estar presente y todavía reconciliando una revisión/ACK; en ese caso debe seguir
+  // contando como copia física sin presentarse falsamente como "al día".
   const confirmed = Math.max(0, Number(health.availableReplicas ?? health.confirmedReplicas ?? 0));
-  const registered = Math.max(0, Number(health.registeredReplicas || 0));
+  const currentVisibleCopy = health.currentDeviceRegistered === true && health.currentDeviceOnline === true ? 1 : 0;
+  const present = Math.max(
+    confirmed,
+    currentVisibleCopy,
+    Math.max(0, Number(health.presentReplicas ?? 0))
+  );
+  const registered = Math.max(present, Math.max(0, Number(health.registeredReplicas || 0)));
   const labels = {
     healthy: t('replicas.healthy', 'Réplicas al día'),
     degraded: t('replicas.degraded', 'Réplicas pendientes'),
@@ -174,13 +179,17 @@ function replicaHealthPresentation(spaceId = '') {
     unavailable: t('replicas.unavailable', 'Sin copia confirmada'),
     unknown: t('replicas.unknown', 'Cobertura por confirmar')
   };
-  const summary = t('replicas.summary', '{confirmed}/{registered} copias al día')
+  const summary = t('replicas.summary', '{present}/{registered} copias')
+    .replace('{present}', String(present))
+    .replace('{registered}', String(registered));
+  const freshness = t('replicas.freshness', '{confirmed}/{registered} al día')
     .replace('{confirmed}', String(confirmed))
     .replace('{registered}', String(registered));
-  const detail = t('replicas.detail', '{label}. {summary}. Los datos siguen almacenados únicamente en los dispositivos autorizados.')
+  const detail = t('replicas.detail', '{label}. {summary}. {freshness}. Los datos siguen almacenados únicamente en los dispositivos autorizados.')
     .replace('{label}', labels[stateName])
-    .replace('{summary}', summary);
-  return { health, state: stateName, label: labels[stateName], summary, detail };
+    .replace('{summary}', summary)
+    .replace('{freshness}', freshness);
+  return { health, state: stateName, label: labels[stateName], summary, freshness, detail };
 }
 function replicaHealthBadge(spaceId = '', compact = false) {
   const presentation = replicaHealthPresentation(spaceId);

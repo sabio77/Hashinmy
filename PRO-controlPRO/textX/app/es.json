@@ -120,8 +120,9 @@
     "single": "Una sola copia",
     "unavailable": "Sin copia confirmada",
     "unknown": "Cobertura por confirmar",
-    "summary": "{confirmed}/{registered} copias al día",
-    "detail": "{label}. {summary}. Los datos siguen almacenados únicamente en los dispositivos autorizados."
+    "summary": "{present}/{registered} copias",
+    "detail": "{label}. {summary}. {freshness}. Los datos siguen almacenados únicamente en los dispositivos autorizados.",
+    "freshness": "{confirmed}/{registered} al día"
   },
   "storage": {
     "protect": "Proteger datos",
