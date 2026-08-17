@@ -877,11 +877,6 @@ function panelOwnerIdsWithAccess() {
     const ownerUserId = panelOwnerUserId(data.space);
     if (ownerUserId) ownerIds.add(ownerUserId);
   }
-  for (const invitation of state.p2pState.invitations?.received || []) {
-    if (String(invitation?.status || '').trim().toLowerCase() !== 'accepted') continue;
-    const ownerUserId = String(invitation?.inviterUserId || '').trim();
-    if (ownerUserId) ownerIds.add(ownerUserId);
-  }
   return [...ownerIds];
 }
 

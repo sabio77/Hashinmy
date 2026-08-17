@@ -35,6 +35,17 @@ const panelCard = app.slice(panelCardStart, panelCardEnd);
 if (panelCard.includes('createProjectCard(')) throw new Error('La card de panel volvió a incrustar cards de proyectos en la lista principal.');
 if (!panelCard.includes('panelAvatarNode(ownerUserId, projects)')) throw new Error('La card de panel dejó de incluir la identidad visual del propietario.');
 
+const ownerAccessStart = app.indexOf('function panelOwnerIdsWithAccess() {');
+const ownerAccessEnd = app.indexOf('\nfunction panelDirectoryRequired()', ownerAccessStart);
+if (ownerAccessStart < 0 || ownerAccessEnd <= ownerAccessStart) throw new Error('No se pudo aislar panelOwnerIdsWithAccess().');
+const ownerAccess = app.slice(ownerAccessStart, ownerAccessEnd);
+if (ownerAccess.includes('state.p2pState.invitations')) {
+  throw new Error('El directorio volvió a considerar invitaciones históricas aceptadas como acceso vigente y puede dejar paneles fantasma tras abandonar o revocar.');
+}
+for (const source of ['state.p2pState.spaces', 'state.projects.values()']) {
+  if (!ownerAccess.includes(source)) throw new Error(`El acceso vigente a paneles dejó de derivarse de ${source}.`);
+}
+
 for (const id of [
   'dashboard-heading-eyebrow',
   'dashboard-heading-title',
@@ -62,4 +73,4 @@ for (const key of ['directoryEyebrow', 'directoryTitle', 'directoryDescription',
   if (!es.includes(`"${key}"`)) throw new Error(`Falta texto de producción para la navegación de paneles: ${key}`);
 }
 
-console.log('OK: directorio oscuro de paneles separado de proyectos, acceso directo al panel propio y avatar del propietario permanecen conectados.');
+console.log('OK: directorio oscuro de paneles separado de proyectos, acceso directo al panel propio, avatar del propietario y limpieza de paneles sin acceso permanecen conectados.');
