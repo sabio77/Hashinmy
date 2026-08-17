@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="Control administrativo local-first para proyectos compartidos entre dispositivos mediante sincronización P2P." />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="color-scheme" content="light dark" />
+  <meta name="color-scheme" content="light" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Control P2P" />
@@ -57,6 +57,20 @@
           <button id="logout-button" class="button button-ghost button-compact" type="button" data-i18n="auth.logoutButton">Salir</button>
         </div>
       </header>
+
+      <aside id="pwa-install-banner" class="pwa-install-banner hidden" role="status" aria-live="polite">
+        <div class="pwa-install-copy">
+          <span class="pwa-install-icon" aria-hidden="true">◇</span>
+          <div>
+            <strong data-i18n="pwa.installTitle">Instala esta app</strong>
+            <p data-i18n="pwa.installDescription">Accede más rápido y úsala como una aplicación en este dispositivo.</p>
+          </div>
+        </div>
+        <div class="pwa-install-actions">
+          <button id="pwa-install-button" class="button button-primary button-compact" type="button" data-i18n="pwa.installButton">Instalar</button>
+          <button id="pwa-install-later-button" class="button button-ghost button-compact" type="button" data-i18n="pwa.installLater">Después</button>
+        </div>
+      </aside>
 
       <aside id="storage-durability-banner" class="storage-durability-banner hidden" data-state="warning" role="status" aria-live="polite">
         <span class="storage-durability-icon" aria-hidden="true">◆</span>

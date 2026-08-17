@@ -110,6 +110,30 @@ POLLING_FORBIDDEN_PATTERNS = [
     r"\bupdateCheckIntervalMs\s*:\s*(?!0\b)\d+",
 ]
 
+def assert_install_experience() -> None:
+    index = (ROOT / "index.html").read_text(encoding="utf-8")
+    manager = (ROOT / "src/js/pwa-update-manager.js").read_text(encoding="utf-8")
+    styles = (ROOT / "src/css/app.css").read_text(encoding="utf-8")
+
+    required_index_tokens = ["pwa-install-banner", "pwa-install-button", "pwa-install-later-button"]
+    for token in required_index_tokens:
+        if token not in index:
+            fail(f"Falta la experiencia visible de instalación PWA: {token}.")
+
+    required_manager_tokens = ["beforeinstallprompt", "appinstalled", "requestInstall", "event.preventDefault()"]
+    for token in required_manager_tokens:
+        if token not in manager:
+            fail(f"Falta el flujo instalable equivalente a la referencia: {token}.")
+
+    if ".pwa-install-banner" not in styles:
+        fail("Faltan estilos de producción para el banner de instalación PWA.")
+
+    for code in ["es", "en", "ar"]:
+        payload = read_json(f"textX/app/{code}.json")
+        for key in ["installTitle", "installDescription", "installButton", "installLater", "installAccepted", "installFallback"]:
+            if not str(payload.get("pwa", {}).get(key, "")).strip():
+                fail(f"textX/app/{code}.json no contiene el texto funcional pwa.{key}.")
+
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
@@ -1291,6 +1315,7 @@ def main() -> None:
             fail(f"Falta archivo obligatorio: {relative}")
 
     assert_subfolder_entrypoint_normalization()
+    assert_install_experience()
     assert_javascript_syntax()
     assert_replication_contract()
     assert_replica_batch_atomicity()

@@ -24,7 +24,13 @@
     "alreadyUpdated": "La app ya está actualizada.",
     "cacheCleared": "Caché local limpiada. Se aplicará la próxima carga limpia.",
     "unsupported": "Este navegador no soporta instalación PWA completa.",
-    "swRegisterError": "No se pudo activar instalación/offline."
+    "swRegisterError": "No se pudo activar instalación/offline.",
+    "installTitle": "Instala esta app",
+    "installDescription": "Accede más rápido y úsala como una aplicación en este dispositivo.",
+    "installButton": "Instalar",
+    "installLater": "Después",
+    "installAccepted": "Instalación iniciada.",
+    "installFallback": "Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”."
   },
   "auth": {
     "eyebrow": "Acceso seguro",

@@ -40,7 +40,8 @@
     lastPrefetchedReleaseAssets: storagePrefix + ':last-prefetched-release-assets-key',
     lastReloadAt: storagePrefix + ':last-reload-at',
     lastReloadKey: storagePrefix + ':last-reload-key',
-    leaderLock: storagePrefix + ':update-leader-lock'
+    leaderLock: storagePrefix + ':update-leader-lock',
+    installDismissed: storagePrefix + ':install-dismissed'
   };
 
   var channel = createBroadcastChannel();
@@ -51,7 +52,9 @@
     reloadArmed: false,
     started: false,
     lastServerPayload: null,
-    ownsLeaderLock: false
+    ownsLeaderLock: false,
+    installPrompt: null,
+    installExperienceBound: false
   };
 
   function translate(key, fallback) {
@@ -565,11 +568,106 @@
     showStatus(translate('pwa.cacheCleared', 'Caché local limpiada. Se aplicará la próxima carga limpia.'), 'ok');
   }
 
+  function isInstalledDisplayMode() {
+    var standalone = false;
+    try {
+      standalone = Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    } catch (error) {}
+    return standalone || Boolean(window.navigator && window.navigator.standalone === true);
+  }
+
+  function installWasDismissed() {
+    try {
+      return localStorage.getItem(storageKeys.installDismissed) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function dismissInstallExperience() {
+    try {
+      localStorage.setItem(storageKeys.installDismissed, '1');
+    } catch (error) {}
+    refreshInstallExperience();
+  }
+
+  function refreshInstallExperience() {
+    var banner = document.getElementById('pwa-install-banner');
+    if (!banner) return;
+    var shouldShow = Boolean(state.installPrompt) && !isInstalledDisplayMode() && !installWasDismissed();
+    banner.classList.toggle('hidden', !shouldShow);
+  }
+
+  async function requestInstall() {
+    var promptEvent = state.installPrompt;
+    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
+      showStatus(translate('pwa.installFallback', 'Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.'), 'ok');
+      refreshInstallExperience();
+      return false;
+    }
+
+    state.installPrompt = null;
+    refreshInstallExperience();
+
+    try {
+      await promptEvent.prompt();
+      var choice = promptEvent.userChoice ? await promptEvent.userChoice.catch(function ignoreInstallChoiceError() { return null; }) : null;
+      if (choice && choice.outcome === 'accepted') {
+        showStatus(translate('pwa.installAccepted', 'Instalación iniciada.'), 'ok');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      showStatus(translate('pwa.installFallback', 'Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.'), 'ok');
+      return false;
+    }
+  }
+
+  function bindInstallExperience() {
+    if (state.installExperienceBound) return;
+    state.installExperienceBound = true;
+
+    var installButton = document.getElementById('pwa-install-button');
+    var laterButton = document.getElementById('pwa-install-later-button');
+
+    if (installButton) {
+      installButton.addEventListener('click', function installFromBanner() {
+        requestInstall();
+      });
+    }
+    if (laterButton) laterButton.addEventListener('click', dismissInstallExperience);
+
+    window.addEventListener('beforeinstallprompt', function captureInstallPrompt(event) {
+      if (isInstalledDisplayMode()) return;
+      event.preventDefault();
+      state.installPrompt = event;
+      refreshInstallExperience();
+    });
+
+    window.addEventListener('appinstalled', function confirmInstalledApp() {
+      state.installPrompt = null;
+      try { localStorage.removeItem(storageKeys.installDismissed); } catch (error) {}
+      refreshInstallExperience();
+    });
+
+    try {
+      var displayModeQuery = window.matchMedia && window.matchMedia('(display-mode: standalone)');
+      if (displayModeQuery && typeof displayModeQuery.addEventListener === 'function') {
+        displayModeQuery.addEventListener('change', refreshInstallExperience);
+      } else if (displayModeQuery && typeof displayModeQuery.addListener === 'function') {
+        displayModeQuery.addListener(refreshInstallExperience);
+      }
+    } catch (error) {}
+
+    refreshInstallExperience();
+  }
+
   async function start() {
     if (state.started) return;
     state.started = true;
 
     bindLifecycleChecks();
+    bindInstallExperience();
 
     if (!('serviceWorker' in navigator)) {
       showStatus(translate('pwa.unsupported', 'Este navegador no soporta instalación PWA completa.'), 'error');
@@ -614,6 +712,7 @@
       return checkNow('manual', { force: true });
     },
     clearCaches: clearCaches,
+    requestInstall: requestInstall,
     releaseLeaderLock: releaseLeaderLock,
     get registration() {
       return state.registration;

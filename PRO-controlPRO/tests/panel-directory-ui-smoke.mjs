@@ -69,8 +69,21 @@ for (const needle of [
   if (!css.includes(needle)) throw new Error(`Falta el tratamiento visual diferenciado de paneles: ${needle}`);
 }
 
+if (!/<meta\s+name=["']color-scheme["']\s+content=["']light["']\s*\/>/i.test(html)) {
+  throw new Error('La app debe declarar una base clara estable para que el tema del sistema no oscurezca las vistas fuera de Paneles.');
+}
+if (!/:root\s*\{[\s\S]*?color-scheme:\s*light\s*;/.test(css)) {
+  throw new Error('La hoja principal debe fijar color-scheme: light en la raíz.');
+}
+if (/@media\s*\(prefers-color-scheme:\s*dark\)/.test(css)) {
+  throw new Error('El modo oscuro del sistema volvió a afectar globalmente la app; el oscuro debe permanecer aislado al directorio de paneles.');
+}
+if (!/#dashboard-view\[data-dashboard-mode=["']panel-directory["']\]\s*\{[^}]*color-scheme:\s*dark\s*;/.test(css)) {
+  throw new Error('El directorio de paneles debe conservar su esquema oscuro local aunque el resto de la app sea claro.');
+}
+
 for (const key of ['directoryEyebrow', 'directoryTitle', 'directoryDescription', 'backToPanels', 'syncingCount']) {
   if (!es.includes(`"${key}"`)) throw new Error(`Falta texto de producción para la navegación de paneles: ${key}`);
 }
 
-console.log('OK: directorio oscuro de paneles separado de proyectos, acceso directo al panel propio, avatar del propietario y limpieza de paneles sin acceso permanecen conectados.');
+console.log('OK: directorio oscuro de paneles aislado sobre una base clara estable, navegación, avatar del propietario y limpieza de accesos permanecen conectados.');

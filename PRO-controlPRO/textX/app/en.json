@@ -24,7 +24,13 @@
     "alreadyUpdated": "The app is already up to date.",
     "cacheCleared": "Local cache cleared. The next load will be clean.",
     "unsupported": "This browser does not support full PWA installation.",
-    "swRegisterError": "Installation/offline mode could not be enabled."
+    "swRegisterError": "Installation/offline mode could not be enabled.",
+    "installTitle": "Install this app",
+    "installDescription": "Open it faster and use it like an app on this device.",
+    "installButton": "Install",
+    "installLater": "Later",
+    "installAccepted": "Installation started.",
+    "installFallback": "Use your browser menu and choose “Install app” or “Add to Home Screen”."
   },
   "auth": {
     "eyebrow": "Secure access",
