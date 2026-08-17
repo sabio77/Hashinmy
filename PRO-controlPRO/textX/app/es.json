@@ -427,6 +427,17 @@
     "completeProject": "Proyecto completo",
     "empty": "La papelera está vacía."
   },
+  "lifecycle": {
+    "recoveryContext": "Envío a papelera pendiente de completar",
+    "retryAction": "Reintentar",
+    "cancelling": "Cancelando el envío a papelera…",
+    "retrying": "Revisando réplicas y reintentando…",
+    "cancelPending": "El proyecto volvió al panel en este dispositivo. La restauración seguirá propagándose hasta deshacer la papelera en las demás copias.",
+    "cancelCompleted": "El envío a papelera fue cancelado y el proyecto quedó restaurado en las copias sincronizadas.",
+    "retryPending": "Se conservaron las réplicas que ya confirmaron la papelera y se reintentaron únicamente las pendientes. El dispositivo iniciador se actualizará al final.",
+    "retryCompleted": "El reintento confirmó las réplicas pendientes y completó el envío a papelera en este dispositivo.",
+    "recoveryError": "No se pudo recuperar la acción de papelera."
+  },
   "panel": {
     "ownName": "Mi panel",
     "sharedName": "Panel de {owner}",

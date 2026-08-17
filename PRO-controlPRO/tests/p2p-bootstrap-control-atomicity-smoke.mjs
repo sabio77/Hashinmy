@@ -42,6 +42,7 @@ function normalizeInvitationCollection(value = {}) {
 function normalizeReplicaHealthMap(value = {}) { return value; }
 async function getMeta() { return 0; }
 async function setMeta() { return true; }
+async function listOutbox() { return []; }
 async function replaceBootstrapControlState(spaces, invitations) {
   if (replaceFailure) throw replaceFailure;
   return { spaces: spaces.map((space) => ({ ...space, durable: true })), removedSpaceIds: [], preservedSpaceIds: [], invitations };
@@ -62,6 +63,7 @@ class TestClient {
   captureSessionContext() { return { deviceId: 'device_atomic_1' }; }
   assertSessionContext() { return true; }
   async ensureCurrentSpaceKey() { return true; }
+  async lifecycleCancellations() { return []; }
   async syncRecoveryRequirements() { if (recoveryFailure) throw recoveryFailure; }
   snapshotRecoveryDelay() { return 0; }
   scheduleSnapshotRecovery() {}

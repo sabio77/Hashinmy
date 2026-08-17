@@ -130,6 +130,9 @@ const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 128;
 const LIFECYCLE_RECEIPT_META_KEY = 'p2pLifecycleReceipts';
 const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const LIFECYCLE_RECEIPT_MAX = 256;
+const LIFECYCLE_CANCELLATION_META_KEY = 'p2pLifecycleCancellations';
+const LIFECYCLE_CANCELLATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LIFECYCLE_CANCELLATION_MAX = 256;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
 const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
 const LIFECYCLE_FINALIZATION_MAX_ATTEMPTS = 3;
@@ -141,13 +144,36 @@ export function normalizeLifecycleTransactionProgress(transaction = {}) {
   const normalized = transaction && typeof transaction === 'object' && !Array.isArray(transaction)
     ? { ...transaction }
     : {};
-  const status = String(normalized.status || '').trim();
+  const action = String(normalized.action || '').trim();
+  let status = String(normalized.status || '').trim();
   const hasRemaining = normalized.remaining !== undefined && normalized.remaining !== null;
   const hasTotal = normalized.total !== undefined && normalized.total !== null;
   const hasCompleted = normalized.completed !== undefined && normalized.completed !== null;
+  const hasConfirmed = normalized.confirmed !== undefined && normalized.confirmed !== null;
+  const released = Math.max(0, Number(normalized.released || 0));
   const total = Math.max(0, Number(normalized.total || 0));
-  const completed = Math.max(0, Number(normalized.completed || 0));
-  const remaining = Math.max(0, Number(normalized.remaining || 0));
+  let completed = Math.max(0, Number(normalized.completed || 0));
+  let remaining = Math.max(0, Number(normalized.remaining || 0));
+  const confirmed = Math.max(0, Number(normalized.confirmed || 0));
+  if (
+    action === 'trash'
+    && released > 0
+    && hasTotal
+    && total > 0
+    && (hasConfirmed || hasCompleted)
+  ) {
+    completed = Math.min(total, hasConfirmed ? confirmed : Math.max(0, completed - released));
+    remaining = Math.max(0, total - completed);
+    normalized.completed = completed;
+    normalized.confirmed = completed;
+    normalized.released = 0;
+    normalized.remaining = remaining;
+    normalized.retryExhausted = true;
+    if (!['completed', 'cancelled'].includes(status) && remaining > 0) {
+      status = 'waiting';
+      normalized.status = 'waiting';
+    }
+  }
   if (hasTotal) normalized.total = total;
   if (hasCompleted) normalized.completed = completed;
   if (hasRemaining) normalized.remaining = remaining;
@@ -1680,6 +1706,7 @@ export class SemillaP2PClient {
     this.lifecycleFinalizationObserverPromise = null;
     this.lifecycleFinalizationObserverAttempt = 0;
     this.lifecycleFinalizationFailures = new Map();
+    this.lifecycleCancellationInFlight = new Set();
     this.deviceSigningPublicKey = null;
   }
 
@@ -2432,15 +2459,33 @@ export class SemillaP2PClient {
 
     const transactionId = String(outboxItem.localLifecycle?.transactionId || `local_lifecycle_${operationId}`).trim();
     const previousCompleted = Array.isArray(outboxItem.localLifecycle?.completedDeviceIds) ? outboxItem.localLifecycle.completedDeviceIds : [];
-    const candidates = this.eligibleLocalLifecyclePeers(spaceId);
-    if (!candidates.length) return { delivered: 0, transaction: null };
+    const completedDeviceIds = new Set(previousCompleted.map((deviceId) => String(deviceId || '').trim()).filter(Boolean));
+    const previousTargets = Array.isArray(outboxItem.localLifecycle?.targets) ? outboxItem.localLifecycle.targets : [];
+    const connectedPeers = this.eligibleLocalLifecyclePeers(spaceId);
+    const connectedByDeviceId = new Map(connectedPeers.map((target) => [String(target.deviceId || '').trim(), target]));
+    const targetMap = new Map();
+    for (const previous of previousTargets) {
+      const deviceId = String(previous?.deviceId || '').trim();
+      const userId = String(previous?.userId || '').trim();
+      if (!deviceId || !userId) continue;
+      targetMap.set(deviceId, { ...previous, ...(connectedByDeviceId.get(deviceId) || {}), userId, deviceId });
+    }
+    for (const target of connectedPeers) {
+      const deviceId = String(target?.deviceId || '').trim();
+      if (deviceId && !targetMap.has(deviceId)) targetMap.set(deviceId, target);
+    }
+    const candidates = [...targetMap.values()].filter((target) => (
+      !completedDeviceIds.has(String(target.deviceId || '').trim())
+      && String(target.sessionId || '').trim()
+    ));
+    if (!candidates.length && !targetMap.size) return { delivered: 0, transaction: null };
     let entry = {
       transactionId,
       action,
       spaceId,
       operationId,
-      targets: candidates,
-      completedDeviceIds: previousCompleted,
+      targets: [...targetMap.values()],
+      completedDeviceIds: [...completedDeviceIds],
       outboxItem
     };
     await this.persistLocalLifecycleEntry(entry, outboxItem);
@@ -2463,16 +2508,22 @@ export class SemillaP2PClient {
       if (Number(result?.delivered || 0) > 0) deliveredTargets.push(target);
     }
     this.assertSessionContext(sessionContext);
-    if (!deliveredTargets.length) {
-      this.pendingLocalLifecycleTransactions.delete(transactionId);
-      this.rememberLifecycleTransaction({ transactionId, status: 'completed' }, { remove: true });
-      return { delivered: 0, transaction: null };
-    }
     const activeEntry = this.pendingLocalLifecycleTransactions.get(transactionId);
     if (!activeEntry) return { delivered: deliveredTargets.length, transaction: null, completed: true };
-    entry = { ...activeEntry, targets: deliveredTargets, completedDeviceIds: activeEntry.completedDeviceIds || [] };
+    const deliveredIds = new Set(deliveredTargets.map((target) => String(target.deviceId || '').trim()));
+    const retainedTargets = (activeEntry.targets || []).filter((target) => {
+      const deviceId = String(target?.deviceId || '').trim();
+      const wasPreviouslyTracked = previousTargets.some((previous) => String(previous?.deviceId || '').trim() === deviceId);
+      return completedDeviceIds.has(deviceId) || wasPreviouslyTracked || deliveredIds.has(deviceId);
+    });
+    entry = { ...activeEntry, targets: retainedTargets, completedDeviceIds: activeEntry.completedDeviceIds || [] };
     await this.persistLocalLifecycleEntry(entry, outboxItem);
-    return { delivered: deliveredTargets.length, transaction: this.localLifecyclePublicState(entry) };
+    const transaction = this.localLifecyclePublicState(entry);
+    if (transaction.total > 0 && transaction.remaining === 0) {
+      const completed = await this.finalizeLocalProjectLifecycle(entry, sessionContext);
+      return { delivered: deliveredTargets.length, transaction: completed, completed: true };
+    }
+    return { delivered: deliveredTargets.length, transaction };
   }
 
   async localLifecycleEntry(transactionId = '') {
@@ -3969,6 +4020,64 @@ export class SemillaP2PClient {
     return detail;
   }
 
+  normalizeLifecycleCancellations(records = [], nowMs = Date.now()) {
+    return (Array.isArray(records) ? records : [])
+      .map((record) => ({
+        transactionId: String(record?.transactionId || '').trim().slice(0, 180),
+        spaceId: String(record?.spaceId || '').trim().slice(0, 140),
+        compensationOperationId: String(record?.compensationOperationId || '').trim().slice(0, 180),
+        cancelledAt: String(record?.cancelledAt || '').trim().slice(0, 80),
+        expiresAtMs: Math.max(0, Number(record?.expiresAtMs || 0))
+      }))
+      .filter((record) => record.transactionId && record.spaceId && record.cancelledAt && record.expiresAtMs > nowMs)
+      .slice(0, LIFECYCLE_CANCELLATION_MAX);
+  }
+
+  async lifecycleCancellations() {
+    const stored = await getMeta(LIFECYCLE_CANCELLATION_META_KEY, []);
+    const normalized = this.normalizeLifecycleCancellations(stored);
+    if (!Array.isArray(stored) || normalized.length !== stored.length) {
+      await setMeta(LIFECYCLE_CANCELLATION_META_KEY, normalized);
+    }
+    return normalized;
+  }
+
+  async rememberLifecycleCancellation(input = {}, sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    const transactionId = String(input.transactionId || '').trim();
+    const spaceId = String(input.spaceId || '').trim();
+    if (!transactionId || !spaceId) throw new Error('No se pudo identificar la acción de papelera cancelada.');
+    const records = await this.lifecycleCancellations();
+    this.assertSessionContext(sessionContext);
+    const record = this.normalizeLifecycleCancellations([{
+      transactionId,
+      spaceId,
+      compensationOperationId: input.compensationOperationId,
+      cancelledAt: String(input.cancelledAt || '').trim() || new Date().toISOString(),
+      expiresAtMs: Date.now() + LIFECYCLE_CANCELLATION_TTL_MS
+    }])[0] || null;
+    if (!record) throw new Error('No se pudo conservar la cancelación de la acción de papelera.');
+    await setMeta(
+      LIFECYCLE_CANCELLATION_META_KEY,
+      [record, ...records.filter((candidate) => candidate.transactionId !== transactionId)].slice(0, LIFECYCLE_CANCELLATION_MAX)
+    );
+    this.assertSessionContext(sessionContext);
+    return record;
+  }
+
+  async lifecycleCancellationKnown(transactionId = '', sessionContext = this.captureSessionContext()) {
+    const cleanTransactionId = String(transactionId || '').trim();
+    if (!cleanTransactionId) return false;
+    if (this.lifecycleCancellationInFlight.has(cleanTransactionId)) return true;
+    this.assertSessionContext(sessionContext);
+    const pending = await listOutbox();
+    this.assertSessionContext(sessionContext);
+    if (pending.some((item) => String(item?.lifecycleCancellation?.transactionId || '').trim() === cleanTransactionId)) return true;
+    const records = await this.lifecycleCancellations();
+    this.assertSessionContext(sessionContext);
+    return records.some((record) => record.transactionId === cleanTransactionId);
+  }
+
   async finalizeLifecycleFromEvent(transaction = {}, nestedEvent = {}, sessionContext = this.captureSessionContext(), source = 'realtime') {
     let localCommitApplied = false;
     try {
@@ -4046,6 +4155,7 @@ export class SemillaP2PClient {
     const incomingStatus = String(normalizedTransaction?.status || '').trim();
     if (
       previous
+      && options.replaceTerminal !== true
       && (
         (previousStatus === 'ready' && incomingStatus === 'waiting')
         || (['failed', 'completion-pending'].includes(previousStatus) && ['waiting', 'ready'].includes(incomingStatus))
@@ -4077,6 +4187,11 @@ export class SemillaP2PClient {
       .filter(Boolean));
     return recoverableSourceLifecycleTransactions(this.bootstrapState?.lifecycleTransactions || [])
       .filter((transaction) => activeSpaceIds.has(transaction.spaceId))
+      .filter((transaction) => !(
+        String(transaction?.action || '').trim() === 'trash'
+        && String(transaction?.status || '').trim() === 'waiting'
+        && transaction?.retryExhausted === true
+      ))
       .filter((transaction) => Math.max(0, Number(this.lifecycleFinalizationFailures.get(transaction.transactionId) || 0)) < LIFECYCLE_FINALIZATION_MAX_ATTEMPTS);
   }
 
@@ -4148,7 +4263,11 @@ export class SemillaP2PClient {
           if (resumedTransaction?.status === 'completed') {
             this.lifecycleFinalizationFailures.delete(transaction.transactionId);
             this.rememberLifecycleTransaction(resumedTransaction, { remove: true, observe: false });
-          } else if (response?.lifecycleFinalizeEvent && ['trash', 'restore'].includes(String(resumedTransaction?.action || transaction.action || '').trim())) {
+          } else if (
+            String(resumedTransaction?.status || '').trim() === 'ready'
+            && response?.lifecycleFinalizeEvent
+            && ['trash', 'restore'].includes(String(resumedTransaction?.action || transaction.action || '').trim())
+          ) {
             await this.finalizeLifecycleFromEvent(resumedTransaction, response.lifecycleFinalizeEvent, sessionContext, 'observer-resume');
           } else if (
             String(resumedTransaction?.status || '').trim() === 'ready'
@@ -4234,7 +4353,7 @@ export class SemillaP2PClient {
 
   lifecycleTransactionFromControl(event = {}) {
     const data = event.data || {};
-    return {
+    return normalizeLifecycleTransactionProgress({
       schemaVersion: 1,
       transactionId: String(data.transactionId || '').trim(),
       action: String(data.action || '').trim(),
@@ -4252,7 +4371,7 @@ export class SemillaP2PClient {
       maxAttempts: Math.max(1, Number(data.maxAttempts || LIFECYCLE_FINALIZATION_MAX_ATTEMPTS)),
       retryExhausted: data.retryExhausted === true,
       updatedAt: String(data.updatedAt || event.createdAt || new Date().toISOString())
-    };
+    });
   }
 
   handleTabMessage(message = {}, sessionContext = this.captureSessionContext()) {
@@ -5816,6 +5935,15 @@ export class SemillaP2PClient {
           : null;
         this.invitationEscrowMaxBytes = Math.max(0, Number(authority?.maxBytes || 0));
       }
+      const [knownLifecycleCancellations, pendingLifecycleOutbox] = await Promise.all([
+        this.lifecycleCancellations(),
+        listOutbox()
+      ]);
+      this.assertSessionContext(sessionContext);
+      const lifecycleCancellationTransactionIds = new Set([
+        ...knownLifecycleCancellations.map((record) => String(record?.transactionId || '').trim()),
+        ...pendingLifecycleOutbox.map((item) => String(item?.lifecycleCancellation?.transactionId || '').trim())
+      ].filter(Boolean));
       const previousLifecycleTransactions = new Map((Array.isArray(this.bootstrapState?.lifecycleTransactions)
         ? this.bootstrapState.lifecycleTransactions
         : [])
@@ -5825,6 +5953,7 @@ export class SemillaP2PClient {
       const lifecycleTransactions = Array.isArray(data.lifecycleTransactions)
         ? data.lifecycleTransactions
           .filter((transaction) => transaction && typeof transaction === 'object')
+          .filter((transaction) => !lifecycleCancellationTransactionIds.has(String(transaction?.transactionId || '').trim()))
           .map((transaction) => normalizeLifecycleTransactionProgress(transaction))
           .map((transaction) => {
             const transactionId = String(transaction?.transactionId || '').trim();
@@ -7722,12 +7851,23 @@ export class SemillaP2PClient {
       }
     } else if (event.eventType === 'p2p.lifecycle.progress') {
       const transaction = this.lifecycleTransactionFromControl(event);
-      this.rememberLifecycleTransaction(transaction);
-      dispatch('p2p:lifecycle-progress', { transaction, event });
+      if (await this.lifecycleCancellationKnown(transaction.transactionId, sessionContext)) {
+        dispatch('p2p:lifecycle-cancel-stale-control', { transaction, event, control: 'progress' });
+      } else {
+        this.rememberLifecycleTransaction(transaction);
+        dispatch('p2p:lifecycle-progress', { transaction, event });
+      }
     } else if (event.eventType === 'p2p.lifecycle.finalize') {
       const transaction = this.lifecycleTransactionFromControl(event);
-      const nestedEvent = event.data?.event || {};
-      await this.finalizeLifecycleFromEvent(transaction, nestedEvent, sessionContext, 'realtime');
+      if (await this.lifecycleCancellationKnown(transaction.transactionId, sessionContext)) {
+        dispatch('p2p:lifecycle-cancel-stale-control', { transaction, event, control: 'finalize' });
+      } else if (String(transaction?.status || '').trim() !== 'ready') {
+        this.rememberLifecycleTransaction(transaction);
+        dispatch('p2p:lifecycle-finalize-deferred', { transaction, event, reason: 'replicas-pending' });
+      } else {
+        const nestedEvent = event.data?.event || {};
+        await this.finalizeLifecycleFromEvent(transaction, nestedEvent, sessionContext, 'realtime');
+      }
     } else if (event.eventType === 'p2p.lifecycle.remote-purge') {
       await this.fenceBootstrapResponses(sessionContext);
       const transaction = this.lifecycleTransactionFromControl(event);
@@ -9642,6 +9782,195 @@ export class SemillaP2PClient {
       }
     }
     return data;
+  }
+
+  async retryProjectLifecycle(transactionId = '') {
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const cleanTransactionId = String(transactionId || '').trim();
+    const transaction = (this.bootstrapState.lifecycleTransactions || []).find((candidate) => (
+      String(candidate?.transactionId || '').trim() === cleanTransactionId
+      && String(candidate?.role || '').trim() === 'source'
+    )) || null;
+    if (!transaction || String(transaction.action || '').trim() !== 'trash') {
+      throw new Error('No se encontró un envío a papelera pendiente que pueda reintentarse.');
+    }
+    if (await this.lifecycleCancellationKnown(cleanTransactionId, sessionContext)) {
+      throw new Error('Esta acción ya tiene una cancelación pendiente y no puede reintentarse.');
+    }
+
+    this.lifecycleFinalizationFailures.delete(cleanTransactionId);
+    const pendingOutbox = await listOutbox();
+    this.assertSessionContext(sessionContext);
+    const outboxItem = pendingOutbox.find((item) => (
+      String(item?.operationId || '').trim() === String(transaction.operationId || '').trim()
+      || String(item?.localLifecycle?.transactionId || '').trim() === cleanTransactionId
+    )) || null;
+
+    try {
+      const response = await apiPost('/api/p2p/lifecycle/resume', {
+        transactionId: cleanTransactionId,
+        deviceId: sessionContext.deviceId
+      }, { maxAttempts: 1, audit: false });
+      this.assertSessionContext(sessionContext);
+      const resumedTransaction = normalizeLifecycleTransactionProgress(response?.lifecycle || transaction);
+      if (resumedTransaction?.status === 'completed') {
+        this.rememberLifecycleTransaction(resumedTransaction, { remove: true, observe: false, replaceTerminal: true });
+        return { ...response, lifecycle: resumedTransaction, completed: true };
+      }
+      this.rememberLifecycleTransaction(resumedTransaction, { observe: false, replaceTerminal: true });
+      if (String(resumedTransaction?.status || '').trim() === 'ready' && response?.lifecycleFinalizeEvent) {
+        const finalized = await this.finalizeLifecycleFromEvent(resumedTransaction, response.lifecycleFinalizeEvent, sessionContext, 'manual-retry');
+        return { ...response, lifecycle: finalized.transaction, completed: true };
+      }
+      if (String(resumedTransaction?.status || '').trim() === 'ready') {
+        throw this.lifecycleFinalizeEventMissingError(resumedTransaction, 'manual-retry');
+      }
+      dispatch('p2p:lifecycle-progress', { transaction: resumedTransaction, source: 'manual-retry' });
+      this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext);
+      return { ...response, lifecycle: resumedTransaction, completed: false };
+    } catch (error) {
+      if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) {
+        throw this.createSessionContextChangedError();
+      }
+      if (!this.isRetryableTransportError(error) || !outboxItem) throw error;
+      const localResult = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
+      this.assertSessionContext(sessionContext);
+      if (Number(localResult?.delivered || 0) <= 0 && !localResult?.transaction) throw error;
+      const localTransaction = localResult?.transaction || transaction;
+      this.rememberLifecycleTransaction(localTransaction, { observe: false, replaceTerminal: true });
+      dispatch('p2p:lifecycle-progress', { transaction: localTransaction, source: 'manual-retry-local' });
+      return { queued: true, localNetwork: true, lifecycle: localTransaction, backendError: error };
+    }
+  }
+
+  async cancelProjectTrash(transactionId = '') {
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const cleanTransactionId = String(transactionId || '').trim();
+    const transaction = (this.bootstrapState.lifecycleTransactions || []).find((candidate) => (
+      String(candidate?.transactionId || '').trim() === cleanTransactionId
+      && String(candidate?.role || '').trim() === 'source'
+    )) || null;
+    if (!transaction || String(transaction.action || '').trim() !== 'trash') {
+      throw new Error('No se encontró un envío a papelera pendiente que pueda cancelarse.');
+    }
+    const spaceId = String(transaction.spaceId || '').trim();
+    const compensationOperationId = createId('op');
+    const prepared = await this.preparePublishEnvelope(spaceId, {
+      operationId: compensationOperationId,
+      type: 'entity.restore',
+      entityType: 'admin.project',
+      entityId: 'project',
+      payload: {
+        at: new Date().toISOString(),
+        actorUserId: String(this.user?.userId || '').trim()
+      }
+    }, { applyLocally: false, deferSourceUntilReplicas: true }, sessionContext);
+    const outboxItem = {
+      ...prepared.outboxItem,
+      endpoint: '/api/p2p/lifecycle/cancel',
+      lifecycleAction: 'restore',
+      lifecycleCancellation: {
+        transactionId: cleanTransactionId,
+        originalOperationId: String(transaction.operationId || '').trim(),
+        spaceId
+      },
+      request: {
+        transactionId: cleanTransactionId,
+        deviceId: sessionContext.deviceId,
+        spaceId,
+        operation: prepared.request.operation
+      }
+    };
+
+    this.lifecycleCancellationInFlight.add(cleanTransactionId);
+    await enqueueOutbox(outboxItem);
+    let response = null;
+    let lastError = null;
+    try {
+      for (let attempt = 1; attempt <= LIFECYCLE_REQUEST_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          response = await apiPost(outboxItem.endpoint, outboxItem.request, { maxAttempts: 1, audit: false });
+          this.assertSessionContext(sessionContext);
+          break;
+        } catch (error) {
+          if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) {
+            throw this.createSessionContextChangedError();
+          }
+          lastError = error;
+          if (!this.isRetryableTransportError(error) || attempt >= LIFECYCLE_REQUEST_MAX_ATTEMPTS) break;
+          await new Promise((resolve) => window.setTimeout(resolve, lifecycleRequestRetryDelay(attempt - 1)));
+        }
+      }
+
+      const retryableFailure = !response && lastError && this.isRetryableTransportError(lastError);
+      if (!response && !retryableFailure) {
+        await removeOutbox(compensationOperationId).catch(() => null);
+        throw lastError || new Error('No se pudo cancelar el envío a papelera.');
+      }
+
+      await this.rememberLifecycleCancellation({
+        transactionId: cleanTransactionId,
+        spaceId,
+        compensationOperationId
+      }, sessionContext);
+      this.assertSessionContext(sessionContext);
+      const originalOperationId = String(transaction.operationId || '').trim();
+      if (originalOperationId && originalOperationId !== compensationOperationId) {
+        await removeOutbox(originalOperationId).catch(() => null);
+      }
+      this.pendingLocalLifecycleTransactions.delete(cleanTransactionId);
+      this.lifecycleFinalizationFailures.delete(cleanTransactionId);
+      this.rememberLifecycleTransaction(transaction, { remove: true, observe: false });
+
+      const localRestoreResult = await applyP2PEvent({ ...prepared.localEvent, lifecycleCancellation: true });
+      this.assertSessionContext(sessionContext);
+      dispatch('p2p:operation', {
+        event: prepared.localEvent,
+        result: localRestoreResult,
+        optimistic: true,
+        lifecycleCancellation: true
+      });
+
+      if (!response) {
+        const localDelivery = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
+        this.assertSessionContext(sessionContext);
+        return {
+          queued: true,
+          cancellationPending: true,
+          localNetwork: Number(localDelivery?.delivered || 0) > 0,
+          lifecycle: localDelivery?.transaction || null,
+          backendError: lastError
+        };
+      }
+
+      const compensation = normalizeLifecycleTransactionProgress(response?.lifecycle || {});
+      await enqueueOutbox({
+        ...outboxItem,
+        backendLifecycle: compensation?.transactionId ? { ...compensation } : null,
+        backendAcceptedAt: new Date().toISOString()
+      });
+      this.assertSessionContext(sessionContext);
+      if (compensation?.transactionId) {
+        this.rememberLifecycleTransaction(compensation, { observe: false, replaceTerminal: true });
+        dispatch('p2p:lifecycle-progress', { transaction: compensation, source: 'manual-cancel' });
+        if (response?.lifecycleFinalizeEvent) {
+          const finalized = await this.finalizeLifecycleFromEvent(compensation, response.lifecycleFinalizeEvent, sessionContext, 'manual-cancel');
+          return { ...response, cancelled: true, lifecycle: finalized.transaction, completed: true };
+        }
+        if (String(compensation.status || '').trim() === 'ready') {
+          // El backend aceptó la compensación, por lo que el outbox debe permanecer
+          // recuperable aunque la respuesta haya perdido el evento final por una carrera.
+          this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext);
+          throw this.lifecycleFinalizeEventMissingError(compensation, 'manual-cancel');
+        }
+        this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext);
+      }
+      return { ...response, cancelled: true, lifecycle: compensation, completed: false };
+    } finally {
+      this.lifecycleCancellationInFlight.delete(cleanTransactionId);
+    }
   }
 
   trashProjectAfterReplicas(spaceId = '', options = {}) {

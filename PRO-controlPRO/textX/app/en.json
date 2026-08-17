@@ -427,6 +427,17 @@
     "completeProject": "Complete project",
     "empty": "The recycle bin is empty."
   },
+  "lifecycle": {
+    "recoveryContext": "Move to recycle bin is still pending",
+    "retryAction": "Retry",
+    "cancelling": "Cancelling the move to the recycle bin…",
+    "retrying": "Checking replicas and retrying…",
+    "cancelPending": "The project is back in the panel on this device. Restoration will keep propagating until the recycle-bin action is undone on the remaining copies.",
+    "cancelCompleted": "The move to the recycle bin was cancelled and the project is restored on synchronized copies.",
+    "retryPending": "Replicas that already confirmed the recycle bin were kept as completed and only pending replicas were retried. The initiating device will update last.",
+    "retryCompleted": "The retry confirmed the pending replicas and completed the move to the recycle bin on this device.",
+    "recoveryError": "The recycle-bin action could not be recovered."
+  },
   "panel": {
     "ownName": "My panel",
     "sharedName": "{owner}'s panel",

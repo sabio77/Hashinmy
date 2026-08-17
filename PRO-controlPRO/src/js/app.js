@@ -816,7 +816,7 @@ function activeProjectLifecycle(spaceId = '') {
   return (state.p2pState.lifecycleTransactions || []).find((transaction) => (
     transaction?.role === 'source'
     && String(transaction.spaceId || '').trim() === cleanSpaceId
-    && ['waiting', 'ready'].includes(String(transaction.status || '').trim())
+    && ['waiting', 'ready', 'failed', 'completion-pending'].includes(String(transaction.status || '').trim())
   )) || null;
 }
 
@@ -1004,7 +1004,7 @@ function createProjectCard(data) {
     if (progress) openButton.append(progress);
   }
   const menu = contextMenuButton({ scope: 'project', spaceId: data.space.spaceId }, t('actions.projectMenu', 'Opciones del proyecto'));
-  menu.disabled = Boolean(lifecycleTransaction);
+  menu.disabled = Boolean(lifecycleTransaction && String(lifecycleTransaction.action || '').trim() !== 'trash');
   card.append(openButton, menu);
   return card;
 }
@@ -2307,6 +2307,16 @@ function renderActionMenu() {
   if (!data) return;
   const space = data.space;
   const actions = [];
+  const lifecycleTransaction = activeProjectLifecycle(context.spaceId);
+
+  if (lifecycleTransaction && String(lifecycleTransaction.action || '').trim() === 'trash' && isSpaceOwner(space)) {
+    elements.actionMenuTitle.textContent = data.project.name;
+    elements.actionMenuContext.textContent = t('lifecycle.recoveryContext', 'Envío a papelera pendiente de completar');
+    actions.push(menuActionButton('retry-project-trash', '↻', t('lifecycle.retryAction', 'Reintentar')));
+    actions.push(menuActionButton('cancel-project-trash', '↶', t('common.cancel', 'Cancelar')));
+    elements.actionMenuList.append(...actions);
+    return;
+  }
 
   if (context.scope === 'project') {
     elements.actionMenuTitle.textContent = data.project.name;
@@ -2494,6 +2504,53 @@ async function executeLifecycleAction(action = '', context = null) {
   }
 }
 
+async function executeProjectTrashRecovery(action = '', context = null) {
+  const data = context ? state.projects.get(context.spaceId) : null;
+  const transaction = context ? activeProjectLifecycle(context.spaceId) : null;
+  if (!context || !data || !transaction || state.p2pBusy || String(transaction.action || '').trim() !== 'trash') return;
+  if (!isSpaceOwner(data.space)) return;
+  setP2PBusy(true);
+  setStatus(elements.actionMenuStatus, action === 'cancel-project-trash'
+    ? t('lifecycle.cancelling', 'Cancelando el envío a papelera…')
+    : t('lifecycle.retrying', 'Revisando réplicas y reintentando…'));
+  try {
+    const result = action === 'cancel-project-trash'
+      ? await semillaP2P.cancelProjectTrash(transaction.transactionId)
+      : await semillaP2P.retryProjectLifecycle(transaction.transactionId);
+    applyP2PState(semillaP2P.bootstrapState);
+    await refreshProjects();
+    closeDialog(elements.actionMenuDialog);
+    showDashboard();
+    if (elements.trashDialog?.open) renderTrash();
+    const target = elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus;
+    if (action === 'cancel-project-trash') {
+      const pending = result?.queued === true || result?.completed !== true;
+      setStatus(
+        target,
+        pending
+          ? t('lifecycle.cancelPending', 'El proyecto volvió al panel en este dispositivo. La restauración seguirá propagándose hasta deshacer la papelera en las demás copias.')
+          : t('lifecycle.cancelCompleted', 'El envío a papelera fue cancelado y el proyecto quedó restaurado en las copias sincronizadas.'),
+        pending ? 'warning' : 'success'
+      );
+    } else {
+      const pending = result?.queued === true || result?.completed !== true;
+      setStatus(
+        target,
+        pending
+          ? t('lifecycle.retryPending', 'Se conservaron las réplicas que ya confirmaron la papelera y se reintentaron únicamente las pendientes. El dispositivo iniciador se actualizará al final.')
+          : t('lifecycle.retryCompleted', 'El reintento confirmó las réplicas pendientes y completó el envío a papelera en este dispositivo.'),
+        pending ? 'warning' : 'success'
+      );
+    }
+  } catch (error) {
+    setStatus(elements.actionMenuStatus, error?.message || t('lifecycle.recoveryError', 'No se pudo recuperar la acción de papelera.'), 'error');
+  } finally {
+    setP2PBusy(false);
+    renderDashboard();
+    if (elements.trashDialog?.open) renderTrash();
+  }
+}
+
 async function executeActionMenuConfirmation() {
   const pending = state.pendingActionMenuAction;
   if (!pending) return;
@@ -2506,6 +2563,10 @@ async function handleActionMenuSelection(event) {
   const action = button.dataset.menuAction;
   const context = state.actionMenuContext;
   if (!context) return;
+  if (action === 'retry-project-trash' || action === 'cancel-project-trash') {
+    await executeProjectTrashRecovery(action, context);
+    return;
+  }
   if (['trash-project', 'trash-record', 'purge-project', 'purge-record'].includes(action)) {
     prepareActionMenuConfirmation(action);
     return;
@@ -2541,7 +2602,7 @@ function renderTrashItem(data = null, context = null, titleText = '', detailText
   const menu = contextMenuButton(context, t('actions.trashMenu', 'Opciones del elemento en papelera'));
   const lifecycleTransaction = context.scope === 'trash-project' ? activeProjectLifecycle(data.space.spaceId) : null;
   const canAct = context.scope === 'trash-project' ? isSpaceOwner(data.space) : recordCanDelete(data.space, context.type);
-  menu.disabled = !canAct || Boolean(lifecycleTransaction);
+  menu.disabled = !canAct || Boolean(lifecycleTransaction && String(lifecycleTransaction.action || '').trim() !== 'trash');
   item.append(content);
   if (lifecycleTransaction) {
     item.dataset.lifecycle = lifecycleTransaction.action;

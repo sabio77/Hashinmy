@@ -238,6 +238,28 @@ const normalizedCompletedWaiting = normalizeLifecycleTransactionProgress({
 if (normalizedCompletedWaiting.status !== 'ready') {
   throw new Error('Una transacción waiting 2/2 todavía puede dejar bloqueada la card aunque ya no tenga réplicas pendientes.');
 }
+const normalizedLegacyReleasedTrash = normalizeLifecycleTransactionProgress({
+  transactionId: 'tx_legacy_released_trash',
+  action: 'trash',
+  spaceId: 'space_legacy_released_trash',
+  role: 'source',
+  status: 'ready',
+  completed: 1,
+  confirmed: 0,
+  released: 1,
+  total: 1,
+  remaining: 0,
+  retryExhausted: true
+});
+if (
+  normalizedLegacyReleasedTrash.status !== 'waiting'
+  || normalizedLegacyReleasedTrash.completed !== 0
+  || normalizedLegacyReleasedTrash.confirmed !== 0
+  || normalizedLegacyReleasedTrash.released !== 0
+  || normalizedLegacyReleasedTrash.remaining !== 1
+) {
+  throw new Error('Una papelera heredada con réplica liberada todavía puede aplicar el origen sin confirmación real.');
+}
 const recoverableTransactions = recoverableSourceLifecycleTransactions([
   { transactionId: 'tx_waiting', spaceId: 'space_waiting', role: 'source', status: 'waiting', completed: 0, total: 1, remaining: 1 },
   { transactionId: 'tx_ready', spaceId: 'space_ready', role: 'source', status: 'ready' },
@@ -298,10 +320,41 @@ for (const marker of [
   'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING',
   'rememberLifecycleTerminalState',
   'previousLifecycleTransactions',
+  "String(transaction?.action || '').trim() === 'trash'",
+  "transaction?.retryExhausted === true",
+  "String(resumedTransaction?.status || '').trim() === 'ready'",
+  'p2p:lifecycle-finalize-deferred',
   '[SemillaP2P][LIFECYCLE_AUDIT]'
 ]) {
   if (!clientSource.includes(marker)) throw new Error(`El observador de finalización perdió una garantía requerida: ${marker}`);
 }
+for (const marker of [
+  'retry-project-trash',
+  'cancel-project-trash',
+  'semillaP2P.retryProjectLifecycle',
+  'semillaP2P.cancelProjectTrash',
+  "['waiting', 'ready', 'failed', 'completion-pending']",
+  "String(lifecycleTransaction.action || '').trim() !== 'trash'"
+]) {
+  if (!appSource.includes(marker)) throw new Error(`La interfaz perdió la recuperación manual de un envío a papelera inconcluso: ${marker}`);
+}
+for (const marker of [
+  'async retryProjectLifecycle',
+  'async cancelProjectTrash',
+  "endpoint: '/api/p2p/lifecycle/cancel'",
+  'lifecycleCancellationKnown',
+  'LIFECYCLE_CANCELLATION_META_KEY',
+  'lifecycleCancellationInFlight',
+  '!completedDeviceIds.has',
+  'replaceTerminal: true',
+  "source: 'manual-cancel'"
+]) {
+  if (!clientSource.includes(marker)) throw new Error(`El cliente P2P perdió una garantía de Cancelar/Reintentar: ${marker}`);
+}
+if (appSource.includes('menu.disabled = Boolean(lifecycleTransaction);')) {
+  throw new Error('La card vuelve a bloquear el menú de tres puntos precisamente durante una papelera pendiente.');
+}
+
 for (const marker of [
   'lifecycle.completedWithDeferredReplicas',
   'transaction?.retryExhausted === true',
