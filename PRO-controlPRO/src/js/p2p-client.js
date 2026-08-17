@@ -407,10 +407,17 @@ function normalizeReplicaHealthMap(input = {}) {
       confirmedReplicas: nonnegativeInteger(rawHealth.confirmedReplicas),
       pendingReplicas: nonnegativeInteger(rawHealth.pendingReplicas),
       confirmedAccounts: nonnegativeInteger(rawHealth.confirmedAccounts),
+      availableReplicas: nonnegativeInteger(rawHealth.availableReplicas),
+      availableAccounts: nonnegativeInteger(rawHealth.availableAccounts),
+      pendingAvailableReplicas: nonnegativeInteger(rawHealth.pendingAvailableReplicas),
       onlineReplicas: nonnegativeInteger(rawHealth.onlineReplicas),
       currentDeviceRegistered: rawHealth.currentDeviceRegistered === true,
       currentDeviceConfirmed: typeof rawHealth.currentDeviceConfirmed === 'boolean' ? rawHealth.currentDeviceConfirmed : null,
+      currentDeviceAvailable: typeof rawHealth.currentDeviceAvailable === 'boolean' ? rawHealth.currentDeviceAvailable : null,
       currentDeviceOnline: rawHealth.currentDeviceOnline === true,
+      displayState: ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(String(rawHealth.displayState || ''))
+        ? String(rawHealth.displayState)
+        : state,
       lastConfirmedAt: String(rawHealth.lastConfirmedAt || '').slice(0, 60),
       truncated: rawHealth.truncated === true
     };
@@ -5907,24 +5914,28 @@ export class SemillaP2PClient {
       listKnownSpaceIds()
     ]);
     this.assertSessionContext(sessionContext);
+    const localSpaceIds = localSpaces
+      .map((space) => String(space?.spaceId || '').trim())
+      .filter(Boolean);
+    const revisionSpaceIds = Array.from(new Set([
+      ...durableKnownSpaceIds,
+      ...localSpaceIds,
+      ...Object.keys(this.recoveryRequirements || {}),
+      ...snapshotSpaceIds
+    ].filter(Boolean))).slice(0, 1_000);
     const [stateRevisions, localDeliverySequence] = await Promise.all([
-      listStateRevisions(durableKnownSpaceIds),
+      listStateRevisions(revisionSpaceIds),
       getMeta(`${CURSOR_META_PREFIX}${sessionContext.deviceId}`, 0)
     ]);
     this.assertSessionContext(sessionContext);
     const lifecycleReceipts = await this.completedLifecycleReceipts(
-      localSpaces.map((space) => space.spaceId),
+      localSpaceIds,
       sessionContext
     );
     this.assertSessionContext(sessionContext);
     const auditTraceId = String(auditContext?.auditTraceId || '').trim();
     const auditSource = String(auditContext?.auditSource || auditContext?.source || '').trim();
-    const knownSpaceIds = Array.from(new Set([
-      ...durableKnownSpaceIds,
-      ...localSpaces.map((space) => String(space?.spaceId || '').trim()),
-      ...Object.keys(this.recoveryRequirements || {}),
-      ...snapshotSpaceIds
-    ].filter(Boolean))).slice(0, 1_000);
+    const knownSpaceIds = revisionSpaceIds;
     const bootstrapRequest = {
       device: this.device,
       requestSnapshots,

@@ -159,8 +159,13 @@ function replicaHealthForSpace(spaceId = '') {
 }
 function replicaHealthPresentation(spaceId = '') {
   const health = replicaHealthForSpace(spaceId);
-  const stateName = ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(health.state) ? health.state : 'unknown';
-  const confirmed = Math.max(0, Number(health.confirmedReplicas || 0));
+  const preferredState = String(health.displayState || health.state || '');
+  const stateName = ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(preferredState) ? preferredState : 'unknown';
+  // La card muestra copias realmente disponibles en instalaciones activas, mientras
+  // `confirmedReplicas` permanece separado como evidencia durable ACK/convergida.
+  // Así una instalación que ya está mostrando el proyecto nunca cae a un falso 0/N
+  // solo porque su prueba temporal de ACK esté siendo reconciliada.
+  const confirmed = Math.max(0, Number(health.availableReplicas ?? health.confirmedReplicas ?? 0));
   const registered = Math.max(0, Number(health.registeredReplicas || 0));
   const labels = {
     healthy: t('replicas.healthy', 'Réplicas al día'),

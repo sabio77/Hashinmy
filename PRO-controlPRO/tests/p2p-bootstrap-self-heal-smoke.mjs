@@ -12,9 +12,13 @@ const fetchEnd = source.indexOf('\n  async start(', fetchStart);
 if (fetchStart < 0 || fetchEnd <= fetchStart) throw new Error('No se encontró fetchBootstrap.');
 const fetchSource = source.slice(fetchStart, fetchEnd);
 if (!fetchSource.includes('listKnownSpaceIds()')
-  || !fetchSource.includes('listStateRevisions(durableKnownSpaceIds)')
+  || !fetchSource.includes('const localSpaceIds = localSpaces')
+  || !fetchSource.includes('const revisionSpaceIds = Array.from(new Set([')
   || !fetchSource.includes('...durableKnownSpaceIds')
+  || !fetchSource.includes('...localSpaceIds')
   || !fetchSource.includes('...Object.keys(this.recoveryRequirements || {})')
+  || !fetchSource.includes('listStateRevisions(revisionSpaceIds)')
+  || !fetchSource.includes('const knownSpaceIds = revisionSpaceIds;')
   || !fetchSource.includes('knownSpaceIds,')) {
   throw new Error('El bootstrap no informa al backend todos los spaceId recuperables desde IndexedDB para reparar un índice derivado perdido.');
 }
