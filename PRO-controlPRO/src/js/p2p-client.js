@@ -110,8 +110,8 @@ const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
 const INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS = 3;
 const INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS = 700;
 const INVITATION_SOURCE_SYNC_WAIT_MS = 8 * 1000;
-const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 2;
-const PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS = 5;
+const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 3;
+const PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS = 3;
 const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
 const SNAPSHOT_SOURCE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_SOURCE_REJECTION_MAX_SOURCES = 32;
@@ -132,21 +132,52 @@ const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const LIFECYCLE_RECEIPT_MAX = 256;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
 const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
+const LIFECYCLE_FINALIZATION_MAX_ATTEMPTS = 3;
+const LIFECYCLE_REQUEST_MAX_ATTEMPTS = 3;
+const LIFECYCLE_REQUEST_RETRY_BASE_MS = 700;
+const LIFECYCLE_REQUEST_RETRY_MAX_MS = 4000;
 
-export function readySourceLifecycleTransactions(transactions = []) {
-  const ready = new Map();
+export function normalizeLifecycleTransactionProgress(transaction = {}) {
+  const normalized = transaction && typeof transaction === 'object' && !Array.isArray(transaction)
+    ? { ...transaction }
+    : {};
+  const status = String(normalized.status || '').trim();
+  const hasRemaining = normalized.remaining !== undefined && normalized.remaining !== null;
+  const hasTotal = normalized.total !== undefined && normalized.total !== null;
+  const hasCompleted = normalized.completed !== undefined && normalized.completed !== null;
+  const total = Math.max(0, Number(normalized.total || 0));
+  const completed = Math.max(0, Number(normalized.completed || 0));
+  const remaining = Math.max(0, Number(normalized.remaining || 0));
+  if (hasTotal) normalized.total = total;
+  if (hasCompleted) normalized.completed = completed;
+  if (hasRemaining) normalized.remaining = remaining;
+  if (
+    status === 'waiting'
+    && ((hasRemaining && remaining === 0) || (hasTotal && hasCompleted && total > 0 && completed >= total))
+  ) normalized.status = 'ready';
+  return normalized;
+}
+
+export function recoverableSourceLifecycleTransactions(transactions = []) {
+  const recoverable = new Map();
   for (const transaction of Array.isArray(transactions) ? transactions : []) {
-    const transactionId = String(transaction?.transactionId || '').trim();
-    const spaceId = String(transaction?.spaceId || '').trim();
+    const normalized = normalizeLifecycleTransactionProgress(transaction);
+    const transactionId = String(normalized?.transactionId || '').trim();
+    const spaceId = String(normalized?.spaceId || '').trim();
     if (
       !transactionId
       || !spaceId
-      || String(transaction?.role || '').trim() !== 'source'
-      || String(transaction?.status || '').trim() !== 'ready'
+      || String(normalized?.role || '').trim() !== 'source'
+      || !['waiting', 'ready'].includes(String(normalized?.status || '').trim())
     ) continue;
-    ready.set(transactionId, { ...transaction, transactionId, spaceId });
+    recoverable.set(transactionId, { ...normalized, transactionId, spaceId });
   }
-  return [...ready.values()];
+  return [...recoverable.values()];
+}
+
+export function readySourceLifecycleTransactions(transactions = []) {
+  return recoverableSourceLifecycleTransactions(transactions)
+    .filter((transaction) => String(transaction?.status || '').trim() === 'ready');
 }
 
 export function lifecycleFinalizationObserverDelay(attempt = 0) {
@@ -154,6 +185,14 @@ export function lifecycleFinalizationObserverDelay(attempt = 0) {
   return Math.min(
     LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS,
     LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS * (2 ** normalizedAttempt)
+  );
+}
+
+export function lifecycleRequestRetryDelay(attempt = 0) {
+  const normalizedAttempt = Math.min(6, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(
+    LIFECYCLE_REQUEST_RETRY_MAX_MS,
+    LIFECYCLE_REQUEST_RETRY_BASE_MS * (2 ** normalizedAttempt)
   );
 }
 
@@ -1640,6 +1679,7 @@ export class SemillaP2PClient {
     this.lifecycleFinalizationObserverTimer = 0;
     this.lifecycleFinalizationObserverPromise = null;
     this.lifecycleFinalizationObserverAttempt = 0;
+    this.lifecycleFinalizationFailures = new Map();
     this.deviceSigningPublicKey = null;
   }
 
@@ -3892,33 +3932,157 @@ export class SemillaP2PClient {
     return this.bootstrapState;
   }
 
+  lifecycleAudit(stage = '', transaction = {}, error = null, options = {}) {
+    const detail = {
+      stage: String(stage || '').trim().slice(0, 100),
+      transactionId: String(transaction?.transactionId || '').trim(),
+      action: String(transaction?.action || '').trim(),
+      spaceId: String(transaction?.spaceId || '').trim(),
+      operationId: String(transaction?.operationId || '').trim(),
+      status: String(transaction?.status || '').trim(),
+      completed: Math.max(0, Number(transaction?.completed || 0)),
+      confirmed: Math.max(0, Number(transaction?.confirmed || 0)),
+      released: Math.max(0, Number(transaction?.released || 0)),
+      total: Math.max(0, Number(transaction?.total || 0)),
+      remaining: Math.max(0, Number(transaction?.remaining || 0)),
+      backendRetryExhausted: transaction?.retryExhausted === true,
+      attempt: Math.max(0, Number(options.attempt || 0)),
+      maxAttempts: Math.max(1, Number(options.maxAttempts || LIFECYCLE_FINALIZATION_MAX_ATTEMPTS)),
+      retryable: options.retryable === true,
+      source: String(options.source || '').trim().slice(0, 80),
+      deviceId: String(this.deviceId || '').trim(),
+      online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+      error: error ? {
+        name: String(error?.name || 'Error'),
+        code: String(error?.code || ''),
+        status: Math.max(0, Number(error?.status || 0)),
+        message: String(error?.message || 'No se pudo completar la acción crítica.').slice(0, 800)
+      } : null,
+      at: new Date().toISOString(),
+      terminal: options.terminal === true,
+      previousStatePreserved: options.previousStatePreserved === true,
+      localCommitApplied: options.localCommitApplied === true
+    };
+    const logger = detail.terminal ? console.error : console.warn;
+    logger('[SemillaP2P][LIFECYCLE_AUDIT]', detail);
+    dispatch('p2p:lifecycle-audit', detail);
+    return detail;
+  }
+
+  async finalizeLifecycleFromEvent(transaction = {}, nestedEvent = {}, sessionContext = this.captureSessionContext(), source = 'realtime') {
+    let localCommitApplied = false;
+    try {
+      this.assertSessionContext(sessionContext);
+      this.assertEncryptedTransportEvent(nestedEvent);
+      const decryptedEvent = await decryptOperationEvent(nestedEvent);
+      this.assertSessionContext(sessionContext);
+      await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);
+      localCommitApplied = true;
+      this.assertSessionContext(sessionContext);
+      const operationId = String(decryptedEvent.operation?.operationId || transaction.operationId || '').trim();
+      const completion = await apiPost('/api/p2p/lifecycle/complete', {
+        transactionId: transaction.transactionId,
+        deviceId: sessionContext.deviceId
+      }, { maxAttempts: 1, audit: false });
+      this.assertSessionContext(sessionContext);
+      if (operationId) await removeOutbox(operationId).catch(() => null);
+      this.assertSessionContext(sessionContext);
+      const completedTransaction = completion?.transaction
+        ? { ...completion.transaction, role: 'source', status: 'completed' }
+        : { ...transaction, status: 'completed' };
+      this.lifecycleFinalizationFailures.delete(String(transaction?.transactionId || '').trim());
+      this.rememberLifecycleTransaction(completedTransaction, { remove: true, observe: false });
+      dispatch('p2p:lifecycle-completed', {
+        transaction: completedTransaction,
+        operationEvent: decryptedEvent,
+        source
+      });
+      return { completed: true, transaction: completedTransaction, operationEvent: decryptedEvent };
+    } catch (error) {
+      if (localCommitApplied && error && typeof error === 'object') error.p2pLocalCommitApplied = true;
+      throw error;
+    }
+  }
+
+  lifecycleFinalizeEventMissingError(transaction = {}, source = '') {
+    const error = new Error('La coordinación llegó a lista, pero el backend no devolvió el evento autoritativo necesario para aplicar la acción en este dispositivo.');
+    error.code = 'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING';
+    error.status = 503;
+    error.retryable = true;
+    error.transactionId = String(transaction?.transactionId || '').trim();
+    error.operationId = String(transaction?.operationId || '').trim();
+    error.spaceId = String(transaction?.spaceId || '').trim();
+    error.lifecycleSource = String(source || '').trim().slice(0, 80);
+    return error;
+  }
+
+  rememberLifecycleTerminalState(transaction = {}, error = null, options = {}) {
+    const localCommitApplied = options.localCommitApplied === true || transaction?.localCommitApplied === true;
+    const terminalStatus = localCommitApplied ? 'completion-pending' : 'failed';
+    const failedTransaction = {
+      ...transaction,
+      status: terminalStatus,
+      retryExhausted: true,
+      attempts: Math.max(1, Number(options.attempt || transaction?.attempts || LIFECYCLE_FINALIZATION_MAX_ATTEMPTS)),
+      failedAt: new Date().toISOString(),
+      lastErrorCode: String(error?.code || ''),
+      lastErrorStatus: Math.max(0, Number(error?.status || 0)),
+      localCommitApplied
+    };
+    this.rememberLifecycleTransaction(failedTransaction, { observe: false });
+    return failedTransaction;
+  }
+
   rememberLifecycleTransaction(transaction = {}, options = {}) {
-    const transactionId = String(transaction?.transactionId || '').trim();
+    const normalizedTransaction = normalizeLifecycleTransactionProgress(transaction);
+    const transactionId = String(normalizedTransaction?.transactionId || '').trim();
     if (!transactionId) return null;
     const current = Array.isArray(this.bootstrapState?.lifecycleTransactions)
       ? this.bootstrapState.lifecycleTransactions
       : [];
     const previous = current.find((item) => String(item?.transactionId || '').trim() === transactionId) || null;
+    let rememberedTransaction = normalizedTransaction;
+    const previousStatus = String(previous?.status || '').trim();
+    const incomingStatus = String(normalizedTransaction?.status || '').trim();
+    if (
+      previous
+      && (
+        (previousStatus === 'ready' && incomingStatus === 'waiting')
+        || (['failed', 'completion-pending'].includes(previousStatus) && ['waiting', 'ready'].includes(incomingStatus))
+      )
+    ) {
+      rememberedTransaction = { ...normalizedTransaction, ...previous, transactionId };
+    }
     const next = current.filter((item) => String(item?.transactionId || '').trim() !== transactionId);
-    if (options.remove !== true && transaction.status !== 'completed') next.push({ ...transaction });
+    if (options.remove === true || rememberedTransaction.status === 'completed') this.lifecycleFinalizationFailures.delete(transactionId);
+    if (options.remove !== true && rememberedTransaction.status !== 'completed') next.push({ ...rememberedTransaction });
     this.bootstrapState = { ...(this.bootstrapState || {}), lifecycleTransactions: next };
     dispatch('p2p:state', { state: this.bootstrapState, lifecycleOnly: true });
     if (options.observe !== false) {
-      const becameReady = String(transaction?.role || '').trim() === 'source'
-        && String(transaction?.status || '').trim() === 'ready'
-        && String(previous?.status || '').trim() !== 'ready';
-      if (becameReady) this.lifecycleFinalizationObserverAttempt = 0;
-      this.scheduleLifecycleFinalizationObserver({ immediate: becameReady });
+      const isRecoverable = String(rememberedTransaction?.role || '').trim() === 'source'
+        && ['waiting', 'ready'].includes(String(rememberedTransaction?.status || '').trim());
+      const wasRecoverable = String(previous?.role || '').trim() === 'source'
+        && ['waiting', 'ready'].includes(String(previous?.status || '').trim());
+      const becameRecoverable = isRecoverable && !wasRecoverable;
+      const becameReady = String(rememberedTransaction?.status || '').trim() === 'ready' && previousStatus !== 'ready';
+      if (becameRecoverable || becameReady) this.lifecycleFinalizationObserverAttempt = 0;
+      this.scheduleLifecycleFinalizationObserver({ immediate: becameRecoverable || becameReady });
     }
-    return transaction;
+    return rememberedTransaction;
   }
 
-  readyLifecycleFinalizations() {
+  recoverableLifecycleFinalizations() {
     const activeSpaceIds = new Set((Array.isArray(this.bootstrapState?.spaces) ? this.bootstrapState.spaces : [])
       .map((space) => String(space?.spaceId || '').trim())
       .filter(Boolean));
-    return readySourceLifecycleTransactions(this.bootstrapState?.lifecycleTransactions || [])
-      .filter((transaction) => activeSpaceIds.has(transaction.spaceId));
+    return recoverableSourceLifecycleTransactions(this.bootstrapState?.lifecycleTransactions || [])
+      .filter((transaction) => activeSpaceIds.has(transaction.spaceId))
+      .filter((transaction) => Math.max(0, Number(this.lifecycleFinalizationFailures.get(transaction.transactionId) || 0)) < LIFECYCLE_FINALIZATION_MAX_ATTEMPTS);
+  }
+
+  readyLifecycleFinalizations() {
+    return this.recoverableLifecycleFinalizations()
+      .filter((transaction) => String(transaction?.status || '').trim() === 'ready');
   }
 
   clearLifecycleFinalizationObserver(options = {}) {
@@ -3928,9 +4092,9 @@ export class SemillaP2PClient {
   }
 
   scheduleLifecycleFinalizationObserver(options = {}, sessionContext = this.captureSessionContext()) {
-    const readyTransactions = this.readyLifecycleFinalizations();
+    const recoverableTransactions = this.recoverableLifecycleFinalizations();
     if (
-      !readyTransactions.length
+      !recoverableTransactions.length
       || !this.started
       || this.manualClose
       || !this.realtimeLeader
@@ -3961,53 +4125,93 @@ export class SemillaP2PClient {
   async runLifecycleFinalizationObserver(sessionContext = this.captureSessionContext()) {
     if (this.lifecycleFinalizationObserverPromise) return this.lifecycleFinalizationObserverPromise;
     this.clearLifecycleFinalizationObserver({ resetAttempt: false });
-    const readyTransactions = this.readyLifecycleFinalizations();
+    const recoverableTransactions = this.recoverableLifecycleFinalizations();
     if (
-      !readyTransactions.length
+      !recoverableTransactions.length
       || !this.realtimeLeader
       || !this.isSessionContextCurrent(sessionContext)
     ) {
       this.clearLifecycleFinalizationObserver();
       return false;
     }
-    if (navigator.onLine === false) return false;
-
     const observerTask = (async () => {
-      let authoritativeRefreshRequired = false;
-      for (const transaction of readyTransactions) {
+      for (const transaction of recoverableTransactions) {
         this.assertSessionContext(sessionContext);
         if (!this.realtimeLeader) break;
         try {
           const response = await apiPost('/api/p2p/lifecycle/resume', {
             transactionId: transaction.transactionId,
             deviceId: sessionContext.deviceId
-          });
+          }, { maxAttempts: 1, audit: false });
           this.assertSessionContext(sessionContext);
-          if (response?.lifecycle?.status === 'completed') {
-            this.rememberLifecycleTransaction(response.lifecycle, { remove: true, observe: false });
+          const resumedTransaction = normalizeLifecycleTransactionProgress(response?.lifecycle || transaction);
+          if (resumedTransaction?.status === 'completed') {
+            this.lifecycleFinalizationFailures.delete(transaction.transactionId);
+            this.rememberLifecycleTransaction(resumedTransaction, { remove: true, observe: false });
+          } else if (response?.lifecycleFinalizeEvent && ['trash', 'restore'].includes(String(resumedTransaction?.action || transaction.action || '').trim())) {
+            await this.finalizeLifecycleFromEvent(resumedTransaction, response.lifecycleFinalizeEvent, sessionContext, 'observer-resume');
+          } else if (
+            String(resumedTransaction?.status || '').trim() === 'ready'
+            && ['trash', 'restore'].includes(String(resumedTransaction?.action || transaction.action || '').trim())
+          ) {
+            throw this.lifecycleFinalizeEventMissingError(resumedTransaction, 'observer-resume');
+          } else {
+            this.lifecycleFinalizationFailures.delete(transaction.transactionId);
+            const remembered = this.rememberLifecycleTransaction(resumedTransaction, { observe: false });
+            dispatch('p2p:lifecycle-progress', { transaction: remembered, source: 'observer-resume' });
+            if (remembered?.retryExhausted === true) {
+              this.lifecycleAudit('replica-confirmation-retry-exhausted', remembered, null, {
+                attempt: Math.max(0, Number(remembered.attempts || 0)),
+                maxAttempts: Math.max(1, Number(remembered.maxAttempts || LIFECYCLE_FINALIZATION_MAX_ATTEMPTS)),
+                retryable: false,
+                terminal: false,
+                source: 'observer',
+                previousStatePreserved: false,
+                localCommitApplied: false
+              });
+            }
           }
         } catch (error) {
           if (this.isSessionContextChangedError(error)) throw error;
           const retryable = this.isRetryableTransportError(error);
-          if (!retryable) authoritativeRefreshRequired = true;
+          const transactionId = String(transaction?.transactionId || '').trim();
+          const attempt = Math.max(0, Number(this.lifecycleFinalizationFailures.get(transactionId) || 0)) + 1;
+          this.lifecycleFinalizationFailures.set(transactionId, attempt);
+          const terminal = !retryable || attempt >= LIFECYCLE_FINALIZATION_MAX_ATTEMPTS;
+          const localCommitApplied = error?.p2pLocalCommitApplied === true || transaction?.localCommitApplied === true;
+          this.lifecycleAudit('finalization-resume-failed', transaction, error, {
+            attempt,
+            maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+            retryable,
+            terminal,
+            source: 'observer',
+            previousStatePreserved: !localCommitApplied,
+            localCommitApplied
+          });
           dispatch('p2p:lifecycle-resume-deferred', {
             transaction,
             error,
             observer: true,
-            retryable
+            retryable,
+            attempt,
+            maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+            terminal
           });
+          if (terminal) {
+            const failedTransaction = this.rememberLifecycleTerminalState(transaction, error, {
+              attempt,
+              localCommitApplied
+            });
+            dispatch('p2p:lifecycle-retry-exhausted', {
+              transaction: failedTransaction,
+              error,
+              attempt,
+              maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+              previousStatePreserved: !localCommitApplied,
+              localCommitApplied
+            });
+          }
         }
-      }
-      if (authoritativeRefreshRequired && this.realtimeLeader && this.isSessionContextCurrent(sessionContext)) {
-        await this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
-          if (this.isSessionContextChangedError(error)) throw error;
-          dispatch('p2p:lifecycle-resume-deferred', {
-            observer: true,
-            refresh: true,
-            error,
-            retryable: this.isRetryableTransportError(error)
-          });
-        });
       }
       return true;
     })();
@@ -4018,12 +4222,12 @@ export class SemillaP2PClient {
     } finally {
       this.lifecycleFinalizationObserverPromise = null;
       const observerCanContinue = this.isSessionContextCurrent(sessionContext) && this.realtimeLeader;
-      const remaining = observerCanContinue ? this.readyLifecycleFinalizations() : [];
+      const remaining = observerCanContinue ? this.recoverableLifecycleFinalizations() : [];
       if (!remaining.length) {
         this.clearLifecycleFinalizationObserver();
       } else {
         this.lifecycleFinalizationObserverAttempt = Math.min(8, this.lifecycleFinalizationObserverAttempt + 1);
-        if (navigator.onLine !== false) this.scheduleLifecycleFinalizationObserver({}, sessionContext);
+        this.scheduleLifecycleFinalizationObserver({}, sessionContext);
       }
     }
   }
@@ -4040,8 +4244,13 @@ export class SemillaP2PClient {
       sourceDeviceId: String(data.sourceDeviceId || event.sourceDeviceId || '').trim(),
       operationId: String(data.operationId || '').trim(),
       completed: Math.max(0, Number(data.completed || 0)),
+      confirmed: Math.max(0, Number(data.confirmed || 0)),
+      released: Math.max(0, Number(data.released || 0)),
       total: Math.max(0, Number(data.total || 0)),
       remaining: Math.max(0, Number(data.remaining || 0)),
+      attempts: Math.max(0, Number(data.attempts || 0)),
+      maxAttempts: Math.max(1, Number(data.maxAttempts || LIFECYCLE_FINALIZATION_MAX_ATTEMPTS)),
+      retryExhausted: data.retryExhausted === true,
       updatedAt: String(data.updatedAt || event.createdAt || new Date().toISOString())
     };
   }
@@ -5584,8 +5793,26 @@ export class SemillaP2PClient {
           : null;
         this.invitationEscrowMaxBytes = Math.max(0, Number(authority?.maxBytes || 0));
       }
+      const previousLifecycleTransactions = new Map((Array.isArray(this.bootstrapState?.lifecycleTransactions)
+        ? this.bootstrapState.lifecycleTransactions
+        : [])
+        .filter((transaction) => transaction && typeof transaction === 'object')
+        .map((transaction) => [String(transaction.transactionId || '').trim(), transaction])
+        .filter(([transactionId]) => transactionId));
       const lifecycleTransactions = Array.isArray(data.lifecycleTransactions)
-        ? data.lifecycleTransactions.filter((transaction) => transaction && typeof transaction === 'object')
+        ? data.lifecycleTransactions
+          .filter((transaction) => transaction && typeof transaction === 'object')
+          .map((transaction) => normalizeLifecycleTransactionProgress(transaction))
+          .map((transaction) => {
+            const transactionId = String(transaction?.transactionId || '').trim();
+            const previous = previousLifecycleTransactions.get(transactionId);
+            if (
+              previous
+              && ['failed', 'completion-pending'].includes(String(previous?.status || '').trim())
+              && ['waiting', 'ready'].includes(String(transaction?.status || '').trim())
+            ) return { ...transaction, ...previous, transactionId };
+            return transaction;
+          })
         : [];
       const lifecyclePurgeSpaceIds = new Set(lifecycleTransactions
         .filter((transaction) => transaction.role === 'target'
@@ -6292,6 +6519,7 @@ export class SemillaP2PClient {
     this.clearPendingTabStateRequest();
     this.clearLocalCapabilityRefreshTimer();
     this.clearLifecycleFinalizationObserver();
+    this.lifecycleFinalizationFailures.clear();
     this.localCapabilityRefreshAttempt = 0;
     this.tabStateReconcileRequested = false;
     this.tabStateReconcileForceSnapshots = false;
@@ -6702,6 +6930,7 @@ export class SemillaP2PClient {
       return acquired;
     }
     try {
+      this.lifecycleFinalizationFailures.clear();
       await this.refreshBootstrap({ requestSnapshots: 'new-device' });
       this.assertSessionContext(sessionContext);
       await this.flushOutbox();
@@ -7423,21 +7652,7 @@ export class SemillaP2PClient {
     } else if (event.eventType === 'p2p.lifecycle.finalize') {
       const transaction = this.lifecycleTransactionFromControl(event);
       const nestedEvent = event.data?.event || {};
-      this.assertEncryptedTransportEvent(nestedEvent);
-      const decryptedEvent = await decryptOperationEvent(nestedEvent);
-      this.assertSessionContext(sessionContext);
-      await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);
-      this.assertSessionContext(sessionContext);
-      const operationId = String(decryptedEvent.operation?.operationId || transaction.operationId || '').trim();
-      if (operationId) await removeOutbox(operationId).catch(() => null);
-      this.assertSessionContext(sessionContext);
-      await apiPost('/api/p2p/lifecycle/complete', {
-        transactionId: transaction.transactionId,
-        deviceId: sessionContext.deviceId
-      });
-      this.assertSessionContext(sessionContext);
-      this.rememberLifecycleTransaction({ ...transaction, status: 'completed' }, { remove: true });
-      dispatch('p2p:lifecycle-completed', { transaction: { ...transaction, status: 'completed' }, event, operationEvent: decryptedEvent });
+      await this.finalizeLifecycleFromEvent(transaction, nestedEvent, sessionContext, 'realtime');
     } else if (event.eventType === 'p2p.lifecycle.remote-purge') {
       await this.fenceBootstrapResponses(sessionContext);
       const transaction = this.lifecycleTransactionFromControl(event);
@@ -9175,34 +9390,145 @@ export class SemillaP2PClient {
 
     await enqueueOutbox(outboxItem);
     this.assertSessionContext(sessionContext);
-    try {
-      const data = await apiPost(outboxItem.endpoint, outboxItem.request);
-      this.assertSessionContext(sessionContext);
-      const transaction = data.lifecycle || null;
-      await enqueueOutbox({
-        ...outboxItem,
-        backendLifecycle: transaction ? { ...transaction } : outboxItem.backendLifecycle || null,
-        backendAcceptedAt: new Date().toISOString()
-      });
-      this.assertSessionContext(sessionContext);
-      if (transaction) {
-        this.rememberLifecycleTransaction(transaction);
-        dispatch('p2p:lifecycle-progress', { transaction, source: 'local-start' });
-      }
-      return data;
-    } catch (error) {
-      if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) throw this.createSessionContextChangedError();
-      if (this.isRetryableTransportError(error) && options.queueWhenOffline !== false) {
-        error.p2pQueued = true;
-        const localDelivery = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
+    let lastError = null;
+    let data = null;
+    let acceptedAttempt = 0;
+    for (let attempt = 1; attempt <= LIFECYCLE_REQUEST_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        data = await apiPost(outboxItem.endpoint, outboxItem.request, { maxAttempts: 1, audit: false });
+        acceptedAttempt = attempt;
         this.assertSessionContext(sessionContext);
-        if (Number(localDelivery?.delivered || 0) > 0) error.p2pLocalDelivered = Number(localDelivery.delivered || 0);
-        dispatch('p2p:outbox', { queued: true, operationId: outboxItem.operationId, lifecycleAction: cleanAction, localDelivered: Number(localDelivery?.delivered || 0) });
-      } else {
+        break;
+      } catch (error) {
+        if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) throw this.createSessionContextChangedError();
+        lastError = error;
+        const retryable = this.isRetryableTransportError(error);
+        const terminal = !retryable || attempt >= LIFECYCLE_REQUEST_MAX_ATTEMPTS;
+        this.lifecycleAudit('lifecycle-start-request-failed', {
+          action: cleanAction,
+          spaceId: cleanSpaceId,
+          operationId: outboxItem.operationId,
+          status: 'starting'
+        }, error, {
+          attempt,
+          maxAttempts: LIFECYCLE_REQUEST_MAX_ATTEMPTS,
+          retryable,
+          terminal,
+          source: 'interactive-request',
+          previousStatePreserved: true
+        });
+        if (!terminal) {
+          await enqueueOutbox({
+            ...outboxItem,
+            attempts: attempt,
+            lastAttemptAt: new Date().toISOString(),
+            lastErrorCode: String(error?.code || ''),
+            lastErrorStatus: Math.max(0, Number(error?.status || 0))
+          });
+          await new Promise((resolve) => window.setTimeout(resolve, lifecycleRequestRetryDelay(attempt - 1)));
+          continue;
+        }
+        if (retryable && options.queueWhenOffline !== false) {
+          const localDelivery = await this.startLocalProjectLifecycle(outboxItem, sessionContext).catch(() => ({ delivered: 0, transaction: null }));
+          this.assertSessionContext(sessionContext);
+          if (Number(localDelivery?.delivered || 0) > 0) {
+            error.p2pQueued = true;
+            error.p2pLocalDelivered = Number(localDelivery.delivered || 0);
+            dispatch('p2p:outbox', {
+              queued: true,
+              operationId: outboxItem.operationId,
+              lifecycleAction: cleanAction,
+              localDelivered: error.p2pLocalDelivered,
+              backendRetryExhausted: true
+            });
+            throw error;
+          }
+        }
         await removeOutbox(outboxItem.operationId).catch(() => null);
+        error.p2pRetryExhausted = retryable && attempt >= LIFECYCLE_REQUEST_MAX_ATTEMPTS;
+        dispatch('p2p:lifecycle-retry-exhausted', {
+          transaction: {
+            action: cleanAction,
+            spaceId: cleanSpaceId,
+            operationId: outboxItem.operationId,
+            status: 'failed',
+            attempts: attempt
+          },
+          error,
+          attempt,
+          maxAttempts: LIFECYCLE_REQUEST_MAX_ATTEMPTS,
+          previousStatePreserved: true,
+          localCommitApplied: false
+        });
+        throw error;
       }
-      throw error;
     }
+    if (!data) throw lastError || new Error('No se pudo completar la acción crítica del proyecto.');
+
+    const transaction = data.lifecycle || null;
+    await enqueueOutbox({
+      ...outboxItem,
+      attempts: acceptedAttempt,
+      backendLifecycle: transaction ? { ...transaction } : outboxItem.backendLifecycle || null,
+      backendAcceptedAt: new Date().toISOString()
+    });
+    this.assertSessionContext(sessionContext);
+    if (!transaction) return data;
+
+    this.rememberLifecycleTransaction(transaction);
+    dispatch('p2p:lifecycle-progress', { transaction, source: 'local-start' });
+    if (['trash', 'restore'].includes(cleanAction) && transaction.status === 'ready') {
+      try {
+        if (!data?.lifecycleFinalizeEvent) throw this.lifecycleFinalizeEventMissingError(transaction, 'start-response');
+        await this.finalizeLifecycleFromEvent(transaction, data.lifecycleFinalizeEvent, sessionContext, 'start-response');
+      } catch (error) {
+        if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) throw this.createSessionContextChangedError();
+        const retryable = this.isRetryableTransportError(error);
+        const transactionId = String(transaction.transactionId || '').trim();
+        const attempt = Math.max(0, Number(this.lifecycleFinalizationFailures.get(transactionId) || 0)) + 1;
+        const terminal = !retryable || attempt >= LIFECYCLE_FINALIZATION_MAX_ATTEMPTS;
+        const localCommitApplied = error?.p2pLocalCommitApplied === true || transaction?.localCommitApplied === true;
+        this.lifecycleFinalizationFailures.set(transactionId, attempt);
+        this.lifecycleAudit('finalization-start-response-failed', transaction, error, {
+          attempt,
+          maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+          retryable,
+          terminal,
+          source: 'start-response',
+          previousStatePreserved: !localCommitApplied,
+          localCommitApplied
+        });
+        dispatch('p2p:lifecycle-resume-deferred', {
+          transaction,
+          error,
+          observer: false,
+          retryable,
+          attempt,
+          maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+          terminal
+        });
+        if (terminal) {
+          const failedTransaction = this.rememberLifecycleTerminalState(transaction, error, {
+            attempt,
+            localCommitApplied
+          });
+          dispatch('p2p:lifecycle-retry-exhausted', {
+            transaction: failedTransaction,
+            error,
+            attempt,
+            maxAttempts: LIFECYCLE_FINALIZATION_MAX_ATTEMPTS,
+            previousStatePreserved: !localCommitApplied,
+            localCommitApplied
+          });
+        } else {
+          if (localCommitApplied) {
+            this.rememberLifecycleTransaction({ ...transaction, localCommitApplied: true }, { observe: false });
+          }
+          this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext);
+        }
+      }
+    }
+    return data;
   }
 
   trashProjectAfterReplicas(spaceId = '', options = {}) {

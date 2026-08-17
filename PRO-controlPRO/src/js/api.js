@@ -100,14 +100,62 @@ function assertRequestSession(requestSessionToken = '') {
   }
 }
 
-async function request(path, options = {}) {
+const REQUEST_MAX_ATTEMPTS = 3;
+const REQUEST_RETRY_BASE_MS = 400;
+const REQUEST_RETRY_MAX_MS = 5000;
+
+function requestRetryable(error = null) {
+  if (isSessionChangedError(error)) return false;
+  if (error?.retryable === false) return false;
+  if (error?.retryable === true) return true;
+  const status = Math.max(0, Number(error?.status || 0));
+  if ([408, 425, 429].includes(status) || status >= 500) return true;
+  return status === 0 && (
+    error?.name === 'TypeError'
+    || error?.name === 'AbortError'
+    || ['REQUEST_TIMEOUT', 'NETWORK_ERROR'].includes(String(error?.code || '').trim().toUpperCase())
+  );
+}
+
+function requestRetryDelay(error = null, attempt = 1) {
+  const retryAfterMs = Math.max(0, Number(error?.retryAfterSeconds || 0)) * 1000;
+  if (retryAfterMs > 0) return Math.min(REQUEST_RETRY_MAX_MS, retryAfterMs);
+  const exponent = Math.max(0, Math.floor(Number(attempt || 1)) - 1);
+  return Math.min(REQUEST_RETRY_MAX_MS, REQUEST_RETRY_BASE_MS * (2 ** exponent));
+}
+
+function requestAudit(stage = '', context = {}) {
+  const detail = {
+    stage: String(stage || '').trim().slice(0, 100),
+    requestId: String(context.requestId || '').trim(),
+    method: String(context.method || 'GET').trim().toUpperCase().slice(0, 12),
+    path: String(context.path || '').trim().slice(0, 240),
+    attempt: Math.max(0, Number(context.attempt || 0)),
+    maxAttempts: Math.max(1, Number(context.maxAttempts || REQUEST_MAX_ATTEMPTS)),
+    retryable: context.retryable === true,
+    terminal: context.terminal === true,
+    previousStatePreserved: true,
+    retryDelayMs: Math.max(0, Number(context.retryDelayMs || 0)),
+    online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+    error: context.error ? {
+      name: String(context.error?.name || 'Error'),
+      code: String(context.error?.code || ''),
+      status: Math.max(0, Number(context.error?.status || 0)),
+      message: String(context.error?.message || 'No se pudo completar la solicitud.').slice(0, 800)
+    } : null,
+    at: new Date().toISOString()
+  };
+  const logger = detail.terminal ? console.error : console.warn;
+  logger('[SemillaP2P][REQUEST_AUDIT]', detail);
+  return detail;
+}
+
+async function requestAttempt(path, options = {}, requestSessionToken = '') {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
   headers.set('X-P2P-Application', P2P_APPLICATION_ID);
-
-  const requestSessionToken = getSessionToken();
   if (requestSessionToken) headers.set('X-Session-Token', requestSessionToken);
 
   try {
@@ -135,16 +183,6 @@ async function request(path, options = {}) {
       if (error.retryAfterSeconds > 0) error.retryAt = Date.now() + (error.retryAfterSeconds * 1000);
       const responseCode = String(data?.code || '').trim().toUpperCase();
       if (/^[A-Z0-9_]{3,80}$/.test(responseCode)) error.code = responseCode;
-      if (isP2PCapacityRetry(error) && String(path || '').startsWith('/api/p2p/')) {
-        window.dispatchEvent(new CustomEvent('p2p:rate-limited', {
-          detail: {
-            path: String(path || ''),
-            error,
-            retryAfterSeconds: error.retryAfterSeconds,
-            retryAt: error.retryAt || 0
-          }
-        }));
-      }
       throw error;
     }
 
@@ -152,7 +190,15 @@ async function request(path, options = {}) {
   } catch (error) {
     assertRequestSession(requestSessionToken);
     if (error?.name === 'AbortError') {
-      throw new Error('El servicio tardó demasiado en responder.');
+      const timeoutError = new Error('El servicio tardó demasiado en responder.');
+      timeoutError.name = 'TimeoutError';
+      timeoutError.code = 'REQUEST_TIMEOUT';
+      timeoutError.retryable = true;
+      throw timeoutError;
+    }
+    if (error?.name === 'TypeError' && !error?.status) {
+      error.code = String(error?.code || 'NETWORK_ERROR');
+      error.retryable = true;
     }
     throw error;
   } finally {
@@ -160,14 +206,68 @@ async function request(path, options = {}) {
   }
 }
 
-export function apiGet(path) {
-  return request(path, { method: 'GET' });
+async function request(path, options = {}, retryOptions = {}) {
+  const requestSessionToken = getSessionToken();
+  const maxAttempts = Math.min(3, Math.max(1, Math.floor(Number(retryOptions.maxAttempts || REQUEST_MAX_ATTEMPTS))));
+  const audit = retryOptions.audit !== false;
+  const method = String(options.method || 'GET').trim().toUpperCase();
+  const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    assertRequestSession(requestSessionToken);
+    try {
+      return await requestAttempt(path, options, requestSessionToken);
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      lastError = error;
+      const retryable = requestRetryable(error);
+      const terminal = !retryable || attempt >= maxAttempts;
+      const retryDelayMs = terminal ? 0 : requestRetryDelay(error, attempt);
+      if (audit) requestAudit(terminal ? 'request-failed' : 'request-retry', {
+        requestId,
+        method,
+        path,
+        attempt,
+        maxAttempts,
+        retryable,
+        terminal,
+        retryDelayMs,
+        error
+      });
+      if (terminal) {
+        if (error && typeof error === 'object') {
+          error.requestAttempts = attempt;
+          error.requestMaxAttempts = maxAttempts;
+          error.requestRetryExhausted = retryable && attempt >= maxAttempts;
+          error.previousStatePreserved = true;
+        }
+        if (isP2PCapacityRetry(error) && String(path || '').startsWith('/api/p2p/')) {
+          window.dispatchEvent(new CustomEvent('p2p:rate-limited', {
+            detail: {
+              path: String(path || ''),
+              error,
+              retryAfterSeconds: error.retryAfterSeconds,
+              retryAt: error.retryAt || 0
+            }
+          }));
+        }
+        throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs));
+    }
+  }
+  throw lastError || new Error('No se pudo completar la solicitud.');
 }
 
-export function apiPost(path, body = {}) {
+export function apiGet(path, retryOptions = {}) {
+  return request(path, { method: 'GET' }, retryOptions);
+}
+
+export function apiPost(path, body = {}, retryOptions = {}) {
   return request(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {})
-  });
+  }, retryOptions);
 }

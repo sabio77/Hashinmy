@@ -1,9 +1,9 @@
 {
   "schemaVersion": 3,
-  "releaseId": "semilla-appweb-pwa@1.9.99+2026-08-17-163",
-  "version": "1.9.99",
-  "build": "2026-08-17-163",
-  "releasedAt": "2026-08-17T12:49:00-05:00",
+  "releaseId": "semilla-appweb-pwa@1.9.101+2026-08-17-165",
+  "version": "1.9.101",
+  "build": "2026-08-17-165",
+  "releasedAt": "2026-08-17T15:13:30-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -52,8 +52,8 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "28ac28d6f0c7d615f1257c45b1e56b1e50a6a09122e87b709f41182cf10deb72",
-      "bytes": 4494
+      "sha256": "29d4b2bbfa261e3ccf1f56fe29b57882f23df215143be2d530f5f4ee92d1c264",
+      "bytes": 4495
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -72,8 +72,8 @@
     },
     {
       "url": "./src/js/api.js",
-      "sha256": "0a3be4b3ba39ddf51ec5c937d395694d114354e412606be2538734bffb028df1",
-      "bytes": 6105
+      "sha256": "096022c6b599516ac25ee33c83a98e6c8d59d33954920c240d6d8add21495201",
+      "bytes": 10368
     },
     {
       "url": "./src/js/firebase-auth.js",
@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "7b0d5733e1d9bc00fdcf2e3695ff6cc1f54ed5a4078a979f80ba99670037400d",
-      "bytes": 481796
+      "sha256": "fd3a4a6ba82a0ae38e9e0cd5353fc32a7f8e1bf647112b734c77f6196e918a7f",
+      "bytes": 498084
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -157,12 +157,12 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "7335c7e8f43450b22d1d7774349328496011671f3fe78718904451b81fd637f8",
-      "bytes": 176951
+      "sha256": "fedfa7d8645ab936da72aa31a9978a76785b9d9b8b94222afe66d12e3628b103",
+      "bytes": 179077
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "fd867d333004ed4b5c2665521ba719b2bc14b786ded726ffdc2d217710130f9a",
+      "sha256": "0b048e64a681705eee4705166dd46172b74c9b8d18b56cf2d973a5640418dcb9",
       "bytes": 981
     },
     {

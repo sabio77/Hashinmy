@@ -50,23 +50,43 @@ for (const marker of [
   'rememberTrashLifecycleReceipt',
   'lifecycleReceipts',
   'completedLifecycleReceipts',
-  'lifecycleReconciliationDeferred'
+  'lifecycleReconciliationDeferred',
+  'finalizeLifecycleFromEvent',
+  'LIFECYCLE_FINALIZATION_MAX_ATTEMPTS = 3',
+  'LIFECYCLE_REQUEST_MAX_ATTEMPTS = 3',
+  'lifecycleFinalizeEvent',
+  'p2p:lifecycle-retry-exhausted',
+  '[SemillaP2P][LIFECYCLE_AUDIT]'
 ]) {
   assert.ok(clientSource.includes(marker), `El cliente perdió la coordinación remota/local requerida: ${marker}`);
 }
 
-const finalizeIndex = clientSource.indexOf("event.eventType === 'p2p.lifecycle.finalize'");
-const localApplyIndex = clientSource.indexOf('await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);', finalizeIndex);
-const completeIndex = clientSource.indexOf("apiPost('/api/p2p/lifecycle/complete'", finalizeIndex);
-assert.ok(finalizeIndex >= 0 && localApplyIndex > finalizeIndex && completeIndex > localApplyIndex, 'El iniciador confirma antes de aplicar localmente o aplica fuera del evento final autoritativo.');
+const finalizeHelperIndex = clientSource.indexOf('async finalizeLifecycleFromEvent(');
+const localApplyIndex = clientSource.indexOf('await this.applyDecryptedOperationEvent(decryptedEvent, sessionContext);', finalizeHelperIndex);
+const completeIndex = clientSource.indexOf("apiPost('/api/p2p/lifecycle/complete'", finalizeHelperIndex);
+const finalizeRealtimeIndex = clientSource.indexOf("event.eventType === 'p2p.lifecycle.finalize'");
+const finalizeDelegateIndex = clientSource.indexOf('await this.finalizeLifecycleFromEvent(transaction, nestedEvent, sessionContext,', finalizeRealtimeIndex);
+assert.ok(finalizeHelperIndex >= 0 && localApplyIndex > finalizeHelperIndex && completeIndex > localApplyIndex, 'El iniciador confirma antes de aplicar localmente o perdió el orden autoritativo de finalización.');
+assert.ok(finalizeRealtimeIndex >= 0 && finalizeDelegateIndex > finalizeRealtimeIndex, 'El SSE de finalización dejó de reutilizar la ruta idempotente y auditable de commit local.');
 
 const lifecycleStartIndex = clientSource.indexOf("async startProjectLifecycle(action = '', spaceId = '', options = {})");
 const lifecycleStartEnd = clientSource.indexOf("trashProjectAfterReplicas(spaceId = '', options = {})", lifecycleStartIndex);
 const lifecycleStartSource = clientSource.slice(lifecycleStartIndex, lifecycleStartEnd);
 const durableIntentIndex = lifecycleStartSource.indexOf('await enqueueOutbox(outboxItem);');
-const backendStartIndex = lifecycleStartSource.indexOf('const data = await apiPost(outboxItem.endpoint, outboxItem.request);');
+const backendStartIndex = lifecycleStartSource.indexOf("data = await apiPost(outboxItem.endpoint, outboxItem.request, { maxAttempts: 1, audit: false });");
 assert.ok(durableIntentIndex >= 0 && backendStartIndex > durableIntentIndex, 'La intención crítica no se conserva antes de contactar al backend.');
 assert.ok(!lifecycleStartSource.includes('await removeOutbox(outboxItem.operationId).catch(() => null);\n      const transaction'), 'La intención crítica vuelve a retirarse apenas el backend acepta iniciar la coordinación.');
+assert.ok(lifecycleStartSource.includes('attempt <= LIFECYCLE_REQUEST_MAX_ATTEMPTS'), 'La solicitud crítica no tiene un máximo explícito de tres intentos.');
+assert.ok(lifecycleStartSource.includes('data?.lifecycleFinalizeEvent'), 'La respuesta de inicio no puede completar directamente una transacción ready cuando se pierde el SSE.');
+assert.ok(lifecycleStartSource.includes("this.lifecycleAudit('lifecycle-start-request-failed'"), 'Los fallos de inicio no generan una auditoría estructurada por intento.');
+assert.ok(lifecycleStartSource.includes('previousStatePreserved: true'), 'El agotamiento de la solicitud no declara que el estado local previo quedó preservado.');
+assert.ok(lifecycleStartSource.includes('lifecycleFinalizeEventMissingError'), 'Una respuesta ready sin evento autoritativo puede volver a quedar bloqueada sin consumir los tres intentos.');
+assert.ok(clientSource.includes("error.code = 'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING'"), 'Falta un error semántico auditable para una finalización ready incompleta.');
+assert.ok(clientSource.includes('this.scheduleLifecycleFinalizationObserver({}, sessionContext);'), 'El observador dejó de reprogramar de forma acotada los intentos cuando la red está temporalmente fuera de línea.');
+assert.ok(!clientSource.includes('if (navigator.onLine === false) return false;\n\n    const observerTask = (async () => {'), 'El observador todavía puede abandonar una transacción activa sin consumir sus tres intentos.');
+const lifecycleCompleteIndex = clientSource.indexOf("apiPost('/api/p2p/lifecycle/complete'", finalizeHelperIndex);
+const lifecycleOutboxRemovalIndex = clientSource.indexOf('await removeOutbox(operationId).catch(() => null);', finalizeHelperIndex);
+assert.ok(lifecycleCompleteIndex >= 0 && lifecycleOutboxRemovalIndex > lifecycleCompleteIndex, 'La intención durable se elimina antes de confirmar el cierre y ya no podría recuperarse si falla la confirmación final.');
 
 const remotePurgeIndex = clientSource.indexOf("event.eventType === 'p2p.lifecycle.remote-purge'");
 const remoteReceiptIndex = clientSource.indexOf('await this.rememberLifecycleReceipt({', remotePurgeIndex);

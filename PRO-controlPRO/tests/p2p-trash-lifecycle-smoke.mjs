@@ -218,11 +218,35 @@ if (observerStart < 0 || observerEnd <= observerStart) {
   throw new Error('No se encontró el contrato reutilizable del observador de finalización.');
 }
 const observerSource = clientSource.slice(observerStart, observerEnd)
+  .replace('export function normalizeLifecycleTransactionProgress', 'function normalizeLifecycleTransactionProgress')
+  .replace('export function recoverableSourceLifecycleTransactions', 'function recoverableSourceLifecycleTransactions')
   .replace('export function readySourceLifecycleTransactions', 'function readySourceLifecycleTransactions')
-  .replace('export function lifecycleFinalizationObserverDelay', 'function lifecycleFinalizationObserverDelay');
+  .replace('export function lifecycleFinalizationObserverDelay', 'function lifecycleFinalizationObserverDelay')
+  .replace('export function lifecycleRequestRetryDelay', 'function lifecycleRequestRetryDelay');
 const observerModuleUrl = `data:text/javascript;base64,${Buffer.from(`${observerSource}
-export { readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay };`).toString('base64')}`;
-const { readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay } = await import(observerModuleUrl);
+export { normalizeLifecycleTransactionProgress, recoverableSourceLifecycleTransactions, readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay, lifecycleRequestRetryDelay };`).toString('base64')}`;
+const { normalizeLifecycleTransactionProgress, recoverableSourceLifecycleTransactions, readySourceLifecycleTransactions, lifecycleFinalizationObserverDelay, lifecycleRequestRetryDelay } = await import(observerModuleUrl);
+const normalizedCompletedWaiting = normalizeLifecycleTransactionProgress({
+  transactionId: 'tx_waiting_complete',
+  spaceId: 'space_waiting_complete',
+  role: 'source',
+  status: 'waiting',
+  completed: 2,
+  total: 2,
+  remaining: 0
+});
+if (normalizedCompletedWaiting.status !== 'ready') {
+  throw new Error('Una transacción waiting 2/2 todavía puede dejar bloqueada la card aunque ya no tenga réplicas pendientes.');
+}
+const recoverableTransactions = recoverableSourceLifecycleTransactions([
+  { transactionId: 'tx_waiting', spaceId: 'space_waiting', role: 'source', status: 'waiting', completed: 0, total: 1, remaining: 1 },
+  { transactionId: 'tx_ready', spaceId: 'space_ready', role: 'source', status: 'ready' },
+  { transactionId: 'tx_target', spaceId: 'space_target', role: 'target', status: 'waiting', completed: 0, total: 1, remaining: 1 },
+  { transactionId: 'tx_completed', spaceId: 'space_completed', role: 'source', status: 'completed' }
+]);
+if (recoverableTransactions.length !== 2 || !recoverableTransactions.some((item) => item.status === 'waiting')) {
+  throw new Error('El observador no recupera las transacciones waiting del iniciador y todavía podría congelarlas indefinidamente.');
+}
 const readyTransactions = readySourceLifecycleTransactions([
   { transactionId: 'tx_ready', spaceId: 'space_ready', role: 'source', status: 'ready' },
   { transactionId: 'tx_waiting', spaceId: 'space_waiting', role: 'source', status: 'waiting' },
@@ -240,20 +264,62 @@ if (
 ) {
   throw new Error('El observador perdió su backoff acotado y podría consumir recursos de forma permanente.');
 }
+if (lifecycleRequestRetryDelay(0) !== 700 || lifecycleRequestRetryDelay(1) !== 1400 || lifecycleRequestRetryDelay(99) !== 4000) {
+  throw new Error('La solicitud crítica perdió su backoff acotado entre los tres intentos.');
+}
+if (!clientSource.includes('.map((transaction) => normalizeLifecycleTransactionProgress(transaction))')) {
+  throw new Error('El bootstrap no normaliza waiting N/N antes de exponer la transacción a la UI.');
+}
+for (const marker of [
+  "apiPost(outboxItem.endpoint, outboxItem.request, { maxAttempts: 1, audit: false })",
+  "apiPost('/api/p2p/lifecycle/resume'",
+  "{ maxAttempts: 1, audit: false }"
+]) {
+  if (!clientSource.includes(marker)) throw new Error(`El ciclo crítico puede multiplicar los tres intentos de red: ${marker}`);
+}
+
 for (const marker of [
   'lifecycleFinalizationObserverTimer',
   'scheduleLifecycleFinalizationObserver',
   'runLifecycleFinalizationObserver',
+  'recoverableLifecycleFinalizations',
+  'normalizeLifecycleTransactionProgress',
+  'recoverableSourceLifecycleTransactions',
   "apiPost('/api/p2p/lifecycle/resume'",
   '!this.realtimeLeader',
   'this.clearLifecycleFinalizationObserver()',
   'this.scheduleLifecycleFinalizationObserver({ immediate: true }, sessionContext)',
-  'lifecycleTransactions: (Array.isArray(this.bootstrapState?.lifecycleTransactions)'
+  'lifecycleTransactions: (Array.isArray(this.bootstrapState?.lifecycleTransactions)',
+  'LIFECYCLE_FINALIZATION_MAX_ATTEMPTS = 3',
+  'LIFECYCLE_REQUEST_MAX_ATTEMPTS = 3',
+  'lifecycleFinalizationFailures',
+  'response?.lifecycleFinalizeEvent',
+  'p2p:lifecycle-retry-exhausted',
+  'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING',
+  'rememberLifecycleTerminalState',
+  'previousLifecycleTransactions',
+  '[SemillaP2P][LIFECYCLE_AUDIT]'
 ]) {
   if (!clientSource.includes(marker)) throw new Error(`El observador de finalización perdió una garantía requerida: ${marker}`);
 }
+for (const marker of [
+  'lifecycle.completedWithDeferredReplicas',
+  'transaction?.retryExhausted === true',
+  'réplica no confirmó a tiempo'
+]) {
+  if (!appSource.includes(marker)) throw new Error(`La interfaz no informa correctamente una finalización con réplicas diferidas: ${marker}`);
+}
 if (clientSource.includes('setInterval(')) {
   throw new Error('El observador de finalización introdujo polling permanente.');
+}
+if (clientSource.includes('if (navigator.onLine === false) return false;\n\n    const observerTask = (async () => {')) {
+  throw new Error('Una pérdida de conectividad todavía puede congelar una card sin consumir el máximo de tres intentos.');
+}
+if (!clientSource.includes("throw this.lifecycleFinalizeEventMissingError(resumedTransaction, 'observer-resume')")) {
+  throw new Error('Una respuesta ready 1/1 o 2/2 sin evento final todavía puede reiniciar el contador y bloquear la card indefinidamente.');
+}
+if (!clientSource.includes("['failed', 'completion-pending'].includes(String(previous?.status || '').trim())")) {
+  throw new Error('Un bootstrap posterior puede volver a activar inmediatamente una transacción que ya agotó sus tres intentos locales.');
 }
 
 console.log('OK: menú vertical, papelera restaurable, purga permanente, métricas activas, concurrencia y observador autodesactivable del ciclo de vida P2P validados.');

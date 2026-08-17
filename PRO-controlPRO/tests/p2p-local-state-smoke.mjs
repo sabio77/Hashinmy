@@ -751,32 +751,61 @@ const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1000;
 const LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS = 1500;
 const LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS = 30000;
+const LIFECYCLE_FINALIZATION_MAX_ATTEMPTS = 3;
+const LIFECYCLE_REQUEST_MAX_ATTEMPTS = 3;
+const LIFECYCLE_REQUEST_RETRY_BASE_MS = 700;
+const LIFECYCLE_REQUEST_RETRY_MAX_MS = 4000;
 const LIFECYCLE_RECEIPT_META_KEY = 'p2pLifecycleReceipts';
 const LIFECYCLE_RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const LIFECYCLE_RECEIPT_MAX = 256;
 const LOCAL_LIFECYCLE_TOMBSTONE_META_KEY = 'p2pLocalLifecycleTombstones';
 const LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const LOCAL_LIFECYCLE_TOMBSTONE_MAX = 256;
-const readySourceLifecycleTransactions = (transactions = []) => {
-  const ready = new Map();
+const normalizeLifecycleTransactionProgress = (transaction = {}) => {
+  const normalized = transaction && typeof transaction === 'object' && !Array.isArray(transaction) ? { ...transaction } : {};
+  const status = String(normalized.status || '').trim();
+  const hasRemaining = normalized.remaining !== undefined && normalized.remaining !== null;
+  const hasTotal = normalized.total !== undefined && normalized.total !== null;
+  const hasCompleted = normalized.completed !== undefined && normalized.completed !== null;
+  const total = Math.max(0, Number(normalized.total || 0));
+  const completed = Math.max(0, Number(normalized.completed || 0));
+  const remaining = Math.max(0, Number(normalized.remaining || 0));
+  if (hasTotal) normalized.total = total;
+  if (hasCompleted) normalized.completed = completed;
+  if (hasRemaining) normalized.remaining = remaining;
+  if (status === 'waiting' && ((hasRemaining && remaining === 0) || (hasTotal && hasCompleted && total > 0 && completed >= total))) normalized.status = 'ready';
+  return normalized;
+};
+const recoverableSourceLifecycleTransactions = (transactions = []) => {
+  const recoverable = new Map();
   for (const transaction of Array.isArray(transactions) ? transactions : []) {
-    const transactionId = String(transaction?.transactionId || '').trim();
-    const spaceId = String(transaction?.spaceId || '').trim();
+    const normalized = normalizeLifecycleTransactionProgress(transaction);
+    const transactionId = String(normalized?.transactionId || '').trim();
+    const spaceId = String(normalized?.spaceId || '').trim();
     if (
       !transactionId
       || !spaceId
-      || String(transaction?.role || '').trim() !== 'source'
-      || String(transaction?.status || '').trim() !== 'ready'
+      || String(normalized?.role || '').trim() !== 'source'
+      || !['waiting', 'ready'].includes(String(normalized?.status || '').trim())
     ) continue;
-    ready.set(transactionId, { ...transaction, transactionId, spaceId });
+    recoverable.set(transactionId, { ...normalized, transactionId, spaceId });
   }
-  return [...ready.values()];
+  return [...recoverable.values()];
 };
+const readySourceLifecycleTransactions = (transactions = []) => recoverableSourceLifecycleTransactions(transactions)
+  .filter((transaction) => String(transaction?.status || '').trim() === 'ready');
 const lifecycleFinalizationObserverDelay = (attempt = 0) => {
   const normalizedAttempt = Math.min(8, Math.max(0, Math.floor(Number(attempt || 0))));
   return Math.min(
     LIFECYCLE_FINALIZATION_OBSERVER_MAX_MS,
     LIFECYCLE_FINALIZATION_OBSERVER_BASE_MS * (2 ** normalizedAttempt)
+  );
+};
+const lifecycleRequestRetryDelay = (attempt = 0) => {
+  const normalizedAttempt = Math.min(6, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(
+    LIFECYCLE_REQUEST_RETRY_MAX_MS,
+    LIFECYCLE_REQUEST_RETRY_BASE_MS * (2 ** normalizedAttempt)
   );
 };
 const CURSOR_META_PREFIX = 'cursor:';
@@ -1360,6 +1389,188 @@ if (lifecycleObserverClient.bootstrapState.lifecycleTransactions.length
   || lifecycleObserverClient.lifecycleFinalizationObserverAttempt !== 0) {
   throw new Error('El observador no se autodesactivó después de confirmar la finalización.');
 }
+
+const waitingLifecycleClient = new SemillaP2PClient();
+waitingLifecycleClient.user = { userId: 'usr_lifecycle_waiting' };
+waitingLifecycleClient.deviceId = 'dev_lifecycle_waiting';
+waitingLifecycleClient.started = true;
+waitingLifecycleClient.manualClose = false;
+waitingLifecycleClient.realtimeLeader = true;
+waitingLifecycleClient.sessionGeneration = 7;
+waitingLifecycleClient.bootstrapState = {
+  spaces: [{
+    spaceId: 'space_lifecycle_waiting',
+    ownerUserId: 'usr_lifecycle_waiting',
+    authorizationState: 'confirmed',
+    members: [{ userId: 'usr_lifecycle_waiting', role: 'owner', permissions: ['read', 'write'] }]
+  }],
+  lifecycleTransactions: [{
+    transactionId: 'tx_lifecycle_waiting',
+    action: 'trash',
+    spaceId: 'space_lifecycle_waiting',
+    role: 'source',
+    status: 'waiting',
+    completed: 1,
+    total: 2,
+    remaining: 1
+  }]
+};
+if (!waitingLifecycleClient.scheduleLifecycleFinalizationObserver({ immediate: true })) {
+  throw new Error('Una transacción waiting del iniciador no activó la recuperación y todavía podría congelar la card.');
+}
+await new Promise((resolve) => setTimeout(resolve, 0));
+const waitingLifecycleRequest = pendingApiCalls.shift();
+if (waitingLifecycleRequest?.endpoint !== '/api/p2p/lifecycle/resume'
+  || waitingLifecycleRequest?.payload?.transactionId !== 'tx_lifecycle_waiting') {
+  throw new Error('La recuperación no reintenta la barrera de confirmación de una transacción waiting.');
+}
+const waitingLifecycleTask = waitingLifecycleClient.lifecycleFinalizationObserverPromise;
+waitingLifecycleClient.realtimeLeader = false;
+waitingLifecycleRequest.resolve({
+  ok: true,
+  lifecycle: {
+    transactionId: 'tx_lifecycle_waiting',
+    action: 'trash',
+    spaceId: 'space_lifecycle_waiting',
+    role: 'source',
+    status: 'waiting',
+    completed: 1,
+    total: 2,
+    remaining: 1,
+    attempts: 1,
+    maxAttempts: 3
+  }
+});
+await waitingLifecycleTask;
+const rememberedWaiting = waitingLifecycleClient.bootstrapState.lifecycleTransactions.find((item) => item.transactionId === 'tx_lifecycle_waiting');
+if (rememberedWaiting?.status !== 'waiting'
+  || rememberedWaiting?.attempts !== 1) {
+  throw new Error('El primer reintento waiting no conserva progreso auditable.');
+}
+waitingLifecycleClient.clearLifecycleFinalizationObserver();
+
+waitingLifecycleClient.rememberLifecycleTransaction({
+  ...rememberedWaiting,
+  status: 'ready',
+  completed: 2,
+  remaining: 0,
+  updatedAt: '2026-08-17T19:00:02.000Z'
+}, { observe: false });
+const afterStaleWaiting = waitingLifecycleClient.rememberLifecycleTransaction({
+  ...rememberedWaiting,
+  status: 'waiting',
+  completed: 1,
+  remaining: 1,
+  updatedAt: '2026-08-17T19:00:01.000Z'
+}, { observe: false });
+if (afterStaleWaiting?.status !== 'ready' || afterStaleWaiting?.remaining !== 0) {
+  throw new Error('Un evento waiting obsoleto todavía puede hacer retroceder una transacción ready y volver a bloquear la card.');
+}
+
+const lifecycleRetryClient = new SemillaP2PClient();
+lifecycleRetryClient.user = { userId: 'usr_lifecycle_retry' };
+lifecycleRetryClient.deviceId = 'dev_lifecycle_retry';
+lifecycleRetryClient.started = true;
+lifecycleRetryClient.manualClose = false;
+lifecycleRetryClient.realtimeLeader = true;
+lifecycleRetryClient.sessionGeneration = 6;
+lifecycleRetryClient.bootstrapState = {
+  spaces: [{
+    spaceId: 'space_lifecycle_retry',
+    ownerUserId: 'usr_lifecycle_retry',
+    authorizationState: 'confirmed',
+    members: [{ userId: 'usr_lifecycle_retry', role: 'owner', permissions: ['read', 'write'] }]
+  }],
+  lifecycleTransactions: [{
+    transactionId: 'tx_lifecycle_retry',
+    action: 'trash',
+    spaceId: 'space_lifecycle_retry',
+    role: 'source',
+    status: 'ready'
+  }]
+};
+lifecycleRetryClient.scheduleLifecycleFinalizationObserver({ immediate: true });
+for (let attempt = 1; attempt <= 3; attempt += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const retryRequest = pendingApiCalls.shift();
+  if (retryRequest?.endpoint !== '/api/p2p/lifecycle/resume') {
+    throw new Error(`El intento ${attempt} de finalización no usó el endpoint idempotente de recuperación.`);
+  }
+  const retryTask = lifecycleRetryClient.lifecycleFinalizationObserverPromise;
+  const retryError = Object.assign(new Error(`fallo temporal ${attempt}`), { status: 503, code: 'P2P_TEMPORARY_UNAVAILABLE' });
+  retryRequest.reject(retryError);
+  await retryTask;
+}
+const exhaustedLifecycle = lifecycleRetryClient.bootstrapState.lifecycleTransactions.find((item) => item.transactionId === 'tx_lifecycle_retry');
+const terminalLifecycleAudit = dispatchedEvents.find((event) => event.name === 'p2p:lifecycle-retry-exhausted' && event.detail?.transaction?.transactionId === 'tx_lifecycle_retry');
+if (lifecycleRetryClient.lifecycleFinalizationFailures.get('tx_lifecycle_retry') !== 3
+  || exhaustedLifecycle?.status !== 'failed'
+  || exhaustedLifecycle?.retryExhausted !== true
+  || lifecycleRetryClient.lifecycleFinalizationObserverTimer
+  || !terminalLifecycleAudit
+  || terminalLifecycleAudit.detail?.previousStatePreserved !== true) {
+  throw new Error('El observador no corta exactamente al tercer fallo, no conserva el estado previo o deja la transacción crítica reintentándose.');
+}
+
+const lifecycleSemanticRetryClient = new SemillaP2PClient();
+lifecycleSemanticRetryClient.user = { userId: 'usr_lifecycle_semantic_retry' };
+lifecycleSemanticRetryClient.deviceId = 'dev_lifecycle_semantic_retry';
+lifecycleSemanticRetryClient.started = true;
+lifecycleSemanticRetryClient.manualClose = false;
+lifecycleSemanticRetryClient.realtimeLeader = true;
+lifecycleSemanticRetryClient.sessionGeneration = 7;
+lifecycleSemanticRetryClient.bootstrapState = {
+  spaces: [{
+    spaceId: 'space_lifecycle_semantic_retry',
+    ownerUserId: 'usr_lifecycle_semantic_retry',
+    authorizationState: 'confirmed',
+    members: [{ userId: 'usr_lifecycle_semantic_retry', role: 'owner', permissions: ['read', 'write'] }]
+  }],
+  lifecycleTransactions: [{
+    transactionId: 'tx_lifecycle_semantic_retry',
+    action: 'trash',
+    spaceId: 'space_lifecycle_semantic_retry',
+    role: 'source',
+    status: 'ready',
+    completed: 2,
+    total: 2,
+    remaining: 0
+  }]
+};
+lifecycleSemanticRetryClient.scheduleLifecycleFinalizationObserver({ immediate: true });
+for (let attempt = 1; attempt <= 3; attempt += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const retryRequest = pendingApiCalls.shift();
+  if (retryRequest?.endpoint !== '/api/p2p/lifecycle/resume') {
+    throw new Error(`El intento semántico ${attempt} no volvió a consultar la finalización de forma idempotente.`);
+  }
+  const retryTask = lifecycleSemanticRetryClient.lifecycleFinalizationObserverPromise;
+  retryRequest.resolve({
+    ok: true,
+    lifecycle: {
+      transactionId: 'tx_lifecycle_semantic_retry',
+      action: 'trash',
+      spaceId: 'space_lifecycle_semantic_retry',
+      role: 'source',
+      status: 'ready',
+      completed: 2,
+      total: 2,
+      remaining: 0
+    }
+  });
+  await retryTask;
+}
+const exhaustedSemanticLifecycle = lifecycleSemanticRetryClient.bootstrapState.lifecycleTransactions.find((item) => item.transactionId === 'tx_lifecycle_semantic_retry');
+const semanticTerminalAudit = dispatchedEvents.find((event) => event.name === 'p2p:lifecycle-retry-exhausted'
+  && event.detail?.transaction?.transactionId === 'tx_lifecycle_semantic_retry');
+if (lifecycleSemanticRetryClient.lifecycleFinalizationFailures.get('tx_lifecycle_semantic_retry') !== 3
+  || exhaustedSemanticLifecycle?.status !== 'failed'
+  || exhaustedSemanticLifecycle?.lastErrorCode !== 'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING'
+  || !semanticTerminalAudit
+  || semanticTerminalAudit.detail?.error?.code !== 'P2P_LIFECYCLE_FINALIZE_EVENT_MISSING') {
+  throw new Error('Una respuesta HTTP exitosa pero semánticamente incompleta todavía puede dejar la card en 1/1 o 2/2 indefinidamente.');
+}
+
 lifecycleObserverClient.realtimeLeader = false;
 lifecycleObserverClient.bootstrapState.lifecycleTransactions = [{
   transactionId: 'tx_lifecycle_follower',

@@ -2946,12 +2946,33 @@ window.addEventListener('p2p:lifecycle-completed', (event) => {
   applyP2PState(semillaP2P.bootstrapState);
   if (transaction?.spaceId === state.selectedSpaceId) showDashboard();
   if (elements.trashDialog?.open) renderTrash();
-  const message = transaction?.action === 'purge'
-    ? t('lifecycle.purgeCompleted', 'Todos los dispositivos confirmaron la eliminación permanente del proyecto.')
-    : transaction?.action === 'restore'
-      ? t('lifecycle.restoreCompleted', 'Todos los dispositivos confirmaron la restauración del proyecto.')
-      : t('lifecycle.trashCompleted', 'Todos los dispositivos confirmaron el envío del proyecto a la papelera.');
+  const released = Math.max(0, Number(transaction?.released || 0));
+  const completedAfterRetryExhaustion = transaction?.retryExhausted === true && released > 0;
+  const message = completedAfterRetryExhaustion
+    ? t('lifecycle.completedWithDeferredReplicas', `La acción se completó después de 3 intentos. ${released} ${released === 1 ? 'réplica no confirmó a tiempo y conservará' : 'réplicas no confirmaron a tiempo y conservarán'} la operación pendiente para sincronizarse al volver a estar disponibles.`)
+    : transaction?.action === 'purge'
+      ? t('lifecycle.purgeCompleted', 'Todos los dispositivos confirmaron la eliminación permanente del proyecto.')
+      : transaction?.action === 'restore'
+        ? t('lifecycle.restoreCompleted', 'Todos los dispositivos confirmaron la restauración del proyecto.')
+        : t('lifecycle.trashCompleted', 'Todos los dispositivos confirmaron el envío del proyecto a la papelera.');
   setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, message, 'success');
+});
+window.addEventListener('p2p:lifecycle-retry-exhausted', (event) => {
+  const transaction = event.detail?.transaction || null;
+  applyP2PState(semillaP2P.bootstrapState);
+  renderDashboard();
+  if (elements.trashDialog?.open) renderTrash();
+  if (state.selectedSpaceId && transaction?.spaceId === state.selectedSpaceId) renderProject();
+  const action = String(transaction?.action || '').trim();
+  const localCommitApplied = event.detail?.localCommitApplied === true || transaction?.localCommitApplied === true;
+  const message = localCommitApplied
+    ? t('lifecycle.completionPending', 'La acción ya se aplicó en este dispositivo y en las réplicas, pero no se pudo cerrar su confirmación después de 3 intentos. No se repetirá indefinidamente; quedó registrada para reconciliarse en la próxima recuperación de conexión.')
+    : action === 'restore'
+      ? t('lifecycle.restoreRetryExhausted', 'No se pudo confirmar la restauración después de 3 intentos. El proyecto conserva el último estado confirmado y se registró la auditoría técnica.')
+      : action === 'purge'
+        ? t('lifecycle.purgeRetryExhausted', 'No se pudo confirmar la eliminación permanente después de 3 intentos. El proyecto conserva el último estado confirmado y se registró la auditoría técnica.')
+        : t('lifecycle.trashRetryExhausted', 'No se pudo confirmar el envío a papelera después de 3 intentos. El proyecto conserva el último estado confirmado y se registró la auditoría técnica.');
+  setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, message, 'error');
 });
 window.addEventListener('p2p:space-deleted', (event) => {
   const deletedSpaceId = String(event.detail?.spaceId || '').trim();

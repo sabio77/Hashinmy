@@ -49,6 +49,7 @@ REQUIRED_FILES = [
     "src/js/app.js",
     "src/css/app.css",
     "tests/application-scope-smoke.mjs",
+    "tests/api-retry-smoke.mjs",
     "tests/pwa-request-isolation-smoke.mjs",
     "tests/p2p-local-state-smoke.mjs",
     "tests/p2p-batch-intent-smoke.mjs",
@@ -279,6 +280,21 @@ def assert_javascript_syntax() -> None:
             fail(f"Error de sintaxis en {relative}: {result.stderr.strip() or result.stdout.strip()}")
 
 
+
+
+def assert_api_retry_policy() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("ADVERTENCIA: node no está disponible; se omite prueba de reintentos de solicitudes backend.", file=sys.stderr)
+        return
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "api-retry-smoke.mjs")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        fail(f"Falló la política uniforme de 3 intentos para solicitudes backend: {result.stderr.strip() or result.stdout.strip()}")
 
 
 def assert_replication_contract() -> None:
@@ -1467,6 +1483,7 @@ def main() -> None:
     assert_subfolder_entrypoint_normalization()
     assert_install_experience()
     assert_javascript_syntax()
+    assert_api_retry_policy()
     assert_replication_contract()
     assert_replica_batch_atomicity()
     assert_local_state_reconciliation()
