@@ -6,7 +6,8 @@ Antes de publicar una app real basada en esta semilla:
 
 - [ ] Cambiar `name`, `short_name` y `description` en `manifest.webmanifest`.
 - [ ] Cambiar `appName` en `src/js/app-metadata.js`.
-- [ ] Cambiar íconos en `assets/icons`.
+- [ ] Generar/reemplazar los PNG de instalación en `assets/pwa/` usando exactamente los nombres y tamaños descritos por sus `.png.txt`.
+- [ ] Generar/reemplazar favicons en `assets/browser/`, Apple Touch Icons en `assets/apple/`, logo interno en `assets/ui/` e iconos de notificación en `assets/notifications/` según corresponda.
 - [ ] Ajustar `theme_color` y `background_color`.
 
 ## Instalación
@@ -14,7 +15,8 @@ Antes de publicar una app real basada en esta semilla:
 - [ ] Verificar que la app se sirve por HTTPS.
 - [ ] Confirmar que `sw.js` queda en la raíz pública de la app.
 - [ ] Revisar `start_url`, `scope` e `id`.
-- [ ] Probar instalación en escritorio y móvil.
+- [ ] Confirmar PNG reales `192x192` y `512x512` con `purpose: any`, más sus variantes `maskable`, antes de probar instalación.
+- [ ] Probar instalación desde el botón propio de la app en escritorio y móvil; no validar como equivalente un simple acceso directo creado por el navegador.
 
 ## Autoactualización
 
@@ -24,6 +26,9 @@ Antes de publicar una app real basada en esta semilla:
 - [ ] Actualizar `src/js/app-metadata.js` en cada deploy importante.
 - [ ] Revisar `fingerprintCheckFiles`.
 - [ ] Probar cambio de CSS/JS con app instalada.
+- [ ] Al reemplazar un PNG de `assets/pwa/`, desplegar mediante `tools/generate-release.py` y confirmar que cambió `icon_rev` en `manifest.webmanifest`.
+- [ ] En Chrome de escritorio, si aparece **Revisar actualización de la aplicación** por cambio de icono, confirmar la actualización; el navegador puede requerir esa aprobación para cambios de identidad.
+- [ ] Mantener estable el nombre y la ubicación de `manifest.webmanifest`; no versionar el archivo cambiando su ruta.
 
 
 ## Conexión con memoriaBACKEND

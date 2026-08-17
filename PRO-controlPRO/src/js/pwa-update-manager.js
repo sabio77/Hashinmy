@@ -601,7 +601,7 @@
   async function requestInstall() {
     var promptEvent = state.installPrompt;
     if (!promptEvent || typeof promptEvent.prompt !== 'function') {
-      showStatus(translate('pwa.installFallback', 'Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.'), 'ok');
+      showStatus(translate('pwa.installFallback', 'La instalación como app independiente aún no está disponible en este navegador o dispositivo. No crees un acceso directo: inténtalo de nuevo cuando aparezca la instalación PWA.'), 'error');
       refreshInstallExperience();
       return false;
     }
@@ -618,7 +618,7 @@
       }
       return false;
     } catch (error) {
-      showStatus(translate('pwa.installFallback', 'Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”.'), 'ok');
+      showStatus(translate('pwa.installFallback', 'La instalación como app independiente aún no está disponible en este navegador o dispositivo. No crees un acceso directo: inténtalo de nuevo cuando aparezca la instalación PWA.'), 'error');
       return false;
     }
   }

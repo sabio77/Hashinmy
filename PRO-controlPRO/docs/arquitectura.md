@@ -68,7 +68,9 @@ Las solicitudes de estado entre ventanas quedan dirigidas al `tabId` y al térmi
 
 2. **Instalación PWA**
    - `manifest.webmanifest`
-   - íconos en `assets/icons`
+   - launcher PWA en `assets/pwa/` (`any` y `maskable`)
+   - favicons en `assets/browser/` y Apple Touch Icons en `assets/apple/`
+   - logo interno en `assets/ui/` e iconos de notificación en `assets/notifications/`
    - `sw.js`
 
 3. **Multilenguaje**

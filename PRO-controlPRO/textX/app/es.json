@@ -30,7 +30,7 @@
     "installButton": "Instalar",
     "installLater": "Después",
     "installAccepted": "Instalación iniciada.",
-    "installFallback": "Usa el menú del navegador y elige “Instalar app” o “Agregar a pantalla de inicio”."
+    "installFallback": "La instalación como app independiente aún no está disponible en este navegador o dispositivo. No crees un acceso directo: inténtalo de nuevo cuando aparezca la instalación PWA."
   },
   "auth": {
     "eyebrow": "Acceso seguro",

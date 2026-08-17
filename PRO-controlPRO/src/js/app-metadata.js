@@ -38,8 +38,8 @@
   var metadata = Object.freeze({
     appName: 'Semilla App Web',
     version: '1.9.99',
-    build: '2026-08-17-162',
-    releasedAt: '2026-08-17T11:43:00-05:00',
+    build: '2026-08-17-163',
+    releasedAt: '2026-08-17T12:49:00-05:00',
     applicationId: applicationId,
     applicationPath: applicationId === 'root' ? '/' : '/' + applicationId + '/',
     applicationBaseUrl: applicationBaseUrl,
@@ -87,11 +87,7 @@
       './textX/app/en.json',
       './textX/seo/en.json',
       './P2P_sin_RED_LOCALx/P2P_sin_transport.js',
-      './assets/icons/logo.png',
-      './assets/icons/icon-192.png',
-      './assets/icons/icon-512.png',
-      './assets/icons/maskable-192.png',
-      './assets/icons/maskable-512.png'
+      './assets/ui/ui_logo_principal_96x96.png'
     ],
 
     // Rutas típicas de APIs reales: no se cachean para evitar datos obsoletos.

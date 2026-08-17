@@ -1,9 +1,9 @@
 {
   "schemaVersion": 3,
-  "releaseId": "semilla-appweb-pwa@1.9.99+2026-08-17-162",
+  "releaseId": "semilla-appweb-pwa@1.9.99+2026-08-17-163",
   "version": "1.9.99",
-  "build": "2026-08-17-162",
-  "releasedAt": "2026-08-17T11:43:00-05:00",
+  "build": "2026-08-17-163",
+  "releasedAt": "2026-08-17T12:49:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -27,8 +27,8 @@
   "criticalAssets": [
     {
       "url": "./index.html",
-      "sha256": "a35575586c7c1dd0835f6667143d2990c53cbbf9ba1cd9511f1c9f2a8214fb9f",
-      "bytes": 26848
+      "sha256": "336f764f923e08b9abc5f7a5ad8dbb3489fe60f62a65240cc4b922098edacfd1",
+      "bytes": 27129
     },
     {
       "url": "./offline.html",
@@ -37,13 +37,13 @@
     },
     {
       "url": "./manifest.webmanifest",
-      "sha256": "c45eedf43b9f6746cacd378e11ab4643c435ba2dc1fdd87b4b1c75cc416c8e79",
-      "bytes": 7987
+      "sha256": "2621320d71181399c4516e858fe470a111c74b4f3cf5567198b74d40ac1244ef",
+      "bytes": 2900
     },
     {
       "url": "./sw.js",
-      "sha256": "c09eced243ab9d671a2ec2113d8eca1f3ed84bc5d8dd803faa24007c156fe277",
-      "bytes": 32393
+      "sha256": "a443d805c4049c3459d0218b09a2d24bef02b74ce44d94e4da7bf5c8c7c9fa44",
+      "bytes": 32220
     },
     {
       "url": "./src/css/app.css",
@@ -52,8 +52,8 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "8e48183efb6e15dfda6051ec17056e6b2dcfc12f41ff8e1d3182b57b4fa14a07",
-      "bytes": 4634
+      "sha256": "28ac28d6f0c7d615f1257c45b1e56b1e50a6a09122e87b709f41182cf10deb72",
+      "bytes": 4494
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -62,8 +62,8 @@
     },
     {
       "url": "./src/js/config.js",
-      "sha256": "54e7708f804162e2abb2d14fd52656842e94468f5851c6962496ff6883017ca3",
-      "bytes": 5467
+      "sha256": "4a3a1b4fdf70a56930ea19ef2d4c4dace968045bdfea3a5145c00e08915cc1d2",
+      "bytes": 8435
     },
     {
       "url": "./src/js/application-scope.js",
@@ -152,8 +152,8 @@
     },
     {
       "url": "./src/js/pwa-update-manager.js",
-      "sha256": "96156014de466cf22cb2c03977efc0a2901e4baf2ec805725bccf712eaafe14a",
-      "bytes": 23732
+      "sha256": "1df6a3108108308fbb5f9de6dfb224ff6d3da1fa83edfe2e32f70137768632c7",
+      "bytes": 23918
     },
     {
       "url": "./src/js/app.js",
@@ -162,13 +162,13 @@
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "1318ae4f89b3417ece407c29775089b3372d496a1aa1371be86d96cc7ca37034",
+      "sha256": "fd867d333004ed4b5c2665521ba719b2bc14b786ded726ffdc2d217710130f9a",
       "bytes": 981
     },
     {
       "url": "./textX/app/es.json",
-      "sha256": "6fad79f220e9a9cba97d410ea2a7e6e9912afa5fb559c5bdb9ba20f79b208e8f",
-      "bytes": 26543
+      "sha256": "69f3ee10682f160bbd56098b45565d46494c0760cc72894a09c00532ff0d0de6",
+      "bytes": 26633
     },
     {
       "url": "./textX/seo/es.json",
@@ -177,8 +177,8 @@
     },
     {
       "url": "./textX/app/ar.json",
-      "sha256": "cec6ae7cb79a518df2454c75b99bf84f2bb20f06e1ff3b82084683ae6d77ecc3",
-      "bytes": 31758
+      "sha256": "d3420eeaf89efcb6d23b4b053ab03011240ff4e92e2b8493270d261a764a7c1c",
+      "bytes": 31872
     },
     {
       "url": "./textX/seo/ar.json",
@@ -187,8 +187,8 @@
     },
     {
       "url": "./textX/app/en.json",
-      "sha256": "18ec58ce2e9010d6c7c0a729b3dcfae71ddd0cba35ec49902a21e0967012ee31",
-      "bytes": 24943
+      "sha256": "ff9f704ccb23efa825b2c198eaa972951489609703b325ee731ef93b916b2224",
+      "bytes": 25035
     },
     {
       "url": "./textX/seo/en.json",
@@ -201,29 +201,89 @@
       "bytes": 25179
     },
     {
-      "url": "./assets/icons/logo.png.txt",
-      "sha256": "5303a9e299dc72ae4424b108ce59a5f580dd38c1b8fc4522b9ccaa0fa01da879",
-      "bytes": 509
+      "url": "./assets/browser/browser_favicon_16x16.png.txt",
+      "sha256": "247324df8bf07d9e8de5a74f0d23fc7387513a94b23ed7aa8afc513bd854e7c0",
+      "bytes": 1598
     },
     {
-      "url": "./assets/icons/icon-192.png.txt",
-      "sha256": "dfc9b0383f8164e9dc10f3544cde68e272db5ef4b5b2dc097f81e615246787fc",
-      "bytes": 476
+      "url": "./assets/browser/browser_favicon_32x32.png.txt",
+      "sha256": "be5392768f139ebbb38aaa54d789b3e3db9c0f49884adf81c72332c1e3f08099",
+      "bytes": 1590
     },
     {
-      "url": "./assets/icons/icon-512.png.txt",
-      "sha256": "defbc3bd510091cec8d5274fc4db0a5b8cfa4f9bd8608faffbe9ca49e68c5c28",
-      "bytes": 476
+      "url": "./assets/apple/apple_touch_icon_152x152.png.txt",
+      "sha256": "e14f0dcd37e3681f86e8502937eb88d14c1133dd0d74b7baf9244b6d1f03d1fa",
+      "bytes": 1666
     },
     {
-      "url": "./assets/icons/maskable-192.png.txt",
-      "sha256": "7920a25b7668e7dd4f93f3b139f7f1120bc2e2fbcc07d083e5b97d77ad57a93e",
-      "bytes": 485
+      "url": "./assets/apple/apple_touch_icon_180x180.png.txt",
+      "sha256": "981f5fa343f2220d98b341e7b463f82e3b31e43c0a25ed7ff7f19a9518515879",
+      "bytes": 1657
     },
     {
-      "url": "./assets/icons/maskable-512.png.txt",
-      "sha256": "cd8fe9ac30252bda9afb2eaca4bbd4b6da051eaa4db4b64d42c44299243f111e",
-      "bytes": 485
+      "url": "./assets/ui/ui_logo_principal_96x96.png.txt",
+      "sha256": "10920d339a1da4a3aa7641bd72fe66a742fa45b156424a299c0ea18b6fdb8908",
+      "bytes": 1599
+    },
+    {
+      "url": "./assets/notifications/notification_icon_192x192.png.txt",
+      "sha256": "c562adc2c343f59848354f9e4715ff9b4221a5f2cb7a9edc2cfffe98c08e1b3b",
+      "bytes": 1604
+    },
+    {
+      "url": "./assets/notifications/notification_badge_monochrome_96x96.png.txt",
+      "sha256": "d680c1171982cf758440b6da20ac6c7df3180acd0d1de35dce6b05b014fe65a8",
+      "bytes": 1644
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_48x48.png.txt",
+      "sha256": "3184aad0ec96975b8558420fe6704241c4d3c134b1466def877533479c188fe2",
+      "bytes": 1669
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_72x72.png.txt",
+      "sha256": "a4d982606248af7e05ae19afd914f6b5fce997db35471d35e9906403df11ba2e",
+      "bytes": 1669
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_96x96.png.txt",
+      "sha256": "977960b0c6cc6ba52d613a8cdbb7e8ddaf608be5bed1f3d921899b5ed9ffdab3",
+      "bytes": 1669
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_128x128.png.txt",
+      "sha256": "aeab5a23d58b756af1b1120be8cad7f6f82c1cb2773c5bca4df3177b4eece792",
+      "bytes": 1673
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_144x144.png.txt",
+      "sha256": "6c768a2433816c1b89145725eeed4404a94ff10347035e8dc5d0cc6958de45c5",
+      "bytes": 1673
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_192x192.png.txt",
+      "sha256": "f9cd848901ae4cf1e0ba56d77e85adc85cb1469fcb6ae697a2d1c06c37b08efb",
+      "bytes": 1673
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_384x384.png.txt",
+      "sha256": "7d93811318cfb3ac2f98b3aea7464e990355cc2d51d78acc992c0456c1aaa415",
+      "bytes": 1673
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_any_512x512.png.txt",
+      "sha256": "a8ca5851c7147c2f8851dd5e109ca6b44d8f5cdc92f0c9fd1e3df8a5caa4dc4c",
+      "bytes": 1673
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_maskable_192x192.png.txt",
+      "sha256": "ce34fd6a27077a68e7c1fec18a0a8ac39a376bc97745e070d25a6a57f57713eb",
+      "bytes": 1720
+    },
+    {
+      "url": "./assets/pwa/pwa_launcher_maskable_512x512.png.txt",
+      "sha256": "daaab4cf8888d37c33a6ce4c52c9424692a1f11a0853f29e444792ef999ae16f",
+      "bytes": 1720
     }
   ],
   "i18n": {
@@ -243,13 +303,42 @@
   },
   "assetPrompts": {
     "autoDiscovery": "build-time scan of assets/**/*.png.txt",
-    "count": 5,
+    "count": 17,
     "files": [
-      "./assets/icons/logo.png.txt",
-      "./assets/icons/icon-192.png.txt",
-      "./assets/icons/icon-512.png.txt",
-      "./assets/icons/maskable-192.png.txt",
-      "./assets/icons/maskable-512.png.txt"
+      "./assets/browser/browser_favicon_16x16.png.txt",
+      "./assets/browser/browser_favicon_32x32.png.txt",
+      "./assets/apple/apple_touch_icon_152x152.png.txt",
+      "./assets/apple/apple_touch_icon_180x180.png.txt",
+      "./assets/ui/ui_logo_principal_96x96.png.txt",
+      "./assets/notifications/notification_icon_192x192.png.txt",
+      "./assets/notifications/notification_badge_monochrome_96x96.png.txt",
+      "./assets/pwa/pwa_launcher_any_48x48.png.txt",
+      "./assets/pwa/pwa_launcher_any_72x72.png.txt",
+      "./assets/pwa/pwa_launcher_any_96x96.png.txt",
+      "./assets/pwa/pwa_launcher_any_128x128.png.txt",
+      "./assets/pwa/pwa_launcher_any_144x144.png.txt",
+      "./assets/pwa/pwa_launcher_any_192x192.png.txt",
+      "./assets/pwa/pwa_launcher_any_384x384.png.txt",
+      "./assets/pwa/pwa_launcher_any_512x512.png.txt",
+      "./assets/pwa/pwa_launcher_maskable_192x192.png.txt",
+      "./assets/pwa/pwa_launcher_maskable_512x512.png.txt"
     ]
+  },
+  "pwaIconRevisionStrategy": {
+    "mode": "content-hash-query",
+    "queryParameter": "icon_rev",
+    "manifestUrlStable": true,
+    "revisionedIcons": {
+      "./assets/pwa/pwa_launcher_any_48x48.png": "./assets/pwa/pwa_launcher_any_48x48.png?icon_rev=3184aad0ec96975b",
+      "./assets/pwa/pwa_launcher_any_72x72.png": "./assets/pwa/pwa_launcher_any_72x72.png?icon_rev=a4d982606248af7e",
+      "./assets/pwa/pwa_launcher_any_96x96.png": "./assets/pwa/pwa_launcher_any_96x96.png?icon_rev=977960b0c6cc6ba5",
+      "./assets/pwa/pwa_launcher_any_128x128.png": "./assets/pwa/pwa_launcher_any_128x128.png?icon_rev=aeab5a23d58b756a",
+      "./assets/pwa/pwa_launcher_any_144x144.png": "./assets/pwa/pwa_launcher_any_144x144.png?icon_rev=6c768a2433816c1b",
+      "./assets/pwa/pwa_launcher_any_192x192.png": "./assets/pwa/pwa_launcher_any_192x192.png?icon_rev=f9cd848901ae4cf1",
+      "./assets/pwa/pwa_launcher_any_384x384.png": "./assets/pwa/pwa_launcher_any_384x384.png?icon_rev=7d93811318cfb3ac",
+      "./assets/pwa/pwa_launcher_any_512x512.png": "./assets/pwa/pwa_launcher_any_512x512.png?icon_rev=a8ca5851c7147c2f",
+      "./assets/pwa/pwa_launcher_maskable_192x192.png": "./assets/pwa/pwa_launcher_maskable_192x192.png?icon_rev=ce34fd6a27077a68",
+      "./assets/pwa/pwa_launcher_maskable_512x512.png": "./assets/pwa/pwa_launcher_maskable_512x512.png?icon_rev=daaab4cf8888d37c"
+    }
   }
 }

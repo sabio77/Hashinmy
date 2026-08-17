@@ -9,8 +9,7 @@
   "display_override": [
     "window-controls-overlay",
     "standalone",
-    "minimal-ui",
-    "browser"
+    "minimal-ui"
   ],
   "orientation": "portrait-primary",
   "background_color": "#F3F5F4",
@@ -25,51 +24,63 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "./assets/icons/icon-192.png",
+      "src": "./assets/pwa/pwa_launcher_any_48x48.png?icon_rev=3184aad0ec96975b",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_72x72.png?icon_rev=a4d982606248af7e",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_96x96.png?icon_rev=977960b0c6cc6ba5",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_128x128.png?icon_rev=aeab5a23d58b756a",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_144x144.png?icon_rev=6c768a2433816c1b",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_192x192.png?icon_rev=f9cd848901ae4cf1",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/icons/icon-512.png",
+      "src": "./assets/pwa/pwa_launcher_any_384x384.png?icon_rev=7d93811318cfb3ac",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pwa/pwa_launcher_any_512x512.png?icon_rev=a8ca5851c7147c2f",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/icons/maskable-192.png",
+      "src": "./assets/pwa/pwa_launcher_maskable_192x192.png?icon_rev=ce34fd6a27077a68",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "./assets/icons/maskable-512.png",
+      "src": "./assets/pwa/pwa_launcher_maskable_512x512.png?icon_rev=daaab4cf8888d37c",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22192%22%20height=%22192%22%20viewBox=%220%200%20192%20192%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20instalable%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2242%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2242%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2223%22%20y=%2223%22%20width=%22146%22%20height=%22146%22%20rx=%2229%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%2296%22%20cy=%2283%22%20r=%2227%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%2063%20123c15-21%2046-21%2065%200%22%20stroke=%22%23fff%22%20stroke-width=%229%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22161%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2231%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22512%22%20height=%22512%22%20viewBox=%220%200%20512%20512%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20instalable%20512%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22113%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22113%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2261%22%20y=%2261%22%20width=%22390%22%20height=%22390%22%20rx=%2278%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22220%22%20r=%2272%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%20169%20328c41-56%20123-56%20174%200%22%20stroke=%22%23fff%22%20stroke-width=%2223%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22430%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2282%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22192%22%20height=%22192%22%20viewBox=%220%200%20192%20192%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20adaptable%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2254%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22192%22%20height=%22192%22%20rx=%2254%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2235%22%20y=%2235%22%20width=%22122%22%20height=%22122%22%20rx=%2224%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%2296%22%20cy=%2283%22%20r=%2227%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%2063%20123c15-21%2046-21%2065%200%22%20stroke=%22%23fff%22%20stroke-width=%229%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22161%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2231%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22512%22%20height=%22512%22%20viewBox=%220%200%20512%20512%22%20role=%22img%22%20aria-label=%22Icono%20geom%C3%A9trico%20adaptable%20512%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23128C7E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23075E54%22/%3E%3C/linearGradient%3E%3CradialGradient%20id=%22h%22%20cx=%2232%%22%20cy=%2224%%22%20r=%2252%%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23fff%22%20stop-opacity=%22.72%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23fff%22%20stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22143%22%20fill=%22url%28%23g%29%22/%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%22143%22%20fill=%22url%28%23h%29%22/%3E%3Crect%20x=%2292%22%20y=%2292%22%20width=%22328%22%20height=%22328%22%20rx=%2266%22%20fill=%22%23fff%22%20fill-opacity=%22.14%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22220%22%20r=%2272%22%20fill=%22%23fff%22%20fill-opacity=%22.9%22/%3E%3Cpath%20d=%22M%20169%20328c41-56%20123-56%20174%200%22%20stroke=%22%23fff%22%20stroke-width=%2223%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Ctext%20x=%2250%%22%20y=%22430%22%20text-anchor=%22middle%22%20font-family=%22Arial,%20sans-serif%22%20font-size=%2282%22%20font-weight=%22700%22%20fill=%22%23fff%22%3EAPP%3C/text%3E%3C/svg%3E",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],
@@ -81,9 +92,10 @@
       "url": "./?shortcut=open",
       "icons": [
         {
-          "src": "./assets/icons/icon-192.png",
+          "src": "./assets/pwa/pwa_launcher_any_192x192.png?icon_rev=f9cd848901ae4cf1",
           "sizes": "192x192",
-          "type": "image/png"
+          "type": "image/png",
+          "purpose": "any"
         }
       ]
     }

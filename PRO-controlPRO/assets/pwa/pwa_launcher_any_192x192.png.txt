@@ -1,0 +1,19 @@
+{
+  "target_image": "assets/pwa/pwa_launcher_any_192x192.png",
+  "format": "PNG",
+  "dimensions_px": {
+    "width": 192,
+    "height": 192
+  },
+  "usage": "icono launcher de la PWA para instalación y selección por densidad",
+  "purpose": "any",
+  "background": "opaque",
+  "prompt": "Logo de aplicación profesional, minimalista y geométrico para una plataforma moderna de control de proyectos y colaboración P2P. Crear un símbolo abstracto único que sugiera sincronización entre dispositivos, flujo de información y control administrativo mediante dos formas continuas entrelazadas alrededor de un núcleo estable. Diseño simple, memorable, equilibrado, bordes limpios, alto contraste, lectura inmediata en tamaños pequeños, sin letras, palabras ni números, sin marcas conocidas y sin semejanza con logotipos existentes. Paleta principal verde petróleo y verde esmeralda con variación tonal sutil; acabado plano, sin mockup. Fondo sólido de marca hasta los bordes, símbolo centrado con margen seguro aproximado de 12%, sin transparencia exterior; preparado para launcher y splash de PWA.",
+  "technical_requirements": [
+    "Composición centrada y perfectamente cuadrada.",
+    "Conservar exactamente el mismo símbolo y proporciones visuales en toda la familia de iconos de la aplicación.",
+    "Optimizar nitidez para el tamaño objetivo sin añadir texto.",
+    "No incluir marcos, fotografías, texturas ni elementos ajenos a la marca."
+  ],
+  "negative_prompt": "texto, letras, APP, números, watermark, marca registrada, swoosh, Nike, icono genérico de nube, manos, personas, fotografía, 3D, mockup, ruido, detalles diminutos, bordes borrosos"
+}

@@ -73,11 +73,23 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_PROMPTS = [
-    "assets/icons/icon-192.png.txt",
-    "assets/icons/icon-512.png.txt",
-    "assets/icons/maskable-192.png.txt",
-    "assets/icons/maskable-512.png.txt",
-    "assets/icons/logo.png.txt",
+    "assets/browser/browser_favicon_16x16.png.txt",
+    "assets/browser/browser_favicon_32x32.png.txt",
+    "assets/apple/apple_touch_icon_152x152.png.txt",
+    "assets/apple/apple_touch_icon_180x180.png.txt",
+    "assets/ui/ui_logo_principal_96x96.png.txt",
+    "assets/notifications/notification_icon_192x192.png.txt",
+    "assets/notifications/notification_badge_monochrome_96x96.png.txt",
+    "assets/pwa/pwa_launcher_any_48x48.png.txt",
+    "assets/pwa/pwa_launcher_any_72x72.png.txt",
+    "assets/pwa/pwa_launcher_any_96x96.png.txt",
+    "assets/pwa/pwa_launcher_any_128x128.png.txt",
+    "assets/pwa/pwa_launcher_any_144x144.png.txt",
+    "assets/pwa/pwa_launcher_any_192x192.png.txt",
+    "assets/pwa/pwa_launcher_any_384x384.png.txt",
+    "assets/pwa/pwa_launcher_any_512x512.png.txt",
+    "assets/pwa/pwa_launcher_maskable_192x192.png.txt",
+    "assets/pwa/pwa_launcher_maskable_512x512.png.txt",
 ]
 
 JAVASCRIPT_FILES = [
@@ -110,6 +122,57 @@ POLLING_FORBIDDEN_PATTERNS = [
     r"\bupdateCheckIntervalMs\s*:\s*(?!0\b)\d+",
 ]
 
+def assert_asset_prompt_contract() -> None:
+    allowed_categories = {"pwa", "browser", "apple", "ui", "notifications"}
+
+    for relative in REQUIRED_PROMPTS:
+        prompt_path = ROOT / relative
+        payload = json.loads(prompt_path.read_text(encoding="utf-8"))
+        expected_image = relative[:-4]
+        target_image = str(payload.get("target_image") or "").replace("\\", "/")
+        if target_image != expected_image:
+            fail(f"El prompt {relative} debe declarar target_image={expected_image}; recibió {target_image!r}.")
+
+        parts = Path(relative).parts
+        if len(parts) < 3 or parts[0] != "assets" or parts[1] not in allowed_categories:
+            fail(f"El prompt {relative} no está organizado por una categoría de assets reconocible.")
+
+        match = re.search(r"_(\d+)x(\d+)\.png\.txt$", relative)
+        if not match:
+            fail(f"El nombre del prompt debe declarar su tamaño final: {relative}.")
+        expected_width, expected_height = map(int, match.groups())
+        dimensions = payload.get("dimensions_px") or {}
+        if dimensions.get("width") != expected_width or dimensions.get("height") != expected_height:
+            fail(f"Las dimensiones internas de {relative} no coinciden con su nombre.")
+
+        if str(payload.get("format") or "").upper() != "PNG":
+            fail(f"El prompt {relative} debe declarar formato PNG.")
+        if not str(payload.get("usage") or "").strip() or not str(payload.get("purpose") or "").strip():
+            fail(f"El prompt {relative} debe explicar usage y purpose para identificar dónde se usa la imagen.")
+
+
+def assert_pwa_asset_documentation() -> None:
+    current_docs = [
+        ROOT / "README.md",
+        ROOT / "docs" / "actualizacion.md",
+        ROOT / "docs" / "arquitectura.md",
+        ROOT / "docs" / "checklist-publicacion.md",
+    ]
+    for path in current_docs:
+        text = path.read_text(encoding="utf-8")
+        if "assets/icons" in text:
+            fail(f"{path.relative_to(ROOT)} todavía dirige assets PWA a la ruta heredada assets/icons.")
+
+    update_docs = (ROOT / "docs" / "actualizacion.md").read_text(encoding="utf-8")
+    if "agrega fallbacks `data:image/svg+xml`" in update_docs:
+        fail("docs/actualizacion.md describe un fallback instalable que el manifest actual prohíbe.")
+    if "Chrome de escritorio no actualiza actualmente los iconos" in update_docs:
+        fail("docs/actualizacion.md conserva una limitación obsoleta: Chrome moderno puede detectar cambios de icono, aunque pueda requerir aprobación del usuario.")
+    for required in ["icon_rev", "Revisar actualización de la aplicación", "cambios de identidad"]:
+        if required not in update_docs:
+            fail(f"docs/actualizacion.md no documenta correctamente la actualización actual de iconos PWA: {required}")
+
+
 def assert_install_experience() -> None:
     index = (ROOT / "index.html").read_text(encoding="utf-8")
     manager = (ROOT / "src/js/pwa-update-manager.js").read_text(encoding="utf-8")
@@ -124,6 +187,15 @@ def assert_install_experience() -> None:
     for token in required_manager_tokens:
         if token not in manager:
             fail(f"Falta el flujo instalable equivalente a la referencia: {token}.")
+
+    forbidden_shortcut_guidance = [
+        "Agregar a pantalla de inicio",
+        "Add to Home Screen",
+        "إضافة إلى الشاشة الرئيسية",
+    ]
+    for token in forbidden_shortcut_guidance:
+        if token in manager:
+            fail("La UI no debe recomendar un acceso directo del navegador cuando falta la instalación PWA real; puede producir un icono con distintivo de Chrome.")
 
     if ".pwa-install-banner" not in styles:
         fail("Faltan estilos de producción para el banner de instalación PWA.")
@@ -1075,31 +1147,35 @@ def assert_no_update_polling() -> None:
                 fail(f"{relative} contiene actualización por polling o intervalo prohibido: {pattern}")
 
 
-def assert_manifest_icon_fallbacks(manifest: Dict[str, Any]) -> None:
+def assert_manifest_install_icons(manifest: Dict[str, Any]) -> None:
     icons = manifest.get("icons") or []
     if not isinstance(icons, list) or not icons:
         fail("manifest.webmanifest debe declarar icons instalables.")
 
-    png_icons = [icon for icon in icons if str(icon.get("src", "")).startswith("./assets/icons/")]
-    data_fallbacks = [icon for icon in icons if str(icon.get("src", "")).startswith("data:image/svg+xml,")]
+    if any(str(icon.get("src", "")).startswith("data:") for icon in icons):
+        fail("manifest.webmanifest no debe simular iconos instalables con data:; Chrome debe validar PNG reales.")
 
-    if len(png_icons) < 4:
-        fail("manifest.webmanifest debe conservar rutas PNG reales para que el logo/íconos se actualicen cuando existan en assets.")
-    if len(data_fallbacks) < 4:
-        fail("manifest.webmanifest debe incluir fallbacks geométricos data:image/svg+xml para que sea instalable aun sin PNG reales.")
+    pwa_icons = [icon for icon in icons if str(icon.get("src", "")).startswith("./assets/pwa/")]
+    if len(pwa_icons) < 10:
+        fail("manifest.webmanifest debe declarar la familia explícita de iconos launcher y maskable en assets/pwa.")
 
     required_pairs = {("192x192", "any"), ("512x512", "any"), ("192x192", "maskable"), ("512x512", "maskable")}
-    fallback_pairs = {(str(icon.get("sizes", "")), str(icon.get("purpose", ""))) for icon in data_fallbacks}
-    missing_pairs = sorted(required_pairs - fallback_pairs)
+    pairs = {(str(icon.get("sizes", "")), str(icon.get("purpose", ""))) for icon in pwa_icons}
+    missing_pairs = sorted(required_pairs - pairs)
     if missing_pairs:
-        fail(f"manifest.webmanifest no cubre fallbacks geométricos instalables: {missing_pairs}")
+        fail(f"manifest.webmanifest no cubre iconos PWA obligatorios: {missing_pairs}")
 
-    for icon in data_fallbacks:
+    for icon in pwa_icons:
         src = str(icon.get("src", ""))
-        if "<svg" in src or "</svg>" in src:
-            fail("Los fallbacks SVG del manifest deben estar URL-encoded dentro del data URI.")
-        if icon.get("type") != "image/svg+xml":
-            fail(f"Fallback geométrico del manifest con type incorrecto: {icon}")
+        if icon.get("type") != "image/png":
+            fail(f"Los iconos instalables deben ser PNG reales: {icon}")
+        if "?icon_rev=" not in src:
+            fail(f"El icono PWA no tiene revisión de contenido en su URL: {src}")
+
+    sw_source = (ROOT / "sw.js").read_text(encoding="utf-8")
+    generated_block = sw_source.split("const GENERATED_IMAGE_FALLBACKS = [", 1)[-1].split("];", 1)[0]
+    if "/assets/pwa/" in generated_block:
+        fail("El Service Worker no debe fabricar fallbacks para rutas de iconos del manifest.")
 
 
 def assert_manifest_matches_textx(languages: Dict[str, Any]) -> None:
@@ -1140,6 +1216,47 @@ def import_release_generator():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def assert_pwa_icon_revision_strategy() -> None:
+    generator = import_release_generator()
+    original_root = generator.ROOT
+    original_manifest = generator.MANIFEST_FILE
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            icon_dir = temp_root / "assets" / "pwa"
+            icon_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = temp_root / "manifest.webmanifest"
+            manifest_path.write_text(json.dumps({
+                "icons": [{
+                    "src": "./assets/pwa/pwa_launcher_any_192x192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any",
+                }]
+            }), encoding="utf-8")
+            prompt = icon_dir / "pwa_launcher_any_192x192.png.txt"
+            prompt.write_text("prompt-v1", encoding="utf-8")
+
+            generator.ROOT = temp_root
+            generator.MANIFEST_FILE = manifest_path
+            generator.update_manifest_icon_revisions()
+            first_src = json.loads(manifest_path.read_text(encoding="utf-8"))["icons"][0]["src"]
+
+            image = icon_dir / "pwa_launcher_any_192x192.png"
+            image.write_bytes(b"png-real-v1")
+            generator.update_manifest_icon_revisions()
+            second_src = json.loads(manifest_path.read_text(encoding="utf-8"))["icons"][0]["src"]
+            image.write_bytes(b"png-real-v2")
+            generator.update_manifest_icon_revisions()
+            third_src = json.loads(manifest_path.read_text(encoding="utf-8"))["icons"][0]["src"]
+
+            if "?icon_rev=" not in first_src or first_src == second_src or second_src == third_src:
+                fail("La URL del icono PWA no cambia de forma determinista cuando cambia el contenido del PNG.")
+    finally:
+        generator.ROOT = original_root
+        generator.MANIFEST_FILE = original_manifest
 
 
 def assert_runtime_backend_injection() -> None:
@@ -1246,10 +1363,14 @@ def assert_generator_syncs_prompts_and_fingerprints() -> None:
     generator = import_release_generator()
 
     with tempfile.TemporaryDirectory() as tmp:
-        tmp_root = Path(tmp)
+        project_root = Path(tmp)
+        tmp_root = project_root / "appWEB"
         custom_prompt = tmp_root / "assets" / "brand" / "hero.png.txt"
         custom_prompt.parent.mkdir(parents=True)
         custom_prompt.write_text("{}", encoding="utf-8")
+        retired_prompt = tmp_root / "assets" / "brand" / "retired.png.txt"
+        retired_prompt.write_text("{}", encoding="utf-8")
+        (project_root / "NOVAelimina.txt").write_text("appWEB/assets/brand/retired.png.txt\n", encoding="utf-8")
 
         original_root = generator.ROOT
         try:
@@ -1260,6 +1381,8 @@ def assert_generator_syncs_prompts_and_fingerprints() -> None:
 
     if "./assets/brand/hero.png.txt" not in prompt_assets:
         fail("tools/generate-release.py no detecta prompts nuevos en assets/**/*.png.txt.")
+    if "./assets/brand/retired.png.txt" in prompt_assets:
+        fail("tools/generate-release.py volvió a incluir un prompt marcado para eliminación en NOVAelimina.txt.")
 
     fake_manifest = {
         "languages": [
@@ -1271,6 +1394,29 @@ def assert_generator_syncs_prompts_and_fingerprints() -> None:
     for expected in ["./textX/app/fr.json", "./textX/seo/fr.json", "./assets/brand/hero.png", "./assets/brand/hero.png.txt"]:
         if expected not in files:
             fail(f"La verificación directa no queda sincronizada con idiomas/assets nuevos: falta {expected}")
+
+
+def assert_nova_elimina_assets_are_ignored() -> None:
+    generator = import_release_generator()
+    eliminated = generator.eliminated_public_paths()
+    if not eliminated:
+        return
+
+    prompt_assets = generator.discover_prompt_assets()
+    leaked_prompts = [path for path in prompt_assets if generator.is_marked_for_elimination(path, eliminated)]
+    if leaked_prompts:
+        fail(f"El generador todavía descubre assets marcados en NOVAelimina.txt: {leaked_prompts}")
+
+    version = read_json("version.json")
+    version_prompts = version.get("assetPrompts", {}).get("files", [])
+    leaked_version = [path for path in version_prompts if generator.is_marked_for_elimination(path, eliminated)]
+    if leaked_version:
+        fail(f"version.json conserva prompts marcados para eliminación: {leaked_version}")
+
+    config = (ROOT / "src/js/config.js").read_text(encoding="utf-8")
+    leaked_config = [path for path in eliminated if path.startswith("./assets/") and path in config]
+    if leaked_config:
+        fail(f"config.js conserva rutas de assets marcadas para eliminación: {leaked_config}")
 
 
 def assert_subfolder_entrypoint_normalization() -> None:
@@ -1315,6 +1461,9 @@ def main() -> None:
         if not (ROOT / relative).exists():
             fail(f"Falta archivo obligatorio: {relative}")
 
+    assert_asset_prompt_contract()
+    assert_pwa_asset_documentation()
+
     assert_subfolder_entrypoint_normalization()
     assert_install_experience()
     assert_javascript_syntax()
@@ -1337,9 +1486,11 @@ def main() -> None:
     assert_service_worker_request_isolation()
     assert_snapshot_request_liveness()
     assert_no_update_polling()
+    assert_pwa_icon_revision_strategy()
     assert_runtime_backend_injection()
     assert_generator_autodetects_new_language()
     assert_generator_syncs_prompts_and_fingerprints()
+    assert_nova_elimina_assets_are_ignored()
 
     index = (ROOT / "index.html").read_text(encoding="utf-8")
     for marker in ['Control de proyectos', 'new-project-button', 'project-list', 'add-purchase-button', 'add-income-button', 'add-projection-button', 'manage-access-button', 'access-dialog', 'access-member-list', 'storage-durability-banner', 'protect-storage-button', 'trash-button', 'trash-dialog', 'action-menu-dialog', 'action-menu-confirm-panel', 'project-filter-input', 'project-filter-clear', 'project-filter-summary']:
@@ -1360,7 +1511,7 @@ def main() -> None:
             fail(f"manifest.webmanifest no tiene {key}.")
     if manifest.get("display") not in ["standalone", "fullscreen", "minimal-ui"]:
         fail("manifest.webmanifest debe usar display instalable.")
-    assert_manifest_icon_fallbacks(manifest)
+    assert_manifest_install_icons(manifest)
 
     languages = read_json("textX/languages.json")
     codes = [item.get("code") for item in languages.get("languages", [])]
@@ -1464,7 +1615,7 @@ def main() -> None:
 
     if "updateCheckIntervalMs: 0" not in config or "periodicUpdateChecksEnabled: false" not in config:
         fail("config.js debe dejar desactivadas las revisiones periódicas.")
-    for optional_asset in ["./assets/icons/logo.png", "./assets/icons/icon-192.png", "./assets/icons/icon-512.png"]:
+    for optional_asset in ["./assets/ui/ui_logo_principal_96x96.png", "./assets/pwa/pwa_launcher_any_192x192.png", "./assets/pwa/pwa_launcher_any_512x512.png"]:
         if optional_asset not in config:
             fail(f"config.js debe vigilar cambios del asset opcional: {optional_asset}")
     if "fetchBytesNoStore" not in manager or "missing:0" not in manager:
@@ -1573,7 +1724,7 @@ def main() -> None:
         fail("sinBACKEND debe quedar desactivado por defecto en Render para conservar el flujo normal con memoriaBACKEND.")
 
     generator = (ROOT / "tools/generate-release.py").read_text(encoding="utf-8")
-    for needle in ["discover_languages", "textX/app/*.json", "metadata_precache_urls", "update_metadata_file", "update_config_file", "update_runtime_config_file", "normalize_backend_url", "--require-backend", "render_environment", "os.environ.get(\"sinBACKEND\")", "APP_SIN_BACKEND", "discover_prompt_assets", "validate_language_key_parity", "codeSource", "src/js/application-scope.js", "src/js/skeleton-screen.js", "src/js/p2p-durability.js", "src/js/p2p-tab-coordinator.js", "src/js/p2p-invitation-intent.js", "src/js/p2p-permissions.js"]:
+    for needle in ["discover_languages", "textX/app/*.json", "metadata_precache_urls", "update_metadata_file", "update_config_file", "update_runtime_config_file", "normalize_backend_url", "--require-backend", "render_environment", "os.environ.get(\"sinBACKEND\")", "APP_SIN_BACKEND", "discover_prompt_assets", "update_manifest_icon_revisions", "icon_rev", "validate_language_key_parity", "codeSource", "src/js/application-scope.js", "src/js/skeleton-screen.js", "src/js/p2p-durability.js", "src/js/p2p-tab-coordinator.js", "src/js/p2p-invitation-intent.js", "src/js/p2p-permissions.js"]:
         if needle not in generator:
             fail(f"tools/generate-release.py no conserva autodetección/sincronización robusta: {needle}")
 

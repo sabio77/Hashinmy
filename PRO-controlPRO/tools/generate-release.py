@@ -26,6 +26,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "version.json"
+MANIFEST_FILE = ROOT / "manifest.webmanifest"
 METADATA_FILE = ROOT / "src" / "js" / "app-metadata.js"
 CONFIG_FILE = ROOT / "src" / "js" / "config.js"
 RUNTIME_CONFIG_FILE = ROOT / "src" / "js" / "runtime-config.js"
@@ -65,19 +66,37 @@ DEFAULT_CRITICAL_ASSETS = [
 
 OPTIONAL_RUNTIME_ASSETS = [
     "./P2P_sin_RED_LOCALx/P2P_sin_transport.js",
-    "./assets/icons/logo.png",
-    "./assets/icons/icon-192.png",
-    "./assets/icons/icon-512.png",
-    "./assets/icons/maskable-192.png",
-    "./assets/icons/maskable-512.png",
+    "./assets/ui/ui_logo_principal_96x96.png",
+    "./assets/notifications/notification_icon_192x192.png",
+    "./assets/notifications/notification_badge_monochrome_96x96.png",
+]
+
+# Solo estos assets opcionales forman parte del shell offline. Los iconos del
+# manifest se mantienen fuera del precache para que un PNG ausente no pueda ser
+# reemplazado por un fallback del Service Worker durante la validación de PWA.
+OPTIONAL_PRECACHE_ASSETS = [
+    "./P2P_sin_RED_LOCALx/P2P_sin_transport.js",
+    "./assets/ui/ui_logo_principal_96x96.png",
 ]
 
 DEFAULT_PROMPT_ASSETS = [
-    "./assets/icons/logo.png.txt",
-    "./assets/icons/icon-192.png.txt",
-    "./assets/icons/icon-512.png.txt",
-    "./assets/icons/maskable-192.png.txt",
-    "./assets/icons/maskable-512.png.txt",
+    "./assets/browser/browser_favicon_16x16.png.txt",
+    "./assets/browser/browser_favicon_32x32.png.txt",
+    "./assets/apple/apple_touch_icon_152x152.png.txt",
+    "./assets/apple/apple_touch_icon_180x180.png.txt",
+    "./assets/ui/ui_logo_principal_96x96.png.txt",
+    "./assets/notifications/notification_icon_192x192.png.txt",
+    "./assets/notifications/notification_badge_monochrome_96x96.png.txt",
+    "./assets/pwa/pwa_launcher_any_48x48.png.txt",
+    "./assets/pwa/pwa_launcher_any_72x72.png.txt",
+    "./assets/pwa/pwa_launcher_any_96x96.png.txt",
+    "./assets/pwa/pwa_launcher_any_128x128.png.txt",
+    "./assets/pwa/pwa_launcher_any_144x144.png.txt",
+    "./assets/pwa/pwa_launcher_any_192x192.png.txt",
+    "./assets/pwa/pwa_launcher_any_384x384.png.txt",
+    "./assets/pwa/pwa_launcher_any_512x512.png.txt",
+    "./assets/pwa/pwa_launcher_maskable_192x192.png.txt",
+    "./assets/pwa/pwa_launcher_maskable_512x512.png.txt",
 ]
 
 
@@ -127,10 +146,130 @@ def png_path_from_prompt(public_prompt_path: str) -> str:
     return public_prompt_path[:-4] if public_prompt_path.endswith(".txt") else public_prompt_path
 
 
+def strip_url_query(public_url: str) -> str:
+    parsed = urlsplit(str(public_url or ""))
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+
+
+def revision_source_for_asset(public_url: str) -> Path | None:
+    clean_url = strip_url_query(public_url)
+    if not clean_url.startswith("./assets/") or not clean_url.lower().endswith(".png"):
+        return None
+
+    image_path = public_to_file(clean_url)
+    if image_path.exists():
+        return image_path
+
+    prompt_path = Path(str(image_path) + ".txt")
+    if prompt_path.exists():
+        return prompt_path
+    return None
+
+
+def revisioned_asset_url(public_url: str) -> str:
+    clean_url = strip_url_query(public_url)
+    source = revision_source_for_asset(clean_url)
+    if source is None:
+        return clean_url
+    revision = sha256_file(source)[:16]
+    separator = "&" if "?" in clean_url else "?"
+    return f"{clean_url}{separator}icon_rev={revision}"
+
+
+def update_manifest_icon_revisions() -> Dict[str, str]:
+    if not MANIFEST_FILE.exists():
+        return {}
+
+    manifest = read_json(MANIFEST_FILE)
+    revisions: Dict[str, str] = {}
+
+    def update_icon_list(items: Any) -> None:
+        if not isinstance(items, list):
+            return
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            src = str(item.get("src") or "")
+            clean_src = strip_url_query(src)
+            if not clean_src.startswith("./assets/") or not clean_src.lower().endswith(".png"):
+                continue
+            next_src = revisioned_asset_url(clean_src)
+            item["src"] = next_src
+            revisions[clean_src] = next_src
+
+    update_icon_list(manifest.get("icons"))
+    for shortcut in manifest.get("shortcuts") or []:
+        if isinstance(shortcut, dict):
+            update_icon_list(shortcut.get("icons"))
+
+    write_json(MANIFEST_FILE, manifest)
+    return revisions
+
+
+def elimination_manifest_candidates() -> List[Path]:
+    return ordered_unique_paths([
+        ROOT / "NOVAelimina.txt",
+        ROOT.parent / "NOVAelimina.txt",
+    ])
+
+
+def ordered_unique_paths(values: Iterable[Path]) -> List[Path]:
+    result: List[Path] = []
+    seen: Set[str] = set()
+    for value in values:
+        key = str(value.resolve(strict=False))
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def normalize_elimination_entry(raw_entry: str) -> str:
+    normalized = str(raw_entry or "").strip().replace("\\", "/")
+    if not normalized or normalized.startswith("#"):
+        return ""
+
+    normalized = normalized.lstrip("./")
+    root_name = ROOT.name.strip("/")
+    if root_name and normalized.startswith(root_name + "/"):
+        normalized = normalized[len(root_name) + 1:]
+
+    return "./" + normalized.strip("/")
+
+
+def eliminated_public_paths() -> Set[str]:
+    eliminated: Set[str] = set()
+    for manifest_path in elimination_manifest_candidates():
+        if not manifest_path.exists() or not manifest_path.is_file():
+            continue
+        for line in manifest_path.read_text(encoding="utf-8").splitlines():
+            normalized = normalize_elimination_entry(line)
+            if normalized:
+                eliminated.add(normalized)
+    return eliminated
+
+
+def is_marked_for_elimination(public_path: str, eliminated: Set[str] | None = None) -> bool:
+    candidate = "./" + str(public_path or "").replace("\\", "/").lstrip("./")
+    entries = eliminated if eliminated is not None else eliminated_public_paths()
+    for entry in entries:
+        normalized_entry = entry.rstrip("/")
+        if candidate == normalized_entry or candidate.startswith(normalized_entry + "/"):
+            return True
+    return False
+
+
 def discover_prompt_assets() -> List[str]:
     assets_dir = ROOT / "assets"
-    discovered = [file_to_public(path) for path in assets_dir.glob("**/*.png.txt")] if assets_dir.exists() else []
-    return ordered_unique(DEFAULT_PROMPT_ASSETS + sorted(discovered))
+    eliminated = eliminated_public_paths()
+    discovered = [
+        file_to_public(path)
+        for path in assets_dir.glob("**/*.png.txt")
+        if not is_marked_for_elimination(file_to_public(path), eliminated)
+    ] if assets_dir.exists() else []
+    defaults = [path for path in DEFAULT_PROMPT_ASSETS if not is_marked_for_elimination(path, eliminated)]
+    return ordered_unique(defaults + sorted(discovered))
 
 
 def discover_optional_runtime_assets(prompt_assets: Iterable[str]) -> List[str]:
@@ -333,7 +472,7 @@ def metadata_precache_urls(language_manifest: Dict[str, Any]) -> List[str]:
         "./",
         *DEFAULT_CRITICAL_ASSETS,
         *public_language_assets(language_manifest),
-        *OPTIONAL_RUNTIME_ASSETS,
+        *OPTIONAL_PRECACHE_ASSETS,
     ])
 
 
@@ -496,6 +635,7 @@ def main() -> None:
     backend_url = update_runtime_config_file(require_backend=args.require_backend or render_environment())
     language_manifest = discover_languages(released_at)
     prompt_assets = discover_prompt_assets()
+    icon_revisions = update_manifest_icon_revisions()
     write_json(LANGUAGE_MANIFEST_FILE, language_manifest)
 
     if not args.no_metadata:
@@ -535,6 +675,12 @@ def main() -> None:
             "autoDiscovery": "build-time scan of assets/**/*.png.txt",
             "count": len(prompt_assets),
             "files": prompt_assets,
+        },
+        "pwaIconRevisionStrategy": {
+            "mode": "content-hash-query",
+            "queryParameter": "icon_rev",
+            "manifestUrlStable": True,
+            "revisionedIcons": icon_revisions,
         },
         "criticalAssets": assets,
     }

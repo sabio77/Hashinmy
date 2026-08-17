@@ -141,7 +141,8 @@ Además, se mantienen las fortalezas existentes de la semilla:
 - Mantiene verificación sin polling: no usa `setInterval` para actualizaciones.
 - Revisa cambios solo por eventos reales: inicio, foco, visibilidad, reconexión, `pageshow`, `updatefound` y `controllerchange`.
 - Conserva actualización automática por `version.json` con huellas SHA-256 de archivos críticos, textos `textX` y prompts de assets.
-- Conserva fallback geométrico para logo/íconos si las imágenes PNG todavía no existen.
+- Los iconos PWA usan URLs con `icon_rev` derivadas del contenido real: al cambiar un PNG, Chrome recibe una identidad de icono distinta y puede ofrecer/aplicar la actualización según las reglas del navegador; en escritorio los cambios sensibles de icono pueden requerir aprobación del usuario.
+- Conserva fallback geométrico únicamente para el logo interno de UI si su PNG todavía no existe; los íconos instalables del manifest deben ser PNG reales para no degradar la instalación a un acceso directo del navegador.
 - Conserva caché canónica para logos/íconos opcionales: las cargas con parámetros anti-caché no multiplican entradas y, sin conexión, reutilizan el PNG real si ya fue descargado antes.
 - Conserva Service Worker con `navigationPreload`, `skipWaiting()`, `clients.claim()` y caché versionada.
 - Conserva `render.yaml` para Render Static Site: ejecuta el release en build y publica la raíz como frontend estático y se conecta por HTTPS a memoriaBACKEND.
@@ -166,7 +167,11 @@ semilla_appweb_pwa_autoactualizable/
 ├── docker-compose.yml
 ├── CHANGELOG.md
 ├── assets/
-│   └── icons/
+│   ├── pwa/              # launcher PWA: any + maskable por tamaño
+│   ├── browser/          # favicons de pestaña/marcador
+│   ├── apple/            # Apple Touch Icons
+│   ├── ui/               # logo interno de la interfaz
+│   └── notifications/    # icono y badge de notificaciones
 ├── src/
 │   ├── css/
 │   │   └── app.css
@@ -377,7 +382,7 @@ El script regenera `textX/languages.json`; la app y el selector detectan el nuev
 
 ## Imágenes y logo
 
-No se crean imágenes dentro de la semilla. Cada imagen esperada tiene su prompt `.txt` en `assets/icons`. Si el PNG no existe, la UI muestra una figura geométrica del tamaño esperado; el manifest incluye íconos geométricos embebidos como `data:image/svg+xml` para mantener la instalabilidad inicial; y el Service Worker puede responder una figura vectorial de respaldo para las rutas PNG declaradas. Si luego subes `assets/icons/logo.png` o cambias los íconos del manifest, la app instalada detecta el cambio por `version.json`/huellas o por la verificación directa disparada por eventos reales, y recarga sin polling.
+No se crean imágenes dentro de la semilla. Cada imagen esperada tiene su prompt `.png.txt` dentro de una carpeta de `assets` cuyo nombre indica su uso (`pwa`, `browser`, `apple`, `ui` o `notifications`) y el propio nombre declara función y tamaño. Si falta el logo interno, la UI muestra una figura geométrica del tamaño esperado. Los iconos del `manifest.webmanifest` no se falsifican con `data:` ni con respuestas generadas por el Service Worker: la instalación PWA solo se ofrece cuando existen PNG reales, incluidos 192x192 y 512x512 y sus variantes `maskable`. Durante cada build, `tools/generate-release.py` agrega a las URLs de los iconos una revisión derivada de su huella; al cambiar el PNG cambia también `icon_rev` sin mover `manifest.webmanifest`. Chrome para Android puede usar ese cambio en su ciclo de actualización del WebAPK; el navegador/SO decide cuándo actualiza el launcher y Chrome de escritorio no actualiza actualmente los iconos de una PWA ya instalada desde cambios del manifest.
 
 ## Autoescalabilidad
 

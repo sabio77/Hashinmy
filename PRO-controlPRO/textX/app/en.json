@@ -30,7 +30,7 @@
     "installButton": "Install",
     "installLater": "Later",
     "installAccepted": "Installation started.",
-    "installFallback": "Use your browser menu and choose “Install app” or “Add to Home Screen”."
+    "installFallback": "Installation as a standalone app is not available on this browser or device yet. Do not create a browser shortcut; try again when the PWA install option becomes available."
   },
   "auth": {
     "eyebrow": "Secure access",

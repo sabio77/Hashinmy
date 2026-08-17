@@ -60,10 +60,7 @@ const DEFAULT_APP_SHELL = [
   './src/js/pwa-update-manager.js',
   './src/js/app.js',
   './P2P_sin_RED_LOCALx/P2P_sin_transport.js',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png',
-  './assets/icons/maskable-192.png',
-  './assets/icons/maskable-512.png'
+  './assets/ui/ui_logo_principal_96x96.png'
 ];
 
 const APP_SHELL = Array.isArray(APP_META.precacheUrls) && APP_META.precacheUrls.length
@@ -109,11 +106,10 @@ const INTERNAL_CACHE_BUST_PARAMS = [
   '__asset'
 ];
 const GENERATED_IMAGE_FALLBACKS = [
-  { path: '/assets/icons/logo.png', width: 96, height: 96, label: 'Logo de la app' },
-  { path: '/assets/icons/icon-192.png', width: 192, height: 192, label: 'Icono instalable 192' },
-  { path: '/assets/icons/icon-512.png', width: 512, height: 512, label: 'Icono instalable 512' },
-  { path: '/assets/icons/maskable-192.png', width: 192, height: 192, label: 'Icono adaptable 192' },
-  { path: '/assets/icons/maskable-512.png', width: 512, height: 512, label: 'Icono adaptable 512' }
+  // Solo la imagen interna de UI puede degradarse a una figura geométrica.
+  // Los iconos del manifest NO reciben fallback: Chrome debe validar PNG reales
+  // antes de ofrecer una instalación PWA y así evitar accesos directos degradados.
+  { path: '/assets/ui/ui_logo_principal_96x96.png', width: 96, height: 96, label: 'Logo de la app' }
 ];
 const NETWORK_ONLY_PATH_PREFIXES = Array.isArray(APP_META.networkOnlyPathPrefixes)
   ? APP_META.networkOnlyPathPrefixes
@@ -887,8 +883,8 @@ self.addEventListener('push', function receiveP2PPush(event) {
       body: payload.body || 'Tienes una nueva actualización compartida.',
       tag: payload.tag || 'semilla-p2p',
       renotify: true,
-      badge: './assets/icons/icon-192.png',
-      icon: './assets/icons/icon-192.png',
+      badge: './assets/notifications/notification_badge_monochrome_96x96.png',
+      icon: './assets/notifications/notification_icon_192x192.png',
       data: {
         url: payload.url || './index.html',
         type: payload.type || 'p2p.notification',
