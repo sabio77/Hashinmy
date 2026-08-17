@@ -158,20 +158,41 @@ function replicaHealthForSpace(spaceId = '') {
   return health && typeof health === 'object' ? health : { spaceId: cleanSpaceId, state: 'unknown', registeredReplicas: 0, confirmedReplicas: 0, pendingReplicas: 0 };
 }
 function replicaHealthPresentation(spaceId = '') {
-  const health = replicaHealthForSpace(spaceId);
+  const cleanSpaceId = String(spaceId || '').trim();
+  const health = replicaHealthForSpace(cleanSpaceId);
   const preferredState = String(health.displayState || health.state || '');
-  const stateName = ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(preferredState) ? preferredState : 'unknown';
+  const freshnessState = ['healthy', 'degraded', 'single', 'unavailable', 'unknown'].includes(preferredState) ? preferredState : 'unknown';
   // La card cuenta existencia de copias por separado de su frescura. Una copia puede
   // estar presente y todavía reconciliando una revisión/ACK; en ese caso debe seguir
   // contando como copia física sin presentarse falsamente como "al día".
+  // Si el proyecto ya fue hidratado desde IndexedDB y está visible en esta instalación,
+  // esa propia card es evidencia local de al menos una copia aunque el reporte agregado
+  // de Redis/SSE todavía esté convergiendo. Así una instalación que está mostrando el
+  // proyecto nunca puede caer visualmente en 0/N por una carrera de metadatos.
   const confirmed = Math.max(0, Number(health.availableReplicas ?? health.confirmedReplicas ?? 0));
-  const currentVisibleCopy = health.currentDeviceRegistered === true && health.currentDeviceOnline === true ? 1 : 0;
+  const localProjectLoaded = Boolean(cleanSpaceId && state.projects?.has?.(cleanSpaceId));
+  const currentVisibleCopy = localProjectLoaded
+    || (health.currentDeviceRegistered === true && health.currentDeviceOnline === true)
+    ? 1
+    : 0;
   const present = Math.max(
     confirmed,
     currentVisibleCopy,
     Math.max(0, Number(health.presentReplicas ?? 0))
   );
   const registered = Math.max(present, Math.max(0, Number(health.registeredReplicas || 0)));
+  // El color representa cobertura de copias físicas; la frescura/ACK continúa informada
+  // por separado. Por eso N/N siempre se pinta completo (verde) aunque alguna copia aún
+  // esté terminando de confirmar su revisión, sin ocultar ese dato en el texto/tooltip.
+  const coverageState = health.truncated === true
+    ? 'unknown'
+    : registered > 0 && present >= registered
+      ? 'healthy'
+      : present <= 0
+        ? 'unavailable'
+        : present === 1
+          ? 'single'
+          : 'degraded';
   const labels = {
     healthy: t('replicas.healthy', 'Réplicas al día'),
     degraded: t('replicas.degraded', 'Réplicas pendientes'),
@@ -186,10 +207,10 @@ function replicaHealthPresentation(spaceId = '') {
     .replace('{confirmed}', String(confirmed))
     .replace('{registered}', String(registered));
   const detail = t('replicas.detail', '{label}. {summary}. {freshness}. Los datos siguen almacenados únicamente en los dispositivos autorizados.')
-    .replace('{label}', labels[stateName])
+    .replace('{label}', labels[freshnessState])
     .replace('{summary}', summary)
     .replace('{freshness}', freshness);
-  return { health, state: stateName, label: labels[stateName], summary, freshness, detail };
+  return { health, state: coverageState, freshnessState, label: labels[freshnessState], summary, freshness, detail };
 }
 function replicaHealthBadge(spaceId = '', compact = false) {
   const presentation = replicaHealthPresentation(spaceId);

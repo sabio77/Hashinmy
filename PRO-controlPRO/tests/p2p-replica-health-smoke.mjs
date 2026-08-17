@@ -80,9 +80,50 @@ assert.match(clientSource, /p2p:operation-published[\s\S]*scheduleReplicaHealthR
 assert.match(clientSource, /replayed > 0\) this\.scheduleReplicaHealthRefresh\(\[event\.spaceId\]\)/, 'La reproducción de eventos cifrados diferidos no renueva la cobertura después de aplicarlos.');
 assert.match(clientSource, /p2p\.replica\.topology\.changed[\s\S]*scheduleReplicaHealthRefresh\(\[event\.spaceId\], \{ delayMs: 350 \}\)/, 'Un alta o retiro de dispositivo no fuerza una actualización inmediata de cobertura en las demás instalaciones.');
 assert.match(clientSource, /const sent = await this\.sendSnapshot\(event\);[\s\S]*if \(sent && event\.spaceId\) this\.scheduleReplicaHealthRefresh\(\[event\.spaceId\], \{ delayMs: 750 \}\)/, 'La fuente de un snapshot no recalcula la cobertura después de crear la copia remota.');
+assert.match(appSource, /localProjectLoaded[\s\S]*state\.projects\?\.has\?\.\(cleanSpaceId\)[\s\S]*currentVisibleCopy/, 'La card no usa el proyecto ya hidratado como evidencia local de al menos 1/N copias.');
 assert.match(appSource, /currentVisibleCopy[\s\S]*health\.presentReplicas[\s\S]*const registered = Math\.max\(present/, 'La card no garantiza el mínimo 1/N de una copia local visible ni usa la presencia de réplica separada de su frescura.');
+assert.match(appSource, /coverageState[\s\S]*registered > 0 && present >= registered[\s\S]*\? 'healthy'/, 'Una cobertura completa N/N no fuerza el estado visual verde.');
 assert.match(appSource, /replicas\.freshness[\s\S]*confirmed[\s\S]*registered/, 'La card dejó de informar por separado cuántas copias están realmente al día.');
 assert.match(appSource, /health\.displayState \|\| health\.state/, 'La card no separa el estado visual de disponibilidad del estado durable de confirmación.');
+
+const presentationStart = appSource.indexOf('function replicaHealthForSpace');
+const presentationEnd = appSource.indexOf('function concurrentConflictMessage', presentationStart);
+assert.ok(presentationStart >= 0 && presentationEnd > presentationStart, 'No se encontró la presentación de cobertura de la card.');
+const presentationModuleUrl = `data:text/javascript;base64,${Buffer.from(`
+const state = { p2pState: { replicaHealth: {} }, projects: new Map() };
+const t = (_key, fallback) => fallback;
+${appSource.slice(presentationStart, presentationEnd)}
+export { state, replicaHealthPresentation };
+`).toString('base64')}`;
+const presentationModule = await import(presentationModuleUrl);
+presentationModule.state.projects.set('space_local', { project: { loaded: true } });
+presentationModule.state.p2pState.replicaHealth.space_local = {
+  state: 'unavailable',
+  displayState: 'unavailable',
+  registeredReplicas: 2,
+  confirmedReplicas: 0,
+  availableReplicas: 0,
+  presentReplicas: 0,
+  currentDeviceRegistered: false,
+  currentDeviceOnline: false
+};
+const localFloor = presentationModule.replicaHealthPresentation('space_local');
+assert.equal(localFloor.summary, '1/2 copias', 'Una card hidratada localmente volvió a mostrar el imposible 0/2.');
+assert.equal(localFloor.state, 'single', 'Una cobertura parcial 1/2 no debe presentarse como completa.');
+
+presentationModule.state.p2pState.replicaHealth.space_complete = {
+  state: 'degraded',
+  displayState: 'degraded',
+  registeredReplicas: 80,
+  confirmedReplicas: 79,
+  availableReplicas: 79,
+  presentReplicas: 80
+};
+const completeCoverage = presentationModule.replicaHealthPresentation('space_complete');
+assert.equal(completeCoverage.summary, '80/80 copias', 'La cobertura física completa no se conserva en la presentación.');
+assert.equal(completeCoverage.state, 'healthy', 'Una cobertura completa 80/80 debe usar el estado visual verde.');
+assert.equal(completeCoverage.freshnessState, 'degraded', 'La cobertura verde no debe ocultar que una réplica todavía está pendiente de ACK/frescura.');
+assert.equal(completeCoverage.freshness, '79/80 al día', 'La frescura real dejó de mostrarse por separado de la cobertura.');
 assert.match(appSource, /replica-health-badge/, 'La interfaz no muestra el estado de las réplicas.');
 assert.match(appSource, /event\.detail\?\.replicaHealthOnly === true/, 'La interfaz no separa cobertura de la carga funcional.');
 assert.match(htmlSource, /id="project-replica-health"/, 'Falta el indicador de cobertura dentro del proyecto.');
