@@ -206,7 +206,8 @@ for (const marker of [
   "tombstone?.status === 'completed'",
   "status: 'prepared'",
   "status: 'completed'",
-  'trashAppliedOrAlreadyAbsent'
+  'lifecycleStateApplied',
+  "lifecycleAction === 'restore'"
 ]) {
   if (!clientSource.includes(marker)) throw new Error(`La recuperación idempotente P2P_sin_ perdió el contrato: ${marker}`);
 }

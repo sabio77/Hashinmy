@@ -78,16 +78,30 @@ const helperStart = clientSource.indexOf('export function retryAfterMilliseconds
 const helperEnd = clientSource.indexOf('function createId', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'No se encontró el cálculo acotado de recuperación.');
 const helperModule = `const SERVER_RETRY_FALLBACK_MS = 5000;\nconst SERVER_RETRY_MAX_MS = 60 * 60 * 1000;\n${clientSource.slice(helperStart, helperEnd)}`
-  .replace('export function retryAfterMilliseconds', 'function retryAfterMilliseconds');
-const helperUrl = `data:text/javascript;base64,${Buffer.from(`${helperModule}\nexport { retryAfterMilliseconds };`).toString('base64')}`;
-const { retryAfterMilliseconds } = await import(helperUrl);
+  .replace('export function retryAfterMilliseconds', 'function retryAfterMilliseconds')
+  .replace('export function serverRecoveryDelayMilliseconds', 'function serverRecoveryDelayMilliseconds');
+const helperUrl = `data:text/javascript;base64,${Buffer.from(`${helperModule}\nexport { retryAfterMilliseconds, serverRecoveryDelayMilliseconds };`).toString('base64')}`;
+const { retryAfterMilliseconds, serverRecoveryDelayMilliseconds } = await import(helperUrl);
 assert.equal(retryAfterMilliseconds({ retryAfterSeconds: 7 }), 7000);
 assert.equal(retryAfterMilliseconds({ retryAfterSeconds: 0 }), 5000);
 assert.equal(retryAfterMilliseconds({ retryAfterSeconds: 3600 }), 60 * 60 * 1000);
+assert.equal(serverRecoveryDelayMilliseconds({ status: 503 }, 0), 5000, 'La recuperación por 5xx no usa el primer backoff.');
+assert.equal(serverRecoveryDelayMilliseconds({ status: 503 }, 1), 10000, 'La recuperación por 5xx no incrementa el backoff.');
+assert.equal(serverRecoveryDelayMilliseconds({ status: 503 }, 4), 30000, 'La recuperación genérica no queda acotada a 30 s.');
+assert.equal(
+  serverRecoveryDelayMilliseconds({ status: 429, code: 'P2P_BOOTSTRAP_RATE_LIMITED', retryAfterSeconds: 7 }, 4),
+  7000,
+  'Retry-After dejó de tener prioridad frente al backoff genérico.'
+);
 
 for (const expected of [
   'this.serverRetryTimer = 0;',
+  'this.serverRetryAttempt = 0;',
+  'serverRecoveryDelayMilliseconds(error = null',
   'scheduleServerRecovery(error = null',
+  'this.isRetryableTransportError(error)',
+  'this.serverRetryDueAt <= dueAt',
+  "reason: rateLimited ? 'rate-limit' : 'transport-retry'",
   "window.addEventListener('p2p:rate-limited', this.boundRateLimited);",
   "window.removeEventListener('p2p:rate-limited', this.boundRateLimited);",
   "this.scheduleServerRecovery(error, 'bootstrap-start');",
@@ -107,4 +121,4 @@ assert.ok(
 );
 assert.ok(!clientSource.includes('setInterval('), 'La recuperación agregó polling periódico.');
 
-console.log('OK: Retry-After cruza CORS/API y agenda una recuperación P2P única, acotada y sin polling.');
+console.log('OK: Retry-After y fallos transitorios 5xx/red agendan recuperación P2P acotada, priorizan el intento más temprano y evitan quedar desconectados sin polling.');

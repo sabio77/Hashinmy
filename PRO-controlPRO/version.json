@@ -102,13 +102,13 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "8fe294fddd2e9279bcc1aea060503a17830105f59410adedd8bb8febb5b6d97a",
-      "bytes": 464468
+      "sha256": "7b0d5733e1d9bc00fdcf2e3695ff6cc1f54ed5a4078a979f80ba99670037400d",
+      "bytes": 481796
     },
     {
       "url": "./src/js/p2p-permissions.js",
-      "sha256": "bb5f557d6a895a9a196dc873bb944be59aa8678e2b6c57e5b909bde829854173",
-      "bytes": 2768
+      "sha256": "8529480d4e7aef5653fd06013e441f69d5540e3d8aca94f715ed41e90696f71e",
+      "bytes": 2779
     },
     {
       "url": "./src/js/p2p-space-creation-intent.js",
@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/p2p-invitation-audit.js",
-      "sha256": "2e76e6e65d37d339f09af8f8a6b4296ecb45a8bd53a414eccb5237f32d9c191b",
-      "bytes": 9737
+      "sha256": "eb0109b4377ff2ea05b5b344867d380afb1b9a121ceeea7f5a8a75772283d8ec",
+      "bytes": 9748
     },
     {
       "url": "./src/js/project-domain.js",
@@ -157,8 +157,8 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "f165d39149da5078236d4585ae0765466fa4a4df96a778aa952c6e716084e629",
-      "bytes": 174714
+      "sha256": "7335c7e8f43450b22d1d7774349328496011671f3fe78718904451b81fd637f8",
+      "bytes": 176951
     },
     {
       "url": "./textX/languages.json",

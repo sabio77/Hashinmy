@@ -178,7 +178,8 @@ assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica
 assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'purge'), true);
 assert.equal(lifecycleReplicationPairAuthorized({ ...lifecycleOwner, role: 'member' }, lifecycleReplica, 'purge'), false);
 assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, { ...lifecycleReplica, permissions: [] }, 'trash'), false);
-assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'restore'), false);
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'restore'), true);
+assert.equal(lifecycleReplicationPairAuthorized(lifecycleOwner, lifecycleReplica, 'archive'), false);
 assert.equal(lifecycleReplicationPairAuthorized({ ...lifecycleOwner, resourceType: 'generic' }, lifecycleReplica, 'purge'), false);
 
 console.log('P2P_sin capability smoke: OK');

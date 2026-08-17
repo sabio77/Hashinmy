@@ -1,6 +1,6 @@
 import { P2P_APPLICATION_ID } from './application-scope.js';
 
-const AUDIT_PREFIX = '[P2P_INVITATION_AUDIT]';
+const AUDIT_PREFIX = '[XXXinvXXX][P2P_INVITATION_AUDIT]';
 const SENSITIVE_AUDIT_MARKER = 'XXXsenXXX';
 const AUDIT_ENTITY_MANIFEST_LIMIT = 400;
 const PROJECT_ROOT_ENTITY_TYPE = 'admin.project';

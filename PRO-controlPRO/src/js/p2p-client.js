@@ -107,6 +107,8 @@ const TAB_STATE_REQUEST_RECOVERY_ATTEMPTS = 4;
 const KEY_ENVELOPE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const MISSING_SPACE_KEY_RECOVERY_WAIT_MS = 2400;
 const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
+const INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS = 3;
+const INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS = 700;
 const INVITATION_SOURCE_SYNC_WAIT_MS = 8 * 1000;
 const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 2;
 const PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS = 5;
@@ -161,6 +163,15 @@ export function retryAfterMilliseconds(error = null, options = {}) {
   const retryAfterSeconds = Number(error?.retryAfterSeconds || 0);
   if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0) return Math.min(maximumMs, fallbackMs);
   return Math.min(maximumMs, Math.max(1000, Math.ceil(retryAfterSeconds * 1000)));
+}
+
+export function serverRecoveryDelayMilliseconds(error = null, attempt = 0) {
+  const rateLimitCode = String(error?.code || '').trim().toUpperCase();
+  const serverDirected = Number(error?.retryAfterSeconds || 0) > 0
+    || ['P2P_BOOTSTRAP_RATE_LIMITED', 'P2P_PUBLISH_RATE_LIMITED', 'P2P_CONTROL_RATE_LIMITED'].includes(rateLimitCode);
+  if (Number(error?.status || 0) === 429 && serverDirected) return retryAfterMilliseconds(error);
+  const normalizedAttempt = Math.min(6, Math.max(0, Math.floor(Number(attempt || 0))));
+  return Math.min(30000, SERVER_RETRY_FALLBACK_MS * (2 ** normalizedAttempt));
 }
 
 export function planLocalCapabilityRefresh(capability = {}, options = {}) {
@@ -449,8 +460,8 @@ export function normalizePublishDeliveryIntent(type = '', options = {}) {
     error.code = 'P2P_PARTIAL_STATE_DELIVERY_FORBIDDEN';
     throw error;
   }
-  if (deferSourceUntilReplicas && String(type || '') !== 'entity.trash') {
-    const error = new Error('Solo el envío de un proyecto a la papelera puede diferirse hasta confirmar las demás réplicas.');
+  if (deferSourceUntilReplicas && !['entity.trash', 'entity.restore'].includes(String(type || ''))) {
+    const error = new Error('Solo una operación crítica de papelera o restauración puede diferirse hasta confirmar las demás réplicas.');
     error.status = 400;
     error.code = 'P2P_LIFECYCLE_OPERATION_INVALID';
     throw error;
@@ -718,7 +729,7 @@ export function assertCanonicalControlEnvelope(event = {}) {
     if (
       !sourceDeviceId
       || !transactionId
-      || !['trash', 'purge'].includes(action)
+      || !['trash', 'restore', 'purge'].includes(action)
       || String(data.spaceId || '').trim() !== spaceId
       || !Number.isSafeInteger(completed)
       || completed < 0
@@ -736,9 +747,10 @@ export function assertCanonicalControlEnvelope(event = {}) {
     if (eventType === 'p2p.lifecycle.finalize') {
       const nested = data.event;
       if (
-        action !== 'trash'
+        !['trash', 'restore'].includes(action)
         || status !== 'ready'
         || !isRecord(nested)
+        || String(nested.operation?.type || '').trim() !== (action === 'restore' ? 'entity.restore' : 'entity.trash')
         || String(nested.eventType || '').trim() !== 'p2p.operation'
         || String(nested.spaceId || '').trim() !== spaceId
         || String(nested.actorUserId || '').trim() !== actorUserId
@@ -1535,6 +1547,7 @@ export class SemillaP2PClient {
     this.serverRetryTimer = 0;
     this.serverRetryDueAt = 0;
     this.serverRetryStage = '';
+    this.serverRetryAttempt = 0;
     this.ackTimer = 0;
     this.ackPromise = null;
     this.ackGeneration = 0;
@@ -1598,8 +1611,13 @@ export class SemillaP2PClient {
     this.tabStateReconcileRunning = false;
     this.tabStateReconcileTask = Promise.resolve();
     this.leadershipTask = Promise.resolve();
+    this.foregroundRecoveryPromise = null;
     this.boundOnline = () => {
       this.recoverOnline().catch((error) => dispatch('p2p:error', { error, stage: 'recover' }));
+    };
+    this.boundForegroundRecovery = () => {
+      if ((typeof document !== 'undefined' && document.visibilityState === 'hidden') || navigator.onLine === false) return;
+      this.recoverForeground().catch((error) => dispatch('p2p:error', { error, stage: 'foreground-recover' }));
     };
     this.boundRateLimited = (event = {}) => {
       const detail = event?.detail || {};
@@ -2063,7 +2081,7 @@ export class SemillaP2PClient {
       })
       .filter((record) => (
         record.transactionId
-        && ['trash', 'purge'].includes(record.action)
+        && ['trash', 'restore', 'purge'].includes(record.action)
         && record.spaceId
         && record.operationId
         && record.sourceUserId
@@ -2109,7 +2127,7 @@ export class SemillaP2PClient {
         : '',
       expiresAtMs: Date.now() + LOCAL_LIFECYCLE_TOMBSTONE_TTL_MS
     }])[0] || null;
-    if (!record) throw new Error('No se pudo conservar el comprobante local de la eliminación remota.');
+    if (!record) throw new Error('No se pudo conservar el comprobante local de la acción crítica remota.');
     const next = [record, ...records.filter((candidate) => candidate.transactionId !== record.transactionId)]
       .slice(0, LOCAL_LIFECYCLE_TOMBSTONE_MAX);
     await setMeta(LOCAL_LIFECYCLE_TOMBSTONE_META_KEY, next);
@@ -2194,7 +2212,7 @@ export class SemillaP2PClient {
       }))
       .filter((record) => (
         record.transactionId
-        && ['trash', 'purge'].includes(record.action)
+        && ['trash', 'restore', 'purge'].includes(record.action)
         && record.spaceId
         && record.operationId
         && record.sourceDeviceId
@@ -2202,7 +2220,7 @@ export class SemillaP2PClient {
         && record.preparedAt
         && (record.status !== 'completed' || record.completedAt)
         && record.expiresAtMs > nowMs
-        && (record.action !== 'trash' || Number.isSafeInteger(record.appliedStateRevision))
+        && (!['trash', 'restore'].includes(record.action) || Number.isSafeInteger(record.appliedStateRevision))
       ))
       .slice(0, LIFECYCLE_RECEIPT_MAX);
   }
@@ -2258,11 +2276,13 @@ export class SemillaP2PClient {
     return receipt;
   }
 
-  async rememberTrashLifecycleReceipt(event = {}, sessionContext = this.captureSessionContext()) {
+  async rememberProjectLifecycleReceipt(event = {}, sessionContext = this.captureSessionContext()) {
     const operation = event?.operation || {};
     const operationId = String(operation.operationId || '').trim();
+    const operationType = String(operation.type || '').trim();
+    const action = operationType === 'entity.restore' ? 'restore' : operationType === 'entity.trash' ? 'trash' : '';
     if (
-      String(operation.type || '').trim() !== 'entity.trash'
+      !action
       || String(operation.entityType || '').trim() !== 'admin.project'
       || String(operation.entityId || '').trim() !== 'project'
       || !operationId
@@ -2270,7 +2290,7 @@ export class SemillaP2PClient {
     ) return null;
     return this.rememberLifecycleReceipt({
       transactionId: `lifecycle_${operationId}`,
-      action: 'trash',
+      action,
       spaceId: event.spaceId,
       operationId,
       sourceDeviceId: event.sourceDeviceId,
@@ -2278,6 +2298,10 @@ export class SemillaP2PClient {
       appliedStateRevision: Math.max(0, Number(event.stateRevision || event.spaceSequence || 0)),
       status: 'completed'
     }, sessionContext);
+  }
+
+  async rememberTrashLifecycleReceipt(event = {}, sessionContext = this.captureSessionContext()) {
+    return this.rememberProjectLifecycleReceipt(event, sessionContext);
   }
 
   localLifecyclePublicState(entry = {}, status = '') {
@@ -2362,7 +2386,7 @@ export class SemillaP2PClient {
     const action = String(outboxItem.lifecycleAction || outboxItem.localLifecycle?.action || '').trim().toLowerCase();
     const spaceId = String(outboxItem.spaceId || outboxItem.request?.spaceId || outboxItem.localLifecycle?.spaceId || '').trim();
     const operationId = String(outboxItem.operationId || outboxItem.localLifecycle?.operationId || '').trim();
-    if (!['trash', 'purge'].includes(action) || !spaceId || !operationId) return { delivered: 0, transaction: null };
+    if (!['trash', 'restore', 'purge'].includes(action) || !spaceId || !operationId) return { delivered: 0, transaction: null };
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
     if (!space || space.ownerUserId !== sessionContext.userId || space.authorizationState === 'unconfirmed') return { delivered: 0, transaction: null };
 
@@ -2384,7 +2408,7 @@ export class SemillaP2PClient {
     const deliveredTargets = [];
     for (const target of candidates) {
       let body;
-      if (action === 'trash') {
+      if (action === 'trash' || action === 'restore') {
         if (!outboxItem.request?.operation) continue;
         body = await this.createSignedLocalOperationBody({
           ...outboxItem.request,
@@ -2432,7 +2456,7 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const action = String(entry.action || '').trim();
     const spaceId = String(entry.spaceId || '').trim();
-    if (action === 'trash') {
+    if (action === 'trash' || action === 'restore') {
       const transportOperation = entry.outboxItem?.request?.operation || {};
       const event = {
         eventId: `lan_lifecycle_source_${String(entry.transactionId || entry.operationId).replace(/[^a-zA-Z0-9._:-]/g, '_')}`,
@@ -3075,12 +3099,17 @@ export class SemillaP2PClient {
     const certifiedPeer = { userId: capabilityPayload.userId, deviceId: capabilityPayload.deviceId };
     const localLifecycle = request.localLifecycle && typeof request.localLifecycle === 'object' ? request.localLifecycle : null;
     const lifecycleAction = String(localLifecycle?.action || '').trim().toLowerCase();
+    const lifecycleOperationType = lifecycleAction === 'restore'
+      ? 'entity.restore'
+      : lifecycleAction === 'trash'
+        ? 'entity.trash'
+        : '';
     const lifecycleIdentityValid = !localLifecycle || (
-      lifecycleAction === 'trash'
+      Boolean(lifecycleOperationType)
       && String(localLifecycle.spaceId || '').trim() === spaceId
       && String(localLifecycle.operationId || '').trim() === String(transportOperation.operationId || '').trim()
       && String(localLifecycle.sourceDeviceId || '').trim() === String(capabilityPayload.deviceId || '').trim()
-      && String(transportOperation.type || '').trim() === 'entity.trash'
+      && String(transportOperation.type || '').trim() === lifecycleOperationType
       && String(transportOperation.entityType || '').trim() === 'admin.project'
       && String(transportOperation.entityId || '').trim() === 'project'
     );
@@ -3093,17 +3122,17 @@ export class SemillaP2PClient {
           sourceDeviceId: localLifecycle.sourceDeviceId
         }, capabilityPayload, sessionContext)
       : null;
-    const acknowledgeTrash = async () => {
+    const acknowledgeLifecycle = async () => {
       const ack = await this.createSignedLocalControlBody('lifecycle.ack', {
         transactionId: String(localLifecycle?.transactionId || '').trim(),
-        action: 'trash',
+        action: lifecycleAction,
         spaceId,
         operationId: String(transportOperation.operationId || '').trim(),
         sourceDeviceId: String(localLifecycle?.sourceDeviceId || '').trim()
       }, sessionContext);
       await this.localTransport?.sendTo?.(String(message.sessionId || '').trim(), ack);
     };
-    const supersedingPurgeProof = localLifecycle && lifecycleIdentityValid
+    const supersedingPurgeProof = localLifecycle && lifecycleIdentityValid && lifecycleAction === 'trash'
       ? await this.completedPurgeProofForSpace(spaceId, sessionContext)
       : null;
     const supersededTrashAuthorized = Boolean(
@@ -3112,7 +3141,7 @@ export class SemillaP2PClient {
     );
     if (operationIdentityValid && lifecycleIdentityValid
       && (lifecycleTombstone?.status === 'completed' || supersededTrashAuthorized)) {
-      await acknowledgeTrash();
+      await acknowledgeLifecycle();
       return true;
     }
     const lifecycleSpace = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === spaceId) || null;
@@ -3195,7 +3224,7 @@ export class SemillaP2PClient {
     if (localLifecycle && !lifecycleTombstone) {
       await this.rememberLocalLifecycleTombstone({
         transactionId: String(localLifecycle.transactionId || '').trim(),
-        action: 'trash',
+        action: lifecycleAction,
         spaceId,
         operationId: relayedOperation.operationId,
         sourceUserId: capabilityPayload.userId,
@@ -3213,18 +3242,20 @@ export class SemillaP2PClient {
     if (localLifecycle) {
       const rootAfter = await getEntity(spaceId, 'admin.project', 'project');
       this.assertSessionContext(sessionContext);
-      const trashAppliedOrAlreadyAbsent = !rootAfter
-        || rootAfter.deleted
-        || Boolean(String(rootAfter.value?.trashedAt || '').trim());
-      if (!trashAppliedOrAlreadyAbsent) {
-        const error = new Error('La réplica local no pudo ubicar el proyecto en la papelera de forma segura.');
+      const lifecycleStateApplied = lifecycleAction === 'restore'
+        ? Boolean(rootAfter && !rootAfter.deleted && !String(rootAfter.value?.trashedAt || '').trim())
+        : (!rootAfter || rootAfter.deleted || Boolean(String(rootAfter.value?.trashedAt || '').trim()));
+      if (!lifecycleStateApplied) {
+        const error = new Error(lifecycleAction === 'restore'
+          ? 'La réplica local no pudo restaurar el proyecto de forma segura.'
+          : 'La réplica local no pudo ubicar el proyecto en la papelera de forma segura.');
         error.code = 'P2P_SIN_LIFECYCLE_STATE_CONFLICT';
         dispatch('p2p:local-network', { state: 'rejected', error, peer: message.peer || null, spaceId });
         return false;
       }
       await this.rememberLocalLifecycleTombstone({
         transactionId: String(localLifecycle.transactionId || '').trim(),
-        action: 'trash',
+        action: lifecycleAction,
         spaceId,
         operationId: relayedOperation.operationId,
         sourceUserId: capabilityPayload.userId,
@@ -3232,7 +3263,7 @@ export class SemillaP2PClient {
         status: 'completed'
       }, sessionContext);
       this.assertSessionContext(sessionContext);
-      await acknowledgeTrash();
+      await acknowledgeLifecycle();
     } else {
       dispatch('p2p:outbox', { queued: true, operationId: relayedOperation.operationId, localNetworkRelay: true });
     }
@@ -4269,45 +4300,64 @@ export class SemillaP2PClient {
     ].includes(String(error?.code || '').trim().toUpperCase());
   }
 
-  clearServerRecoveryTimer() {
+  clearServerRecoveryTimer(options = {}) {
     if (this.serverRetryTimer) window.clearTimeout(this.serverRetryTimer);
     this.serverRetryTimer = 0;
     this.serverRetryDueAt = 0;
     this.serverRetryStage = '';
+    if (options.resetAttempt !== false) this.serverRetryAttempt = 0;
   }
 
-  scheduleServerRecovery(error = null, stage = 'rate-limit') {
+  scheduleServerRecovery(error = null, stage = 'transport-retry') {
     const rateLimitCode = String(error?.code || '').trim().toUpperCase();
     const serverDirected = Number(error?.retryAfterSeconds || 0) > 0
       || ['P2P_BOOTSTRAP_RATE_LIMITED', 'P2P_PUBLISH_RATE_LIMITED', 'P2P_CONTROL_RATE_LIMITED'].includes(rateLimitCode);
-    if (Number(error?.status || 0) !== 429 || !serverDirected || this.manualClose || !this.started || !getSessionToken()) return false;
+    const rateLimited = Number(error?.status || 0) === 429 && serverDirected;
+    if (
+      !this.isRetryableTransportError(error)
+      || this.manualClose
+      || !this.started
+      || !getSessionToken()
+    ) return false;
     const sessionContext = this.captureSessionContext();
     if (!this.isSessionContextCurrent(sessionContext)) return false;
-    const delay = retryAfterMilliseconds(error);
+
+    const attempt = Math.min(6, Math.max(0, Number(this.serverRetryAttempt || 0)));
+    const delay = serverRecoveryDelayMilliseconds(error, attempt);
     const dueAt = Date.now() + delay;
+
     if (this.serverRetryTimer) {
-      if (this.serverRetryDueAt >= dueAt) return true;
+      // Conserva siempre el intento ya programado que ocurrirá antes. Antes se hacía
+      // la comparación al revés y un error posterior podía retrasar una recuperación
+      // que ya estaba agendada.
+      if (this.serverRetryDueAt > 0 && this.serverRetryDueAt <= dueAt) return true;
       window.clearTimeout(this.serverRetryTimer);
     }
+
     this.serverRetryDueAt = dueAt;
-    this.serverRetryStage = String(stage || 'rate-limit').slice(0, 180);
+    this.serverRetryStage = String(stage || (rateLimited ? 'rate-limit' : 'transport-retry')).slice(0, 180);
+    if (!rateLimited) this.serverRetryAttempt = Math.min(7, attempt + 1);
     dispatch('p2p:connection', {
       state: 'connecting',
-      reason: 'rate-limit',
+      reason: rateLimited ? 'rate-limit' : 'transport-retry',
       deviceId: sessionContext.deviceId,
       retryAfterSeconds: Math.ceil(delay / 1000),
       retryAt: dueAt,
       stage: this.serverRetryStage
     });
+
     this.serverRetryTimer = window.setTimeout(() => {
       this.serverRetryTimer = 0;
       this.serverRetryDueAt = 0;
       this.serverRetryStage = '';
-      if (!this.isSessionContextCurrent(sessionContext) || !navigator.onLine) return;
+      if (!this.isSessionContextCurrent(sessionContext)) return;
+      // Si el navegador está realmente offline, el evento `online` reanudará el ciclo.
+      // No quemamos batería con temporizadores mientras no existe conectividad.
+      if (navigator.onLine === false) return;
       this.recoverOnline().catch((recoveryError) => {
         if (this.isSessionContextChangedError(recoveryError)) return;
-        if (!this.scheduleServerRecovery(recoveryError, 'rate-limit-retry')) {
-          dispatch('p2p:error', { error: recoveryError, stage: 'rate-limit-retry' });
+        if (!this.scheduleServerRecovery(recoveryError, 'transport-retry')) {
+          dispatch('p2p:error', { error: recoveryError, stage: 'transport-retry' });
         }
       });
     }, delay);
@@ -6117,8 +6167,12 @@ export class SemillaP2PClient {
       this.assertSessionContext(sessionContext);
       if (this.snapshotRecoveryRequired) this.scheduleSnapshotRecovery(SNAPSHOT_RECOVERY_FALLBACK_MS);
       window.removeEventListener('online', this.boundOnline);
+      window.removeEventListener('pageshow', this.boundForegroundRecovery);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.boundForegroundRecovery);
       window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
       window.addEventListener('online', this.boundOnline);
+      window.addEventListener('pageshow', this.boundForegroundRecovery);
+      if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.boundForegroundRecovery);
       window.addEventListener('p2p:rate-limited', this.boundRateLimited);
       this.tabCoordinationReady = false;
       this.realtimeLeader = await this.tabCoordinator.start({
@@ -6247,6 +6301,8 @@ export class SemillaP2PClient {
     this.clearAtomicTransportBatchTimer();
     this.pendingAtomicEventBatches.clear();
     window.removeEventListener('online', this.boundOnline);
+    window.removeEventListener('pageshow', this.boundForegroundRecovery);
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.boundForegroundRecovery);
     window.removeEventListener('p2p:rate-limited', this.boundRateLimited);
     this.unbindTabRelays();
     const pendingTabCoordinator = this.tabCoordinator.stop().catch(() => null);
@@ -6275,6 +6331,7 @@ export class SemillaP2PClient {
     this.recoveryRequirements = {};
     this.highestPendingAck = 0;
     this.openPromise = null;
+    this.foregroundRecoveryPromise = null;
     if (this.eventSource) this.eventSource.close();
     this.eventSource = null;
 
@@ -6334,12 +6391,305 @@ export class SemillaP2PClient {
   async recoverMissingProjectRoots(spaceIds = [], auditContext = {}) {
     const normalizedSpaceIds = normalizeSnapshotSpaceIds(spaceIds);
     if (!normalizedSpaceIds.length) return this.bootstrapState;
-    return this.refreshBootstrap({
-      requestSnapshots: 'force',
-      snapshotSpaceIds: normalizedSpaceIds,
-      auditTraceId: String(auditContext?.auditTraceId || '').trim(),
-      auditSource: String(auditContext?.source || auditContext?.auditSource || 'missing-project-root-recovery').trim()
+    const sessionContext = this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const auditTraceId = String(auditContext?.auditTraceId || '').trim() || createInvitationAuditTraceId('incomplete_invitation');
+    const auditSource = String(auditContext?.source || auditContext?.auditSource || 'missing-project-root-recovery').trim();
+    const projectRootLoaded = (entities = []) => (Array.isArray(entities) ? entities : []).some((entity) => (
+      String(entity?.entityType || '').trim() === 'admin.project'
+      && String(entity?.entityId || '').trim() === 'project'
+      && entity?.deleted !== true
+      && entity?.confirmedDeleted !== true
+      && entity?.value
+      && typeof entity.value === 'object'
+      && !Array.isArray(entity.value)
+    ));
+    const acceptedInvitationForSpace = (spaceId = '') => (this.bootstrapState.invitations?.received || [])
+      .filter((invitation) => String(invitation?.spaceId || '').trim() === spaceId
+        && String(invitation?.status || '').trim().toLowerCase() === 'accepted')
+      .sort((left, right) => (Date.parse(right?.respondedAt || right?.updatedAt || right?.createdAt || '') || 0)
+        - (Date.parse(left?.respondedAt || left?.updatedAt || left?.createdAt || '') || 0))[0] || null;
+
+    let unresolvedSpaceIds = [...normalizedSpaceIds];
+    let latestState = this.bootstrapState;
+    const attemptsAudit = [];
+
+    for (let attempt = 1; attempt <= INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS && unresolvedSpaceIds.length; attempt += 1) {
+      this.assertSessionContext(sessionContext);
+      const currentTargets = [...unresolvedSpaceIds];
+      invitationAuditLog('frontend.incomplete-recovery.attempt.begin', {
+        auditTraceId,
+        auditSource,
+        attempt,
+        maxAttempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        spaceIds: currentTargets,
+        deviceId: sessionContext.deviceId
+      });
+
+      let bootstrapError = null;
+      try {
+        latestState = await this.refreshBootstrap({
+          requestSnapshots: 'force',
+          snapshotSpaceIds: currentTargets,
+          auditTraceId,
+          auditSource: `${auditSource}:attempt-${attempt}`
+        });
+      } catch (error) {
+        if (this.isSessionContextChangedError(error)) throw error;
+        bootstrapError = error;
+        invitationAuditLog('frontend.incomplete-recovery.attempt.bootstrap-error', {
+          auditTraceId,
+          auditSource,
+          attempt,
+          maxAttempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+          spaceIds: currentTargets,
+          deviceId: sessionContext.deviceId,
+          error: invitationAuditError(error),
+          ...XXXsenXXX({ error, bootstrapState: this.bootstrapState })
+        });
+      }
+      this.assertSessionContext(sessionContext);
+
+      const attemptSpaces = [];
+      const nextUnresolved = [];
+      for (const spaceId of currentTargets) {
+        this.assertSessionContext(sessionContext);
+        const space = (this.bootstrapState.spaces || []).find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
+        const invitation = acceptedInvitationForSpace(spaceId);
+        let directRecovery = null;
+        let directRecoveryError = null;
+        if (space && invitation && Math.max(0, Number(space?.encryptionVersion || 0)) >= 1) {
+          try {
+            directRecovery = await this.recoverAcceptedInvitationBootstrap(
+              space,
+              this.bootstrapState.invitations?.received || [],
+              sessionContext,
+              {
+                forceSnapshot: true,
+                deferKeyWait: false,
+                ignoreCooldown: true,
+                auditTraceId
+              }
+            );
+          } catch (error) {
+            if (this.isSessionContextChangedError(error)) throw error;
+            directRecoveryError = error;
+          }
+        }
+        const entities = await listEntities(spaceId).catch(() => []);
+        this.assertSessionContext(sessionContext);
+        const loaded = projectRootLoaded(entities);
+        if (!loaded) nextUnresolved.push(spaceId);
+        const reason = loaded
+          ? 'project_root_loaded'
+          : directRecoveryError?.code || directRecoveryError?.message
+            || directRecovery?.reason
+            || bootstrapError?.code || bootstrapError?.message
+            || (!space ? 'space_missing_from_bootstrap' : !invitation ? 'accepted_invitation_missing' : 'project_root_missing');
+        attemptSpaces.push({
+          spaceId,
+          loaded,
+          invitationId: String(invitation?.invitationId || '').trim(),
+          invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+          invitationScope: String(invitation?.invitationScope || '').trim(),
+          authorizationState: String(space?.authorizationState || '').trim(),
+          authorizationPendingReason: String(space?.authorizationPendingReason || '').trim(),
+          directRecovery: directRecovery ? {
+            recovered: directRecovery.recovered === true,
+            reason: String(directRecovery.reason || '').trim()
+          } : null,
+          directRecoveryError: invitationAuditError(directRecoveryError),
+          reason,
+          entities: invitationAuditEntitySummary(entities),
+          rawAudit: { invitation, space, directRecovery, directRecoveryError, entities }
+        });
+      }
+      unresolvedSpaceIds = nextUnresolved;
+      attemptsAudit.push({ attempt, spaces: attemptSpaces.map(({ rawAudit, ...summary }) => summary) });
+      invitationAuditLog('frontend.incomplete-recovery.attempt.result', {
+        auditTraceId,
+        auditSource,
+        attempt,
+        maxAttempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        unresolvedSpaceIds,
+        spaces: attemptSpaces.map(({ rawAudit, ...summary }) => summary),
+        deviceId: sessionContext.deviceId,
+        ...XXXsenXXX({ spaces: attemptSpaces.map((item) => item.rawAudit), bootstrapState: this.bootstrapState })
+      });
+      if (!unresolvedSpaceIds.length) {
+        invitationAuditLog('frontend.incomplete-recovery.complete', {
+          auditTraceId,
+          auditSource,
+          attemptsUsed: attempt,
+          recoveredSpaceIds: normalizedSpaceIds,
+          deviceId: sessionContext.deviceId
+        });
+        return {
+          ...latestState,
+          invitationRecovery: {
+            completed: true,
+            discarded: false,
+            attemptsUsed: attempt,
+            recoveredSpaceIds: normalizedSpaceIds,
+            unresolvedSpaceIds: [],
+            attempts: attemptsAudit
+          }
+        };
+      }
+      if (attempt < INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS) {
+        await new Promise((resolve) => window.setTimeout(resolve, INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS * attempt));
+      }
+    }
+
+    this.assertSessionContext(sessionContext);
+    const receivedAccepted = (this.bootstrapState.invitations?.received || [])
+      .filter((invitation) => String(invitation?.status || '').trim().toLowerCase() === 'accepted');
+    const failedInvitations = unresolvedSpaceIds.map((spaceId) => acceptedInvitationForSpace(spaceId)).filter(Boolean);
+    const failedGroupIds = new Set(failedInvitations
+      .filter((invitation) => String(invitation?.invitationScope || '').trim().toLowerCase() === 'panel')
+      .map((invitation) => String(invitation?.invitationGroupId || '').trim())
+      .filter(Boolean));
+    const cleanupInvitations = receivedAccepted.filter((invitation) => {
+      const invitationId = String(invitation?.invitationId || '').trim();
+      const spaceId = String(invitation?.spaceId || '').trim();
+      const groupId = String(invitation?.invitationGroupId || '').trim();
+      return failedInvitations.some((failed) => String(failed?.invitationId || '').trim() === invitationId)
+        || (groupId && failedGroupIds.has(groupId))
+        || (unresolvedSpaceIds.includes(spaceId) && invitationId);
     });
+    const cleanupInvitationIds = Array.from(new Set(cleanupInvitations.map((invitation) => String(invitation?.invitationId || '').trim()).filter(Boolean)));
+    const terminalAudit = [];
+    for (const spaceId of unresolvedSpaceIds) {
+      const entities = await listEntities(spaceId).catch(() => []);
+      const space = (this.bootstrapState.spaces || []).find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
+      const invitation = acceptedInvitationForSpace(spaceId);
+      terminalAudit.push({
+        spaceId,
+        invitationId: String(invitation?.invitationId || '').trim(),
+        invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
+        authorizationState: String(space?.authorizationState || '').trim(),
+        authorizationPendingReason: String(space?.authorizationPendingReason || '').trim(),
+        entities: invitationAuditEntitySummary(entities),
+        rawAudit: { invitation, space, entities }
+      });
+    }
+    invitationAuditLog('frontend.incomplete-recovery.exhausted', {
+      auditTraceId,
+      auditSource,
+      attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+      unresolvedSpaceIds,
+      cleanupInvitationIds,
+      spaces: terminalAudit.map(({ rawAudit, ...summary }) => summary),
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ bootstrapState: this.bootstrapState, spaces: terminalAudit.map((item) => item.rawAudit), attemptsAudit })
+    });
+
+    let cleanup = null;
+    try {
+      cleanup = await apiPost('/api/p2p/invitations/recovery-cleanup', {
+        invitationIds: cleanupInvitationIds,
+        spaceIds: unresolvedSpaceIds,
+        deviceId: sessionContext.deviceId,
+        auditTraceId,
+        attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        reason: 'project_root_missing_after_retries',
+        diagnostic: {
+          unresolvedSpaceIds,
+          reasons: terminalAudit.map((item) => item.authorizationPendingReason || 'project_root_missing')
+        }
+      });
+    } catch (error) {
+      if (this.isSessionContextChangedError(error)) throw error;
+      invitationAuditLog('frontend.incomplete-recovery.cleanup-error', {
+        auditTraceId,
+        auditSource,
+        attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        unresolvedSpaceIds,
+        cleanupInvitationIds,
+        deviceId: sessionContext.deviceId,
+        error: invitationAuditError(error),
+        ...XXXsenXXX({ error, bootstrapState: this.bootstrapState, spaces: terminalAudit.map((item) => item.rawAudit) })
+      });
+      return {
+        ...latestState,
+        invitationRecovery: {
+          completed: false,
+          discarded: false,
+          cleanupPending: true,
+          attemptsUsed: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+          recoveredSpaceIds: normalizedSpaceIds.filter((spaceId) => !unresolvedSpaceIds.includes(spaceId)),
+          unresolvedSpaceIds,
+          cleanupInvitationIds,
+          attempts: attemptsAudit,
+          cleanupError: invitationAuditError(error)
+        }
+      };
+    }
+
+    this.assertSessionContext(sessionContext);
+    const removedSpaceIds = normalizeSnapshotSpaceIds(cleanup?.removedSpaceIds || unresolvedSpaceIds);
+    for (const spaceId of removedSpaceIds) {
+      await purgeLocalSpace(spaceId).catch(() => null);
+      await purgeSpaceCrypto(spaceId).catch(() => null);
+      this.removeSpaceFromBootstrapState(spaceId);
+    }
+    this.recoveryRequirements = await getRecoveryRequirements();
+    this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
+    latestState = await this.refreshBootstrap({
+      requestSnapshots: false,
+      auditTraceId,
+      auditSource: `${auditSource}:post-cleanup`
+    }).catch((error) => {
+      if (this.isSessionContextChangedError(error)) throw error;
+      return this.bootstrapState;
+    });
+    this.assertSessionContext(sessionContext);
+    invitationAuditLog('frontend.incomplete-recovery.cleanup-complete', {
+      auditTraceId,
+      auditSource,
+      attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+      cleanupInvitationIds,
+      cleanedInvitationIds: Array.isArray(cleanup?.cleanedInvitationIds) ? cleanup.cleanedInvitationIds : [],
+      removedSpaceIds,
+      deviceId: sessionContext.deviceId,
+      ...XXXsenXXX({ cleanupResponse: cleanup, bootstrapState: this.bootstrapState, terminalAudit: terminalAudit.map((item) => item.rawAudit) })
+    });
+    dispatch('p2p:invitation-recovery-discarded', {
+      invitationIds: cleanupInvitationIds,
+      spaceIds: removedSpaceIds,
+      attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+      auditTraceId
+    });
+    return {
+      ...latestState,
+      invitationRecovery: {
+        completed: false,
+        discarded: true,
+        attemptsUsed: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        recoveredSpaceIds: normalizedSpaceIds.filter((spaceId) => !removedSpaceIds.includes(spaceId)),
+        unresolvedSpaceIds: removedSpaceIds,
+        cleanupInvitationIds,
+        cleanedInvitationIds: Array.isArray(cleanup?.cleanedInvitationIds) ? cleanup.cleanedInvitationIds : [],
+        removedSpaceIds,
+        attempts: attemptsAudit
+      }
+    };
+  }
+
+  async recoverForeground() {
+    if (!this.started || this.manualClose || !getSessionToken() || navigator.onLine === false) return false;
+    if (!this.realtimeLeader) {
+      this.requestTabState('foreground-resume');
+      return false;
+    }
+    if (this.foregroundRecoveryPromise) return this.foregroundRecoveryPromise;
+    const recovery = this.recoverOnline();
+    this.foregroundRecoveryPromise = recovery;
+    try {
+      return await recovery;
+    } finally {
+      if (this.foregroundRecoveryPromise === recovery) this.foregroundRecoveryPromise = null;
+    }
   }
 
   async recoverOnline() {
@@ -6703,7 +7053,7 @@ export class SemillaP2PClient {
     assertCanonicalOperationEnvelope(event);
     const applyResult = await applyP2PEvent(event);
     this.assertSessionContext(sessionContext);
-    await this.rememberTrashLifecycleReceipt(event, sessionContext);
+    await this.rememberProjectLifecycleReceipt(event, sessionContext);
     this.assertSessionContext(sessionContext);
     if (event.operation?.type === 'snapshot.complete') {
       if (applyResult?.snapshotIncomplete) {
@@ -8014,7 +8364,7 @@ export class SemillaP2PClient {
     }
     const invitationId = String(invitation.invitationId || '').trim();
     const lastAttemptAt = Math.max(0, Number(this.invitationEscrowRecoveryAttempts.get(invitationId) || 0));
-    if (lastAttemptAt && Date.now() - lastAttemptAt < INVITATION_ESCROW_RECOVERY_RETRY_MS) {
+    if (options.ignoreCooldown !== true && lastAttemptAt && Date.now() - lastAttemptAt < INVITATION_ESCROW_RECOVERY_RETRY_MS) {
       invitationAuditLog('frontend.recovery.cooldown', {
         auditTraceId,
         invitationId,
@@ -8776,15 +9126,15 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const cleanAction = String(action || '').trim().toLowerCase();
     const cleanSpaceId = String(spaceId || '').trim();
-    if (!['trash', 'purge'].includes(cleanAction) || !cleanSpaceId) throw new Error('La acción crítica del proyecto no es válida.');
+    if (!['trash', 'restore', 'purge'].includes(cleanAction) || !cleanSpaceId) throw new Error('La acción crítica del proyecto no es válida.');
     this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
 
     let outboxItem;
-    if (cleanAction === 'trash') {
+    if (cleanAction === 'trash' || cleanAction === 'restore') {
       const operationId = String(options.operationId || '').trim() || createId('op');
       const prepared = await this.preparePublishEnvelope(cleanSpaceId, {
         operationId,
-        type: 'entity.trash',
+        type: cleanAction === 'restore' ? 'entity.restore' : 'entity.trash',
         entityType: 'admin.project',
         entityId: 'project',
         payload: {
@@ -8857,6 +9207,10 @@ export class SemillaP2PClient {
 
   trashProjectAfterReplicas(spaceId = '', options = {}) {
     return this.startProjectLifecycle('trash', spaceId, options);
+  }
+
+  restoreProjectAfterReplicas(spaceId = '', options = {}) {
+    return this.startProjectLifecycle('restore', spaceId, options);
   }
 
   deleteProjectAfterReplicas(spaceId = '', options = {}) {

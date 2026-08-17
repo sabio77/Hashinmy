@@ -604,6 +604,10 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
     const requestedRecoverySpaceIds = new Set((recoveryState?.snapshotRequests || [])
       .map((request) => String(request?.spaceId || '').trim())
       .filter(Boolean));
+    const invitationRecovery = recoveryState?.invitationRecovery && typeof recoveryState.invitationRecovery === 'object'
+      ? recoveryState.invitationRecovery
+      : null;
+    const discardedSpaceIds = new Set((invitationRecovery?.removedSpaceIds || []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean));
     const unresolved = [];
     const recoveryAudit = [];
     for (const spaceId of candidates) {
@@ -631,8 +635,34 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
       requestedSnapshotSpaceIds: [...requestedRecoverySpaceIds],
       unresolved,
       spaces: recoveryAudit.map(({ rawAudit, ...summary }) => summary),
+      invitationRecovery: invitationRecovery ? {
+        completed: invitationRecovery.completed === true,
+        discarded: invitationRecovery.discarded === true,
+        cleanupPending: invitationRecovery.cleanupPending === true,
+        attemptsUsed: Number(invitationRecovery.attemptsUsed || 0),
+        removedSpaceIds: [...discardedSpaceIds],
+        cleanupInvitationIds: Array.isArray(invitationRecovery.cleanupInvitationIds) ? invitationRecovery.cleanupInvitationIds : []
+      } : null,
       ...XXXsenXXX({ recoveryState, spaces: recoveryAudit.map((item) => item.rawAudit) })
     });
+    if (invitationRecovery?.discarded === true) {
+      setStatus(
+        elements.dashboardStatus,
+        discardedSpaceIds.size === 1
+          ? t('p2p.invitationRecoveryDiscarded', 'No fue posible reconstruir la invitación después de 3 intentos. La autorización incompleta se eliminó automáticamente para evitar dejar datos residuales.')
+          : t('p2p.invitationRecoveriesDiscarded', 'No fue posible reconstruir las invitaciones después de 3 intentos. Las autorizaciones incompletas se eliminaron automáticamente para evitar dejar datos residuales.'),
+        'warning'
+      );
+      return false;
+    }
+    if (invitationRecovery?.cleanupPending === true) {
+      setStatus(
+        elements.dashboardStatus,
+        t('p2p.invitationRecoveryCleanupPending', 'La invitación agotó 3 intentos de recuperación. La limpieza automática se reintentará cuando el servicio vuelva a estar disponible.'),
+        'warning'
+      );
+      return false;
+    }
     if (unresolved.length) {
       const pendingRecoveryCount = unresolved.filter((spaceId) => requestedRecoverySpaceIds.has(spaceId)).length;
       setStatus(
@@ -798,7 +828,9 @@ function lifecycleProgressPresentation(transaction = null) {
   const percentage = total > 0 ? Math.min(100, (completed / total) * 100) : 100;
   const title = action === 'purge'
     ? t('lifecycle.purgeTitle', 'Eliminación permanente en curso')
-    : t('lifecycle.trashTitle', 'Envío a papelera en curso');
+    : action === 'restore'
+      ? t('lifecycle.restoreTitle', 'Restauración del proyecto en curso')
+      : t('lifecycle.trashTitle', 'Envío a papelera en curso');
   const summary = total > 0
     ? t('lifecycle.deviceProgress', '{completed} de {total} dispositivos completados · {remaining} pendientes')
       .replace('{completed}', String(completed))
@@ -2396,7 +2428,7 @@ async function executeLifecycleAction(action = '', context = null) {
     if (isProjectAction) {
       if (!isSpaceOwner(data.space)) throw new Error(t('permissions.ownerRequired', 'Solo el propietario puede realizar esta acción.'));
       if (action === 'trash-project') result = await semillaP2P.trashProjectAfterReplicas(context.spaceId, { expected: data.project._entity?.value || {} });
-      if (action === 'restore-project') result = await semillaP2P.restore(context.spaceId, PROJECT_ENTITY_TYPE, PROJECT_ENTITY_ID, { expected: data.project._entity?.value || {} });
+      if (action === 'restore-project') result = await semillaP2P.restoreProjectAfterReplicas(context.spaceId, { expected: data.project._entity?.value || {} });
       if (action === 'purge-project') result = await semillaP2P.deleteProjectAfterReplicas(context.spaceId);
     } else {
       if (!recordCanDelete(data.space, context.type)) throw new Error(t('permissions.deleteDenied', 'No tienes permiso para eliminar registros.'));
@@ -2417,7 +2449,7 @@ async function executeLifecycleAction(action = '', context = null) {
     await refreshProjects();
     clearActionMenuConfirmation();
     closeDialog(elements.actionMenuDialog);
-    const coordinatedProjectAction = isProjectAction && ['trash-project', 'purge-project'].includes(action);
+    const coordinatedProjectAction = isProjectAction && ['trash-project', 'restore-project', 'purge-project'].includes(action);
     if (coordinatedProjectAction) {
       showDashboard();
       if (elements.trashDialog?.open) renderTrash();
@@ -2443,7 +2475,7 @@ async function executeLifecycleAction(action = '', context = null) {
       applyP2PState(semillaP2P.bootstrapState);
       await refreshProjects();
       closeDialog(elements.actionMenuDialog);
-      const isCoordinatedProjectAction = context?.scope?.includes('project') && ['trash-project', 'purge-project'].includes(action);
+      const isCoordinatedProjectAction = context?.scope?.includes('project') && ['trash-project', 'restore-project', 'purge-project'].includes(action);
       const message = isCoordinatedProjectAction
         ? Number(error?.p2pLocalDelivered || 0) > 0
           ? t('lifecycle.localNetworkStarted', 'La acción se envió por la red local. Este dispositivo se actualizará cuando las demás copias confirmen.')
@@ -2916,7 +2948,9 @@ window.addEventListener('p2p:lifecycle-completed', (event) => {
   if (elements.trashDialog?.open) renderTrash();
   const message = transaction?.action === 'purge'
     ? t('lifecycle.purgeCompleted', 'Todos los dispositivos confirmaron la eliminación permanente del proyecto.')
-    : t('lifecycle.trashCompleted', 'Todos los dispositivos confirmaron el envío del proyecto a la papelera.');
+    : transaction?.action === 'restore'
+      ? t('lifecycle.restoreCompleted', 'Todos los dispositivos confirmaron la restauración del proyecto.')
+      : t('lifecycle.trashCompleted', 'Todos los dispositivos confirmaron el envío del proyecto a la papelera.');
   setStatus(elements.trashDialog?.open ? elements.trashStatus : elements.dashboardStatus, message, 'success');
 });
 window.addEventListener('p2p:space-deleted', (event) => {
@@ -2937,7 +2971,10 @@ window.addEventListener('p2p:space-deleted', (event) => {
 window.addEventListener('p2p:authorization-unconfirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.authorizationUnconfirmedDashboard', 'Se conservaron proyectos locales cuya autorización no pudo confirmarse. Permanecen disponibles en modo de solo lectura para evitar pérdida de datos.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'La invitación fue aceptada. El proyecto permanecerá en solo lectura hasta recuperar y validar su copia completa.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-confirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryConfirmed', 'La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.'), 'success'); });
-window.addEventListener('p2p:error', () => setConnectionState('error'));
+window.addEventListener('p2p:error', (event) => {
+  const stage = String(event.detail?.stage || '').trim();
+  if (['recover', 'foreground-recover', 'realtime', 'realtime-ready-timeout'].includes(stage)) setConnectionState('disconnected');
+});
 navigator.serviceWorker?.addEventListener('message', (event) => {
   const invitationId = invitationIntentFromServiceWorkerMessage(event.data || {});
   if (invitationId) refreshInvitationIntent(invitationId);

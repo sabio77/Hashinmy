@@ -49,7 +49,7 @@ export function memberAllowsDurableOperation(scope = {}, membership = {}, operat
 
 export function lifecycleReplicationPairAuthorized(sourceMembership = {}, targetMembership = {}, action = '') {
   const cleanAction = normalize(action, 24);
-  if (!['trash', 'purge'].includes(cleanAction)) return false;
+  if (!['trash', 'restore', 'purge'].includes(cleanAction)) return false;
   const sourcePermissions = normalizedPermissions(sourceMembership);
   const targetPermissions = normalizedPermissions(targetMembership);
   return sourceMembership?.role === 'owner'
