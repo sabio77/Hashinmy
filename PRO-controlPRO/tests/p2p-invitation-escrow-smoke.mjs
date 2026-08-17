@@ -14,7 +14,7 @@ function extract(startMarker, endMarker) {
 }
 
 const freshness = extract(
-  '  async waitForInvitationSourceRevision(',
+  '  async ensureInvitationSourceCurrent(',
   "\n  async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext(), auditContext = {}) {"
 );
 const build = extract(
@@ -44,24 +44,111 @@ for (const needle of [
 for (const needle of [
   "requestSnapshots: 'force'",
   'snapshotSpaceIds: [cleanSpaceId]',
-  'waitForInvitationSourceRevision(',
-  "eventNames = ['p2p:snapshot-complete', 'p2p:operation', 'p2p:state']",
-  'P2P_INVITATION_SOURCE_SYNC_PENDING'
+  'this.isRetryableTransportError(error)',
+  "dispatch('p2p:invitation-source-best-effort'",
+  'const current = localStateRevision >= backendStateRevision',
+  'refreshDeferred'
 ]) {
-  if (!freshness.includes(needle)) throw new Error(`La invitación perdió la prevalidación event-driven de revisión vigente: ${needle}`);
+  if (!freshness.includes(needle)) throw new Error(`La invitación perdió la política best-effort de revisión disponible: ${needle}`);
 }
-if (freshness.includes('setInterval(')) {
-  throw new Error('La espera de revisión vigente volvió a usar polling en lugar de señales P2P.');
+if (freshness.includes('await this.waitForInvitationSourceRevision(')
+  || freshness.includes("error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING'")) {
+  throw new Error('La invitación vuelve a bloquearse esperando que la copia local alcance la revisión más reciente.');
 }
+
+const invitationAuthorization = extract(
+  "  assertInvitationSourceAllowed(spaceId = '') {",
+  "\n  spaceRequiresEncryption(spaceId = '') {"
+);
+for (const needle of [
+  'this.isSpaceReplicaRecoveryPending(cleanSpaceId)',
+  "permissions.includes('invite')",
+  "reason: 'replica_recovery'",
+  'return this.assertSpaceAuthorizationConfirmed(cleanSpaceId)'
+]) {
+  if (!invitationAuthorization.includes(needle)) throw new Error(`La autorización best-effort de invitación perdió: ${needle}`);
+}
+if (!invite.includes('this.assertInvitationSourceAllowed(requestedSpaceId)')) {
+  throw new Error('La invitación individual volvió a bloquearse por replica_recovery antes de consultar la autoridad del backend.');
+}
+if (!invite.includes('this.assertInvitationSourceAllowed(spaceId)')) {
+  throw new Error('La invitación de panel volvió a bloquearse por replica_recovery antes de consultar la autoridad del backend.');
+}
+
+const invitationAuthorizationFunction = invitationAuthorization
+  .replace("  assertInvitationSourceAllowed(spaceId = '') {", "function assertInvitationSourceAllowed(spaceId = '') {");
+const authorizationModuleUrl = `data:text/javascript;base64,${Buffer.from(`${invitationAuthorizationFunction}
+export { assertInvitationSourceAllowed };`).toString('base64')}`;
+const { assertInvitationSourceAllowed } = await import(authorizationModuleUrl);
+const bestEffortEvents = [];
+const baseAuthorizationContext = {
+  user: { userId: 'owner_1' },
+  bootstrapState: {
+    spaces: [{
+      spaceId: 'space_1',
+      ownerUserId: 'owner_1',
+      authorizationState: 'unconfirmed',
+      authorizationPendingReason: 'replica_recovery',
+      members: [{ userId: 'owner_1', permissions: ['read'] }]
+    }]
+  },
+  isSpaceAuthorizationConfirmed() { return false; },
+  isSpaceReplicaRecoveryPending() { return true; },
+  assertSpaceAuthorizationConfirmed() { throw Object.assign(new Error('blocked'), { code: 'P2P_AUTHORIZATION_UNCONFIRMED' }); }
+};
+globalThis.dispatch = (type, detail) => bestEffortEvents.push({ type, detail });
+assertInvitationSourceAllowed.call(baseAuthorizationContext, 'space_1');
+if (!bestEffortEvents.some((event) => event.type === 'p2p:invitation-source-best-effort' && event.detail?.reason === 'replica_recovery')) {
+  throw new Error('El propietario en replica_recovery no conserva el camino best-effort de invitación.');
+}
+const memberContext = {
+  ...baseAuthorizationContext,
+  user: { userId: 'member_1' },
+  bootstrapState: {
+    spaces: [{
+      spaceId: 'space_1',
+      ownerUserId: 'owner_1',
+      authorizationState: 'unconfirmed',
+      authorizationPendingReason: 'replica_recovery',
+      members: [{ userId: 'member_1', permissions: ['read', 'invite'] }]
+    }]
+  }
+};
+assertInvitationSourceAllowed.call(memberContext, 'space_1');
+let unauthorizedBlocked = false;
+try {
+  assertInvitationSourceAllowed.call({
+    ...memberContext,
+    bootstrapState: {
+      spaces: [{
+        spaceId: 'space_1',
+        ownerUserId: 'owner_1',
+        authorizationState: 'unconfirmed',
+        authorizationPendingReason: 'replica_recovery',
+        members: [{ userId: 'member_1', permissions: ['read'] }]
+      }]
+    }
+  }, 'space_1');
+} catch (error) {
+  unauthorizedBlocked = error?.code === 'P2P_AUTHORIZATION_UNCONFIRMED';
+}
+if (!unauthorizedBlocked) throw new Error('Un miembro sin permiso invite pudo usar el bypass de replica_recovery.');
 
 for (const needle of [
   'this.invitationEscrowAuthority',
   'encryptSnapshotEntities(cleanSpaceId, entities)',
   'createSpaceKeyEnvelope(cleanSpaceId',
-  'P2P_INVITATION_ESCROW_PENDING',
+  "invitationAuditLog('frontend.escrow.pending-local-omitted'",
+  "reason: 'pending_local_changes'",
   'P2P_INVITATION_ESCROW_TOO_LARGE'
 ]) {
   if (!build.includes(needle)) throw new Error(`La semilla cifrada de invitación perdió: ${needle}`);
+}
+if (build.includes("error.code = 'P2P_INVITATION_ESCROW_PENDING'")) {
+  throw new Error('La invitación vuelve a bloquearse por cambios locales pendientes en lugar de sembrar la última copia confirmada disponible.');
+}
+if (build.indexOf('canonicalLocalSnapshotEntities(localEntities)') < 0) {
+  throw new Error('La invitación dejó de excluir del escrow los cambios optimistas todavía no confirmados.');
 }
 if (build.indexOf('this.flushOutbox()') > build.indexOf('listEntities(cleanSpaceId)')) {
   throw new Error('La invitación captura el snapshot antes de intentar consolidar el outbox local.');
@@ -80,11 +167,15 @@ if (!invite.includes('bootstrapEscrow = await this.buildInvitationBootstrapEscro
   throw new Error('El POST de creación ya no adjunta la semilla cifrada generada localmente.');
 }
 for (const needle of [
-  'await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext)',
-  "error?.code === 'P2P_INVITATION_ESCROW_STALE_STATE'",
+  'sourceFreshness = await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext)',
+  "invitationAuditLog('frontend.invite.source-state'",
+  "error?.code === 'P2P_INVITATION_ESCROW_FUTURE_STATE'",
   'INVITATION_SOURCE_CREATE_MAX_ATTEMPTS'
 ]) {
-  if (!invite.includes(needle)) throw new Error(`La creación perdió la defensa contra snapshot de invitación obsoleto: ${needle}`);
+  if (!invite.includes(needle)) throw new Error(`La creación perdió el envío best-effort o la compatibilidad de transición: ${needle}`);
+}
+if (invite.includes("error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING'")) {
+  throw new Error('La creación todavía expone el bloqueo P2P_INVITATION_SOURCE_SYNC_PENDING.');
 }
 for (const needle of [
   "status || '').trim().toLowerCase() === 'accepted'",

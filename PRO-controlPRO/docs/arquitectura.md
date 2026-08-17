@@ -40,7 +40,7 @@ Antes de enviar el ACK, el líder multiventana reúne los `spaceId` funcionales 
 
 IndexedDB es la copia canónica funcional. Por ello, una ausencia en `spaces` no constituye autorización para borrar. `memoriaBACKEND` registra revocaciones y abandonos explícitos en un índice temporal acotado y los entrega como `revokedSpaceIds`. `p2p-storage.js` reconcilia tres estados: confirmado por backend, revocado explícitamente —que sí se purga de forma transaccional— y local no confirmado, que se conserva con `authorizationState: "unconfirmed"`.
 
-`p2p-client.js` impide publicar, vaciar outbox, invitar, modificar accesos o intercambiar claves en el tercer estado. `app.js` mantiene la información consultable y comunica el modo de recuperación. Cuando la membresía vuelve a aparecer, la reconciliación elimina la marca y reanuda el flujo normal; cuando llega un tombstone, purga datos y material criptográfico.
+`p2p-client.js` impide publicar, vaciar outbox, modificar accesos o intercambiar claves en el tercer estado. Las invitaciones son la excepción controlada cuando el motivo es `replica_recovery`: si la copia local aún conserva al propietario o un miembro con permiso `invite`, puede enviar una semilla cifrada con la última versión confirmada disponible y memoriaBACKEND vuelve a validar autoritativamente permisos, membresía, clave y revisión antes de persistirla. Los cambios optimistas pendientes no se incluyen en esa semilla y convergen después por el flujo normal. `app.js` mantiene la información consultable y comunica el modo de recuperación. Cuando la membresía vuelve a aparecer, la reconciliación elimina la marca y reanuda el flujo normal; cuando llega un tombstone, purga datos y material criptográfico.
 
 ## Eventos de control multiventana
 

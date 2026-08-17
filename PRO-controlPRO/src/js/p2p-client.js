@@ -110,7 +110,6 @@ const MISSING_SPACE_KEY_RECOVERY_WAIT_MS = 2400;
 const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
 const INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS = 3;
 const INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS = 700;
-const INVITATION_SOURCE_SYNC_WAIT_MS = 8 * 1000;
 const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 3;
 const PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS = 3;
 const KEY_ENVELOPE_REJECTION_MAX_SOURCES = 32;
@@ -4708,6 +4707,26 @@ export class SemillaP2PClient {
     throw error;
   }
 
+  assertInvitationSourceAllowed(spaceId = '') {
+    const cleanSpaceId = String(spaceId || '').trim();
+    if (this.isSpaceAuthorizationConfirmed(cleanSpaceId)) return true;
+    if (this.isSpaceReplicaRecoveryPending(cleanSpaceId)) {
+      const userId = String(this.user?.userId || '').trim();
+      const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId) || null;
+      const member = (space?.members || []).find((candidate) => String(candidate?.userId || '').trim() === userId) || null;
+      const permissions = Array.isArray(member?.permissions) ? member.permissions : [];
+      if (space && member && (String(space.ownerUserId || '').trim() === userId || permissions.includes('invite'))) {
+        dispatch('p2p:invitation-source-best-effort', {
+          spaceId: cleanSpaceId,
+          reason: 'replica_recovery',
+          authorizationPendingReason: String(space.authorizationPendingReason || '').trim()
+        });
+        return true;
+      }
+    }
+    return this.assertSpaceAuthorizationConfirmed(cleanSpaceId);
+  }
+
   spaceRequiresEncryption(spaceId = '') {
     const cleanSpaceId = String(spaceId || '').trim();
     const space = (this.bootstrapState.spaces || []).find((candidate) => candidate?.spaceId === cleanSpaceId);
@@ -8046,105 +8065,49 @@ export class SemillaP2PClient {
     }, delay);
   }
 
-  async waitForInvitationSourceRevision(
-    spaceId = '',
-    targetRevision = 0,
-    sessionContext = this.captureSessionContext(),
-    timeoutMs = INVITATION_SOURCE_SYNC_WAIT_MS
-  ) {
-    this.assertSessionContext(sessionContext);
-    const cleanSpaceId = String(spaceId || '').trim();
-    const requiredRevision = Math.max(0, Number(targetRevision || 0));
-    if (!cleanSpaceId || requiredRevision <= 0) return true;
-
-    const localIsCurrent = async () => {
-      const revisions = await listStateRevisions([cleanSpaceId]);
-      this.assertSessionContext(sessionContext);
-      return Math.max(0, Number(revisions?.[cleanSpaceId] || 0)) >= requiredRevision;
-    };
-    if (await localIsCurrent()) return true;
-
-    const safeTimeoutMs = Math.max(1000, Number(timeoutMs || INVITATION_SOURCE_SYNC_WAIT_MS));
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      let checking = false;
-      let timer = 0;
-      const eventNames = ['p2p:snapshot-complete', 'p2p:operation', 'p2p:state'];
-      const cleanup = () => {
-        if (timer) window.clearTimeout(timer);
-        for (const eventName of eventNames) window.removeEventListener(eventName, onSignal);
-      };
-      const finish = (value, error = null) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        if (error) reject(error);
-        else resolve(value);
-      };
-      const onSignal = (event) => {
-        if (settled || checking) return;
-        const eventSpaceId = String(
-          event?.detail?.event?.spaceId
-          || event?.detail?.spaceId
-          || ''
-        ).trim();
-        if (eventSpaceId && eventSpaceId !== cleanSpaceId) return;
-        checking = true;
-        localIsCurrent().then((current) => {
-          if (current) finish(true);
-        }).catch((error) => {
-          if (this.isSessionContextChangedError(error)) finish(false, error);
-        }).finally(() => {
-          checking = false;
-        });
-      };
-      for (const eventName of eventNames) window.addEventListener(eventName, onSignal);
-      timer = window.setTimeout(() => finish(false), safeTimeoutMs);
-      onSignal({ detail: {} });
-    });
-  }
-
   async ensureInvitationSourceCurrent(spaceId = '', sessionContext = this.captureSessionContext()) {
     this.assertSessionContext(sessionContext);
     const cleanSpaceId = String(spaceId || '').trim();
-    if (!cleanSpaceId) return { current: true, localStateRevision: 0, backendStateRevision: 0 };
+    if (!cleanSpaceId) return { current: true, localStateRevision: 0, backendStateRevision: 0, refreshDeferred: false };
 
-    await this.refreshBootstrap({
-      requestSnapshots: 'force',
-      snapshotSpaceIds: [cleanSpaceId]
-    });
-    this.assertSessionContext(sessionContext);
+    let refreshDeferred = false;
+    let refreshError = null;
+    try {
+      await this.refreshBootstrap({
+        requestSnapshots: 'force',
+        snapshotSpaceIds: [cleanSpaceId]
+      });
+      this.assertSessionContext(sessionContext);
+    } catch (error) {
+      if (this.isSessionContextChangedError(error)) throw error;
+      if (!this.isRetryableTransportError(error)) throw error;
+      refreshDeferred = true;
+      refreshError = error;
+      dispatch('p2p:invitation-source-refresh-deferred', {
+        spaceId: cleanSpaceId,
+        error
+      });
+    }
 
     const revisions = await listStateRevisions([cleanSpaceId]);
     this.assertSessionContext(sessionContext);
-    let localStateRevision = Math.max(0, Number(revisions?.[cleanSpaceId] || 0));
+    const localStateRevision = Math.max(0, Number(revisions?.[cleanSpaceId] || 0));
     const backendStateRevision = Math.max(0, Number(this.bootstrapState?.stateRevisions?.[cleanSpaceId] || 0));
-    if (localStateRevision >= backendStateRevision) {
-      return { current: true, localStateRevision, backendStateRevision };
+    const current = localStateRevision >= backendStateRevision;
+    if (!current) {
+      dispatch('p2p:invitation-source-best-effort', {
+        spaceId: cleanSpaceId,
+        localStateRevision,
+        backendStateRevision
+      });
     }
-
-    const synchronized = await this.waitForInvitationSourceRevision(
-      cleanSpaceId,
+    return {
+      current,
+      localStateRevision,
       backendStateRevision,
-      sessionContext
-    );
-    this.assertSessionContext(sessionContext);
-    if (synchronized) {
-      const refreshed = await listStateRevisions([cleanSpaceId]);
-      this.assertSessionContext(sessionContext);
-      localStateRevision = Math.max(0, Number(refreshed?.[cleanSpaceId] || 0));
-      if (localStateRevision >= backendStateRevision) {
-        return { current: true, localStateRevision, backendStateRevision };
-      }
-    }
-
-    const error = new Error('Este dispositivo todavía está recuperando la versión más reciente del proyecto. La invitación no se enviará con una copia desactualizada.');
-    error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING';
-    error.status = 409;
-    error.spaceId = cleanSpaceId;
-    error.localStateRevision = localStateRevision;
-    error.backendStateRevision = backendStateRevision;
-    throw error;
+      refreshDeferred,
+      refreshErrorCode: String(refreshError?.code || '')
+    };
   }
 
   async buildInvitationBootstrapEscrow(spaceId = '', sessionContext = this.captureSessionContext(), auditContext = {}) {
@@ -8174,21 +8137,30 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const pendingForSpace = (pending || []).filter((item) => String(item?.spaceId || item?.request?.spaceId || '').trim() === cleanSpaceId);
     const optimisticCount = (localEntities || []).filter((entity) => entity?.optimistic === true).length;
-    if (pendingForSpace.length || optimisticCount) {
-      const error = new Error('Hay cambios locales pendientes de confirmar. Sincronízalos antes de crear una invitación para que la copia inicial sea consistente.');
-      error.code = 'P2P_INVITATION_ESCROW_PENDING';
-      error.status = 409;
-      error.spaceId = cleanSpaceId;
-      error.pendingOperations = pendingForSpace.length;
-      error.optimisticEntities = optimisticCount;
-      throw error;
-    }
-
     const entities = canonicalLocalSnapshotEntities(localEntities).map((entity, index) => ({
       ...entity,
       operationId: String(entity.operationId || '').trim()
         || `invitation-seed:${index}:${entity.entityType}:${entity.entityId}:${Math.max(0, Number(entity.stateRevision || 0))}`
     }));
+    if (pendingForSpace.length || optimisticCount) {
+      invitationAuditLog('frontend.escrow.pending-local-omitted', {
+        auditTraceId: String(auditContext.auditTraceId || '').trim(),
+        invitationScope: String(auditContext.invitationScope || '').trim(),
+        invitationGroupId: String(auditContext.invitationGroupId || '').trim(),
+        spaceId: cleanSpaceId,
+        deviceId: sessionContext.deviceId,
+        pendingOperations: pendingForSpace.length,
+        optimisticEntities: optimisticCount,
+        confirmedEntities: invitationAuditEntitySummary(entities)
+      });
+      dispatch('p2p:invitation-source-best-effort', {
+        spaceId: cleanSpaceId,
+        reason: 'pending_local_changes',
+        pendingOperations: pendingForSpace.length,
+        optimisticEntities: optimisticCount,
+        confirmedEntityCount: entities.length
+      });
+    }
     const entityStateRevision = entities.reduce((maximum, entity) => Math.max(
       maximum,
       Math.max(0, Number(entity.stateRevision || entity.spaceSequence || 0))
@@ -8811,13 +8783,24 @@ export class SemillaP2PClient {
       deviceId: sessionContext.deviceId,
       ...XXXsenXXX({ recipientEmail: String(email || ''), inviteOptions: options })
     });
-    if (requestedSpaceId) this.assertSpaceAuthorizationConfirmed(requestedSpaceId);
+    if (requestedSpaceId) this.assertInvitationSourceAllowed(requestedSpaceId);
     const existingSpace = (this.bootstrapState.spaces || []).find((space) => space?.spaceId === requestedSpaceId);
     const encryptedExistingSpace = requestedSpaceId && Math.max(0, Number(existingSpace?.encryptionVersion || 0)) >= 1;
     let bootstrapEscrow = null;
+    let sourceFreshness = null;
     if (encryptedExistingSpace) {
-      await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
+      sourceFreshness = await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
       this.assertSessionContext(sessionContext);
+      invitationAuditLog('frontend.invite.source-state', {
+        auditTraceId,
+        spaceId: requestedSpaceId,
+        deviceId: sessionContext.deviceId,
+        current: sourceFreshness.current === true,
+        localStateRevision: Math.max(0, Number(sourceFreshness.localStateRevision || 0)),
+        backendStateRevision: Math.max(0, Number(sourceFreshness.backendStateRevision || 0)),
+        refreshDeferred: sourceFreshness.refreshDeferred === true,
+        refreshErrorCode: String(sourceFreshness.refreshErrorCode || '')
+      });
       await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true, allowOwnerRecoveryRotation: true });
       this.assertSessionContext(sessionContext);
       bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext, { auditTraceId, invitationScope: options.invitationScope || 'project', invitationGroupId: options.invitationGroupId || '' });
@@ -8849,8 +8832,8 @@ export class SemillaP2PClient {
           error: invitationAuditError(error),
           ...XXXsenXXX({ recipientEmail: String(email || ''), inviteOptions: options, sourceBootstrapEscrow: bootstrapEscrow, error })
         });
-        const staleSnapshot = error?.code === 'P2P_INVITATION_ESCROW_STALE_STATE';
-        if (!encryptedExistingSpace || !staleSnapshot || attempt >= INVITATION_SOURCE_CREATE_MAX_ATTEMPTS - 1) throw error;
+        const sourceRevisionConflict = error?.code === 'P2P_INVITATION_ESCROW_FUTURE_STATE';
+        if (!encryptedExistingSpace || !sourceRevisionConflict || attempt >= INVITATION_SOURCE_CREATE_MAX_ATTEMPTS - 1) throw error;
         await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
         this.assertSessionContext(sessionContext);
         bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext, { auditTraceId, invitationScope: options.invitationScope || 'project', invitationGroupId: options.invitationGroupId || '' });
@@ -8858,8 +8841,8 @@ export class SemillaP2PClient {
       }
     }
     if (!data) {
-      const error = new Error('No se pudo crear la invitación con una copia inicial vigente.');
-      error.code = 'P2P_INVITATION_SOURCE_SYNC_PENDING';
+      const error = new Error('No se pudo crear la invitación con la copia inicial disponible.');
+      error.code = 'P2P_INVITATION_CREATE_FAILED';
       error.status = 409;
       throw error;
     }
@@ -8938,7 +8921,7 @@ export class SemillaP2PClient {
         error.status = 403;
         throw error;
       }
-      this.assertSpaceAuthorizationConfirmed(spaceId);
+      this.assertInvitationSourceAllowed(spaceId);
       return space;
     });
     const requestedPermissions = options.permissions || ['read', 'write'];

@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "3059f35b3c79a4e733ae826fd521706ac4bcf2a1831d63144db1de1ae72aa29e",
-      "bytes": 504209
+      "sha256": "ee997ecb9b1e51d3821d71cc9572171a64e554fc21986f1648da16f344918496",
+      "bytes": 503824
     },
     {
       "url": "./src/js/p2p-permissions.js",
