@@ -102,6 +102,7 @@ for (const expected of [
   'this.isRetryableTransportError(error)',
   'this.serverRetryDueAt <= dueAt',
   "reason: rateLimited ? 'rate-limit' : 'transport-retry'",
+  "state: !rateLimited && attempt >= 3 ? 'disconnected' : 'connecting'",
   "window.addEventListener('p2p:rate-limited', this.boundRateLimited);",
   "window.removeEventListener('p2p:rate-limited', this.boundRateLimited);",
   "this.scheduleServerRecovery(error, 'bootstrap-start');",

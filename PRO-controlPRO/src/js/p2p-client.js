@@ -4547,7 +4547,10 @@ export class SemillaP2PClient {
     this.serverRetryStage = String(stage || (rateLimited ? 'rate-limit' : 'transport-retry')).slice(0, 180);
     if (!rateLimited) this.serverRetryAttempt = Math.min(7, attempt + 1);
     dispatch('p2p:connection', {
-      state: 'connecting',
+      // Tras tres fallos transitorios consecutivos seguimos reintentando, pero ya no
+      // presentamos un "Conectando…" indefinido. `disconnected` conserva el ciclo
+      // automático y permite a la UI mostrar un estado degradado/reintentando.
+      state: !rateLimited && attempt >= 3 ? 'disconnected' : 'connecting',
       reason: rateLimited ? 'rate-limit' : 'transport-retry',
       deviceId: sessionContext.deviceId,
       retryAfterSeconds: Math.ceil(delay / 1000),
@@ -6234,6 +6237,10 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const auditTraceId = String(auditContext?.auditTraceId || '').trim();
     const auditSource = String(auditContext?.auditSource || auditContext?.source || '').trim();
+    // Los flujos que ya poseen su propio watchdog pueden limitar el reintento HTTP
+    // interno para evitar multiplicar intentos (p. ej. 3 ciclos externos x 3 HTTP).
+    // El bootstrap ordinario conserva por defecto los 3 intentos de api.js.
+    const requestMaxAttempts = Math.min(3, Math.max(1, Math.floor(Number(auditContext?.requestMaxAttempts || 3))));
     const knownSpaceIds = revisionSpaceIds;
     const bootstrapRequest = {
       device: this.device,
@@ -6269,7 +6276,7 @@ export class SemillaP2PClient {
     }
     let data = null;
     try {
-      data = await apiPost('/api/p2p/bootstrap', bootstrapRequest);
+      data = await apiPost('/api/p2p/bootstrap', bootstrapRequest, { maxAttempts: requestMaxAttempts });
     } catch (error) {
       if (auditTraceId) {
         invitationAuditLog('frontend.bootstrap.backend-error', {
@@ -6605,12 +6612,12 @@ export class SemillaP2PClient {
     }
   }
 
-  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [], auditTraceId = '', auditSource = '' } = {}) {
+  async refreshBootstrap({ requestSnapshots = false, snapshotSpaceIds = [], auditTraceId = '', auditSource = '', requestMaxAttempts = 3 } = {}) {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const snapshotMode = requestSnapshots === true ? 'force' : requestSnapshots;
     this.nextBootstrapSnapshotSpaceIds = normalizeSnapshotSpaceIds(snapshotSpaceIds);
-    const state = await this.fetchBootstrap(snapshotMode, { auditTraceId, auditSource });
+    const state = await this.fetchBootstrap(snapshotMode, { auditTraceId, auditSource, requestMaxAttempts });
     this.assertSessionContext(sessionContext);
     dispatch('p2p:state', { state });
     return state;
@@ -6660,7 +6667,10 @@ export class SemillaP2PClient {
           requestSnapshots: 'force',
           snapshotSpaceIds: currentTargets,
           auditTraceId,
-          auditSource: `${auditSource}:attempt-${attempt}`
+          auditSource: `${auditSource}:attempt-${attempt}`,
+          // Este watchdog ya ejecuta exactamente tres ciclos. Cada ciclo hace una
+          // sola solicitud para que un 5xx persistente no se convierta en 9 requests.
+          requestMaxAttempts: 1
         });
       } catch (error) {
         if (this.isSessionContextChangedError(error)) throw error;
@@ -6801,28 +6811,64 @@ export class SemillaP2PClient {
         rawAudit: { invitation, space, entities }
       });
     }
+    const currentUserId = String(this.user?.userId || '').trim();
+    const protectedOwnedSpaceIds = terminalAudit
+      .filter((item) => currentUserId && String(item?.rawAudit?.space?.ownerUserId || '').trim() === currentUserId)
+      .map((item) => item.spaceId);
+    const cleanupSpaceIds = unresolvedSpaceIds.filter((spaceId) => !protectedOwnedSpaceIds.includes(spaceId));
+
     invitationAuditLog('frontend.incomplete-recovery.exhausted', {
       auditTraceId,
       auditSource,
       attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
       unresolvedSpaceIds,
+      cleanupSpaceIds,
+      protectedOwnedSpaceIds,
       cleanupInvitationIds,
       spaces: terminalAudit.map(({ rawAudit, ...summary }) => summary),
       deviceId: sessionContext.deviceId,
       ...XXXsenXXX({ bootstrapState: this.bootstrapState, spaces: terminalAudit.map((item) => item.rawAudit), attemptsAudit })
     });
 
+    if (!cleanupInvitationIds.length && !cleanupSpaceIds.length) {
+      invitationAuditLog('frontend.incomplete-recovery.cleanup-skipped-owner', {
+        auditTraceId,
+        auditSource,
+        attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        unresolvedSpaceIds,
+        protectedOwnedSpaceIds,
+        deviceId: sessionContext.deviceId
+      });
+      return {
+        ...latestState,
+        invitationRecovery: {
+          completed: false,
+          discarded: false,
+          cleanupPending: false,
+          cleanupSkipped: true,
+          attemptsUsed: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+          recoveredSpaceIds: normalizedSpaceIds.filter((spaceId) => !unresolvedSpaceIds.includes(spaceId)),
+          unresolvedSpaceIds,
+          cleanupInvitationIds: [],
+          protectedSpaceIds: protectedOwnedSpaceIds,
+          attempts: attemptsAudit
+        }
+      };
+    }
+
     let cleanup = null;
     try {
       cleanup = await apiPost('/api/p2p/invitations/recovery-cleanup', {
         invitationIds: cleanupInvitationIds,
-        spaceIds: unresolvedSpaceIds,
+        spaceIds: cleanupSpaceIds,
         deviceId: sessionContext.deviceId,
         auditTraceId,
         attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
         reason: 'project_root_missing_after_retries',
         diagnostic: {
           unresolvedSpaceIds,
+          cleanupSpaceIds,
+          protectedOwnedSpaceIds,
           reasons: terminalAudit.map((item) => item.authorizationPendingReason || 'project_root_missing')
         }
       });
@@ -6855,7 +6901,11 @@ export class SemillaP2PClient {
     }
 
     this.assertSessionContext(sessionContext);
-    const removedSpaceIds = normalizeSnapshotSpaceIds(cleanup?.removedSpaceIds || unresolvedSpaceIds);
+    const removedSpaceIds = normalizeSnapshotSpaceIds(cleanup?.removedSpaceIds || []);
+    const protectedSpaceIds = normalizeSnapshotSpaceIds([
+      ...protectedOwnedSpaceIds,
+      ...(Array.isArray(cleanup?.protectedSpaceIds) ? cleanup.protectedSpaceIds : [])
+    ]);
     for (const spaceId of removedSpaceIds) {
       await purgeLocalSpace(spaceId).catch(() => null);
       await purgeSpaceCrypto(spaceId).catch(() => null);
@@ -6879,26 +6929,31 @@ export class SemillaP2PClient {
       cleanupInvitationIds,
       cleanedInvitationIds: Array.isArray(cleanup?.cleanedInvitationIds) ? cleanup.cleanedInvitationIds : [],
       removedSpaceIds,
+      protectedSpaceIds,
       deviceId: sessionContext.deviceId,
       ...XXXsenXXX({ cleanupResponse: cleanup, bootstrapState: this.bootstrapState, terminalAudit: terminalAudit.map((item) => item.rawAudit) })
     });
-    dispatch('p2p:invitation-recovery-discarded', {
-      invitationIds: cleanupInvitationIds,
-      spaceIds: removedSpaceIds,
-      attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
-      auditTraceId
-    });
+    if (removedSpaceIds.length) {
+      dispatch('p2p:invitation-recovery-discarded', {
+        invitationIds: cleanupInvitationIds,
+        spaceIds: removedSpaceIds,
+        attempts: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
+        auditTraceId
+      });
+    }
     return {
       ...latestState,
       invitationRecovery: {
         completed: false,
-        discarded: true,
+        discarded: removedSpaceIds.length > 0,
+        cleanupPending: false,
         attemptsUsed: INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS,
-        recoveredSpaceIds: normalizedSpaceIds.filter((spaceId) => !removedSpaceIds.includes(spaceId)),
-        unresolvedSpaceIds: removedSpaceIds,
+        recoveredSpaceIds: normalizedSpaceIds.filter((spaceId) => !removedSpaceIds.includes(spaceId) && !unresolvedSpaceIds.includes(spaceId)),
+        unresolvedSpaceIds: unresolvedSpaceIds.filter((spaceId) => !removedSpaceIds.includes(spaceId)),
         cleanupInvitationIds,
         cleanedInvitationIds: Array.isArray(cleanup?.cleanedInvitationIds) ? cleanup.cleanedInvitationIds : [],
         removedSpaceIds,
+        protectedSpaceIds,
         attempts: attemptsAudit
       }
     };
