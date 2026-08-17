@@ -61,6 +61,8 @@ for (const id of [
 
 for (const needle of [
   '#dashboard-view[data-dashboard-mode="panel-directory"]',
+  'body:has(#dashboard-view[data-dashboard-mode="panel-directory"]:not(.hidden))',
+  '.workspace:has(#dashboard-view[data-dashboard-mode="panel-directory"]:not(.hidden))',
   '.portfolio-panel-open',
   '.panel-owner-avatar',
   '.panel-context-bar',
@@ -86,4 +88,4 @@ for (const key of ['directoryEyebrow', 'directoryTitle', 'directoryDescription',
   if (!es.includes(`"${key}"`)) throw new Error(`Falta texto de producción para la navegación de paneles: ${key}`);
 }
 
-console.log('OK: directorio oscuro de paneles aislado sobre una base clara estable, navegación, avatar del propietario y limpieza de accesos permanecen conectados.');
+console.log('OK: el directorio de paneles activa una superficie oscura completa y contextual; al salir, la base clara, navegación, avatar y limpieza de accesos permanecen intactos.');
