@@ -78,6 +78,7 @@ const state = {
   busy: false,
   p2pBusy: false,
   selectedSpaceId: '',
+  selectedPanelOwnerUserId: '',
   renderSequence: 0,
   p2pState: { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] },
   projects: new Map(),
@@ -115,7 +116,9 @@ const elements = {
   devicesButton: byId('devices-button'), devicesDialog: byId('devices-dialog'), deviceList: byId('device-list'), deviceStatus: byId('device-status'), deviceConfirmPanel: byId('device-confirm-panel'), deviceConfirmMessage: byId('device-confirm-message'), deviceConfirmButton: byId('device-confirm-button'), deviceConfirmCancel: byId('device-confirm-cancel'),
   localNetworkButton: byId('local-network-button'), localNetworkDialog: byId('local-network-dialog'), localNetworkState: byId('local-network-state'), localNetworkInput: byId('local-network-input'), localNetworkOutput: byId('local-network-output'), localNetworkCreateOffer: byId('local-network-create-offer'), localNetworkAcceptOffer: byId('local-network-accept-offer'), localNetworkCompleteAnswer: byId('local-network-complete-answer'), localNetworkCopy: byId('local-network-copy'), localNetworkPeers: byId('local-network-peers'), localNetworkStatus: byId('local-network-status'),
   dashboardView: byId('dashboard-view'), projectView: byId('project-view'), dashboardStatus: byId('dashboard-status'), projectStatus: byId('project-status'),
-  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
+  dashboardHeadingEyebrow: byId('dashboard-heading-eyebrow'), dashboardHeadingTitle: byId('dashboard-heading-title'), dashboardHeadingDescription: byId('dashboard-heading-description'),
+  backToPanelsButton: byId('back-to-panels-button'), panelContextBar: byId('panel-context-bar'), panelContextOwner: byId('panel-context-owner'), panelContextActions: byId('panel-context-actions'),
+  portfolioMetrics: byId('portfolio-metrics'), projectList: byId('project-list'), projectFilterToolbar: byId('project-filter-toolbar'), projectFilterInput: byId('project-filter-input'), projectFilterClear: byId('project-filter-clear'), projectFilterSummary: byId('project-filter-summary'), newProjectButton: byId('new-project-button'), backButton: byId('back-to-dashboard-button'),
   projectName: byId('project-name'), projectDescription: byId('project-description'), projectAddress: byId('project-address'), projectMemberSummary: byId('project-member-summary'), projectReplicaHealth: byId('project-replica-health'),
   projectMetrics: byId('project-metrics'), budgetProgressValue: byId('budget-progress-value'), budgetProgressLabel: byId('budget-progress-label'),
   inviteCollaboratorButton: byId('invite-collaborator-button'), manageAccessButton: byId('manage-access-button'), editProjectButton: byId('edit-project-button'), addPurchaseButton: byId('add-purchase-button'), addIncomeButton: byId('add-income-button'), addProjectionButton: byId('add-projection-button'),
@@ -447,6 +450,7 @@ function requestStorageProtection(options = {}) {
 function resetUserScopedInterface() {
   state.renderSequence += 1;
   state.selectedSpaceId = '';
+  state.selectedPanelOwnerUserId = '';
   state.p2pState = { spaces: [], invitations: { received: [], sent: [] }, devices: [], replicaHealth: {}, lifecycleTransactions: [] };
   state.projects.clear();
   state.pendingProjectCreation = null;
@@ -710,9 +714,11 @@ async function refreshProjects(auditContext = {}) {
   if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
-function renderPortfolioMetrics() {
+function renderPortfolioMetrics(projectsOverride = null) {
   elements.portfolioMetrics.replaceChildren();
-  const projects = [...state.projects.values()].filter((item) => !item.project.isTrashed);
+  const projects = Array.isArray(projectsOverride)
+    ? projectsOverride.filter((item) => !item.project.isTrashed)
+    : [...state.projects.values()].filter((item) => !item.project.isTrashed);
   const totalCapital = sumMoneyValues(projects, (item) => item.metrics.totalCapital);
   const totalPurchases = sumMoneyValues(projects, (item) => item.metrics.totalPurchases);
   const available = sumMoneyValues(projects, (item) => item.metrics.availableCapital);
@@ -796,20 +802,92 @@ function panelOwnerUserId(space = {}) {
 }
 
 function panelOwnerProfile(ownerUserId = '', projects = []) {
+  const cleanOwnerUserId = String(ownerUserId || '').trim();
+  if (!cleanOwnerUserId) return null;
+  if (cleanOwnerUserId === String(state.user?.userId || '').trim()) return state.user || null;
   for (const data of projects) {
-    const member = (data.space?.members || []).find((candidate) => String(candidate?.userId || '').trim() === ownerUserId);
+    const member = (data.space?.members || []).find((candidate) => String(candidate?.userId || '').trim() === cleanOwnerUserId);
     if (member?.profile) return member.profile;
   }
-  return null;
+  const invitation = (state.p2pState.invitations?.received || []).find((candidate) => (
+    String(candidate?.inviterUserId || '').trim() === cleanOwnerUserId
+    && candidate?.inviter
+  ));
+  return invitation?.inviter || null;
+}
+
+function panelOwnerLabel(ownerUserId = '', projects = []) {
+  const profile = panelOwnerProfile(ownerUserId, projects);
+  return String(profile?.displayName || profile?.email || '').trim();
 }
 
 function panelDisplayName(ownerUserId = '', projects = []) {
   if (ownerUserId && ownerUserId === state.user?.userId) return t('panel.ownName', 'Mi panel');
-  const profile = panelOwnerProfile(ownerUserId, projects);
-  const label = profile?.displayName || profile?.email || '';
+  const label = panelOwnerLabel(ownerUserId, projects);
   return label
     ? t('panel.sharedName', 'Panel de {owner}').replace('{owner}', label)
     : t('panel.sharedFallback', 'Panel compartido');
+}
+
+function safePanelPhotoUrl(profile = null) {
+  const candidate = String(profile?.photoUrl || '').trim();
+  if (!candidate) return '';
+  try {
+    const url = new URL(candidate, window.location.href);
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function panelAvatarNode(ownerUserId = '', projects = [], options = {}) {
+  const profile = panelOwnerProfile(ownerUserId, projects);
+  const label = panelOwnerLabel(ownerUserId, projects) || panelDisplayName(ownerUserId, projects);
+  const avatar = document.createElement('span');
+  avatar.className = options.compact === true ? 'panel-owner-avatar is-compact' : 'panel-owner-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  const fallback = document.createElement('span');
+  fallback.className = 'panel-owner-avatar-fallback';
+  fallback.textContent = String(label || '?').trim().slice(0, 1).toUpperCase() || '?';
+  avatar.append(fallback);
+  const photoUrl = safePanelPhotoUrl(profile);
+  if (photoUrl) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.src = photoUrl;
+    image.addEventListener('load', () => avatar.dataset.imageState = 'loaded', { once: true });
+    image.addEventListener('error', () => image.remove(), { once: true });
+    avatar.prepend(image);
+  }
+  return avatar;
+}
+
+function panelOwnerIdsWithAccess() {
+  const ownerIds = new Set();
+  const ownUserId = String(state.user?.userId || '').trim();
+  if (ownUserId) ownerIds.add(ownUserId);
+  for (const space of state.p2pState.spaces || []) {
+    const ownerUserId = panelOwnerUserId(space);
+    if (ownerUserId) ownerIds.add(ownerUserId);
+  }
+  for (const data of state.projects.values()) {
+    const ownerUserId = panelOwnerUserId(data.space);
+    if (ownerUserId) ownerIds.add(ownerUserId);
+  }
+  for (const invitation of state.p2pState.invitations?.received || []) {
+    if (String(invitation?.status || '').trim().toLowerCase() !== 'accepted') continue;
+    const ownerUserId = String(invitation?.inviterUserId || '').trim();
+    if (ownerUserId) ownerIds.add(ownerUserId);
+  }
+  return [...ownerIds];
+}
+
+function panelDirectoryRequired() {
+  const ownUserId = String(state.user?.userId || '').trim();
+  return Boolean(ownUserId && panelOwnerIdsWithAccess().some((ownerUserId) => ownerUserId !== ownUserId));
 }
 
 function projectsForPanel(ownerUserId = '', options = {}) {
@@ -868,49 +946,125 @@ function createProjectCard(data) {
   return card;
 }
 
+function panelActionButtons(ownerUserId = '') {
+  const buttons = [];
+  if (ownerUserId === state.user?.userId) {
+    const invite = document.createElement('button'); invite.type = 'button'; invite.className = 'button button-secondary button-compact panel-action-button'; invite.dataset.panelAction = 'invite'; invite.dataset.panelOwnerUserId = ownerUserId; invite.textContent = t('panel.invite', 'Invitar panel');
+    const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'button button-ghost button-compact panel-action-button'; manage.dataset.panelAction = 'manage'; manage.dataset.panelOwnerUserId = ownerUserId; manage.textContent = t('panel.manage', 'Participantes');
+    buttons.push(invite, manage);
+  } else {
+    const leave = document.createElement('button'); leave.type = 'button'; leave.className = 'button button-ghost button-compact panel-action-button'; leave.dataset.panelAction = 'leave'; leave.dataset.panelOwnerUserId = ownerUserId; leave.textContent = t('panel.leave', 'Abandonar panel');
+    buttons.push(leave);
+  }
+  return buttons;
+}
+
 function createPanelCard(ownerUserId = '', projects = []) {
   const panel = document.createElement('article'); panel.className = 'portfolio-panel-card'; panel.dataset.panelOwnerUserId = ownerUserId;
-  const heading = document.createElement('header'); heading.className = 'portfolio-panel-heading';
-  const identity = document.createElement('div'); identity.className = 'portfolio-panel-identity';
-  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = ownerUserId === state.user?.userId ? t('panel.owned', 'Panel propio') : t('panel.invited', 'Panel invitado');
-  const title = document.createElement('h3'); title.textContent = panelDisplayName(ownerUserId, projects);
-  const summary = document.createElement('p'); summary.textContent = t('panel.projectCount', '{count} proyectos autorizados').replace('{count}', String(projects.length));
+  const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'portfolio-panel-open'; openButton.dataset.openPanel = ownerUserId;
+  openButton.setAttribute('aria-label', t('panel.open', 'Abrir {panel}').replace('{panel}', panelDisplayName(ownerUserId, projects)));
+  const avatar = panelAvatarNode(ownerUserId, projects);
+  const identity = document.createElement('span'); identity.className = 'portfolio-panel-identity';
+  const eyebrow = document.createElement('span'); eyebrow.className = 'eyebrow'; eyebrow.textContent = ownerUserId === state.user?.userId ? t('panel.owned', 'Propio') : t('panel.invited', 'Invitado');
+  const title = document.createElement('strong'); title.className = 'portfolio-panel-title'; title.textContent = panelDisplayName(ownerUserId, projects);
+  const summary = document.createElement('span'); summary.className = 'portfolio-panel-summary'; summary.textContent = t('panel.projectCount', '{count} proyectos').replace('{count}', String(projects.length));
   identity.append(eyebrow, title, summary);
-  const actions = document.createElement('div'); actions.className = 'portfolio-panel-actions';
-  if (ownerUserId === state.user?.userId) {
-    const invite = document.createElement('button'); invite.type = 'button'; invite.className = 'button button-secondary button-compact'; invite.dataset.panelAction = 'invite'; invite.dataset.panelOwnerUserId = ownerUserId; invite.textContent = t('panel.invite', 'Invitar panel');
-    const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'button button-ghost button-compact'; manage.dataset.panelAction = 'manage'; manage.dataset.panelOwnerUserId = ownerUserId; manage.textContent = t('panel.manage', 'Participantes');
-    actions.append(invite, manage);
-  } else {
-    const leave = document.createElement('button'); leave.type = 'button'; leave.className = 'button button-ghost button-compact'; leave.dataset.panelAction = 'leave'; leave.dataset.panelOwnerUserId = ownerUserId; leave.textContent = t('panel.leave', 'Abandonar panel');
-    actions.append(leave);
-  }
-  heading.append(identity, actions);
-  const grid = document.createElement('section'); grid.className = 'project-grid portfolio-panel-projects';
-  projects.forEach((data) => grid.append(createProjectCard(data)));
-  panel.append(heading, grid);
+  const arrow = document.createElement('span'); arrow.className = 'portfolio-panel-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '→';
+  openButton.append(avatar, identity, arrow);
+  const actions = document.createElement('div'); actions.className = 'portfolio-panel-actions'; actions.append(...panelActionButtons(ownerUserId));
+  panel.append(openButton, actions);
   return panel;
 }
 
-function renderDashboard(auditContext = {}) {
-  renderPortfolioMetrics();
+function configureDashboardChrome(mode = 'panel-projects', ownerUserId = '', projects = []) {
+  const isDirectory = mode === 'panel-directory';
+  const isOwnPanel = ownerUserId === state.user?.userId;
+  elements.dashboardView.dataset.dashboardMode = mode;
+  elements.portfolioMetrics.hidden = isDirectory;
+  if (elements.projectFilterToolbar) elements.projectFilterToolbar.hidden = isDirectory;
+  elements.newProjectButton.hidden = isDirectory || !isOwnPanel;
+  elements.panelContextBar?.classList.toggle('hidden', isDirectory);
+  if (elements.dashboardHeadingEyebrow) elements.dashboardHeadingEyebrow.textContent = isDirectory
+    ? t('panel.directoryEyebrow', 'Espacios compartidos')
+    : isOwnPanel ? t('panel.owned', 'Propio') : t('panel.invited', 'Invitado');
+  if (elements.dashboardHeadingTitle) elements.dashboardHeadingTitle.textContent = isDirectory
+    ? t('panel.directoryTitle', 'Tus paneles')
+    : panelDisplayName(ownerUserId, projects);
+  if (elements.dashboardHeadingDescription) elements.dashboardHeadingDescription.textContent = isDirectory
+    ? t('panel.directoryDescription', 'Elige un panel para ver únicamente los proyectos que tienes autorizados en él.')
+    : t('panel.projectCount', '{count} proyectos').replace('{count}', String(projects.length));
+  if (isDirectory) return;
+
+  if (elements.backToPanelsButton) elements.backToPanelsButton.hidden = !panelDirectoryRequired();
+  if (elements.panelContextOwner) {
+    elements.panelContextOwner.replaceChildren();
+    const identity = document.createElement('span'); identity.className = 'panel-context-identity';
+    const label = document.createElement('strong'); label.textContent = panelDisplayName(ownerUserId, projects);
+    const owner = document.createElement('span'); owner.textContent = panelOwnerLabel(ownerUserId, projects) || (isOwnPanel ? (state.user?.email || '') : t('panel.sharedFallback', 'Panel compartido'));
+    identity.append(label, owner);
+    elements.panelContextOwner.append(panelAvatarNode(ownerUserId, projects, { compact: true }), identity);
+  }
+  if (elements.panelContextActions) {
+    elements.panelContextActions.replaceChildren(...panelActionButtons(ownerUserId));
+  }
+}
+
+function panelVisibilityAudit(ownerIds = []) {
+  return ownerIds.map((ownerUserId) => {
+    const authoritativeSpaces = (state.p2pState.spaces || []).filter((space) => panelOwnerUserId(space) === ownerUserId);
+    const loadedProjects = projectsForPanel(ownerUserId);
+    const missingSpaceIds = authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter((spaceId) => spaceId && !state.projects.has(spaceId));
+    return {
+      ownerUserId,
+      authoritativeSpaceIds: authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
+      loadedSpaceIds: loadedProjects.map((data) => String(data?.space?.spaceId || '').trim()).filter(Boolean),
+      missingSpaceIds,
+      partiallyAccepted: partiallyAcceptedPanelInvitationForOwner(ownerUserId),
+      complete: ownerUserId === state.user?.userId ? missingSpaceIds.length === 0 : panelIsComplete(ownerUserId)
+    };
+  });
+}
+
+function renderPanelDirectory(ownerIds = []) {
+  configureDashboardChrome('panel-directory');
   elements.projectList.replaceChildren();
-  const allProjects = [...state.projects.values()]
-    .filter((item) => !item.project.isTrashed)
+  const ownUserId = String(state.user?.userId || '').trim();
+  const orderedOwnerIds = [...ownerIds].sort((a, b) => {
+    if (a === ownUserId) return -1;
+    if (b === ownUserId) return 1;
+    return panelDisplayName(a, projectsForPanel(a)).localeCompare(panelDisplayName(b, projectsForPanel(b)), document.documentElement.lang || 'es');
+  });
+  let hiddenPanels = 0;
+  for (const ownerUserId of orderedOwnerIds) {
+    if (ownerUserId !== ownUserId && !panelIsComplete(ownerUserId)) { hiddenPanels += 1; continue; }
+    elements.projectList.append(createPanelCard(ownerUserId, projectsForPanel(ownerUserId)));
+  }
+  if (hiddenPanels > 0) {
+    const syncing = document.createElement('div'); syncing.className = 'panel-directory-syncing';
+    syncing.innerHTML = `<strong>${t('panel.syncingTitle', 'Sincronizando paneles')}</strong><p>${t('panel.syncingCount', '{count} paneles compartidos todavía se están sincronizando.').replace('{count}', String(hiddenPanels))}</p>`;
+    elements.projectList.append(syncing);
+  }
+}
+
+function renderSelectedPanel(ownerUserId = '') {
+  const panelProjects = projectsForPanel(ownerUserId)
     .sort((a, b) => String(b.project.updatedAt || '').localeCompare(String(a.project.updatedAt || '')));
+  configureDashboardChrome('panel-projects', ownerUserId, panelProjects);
+  renderPortfolioMetrics(panelProjects);
+  elements.projectList.replaceChildren();
   const normalizedFilter = normalizeProjectFilterText(state.projectFilterQuery);
   const projects = normalizedFilter
-    ? allProjects.filter((item) => projectMatchesFilter(item.project, normalizedFilter))
-    : allProjects;
+    ? panelProjects.filter((item) => projectMatchesFilter(item.project, normalizedFilter))
+    : panelProjects;
   if (elements.projectFilterInput && elements.projectFilterInput.value !== state.projectFilterQuery) elements.projectFilterInput.value = state.projectFilterQuery;
   if (elements.projectFilterClear) elements.projectFilterClear.hidden = !normalizedFilter;
   if (elements.projectFilterSummary) {
     elements.projectFilterSummary.hidden = !normalizedFilter;
     elements.projectFilterSummary.textContent = normalizedFilter
-      ? t('dashboard.filterResults', '{shown} de {total} proyectos coinciden').replace('{shown}', String(projects.length)).replace('{total}', String(allProjects.length))
+      ? t('dashboard.filterResults', '{shown} de {total} proyectos coinciden').replace('{shown}', String(projects.length)).replace('{total}', String(panelProjects.length))
       : '';
   }
-  if (!allProjects.length) {
+  if (!panelProjects.length) {
     const empty = document.createElement('div'); empty.className = 'empty-state';
     empty.innerHTML = `<strong>${t('dashboard.emptyTitle', 'Aún no hay proyectos')}</strong><p>${t('dashboard.emptyDescription', 'Usa el botón + para crear el primero. Después podrás invitar participantes y registrar movimientos.')}</p>`;
     elements.projectList.append(empty); return;
@@ -920,25 +1074,31 @@ function renderDashboard(auditContext = {}) {
     empty.innerHTML = `<strong>${t('dashboard.filterNoResultsTitle', 'No hay proyectos coincidentes')}</strong><p>${t('dashboard.filterNoResultsDescription', 'Prueba con otra palabra del nombre, la descripción o la dirección.')}</p>`;
     elements.projectList.append(empty); return;
   }
-  const ownerIds = Array.from(new Set(projects.map((data) => panelOwnerUserId(data.space)).filter(Boolean)));
-  const panelAudit = ownerIds.map((ownerUserId) => {
-    const authoritativeSpaces = (state.p2pState.spaces || []).filter((space) => panelOwnerUserId(space) === ownerUserId);
-    const loadedProjects = projects.filter((data) => panelOwnerUserId(data.space) === ownerUserId);
-    const missingSpaceIds = authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter((spaceId) => spaceId && !state.projects.has(spaceId));
-    return {
-      ownerUserId,
-      authoritativeSpaceIds: authoritativeSpaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
-      loadedSpaceIds: loadedProjects.map((data) => String(data?.space?.spaceId || '').trim()).filter(Boolean),
-      missingSpaceIds,
-      partiallyAccepted: partiallyAcceptedPanelInvitationForOwner(ownerUserId),
-      complete: panelIsComplete(ownerUserId)
-    };
-  });
+  projects.forEach((data) => elements.projectList.append(createProjectCard(data)));
+}
+
+function renderDashboard(auditContext = {}) {
+  if (!state.user?.userId) {
+    elements.projectList.replaceChildren();
+    elements.portfolioMetrics.replaceChildren();
+    elements.panelContextBar?.classList.add('hidden');
+    delete elements.dashboardView.dataset.dashboardMode;
+    return;
+  }
+  const ownerIds = panelOwnerIdsWithAccess();
+  const ownUserId = String(state.user.userId || '').trim();
+  const directoryRequired = panelDirectoryRequired();
+  if (!directoryRequired) state.selectedPanelOwnerUserId = ownUserId;
+  if (state.selectedPanelOwnerUserId && !ownerIds.includes(state.selectedPanelOwnerUserId)) state.selectedPanelOwnerUserId = directoryRequired ? '' : ownUserId;
+  if (state.selectedPanelOwnerUserId && state.selectedPanelOwnerUserId !== ownUserId && !panelIsComplete(state.selectedPanelOwnerUserId)) state.selectedPanelOwnerUserId = '';
+
   invitationAuditLog('frontend.ui.panel-visibility', {
     auditTraceId: String(auditContext?.auditTraceId || '').trim(),
     auditSource: String(auditContext?.source || '').trim(),
-    userId: String(state.user?.userId || '').trim(),
-    panels: panelAudit,
+    userId: ownUserId,
+    selectedPanelOwnerUserId: state.selectedPanelOwnerUserId,
+    directoryRequired,
+    panels: panelVisibilityAudit(ownerIds),
     ...XXXsenXXX({
       account: state.user,
       bootstrapSpaces: state.p2pState.spaces || [],
@@ -946,19 +1106,9 @@ function renderDashboard(auditContext = {}) {
       receivedInvitations: state.p2pState.invitations?.received || []
     })
   });
-  let renderedPanels = 0;
-  for (const ownerUserId of ownerIds) {
-    if (!panelIsComplete(ownerUserId)) continue;
-    const panelProjects = projects.filter((data) => panelOwnerUserId(data.space) === ownerUserId);
-    if (!panelProjects.length) continue;
-    elements.projectList.append(createPanelCard(ownerUserId, panelProjects));
-    renderedPanels += 1;
-  }
-  if (!renderedPanels) {
-    const hidden = document.createElement('div'); hidden.className = 'empty-state';
-    hidden.innerHTML = `<strong>${t('panel.syncingTitle', 'Sincronizando paneles')}</strong><p>${t('panel.syncingDescription', 'Los paneles aparecen únicamente cuando todos sus proyectos autorizados están disponibles y validados en este dispositivo.')}</p>`;
-    elements.projectList.append(hidden);
-  }
+
+  if (directoryRequired && !state.selectedPanelOwnerUserId) renderPanelDirectory(ownerIds);
+  else renderSelectedPanel(state.selectedPanelOwnerUserId || ownUserId);
 }
 
 function queueInvitationIntent(invitationId = '') {
@@ -1426,11 +1576,40 @@ function renderProject() {
   else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
 }
 
-function showDashboard() { state.selectedSpaceId = ''; clearAccessConfirmation(); elements.projectView.classList.add('hidden'); elements.dashboardView.classList.remove('hidden'); setStatus(elements.projectStatus, ''); }
+function showDashboard() {
+  state.selectedSpaceId = '';
+  clearAccessConfirmation();
+  elements.projectView.classList.add('hidden');
+  elements.dashboardView.classList.remove('hidden');
+  setStatus(elements.projectStatus, '');
+  renderDashboard();
+}
+
+function openPanel(ownerUserId = '') {
+  const cleanOwnerUserId = String(ownerUserId || '').trim();
+  if (!cleanOwnerUserId || !panelOwnerIdsWithAccess().includes(cleanOwnerUserId)) return;
+  if (cleanOwnerUserId !== state.user?.userId && !panelIsComplete(cleanOwnerUserId)) return;
+  state.selectedPanelOwnerUserId = cleanOwnerUserId;
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  renderDashboard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showPanelDirectory() {
+  if (!panelDirectoryRequired()) return;
+  state.selectedPanelOwnerUserId = '';
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  renderDashboard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function openProject(spaceId) {
   const data = state.projects.get(spaceId);
   if (!data || data.project.isTrashed) return;
   state.selectedSpaceId = spaceId;
+  state.selectedPanelOwnerUserId = panelOwnerUserId(data.space) || state.selectedPanelOwnerUserId;
   elements.dashboardView.classList.add('hidden');
   elements.projectView.classList.remove('hidden');
   renderProject();
@@ -1439,6 +1618,7 @@ function openProject(spaceId) {
 }
 
 function applyP2PState(nextState = {}, auditContext = {}) {
+  const directoryWasRequired = panelDirectoryRequired();
   state.p2pState = {
     spaces: Array.isArray(nextState.spaces) ? nextState.spaces : [],
     invitations: {
@@ -1449,6 +1629,7 @@ function applyP2PState(nextState = {}, auditContext = {}) {
     replicaHealth: nextState.replicaHealth && typeof nextState.replicaHealth === 'object' ? nextState.replicaHealth : {},
     lifecycleTransactions: Array.isArray(nextState.lifecycleTransactions) ? nextState.lifecycleTransactions : []
   };
+  if (!directoryWasRequired && panelDirectoryRequired()) state.selectedPanelOwnerUserId = '';
   renderInvitations(); if (elements.devicesDialog?.open) renderDevices();
   if (!state.panelResponseInProgress) refreshProjects(auditContext).catch((error) => setStatus(elements.dashboardStatus, error?.message || t('dashboard.loadError', 'No se pudieron cargar los proyectos.'), 'error'));
 }
@@ -2773,20 +2954,27 @@ elements.projectFilterClear?.addEventListener('click', () => {
   }
   renderDashboard();
 });
+function handlePanelActionButton(panelAction) {
+  if (!panelAction) return false;
+  const ownerUserId = String(panelAction.dataset.panelOwnerUserId || '').trim();
+  if (panelAction.dataset.panelAction === 'invite') openInviteForm({ scope: 'panel', ownerUserId });
+  if (panelAction.dataset.panelAction === 'manage') openPanelAccess(ownerUserId);
+  if (panelAction.dataset.panelAction === 'leave') leavePanel(ownerUserId, panelAction);
+  return true;
+}
+
 elements.projectList?.addEventListener('click', (event) => {
   const panelAction = event.target.closest('button[data-panel-action]');
-  if (panelAction) {
-    const ownerUserId = String(panelAction.dataset.panelOwnerUserId || '').trim();
-    if (panelAction.dataset.panelAction === 'invite') openInviteForm({ scope: 'panel', ownerUserId });
-    if (panelAction.dataset.panelAction === 'manage') openPanelAccess(ownerUserId);
-    if (panelAction.dataset.panelAction === 'leave') leavePanel(ownerUserId, panelAction);
-    return;
-  }
+  if (handlePanelActionButton(panelAction)) return;
+  const openPanelButton = event.target.closest('button[data-open-panel]');
+  if (openPanelButton) { openPanel(openPanelButton.dataset.openPanel); return; }
   const menu = event.target.closest('button[data-action-menu-scope]');
   if (menu) { openActionMenu(actionMenuContextFromButton(menu)); return; }
   const open = event.target.closest('button[data-open-project]');
   if (open) openProject(open.dataset.openProject);
 });
+elements.panelContextActions?.addEventListener('click', (event) => handlePanelActionButton(event.target.closest('button[data-panel-action]')));
+elements.backToPanelsButton?.addEventListener('click', showPanelDirectory);
 elements.backButton?.addEventListener('click', showDashboard);
 elements.addPurchaseButton?.addEventListener('click', () => openRecordForm('purchase')); elements.addIncomeButton?.addEventListener('click', () => openRecordForm('income')); elements.addProjectionButton?.addEventListener('click', () => openRecordForm('projection')); elements.recordForm?.addEventListener('submit', submitRecord);
 [elements.purchaseList, elements.projectionList, elements.incomeList].forEach((list) => list?.addEventListener('click', (event) => {

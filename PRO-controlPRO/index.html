@@ -67,18 +67,24 @@
       <section id="dashboard-view" class="view-stack">
         <div class="section-heading">
           <div>
-            <p class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
-            <h2 data-i18n="dashboard.panels">Paneles y proyectos</h2>
-            <p class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
+            <p id="dashboard-heading-eyebrow" class="eyebrow" data-i18n="dashboard.eyebrow">Resumen administrativo</p>
+            <h2 id="dashboard-heading-title" data-i18n="dashboard.panels">Paneles y proyectos</h2>
+            <p id="dashboard-heading-description" class="section-description" data-i18n="dashboard.description">Capital, gastos y proyecciones sincronizados entre los participantes autorizados.</p>
           </div>
           <button id="new-project-button" class="add-project-button" type="button" aria-label="Crear proyecto" data-i18n-attr="aria-label:dashboard.createProject">
             <span aria-hidden="true">+</span>
           </button>
         </div>
 
+        <div id="panel-context-bar" class="panel-context-bar hidden">
+          <button id="back-to-panels-button" class="button button-ghost button-compact" type="button" data-i18n="panel.backToPanels">← Paneles</button>
+          <div id="panel-context-owner" class="panel-context-owner"></div>
+          <div id="panel-context-actions" class="panel-context-actions"></div>
+        </div>
+
         <section id="portfolio-metrics" class="metrics-grid compact-metrics" aria-label="Resumen de todos los proyectos"></section>
         <p id="dashboard-status" class="inline-status" role="status" aria-live="polite"></p>
-        <div class="project-filter-toolbar">
+        <div id="project-filter-toolbar" class="project-filter-toolbar">
           <label class="project-filter-field" for="project-filter-input">
             <span class="project-filter-icon" aria-hidden="true"></span>
             <input id="project-filter-input" type="search" maxlength="300" autocomplete="off" enterkeyhint="search" aria-controls="project-list" aria-label="Filtrar proyectos" placeholder="Filtrar por nombre, descripción o dirección" data-i18n-attr="aria-label:dashboard.filterLabel;placeholder:dashboard.filterPlaceholder" />
