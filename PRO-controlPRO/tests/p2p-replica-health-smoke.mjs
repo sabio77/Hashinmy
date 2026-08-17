@@ -36,19 +36,34 @@ assert.deepEqual(normalizeReplicaHealthMap({
     pendingReplicas: 0,
     confirmedAccounts: 0,
     onlineReplicas: 0,
+    currentDeviceRegistered: false,
+    currentDeviceConfirmed: null,
+    currentDeviceOnline: false,
     lastConfirmedAt: '',
     truncated: false
   }
 });
 
 assert.match(clientSource, /listStateRevisions\(targetSpaceIds\)/, 'La consulta de salud no confirma la revisión local persistida.');
-assert.match(clientSource, /deviceId: sessionContext\.deviceId[\s\S]*stateRevisions: localStateRevisions/, 'La cobertura no queda ligada al dispositivo autenticado.');
+assert.match(clientSource, /deviceId: sessionContext\.deviceId[\s\S]*stateRevisions: localStateRevisions[\s\S]*deliverySequence:/, 'La cobertura no queda ligada al dispositivo y a su cursor local persistido.');
+assert.match(clientSource, /const bootstrapRequest = \{[\s\S]*deliverySequence: Math\.max\(0, Number\(localDeliverySequence \|\| 0\)\)/, 'El bootstrap no puede reconciliar una réplica ya al día porque omite el cursor local.');
 assert.match(clientSource, /replicaHealthOnly: true/, 'La actualización de cobertura vuelve a recargar todas las entidades.');
 
 assert.match(clientSource, /pendingAckReplicaSpaceIds/, 'El ACK no conserva los espacios cuyo estado local debe confirmarse.');
 assert.match(clientSource, /appliedStateRevisions\s*=\s*await listStateRevisions\(replicaSpaceIds\)/, 'El ACK no lee las revisiones realmente persistidas antes de declarar cobertura.');
 assert.match(clientSource, /appliedStateRevisions[\s\S]*apiPost\('\/api\/p2p\/events\/ack'/, 'El ACK no envía la declaración de estado aplicado al backend.');
 assert.match(clientSource, /replicaRevisionHints \|\| ackResult\.replicaRevisions/, 'El cliente no trata las revisiones del relay como hints compatibles.');
+assert.match(clientSource, /waitingOnlineReplica[\s\S]*replicaHealthConvergenceAttempts[\s\S]*scheduleReplicaHealthRefresh\(retrySpaceIds/, 'La UI puede quedar congelada mientras otra réplica conectada termina de confirmarse.');
+assert.match(clientSource, /pendingReplicas[\s\S]*REPLICA_HEALTH_BACKGROUND_RETRY_MS[\s\S]*retrySpaceIds\.push\(spaceId\)/, 'La cobertura deja de reconciliarse cuando otra instalación registrada aún no estaba online en la primera consulta.');
+assert.match(clientSource, /currentDeviceRegistered[\s\S]*currentDeviceConfirmed[\s\S]*currentDeviceOnline/, 'El cliente no conserva la identidad segura de su propia réplica dentro de la salud agregada.');
+assert.match(clientSource, /currentReplicaNeedsRecovery[\s\S]*currentDeviceConfirmed === false[\s\S]*waitingOnlineReplica = currentReplicaNeedsRecovery/, 'La auto-recuperación todavía depende de una presencia Redis perfecta para reconocer al propio dispositivo activo.');
+assert.match(clientSource, /attempt >= REPLICA_HEALTH_SELF_RECOVERY_ATTEMPTS[\s\S]*currentReplicaNeedsRecovery[\s\S]*selfRecoverySpaceIds\.push\(spaceId\)/, 'Una réplica local conectada puede seguir en 0\/N sin escalar a recuperación real.');
+assert.match(clientSource, /recoverReplicaHealthConvergence[\s\S]*requestSnapshots: 'force'[\s\S]*snapshotSpaceIds: targets[\s\S]*replica-health-self-recovery/, 'La recuperación de cobertura no solicita una reconstrucción dirigida únicamente a los espacios pendientes.');
+assert.match(clientSource, /REPLICA_HEALTH_SELF_RECOVERY_COOLDOWN_MS[\s\S]*replicaHealthRecoveryCooldownUntil/, 'La auto-recuperación de cobertura puede generar tormentas de snapshots sin cooldown.');
+assert.match(clientSource, /REPLICA_HEALTH_RETRY_ATTEMPT_CAP[\s\S]*Math\.min[\s\S]*scheduleReplicaHealthRefresh\(retrySpaceIds/, 'La reconciliación de cobertura vuelve a detenerse definitivamente al agotar un contador fijo de intentos.');
+assert.match(clientSource, /if \(backendReady\) this\.scheduleReplicaHealthRefresh\(this\.readableSpaceIds\(\), \{ delayMs: 500 \}\)/, 'El arranque líder no fuerza una reconciliación posterior al bootstrap y puede conservar el 0\/N inicial.');
+assert.match(clientSource, /scheduleReplicaHealthRefresh\(refreshSpaceIds\.length \? refreshSpaceIds : this\.readableSpaceIds\(\)\)/, 'Un ACK de control no provoca reconciliación de cobertura cuando no trae revisiones de entidad.');
+assert.match(clientSource, /p2p:operation-published[\s\S]*scheduleReplicaHealthRefresh\(\[spaceId\]\)/, 'La copia origen no renueva su cobertura después de publicar una operación durable.');
 assert.match(clientSource, /replayed > 0\) this\.scheduleReplicaHealthRefresh\(\[event\.spaceId\]\)/, 'La reproducción de eventos cifrados diferidos no renueva la cobertura después de aplicarlos.');
 assert.match(appSource, /replica-health-badge/, 'La interfaz no muestra el estado de las réplicas.');
 assert.match(appSource, /event\.detail\?\.replicaHealthOnly === true/, 'La interfaz no separa cobertura de la carga funcional.');
@@ -61,4 +76,4 @@ for (const language of ['es', 'en', 'ar']) {
   }
 }
 
-console.log('OK: normalización, ACK basado en estado aplicado, actualización liviana e indicadores ES/EN/AR validados.');
+console.log('OK: normalización, ACK aplicado, auto-recuperación dirigida de 0/N, reconciliación persistente, arranque líder e indicadores ES/EN/AR validados.');

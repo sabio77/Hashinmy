@@ -38,6 +38,8 @@ const requests = [];
 async function listSpaces() { return []; }
 async function listKnownSpaceIds() { return []; }
 async function listStateRevisions() { return {}; }
+const CURSOR_META_PREFIX = 'p2p_delivery_cursor:';
+async function getMeta() { return 0; }
 function apiPost(path, body) {
   return new Promise((resolve, reject) => requests.push({ path, body, resolve, reject }));
 }

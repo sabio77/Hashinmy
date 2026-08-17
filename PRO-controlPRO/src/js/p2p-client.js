@@ -91,6 +91,12 @@ const SERVER_RETRY_MAX_MS = 60 * 60 * 1000;
 const ACK_BATCH_DELAY_MS = 250;
 const ACK_RETRY_BASE_MS = 1000;
 const ACK_RETRY_MAX_MS = 30000;
+const REPLICA_HEALTH_FAST_RETRY_BASE_MS = 1500;
+const REPLICA_HEALTH_FAST_RETRY_MAX_MS = 30000;
+const REPLICA_HEALTH_BACKGROUND_RETRY_MS = 45 * 1000;
+const REPLICA_HEALTH_RETRY_ATTEMPT_CAP = 6;
+const REPLICA_HEALTH_SELF_RECOVERY_ATTEMPTS = 3;
+const REPLICA_HEALTH_SELF_RECOVERY_COOLDOWN_MS = 60 * 1000;
 const SNAPSHOT_RECOVERY_FALLBACK_MS = 60 * 1000;
 const SNAPSHOT_RECOVERY_MARGIN_MS = 5 * 1000;
 const ATOMIC_BATCH_ASSEMBLY_TIMEOUT_MS = 15 * 1000;
@@ -402,6 +408,9 @@ function normalizeReplicaHealthMap(input = {}) {
       pendingReplicas: nonnegativeInteger(rawHealth.pendingReplicas),
       confirmedAccounts: nonnegativeInteger(rawHealth.confirmedAccounts),
       onlineReplicas: nonnegativeInteger(rawHealth.onlineReplicas),
+      currentDeviceRegistered: rawHealth.currentDeviceRegistered === true,
+      currentDeviceConfirmed: typeof rawHealth.currentDeviceConfirmed === 'boolean' ? rawHealth.currentDeviceConfirmed : null,
+      currentDeviceOnline: rawHealth.currentDeviceOnline === true,
       lastConfirmedAt: String(rawHealth.lastConfirmedAt || '').slice(0, 60),
       truncated: rawHealth.truncated === true
     };
@@ -1504,6 +1513,9 @@ export class SemillaP2PClient {
     this.ackGeneration = 0;
     this.ackRetryCount = 0;
     this.replicaHealthTimer = 0;
+    this.replicaHealthConvergenceAttempts = new Map();
+    this.replicaHealthRecoveryCooldownUntil = new Map();
+    this.replicaHealthRecoveryPromise = null;
     this.pendingReplicaHealthSpaceIds = new Set();
     this.pendingAckReplicaSpaceIds = new Set();
     this.snapshotRecoveryTimer = 0;
@@ -4108,6 +4120,9 @@ export class SemillaP2PClient {
     this.ackTimer = 0;
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds.clear();
+    this.replicaHealthConvergenceAttempts.clear();
+    this.replicaHealthRecoveryCooldownUntil.clear();
+    this.replicaHealthRecoveryPromise = null;
     this.pendingAckReplicaSpaceIds.clear();
     this.highestPendingAck = 0;
     this.ackGeneration += 1;
@@ -4156,6 +4171,7 @@ export class SemillaP2PClient {
         if (!this.realtimeLeader) return;
         await this.openRealtime();
         this.assertSessionContext(sessionContext);
+        this.scheduleReplicaHealthRefresh(this.readableSpaceIds());
         await this.registerExistingPushSubscription().catch((error) => {
           if (this.isSessionContextChangedError(error)) throw error;
           return false;
@@ -5683,12 +5699,16 @@ export class SemillaP2PClient {
       .filter(Boolean)))
       .slice(0, 100);
     const targetSpaceIds = cleanSpaceIds.length ? cleanSpaceIds : this.readableSpaceIds();
-    const localStateRevisions = await listStateRevisions(targetSpaceIds);
+    const [localStateRevisions, localDeliverySequence] = await Promise.all([
+      listStateRevisions(targetSpaceIds),
+      getMeta(`${CURSOR_META_PREFIX}${sessionContext.deviceId}`, 0)
+    ]);
     this.assertSessionContext(sessionContext);
     const data = await apiPost('/api/p2p/replicas/health', {
       deviceId: sessionContext.deviceId,
       spaceIds: cleanSpaceIds,
-      stateRevisions: localStateRevisions
+      stateRevisions: localStateRevisions,
+      deliverySequence: Math.max(0, Number(localDeliverySequence || 0))
     });
     this.assertSessionContext(sessionContext);
     if (data.stateRevisions && typeof data.stateRevisions === 'object') {
@@ -5700,7 +5720,53 @@ export class SemillaP2PClient {
     return this.mergeReplicaHealth(data.replicaHealth || {});
   }
 
-  scheduleReplicaHealthRefresh(spaceIds = []) {
+  async recoverReplicaHealthConvergence(spaceIds = [], sessionContext = this.captureSessionContext()) {
+    this.assertSessionContext(sessionContext);
+    if (this.replicaHealthRecoveryPromise) return this.replicaHealthRecoveryPromise;
+    if (!this.started || this.manualClose || !this.realtimeLeader || !getSessionToken() || !navigator.onLine) return false;
+
+    const now = Date.now();
+    const readable = new Set(this.readableSpaceIds());
+    const targets = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
+      .map((spaceId) => String(spaceId || '').trim())
+      .filter((spaceId) => spaceId && readable.has(spaceId))))
+      .filter((spaceId) => Number(this.replicaHealthRecoveryCooldownUntil.get(spaceId) || 0) <= now)
+      .slice(0, 25);
+    if (!targets.length) return false;
+
+    for (const spaceId of targets) {
+      this.replicaHealthRecoveryCooldownUntil.set(spaceId, now + REPLICA_HEALTH_SELF_RECOVERY_COOLDOWN_MS);
+    }
+
+    const recovering = (async () => {
+      dispatch('p2p:replica-health-recovery', { state: 'started', spaceIds: targets, deviceId: sessionContext.deviceId });
+      try {
+        await this.refreshBootstrap({
+          requestSnapshots: 'force',
+          snapshotSpaceIds: targets,
+          auditSource: 'replica-health-self-recovery'
+        });
+        this.assertSessionContext(sessionContext);
+        this.scheduleAck(Math.max(this.highestPendingAck, this.lastProcessedSequence), { immediate: true });
+        this.scheduleReplicaHealthRefresh(targets, { delayMs: 750 });
+        dispatch('p2p:replica-health-recovery', { state: 'requested', spaceIds: targets, deviceId: sessionContext.deviceId });
+        return true;
+      } catch (error) {
+        if (!this.isSessionContextChangedError(error) && this.isSessionContextCurrent(sessionContext)) {
+          dispatch('p2p:replica-health-recovery', { state: 'deferred', error, spaceIds: targets, deviceId: sessionContext.deviceId });
+          if (this.isRetryableTransportError(error)) this.scheduleServerRecovery(error, 'replica-health-self-recovery');
+        }
+        return false;
+      } finally {
+        if (this.replicaHealthRecoveryPromise === recovering) this.replicaHealthRecoveryPromise = null;
+      }
+    })();
+
+    this.replicaHealthRecoveryPromise = recovering;
+    return recovering;
+  }
+
+  scheduleReplicaHealthRefresh(spaceIds = [], options = {}) {
     for (const spaceId of Array.isArray(spaceIds) ? spaceIds : []) {
       const cleanSpaceId = String(spaceId || '').trim();
       if (cleanSpaceId) this.pendingReplicaHealthSpaceIds.add(cleanSpaceId);
@@ -5713,17 +5779,99 @@ export class SemillaP2PClient {
       || !getSessionToken()
       || !navigator.onLine) return;
     const sessionContext = this.captureSessionContext();
+    const delayMs = Math.max(250, Number(options.delayMs || 1250));
     this.replicaHealthTimer = window.setTimeout(async () => {
       this.replicaHealthTimer = 0;
       if (!this.isSessionContextCurrent(sessionContext) || !this.realtimeLeader || !navigator.onLine) return;
       const requested = [...this.pendingReplicaHealthSpaceIds];
       this.pendingReplicaHealthSpaceIds.clear();
-      await this.refreshReplicaHealth(requested).catch((error) => {
-        if (!this.isSessionContextChangedError(error)) {
-          for (const spaceId of requested) this.pendingReplicaHealthSpaceIds.add(spaceId);
+      try {
+        const health = await this.refreshReplicaHealth(requested);
+        this.assertSessionContext(sessionContext);
+        const retrySpaceIds = [];
+        const selfRecoverySpaceIds = [];
+        let nextRetryDelayMs = 0;
+        for (const spaceId of requested) {
+          const entry = health?.[spaceId];
+          const pendingReplicas = Number(entry?.pendingReplicas || 0);
+          if (!(pendingReplicas > 0)) {
+            this.replicaHealthConvergenceAttempts.delete(spaceId);
+            continue;
+          }
+
+          const currentReplicaNeedsRecovery = entry?.currentDeviceRegistered === true
+            && entry?.currentDeviceConfirmed === false;
+          const waitingOnlineReplica = currentReplicaNeedsRecovery
+            || Number(entry?.onlineReplicas || 0) > Number(entry?.confirmedReplicas || 0);
+          if (waitingOnlineReplica) {
+            const attempt = Math.min(
+              REPLICA_HEALTH_RETRY_ATTEMPT_CAP,
+              Number(this.replicaHealthConvergenceAttempts.get(spaceId) || 0) + 1
+            );
+            this.replicaHealthConvergenceAttempts.set(spaceId, attempt);
+            if (
+              attempt >= REPLICA_HEALTH_SELF_RECOVERY_ATTEMPTS
+              && currentReplicaNeedsRecovery
+            ) {
+              selfRecoverySpaceIds.push(spaceId);
+            }
+            const fastDelayMs = Math.min(
+              REPLICA_HEALTH_FAST_RETRY_MAX_MS,
+              REPLICA_HEALTH_FAST_RETRY_BASE_MS * (2 ** Math.max(0, attempt - 1))
+            );
+            nextRetryDelayMs = nextRetryDelayMs ? Math.min(nextRetryDelayMs, fastDelayMs) : fastDelayMs;
+          } else {
+            // Si otra instalación registrada todavía no está online, mantener una
+            // reconciliación liviana evita que la card conserve para siempre el valor
+            // observado durante el bootstrap. No se releen datos funcionales: solo
+            // metadatos de cobertura y revisión.
+            this.replicaHealthConvergenceAttempts.set(spaceId, 0);
+            nextRetryDelayMs = nextRetryDelayMs
+              ? Math.min(nextRetryDelayMs, REPLICA_HEALTH_BACKGROUND_RETRY_MS)
+              : REPLICA_HEALTH_BACKGROUND_RETRY_MS;
+          }
+          retrySpaceIds.push(spaceId);
         }
-      });
-    }, 1250);
+        if (selfRecoverySpaceIds.length) {
+          await this.recoverReplicaHealthConvergence(selfRecoverySpaceIds, sessionContext);
+          this.assertSessionContext(sessionContext);
+        }
+        if (retrySpaceIds.length) {
+          this.scheduleReplicaHealthRefresh(retrySpaceIds, {
+            delayMs: nextRetryDelayMs || REPLICA_HEALTH_BACKGROUND_RETRY_MS
+          });
+        }
+      } catch (error) {
+        if (!this.isSessionContextChangedError(error) && this.isRetryableTransportError(error)) {
+          const retrySpaceIds = [];
+          let maxAttempt = 0;
+          for (const spaceId of requested) {
+            const attempt = Math.min(
+              REPLICA_HEALTH_RETRY_ATTEMPT_CAP,
+              Number(this.replicaHealthConvergenceAttempts.get(spaceId) || 0) + 1
+            );
+            this.replicaHealthConvergenceAttempts.set(spaceId, attempt);
+            retrySpaceIds.push(spaceId);
+            maxAttempt = Math.max(maxAttempt, attempt);
+          }
+          for (const spaceId of retrySpaceIds) this.pendingReplicaHealthSpaceIds.add(spaceId);
+          if (retrySpaceIds.length) {
+            this.scheduleReplicaHealthRefresh([], {
+              delayMs: Math.max(
+                retryAfterMilliseconds(error, { fallbackMs: 5000, maximumMs: 60000 }),
+                Math.min(
+                  REPLICA_HEALTH_FAST_RETRY_MAX_MS,
+                  REPLICA_HEALTH_FAST_RETRY_BASE_MS * (2 ** Math.max(0, maxAttempt - 1))
+                )
+              )
+            });
+          }
+        } else if (!this.isSessionContextChangedError(error)) {
+          for (const spaceId of requested) this.replicaHealthConvergenceAttempts.delete(spaceId);
+          dispatch('p2p:replica-health-error', { error, spaceIds: requested });
+        }
+      }
+    }, delayMs);
   }
 
   async fenceBootstrapResponses(sessionContext = this.captureSessionContext()) {
@@ -5759,7 +5907,10 @@ export class SemillaP2PClient {
       listKnownSpaceIds()
     ]);
     this.assertSessionContext(sessionContext);
-    const stateRevisions = await listStateRevisions(durableKnownSpaceIds);
+    const [stateRevisions, localDeliverySequence] = await Promise.all([
+      listStateRevisions(durableKnownSpaceIds),
+      getMeta(`${CURSOR_META_PREFIX}${sessionContext.deviceId}`, 0)
+    ]);
     this.assertSessionContext(sessionContext);
     const lifecycleReceipts = await this.completedLifecycleReceipts(
       localSpaces.map((space) => space.spaceId),
@@ -5780,6 +5931,7 @@ export class SemillaP2PClient {
       snapshotSpaceIds,
       knownSpaceIds,
       stateRevisions,
+      deliverySequence: Math.max(0, Number(localDeliverySequence || 0)),
       lifecycleReceipts,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
         ? {}
@@ -5912,6 +6064,7 @@ export class SemillaP2PClient {
     this.ackPromise = null;
     this.ackRetryCount = 0;
     this.pendingReplicaHealthSpaceIds.clear();
+    this.replicaHealthConvergenceAttempts.clear();
     this.invitationEscrowRecoveryAttempts.clear();
     this.rejectedKeyEnvelopeSources.clear();
     this.clearRejectedKeyEnvelopeRetryTimers();
@@ -6007,6 +6160,9 @@ export class SemillaP2PClient {
       this.tabCoordinationReady = true;
       this.assertSessionContext(sessionContext);
       if (this.realtimeLeader) this.scheduleLocalCapabilityRefresh({ reason: 'startup' }, sessionContext);
+      if (this.realtimeLeader) {
+        if (backendReady) this.scheduleReplicaHealthRefresh(this.readableSpaceIds(), { delayMs: 500 });
+      }
       dispatch('p2p:ready', { client: this, state: this.bootstrapState, localOnly: !backendReady, sharedTab: !this.realtimeLeader });
       return this.bootstrapState;
     } catch (error) {
@@ -6072,6 +6228,9 @@ export class SemillaP2PClient {
     this.ackTimer = 0;
     this.replicaHealthTimer = 0;
     this.pendingReplicaHealthSpaceIds.clear();
+    this.replicaHealthConvergenceAttempts.clear();
+    this.replicaHealthRecoveryCooldownUntil.clear();
+    this.replicaHealthRecoveryPromise = null;
     this.pendingAckReplicaSpaceIds.clear();
     this.ackGeneration += 1;
     this.ackPromise = null;
@@ -6166,6 +6325,7 @@ export class SemillaP2PClient {
       await this.openRealtime();
       this.assertSessionContext(sessionContext);
       this.scheduleAck(Math.max(this.highestPendingAck, this.lastProcessedSequence), { immediate: true });
+      this.scheduleReplicaHealthRefresh(this.readableSpaceIds());
       await this.registerExistingPushSubscription().catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
         return false;
@@ -7169,7 +7329,7 @@ export class SemillaP2PClient {
           if (refreshSpaceIds.length && (localReplicaReadDeferred || ackResult.replicaReportDeferred === true)) {
             for (const spaceId of refreshSpaceIds) this.pendingReplicaHealthSpaceIds.add(spaceId);
           }
-          this.scheduleReplicaHealthRefresh(refreshSpaceIds);
+          this.scheduleReplicaHealthRefresh(refreshSpaceIds.length ? refreshSpaceIds : this.readableSpaceIds());
           if (ackResult.lifecycleReconciliationDeferred === true && this.realtimeLeader) {
             this.refreshBootstrap({ requestSnapshots: false }).catch((error) => {
               if (!this.isSessionContextChangedError(error)) {
@@ -8871,6 +9031,9 @@ export class SemillaP2PClient {
       }
       this.assertSessionContext(sessionContext);
       dispatch('p2p:operation-published', { event: data.event, request });
+      if (isEntityOperationType(normalized.type) && typeof this.scheduleReplicaHealthRefresh === 'function') {
+        this.scheduleReplicaHealthRefresh([spaceId]);
+      }
       return data;
     } catch (error) {
       if (this.isSessionContextChangedError(error) || !this.isSessionContextCurrent(sessionContext)) {
@@ -9641,6 +9804,9 @@ export class SemillaP2PClient {
     }
     const remaining = (await listOutbox()).length;
     this.assertSessionContext(sessionContext);
+    if (sent > 0 && typeof this.scheduleReplicaHealthRefresh === 'function' && typeof this.readableSpaceIds === 'function') {
+      this.scheduleReplicaHealthRefresh(this.readableSpaceIds());
+    }
     return { sent, rejected, pending: remaining, sentOperations, rejectedOperations };
   }
 

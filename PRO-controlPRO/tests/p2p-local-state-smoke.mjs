@@ -1648,6 +1648,8 @@ outboxIsolationClient.deviceId = 'dev_outbox_isolation';
 outboxIsolationClient.started = true;
 outboxIsolationClient.sessionGeneration = 8;
 outboxIsolationClient.realtimeLeader = true;
+// Esta sección valida aislamiento/reintentos del outbox; la salud de réplicas tiene cobertura propia.
+outboxIsolationClient.scheduleReplicaHealthRefresh = () => {};
 outboxIsolationClient.bootstrapState = {
   spaces: [
     { spaceId: 'space_blocked', members: [{ userId: 'usr_outbox_isolation', permissions: ['read', 'add'] }] },
