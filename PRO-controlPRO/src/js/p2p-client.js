@@ -96,6 +96,7 @@ const TAB_STATE_REQUEST_RETRY_BASE_MS = 1500;
 const TAB_STATE_REQUEST_RETRY_MAX_MS = 12000;
 const TAB_STATE_REQUEST_TARGETED_RETRY_LIMIT = 3;
 const KEY_ENVELOPE_REJECTION_TTL_MS = 5 * 60 * 1000;
+const MISSING_SPACE_KEY_RECOVERY_WAIT_MS = 2400;
 const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
 const INVITATION_SOURCE_SYNC_WAIT_MS = 8 * 1000;
 const INVITATION_SOURCE_CREATE_MAX_ATTEMPTS = 2;
@@ -1481,6 +1482,7 @@ export class SemillaP2PClient {
     this.deviceId = '';
     this.deviceEncryptionPublicKey = null;
     this.keyRequestTimes = new Map();
+    this.missingSpaceKeyRecoveryPromises = new Map();
     this.invitationEscrowRecoveryAttempts = new Map();
     this.rejectedKeyEnvelopeSources = new Map();
     this.rejectedKeyEnvelopeRetryTimers = new Map();
@@ -4588,6 +4590,189 @@ export class SemillaP2PClient {
     return { ...data, space: remembered };
   }
 
+  async requestSpaceKeyAndWait(spaceId = '', keyId = '', options = {}) {
+    const cleanSpaceId = String(spaceId || '').trim();
+    const cleanKeyId = String(keyId || '').trim();
+    if (!cleanSpaceId || !cleanKeyId) return { recovered: false, requested: false };
+    if (await hasSpaceKey(cleanSpaceId, cleanKeyId)) return { recovered: true, requested: false };
+
+    const sessionContext = options.sessionContext || this.captureSessionContext();
+    this.assertSessionContext(sessionContext);
+    const waitMs = Math.max(250, Number(options.waitMs || MISSING_SPACE_KEY_RECOVERY_WAIT_MS));
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timer = 0;
+      let requested = false;
+
+      const cleanup = () => {
+        window.removeEventListener('p2p:key-received', onKeyReceived);
+        if (timer) window.clearTimeout(timer);
+      };
+      const finish = (result, error = null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve(result);
+      };
+      const verifyRecovered = async () => {
+        try {
+          this.assertSessionContext(sessionContext);
+          const recovered = await hasSpaceKey(cleanSpaceId, cleanKeyId);
+          this.assertSessionContext(sessionContext);
+          if (recovered) finish({ recovered: true, requested });
+          return recovered;
+        } catch (error) {
+          finish(null, error);
+          return false;
+        }
+      };
+      const onKeyReceived = (event) => {
+        if (String(event?.detail?.spaceId || '').trim() !== cleanSpaceId) return;
+        if (String(event?.detail?.keyId || '').trim() !== cleanKeyId) return;
+        verifyRecovered();
+      };
+
+      window.addEventListener('p2p:key-received', onKeyReceived);
+      timer = window.setTimeout(() => finish({ recovered: false, requested, timedOut: requested }), waitMs);
+
+      (async () => {
+        try {
+          requested = await this.requestSpaceKey(cleanSpaceId, cleanKeyId, { force: true });
+          this.assertSessionContext(sessionContext);
+          if (await verifyRecovered()) return;
+          if (!requested) finish({ recovered: false, requested: false });
+        } catch (error) {
+          if (this.isSessionContextChangedError?.(error)) {
+            finish(null, error);
+            return;
+          }
+          finish({ recovered: false, requested, requestError: error });
+        }
+      })();
+    });
+  }
+
+  async recoverMissingSpaceKey(spaceId = '', keyId = '', options = {}) {
+    const cleanSpaceId = String(spaceId || '').trim();
+    const cleanKeyId = String(keyId || '').trim();
+    if (!cleanSpaceId || !cleanKeyId) return null;
+    const recoveryScope = `${cleanSpaceId}|${cleanKeyId}`;
+    const existingRecovery = this.missingSpaceKeyRecoveryPromises.get(recoveryScope);
+    if (existingRecovery) return existingRecovery;
+
+    const recovery = (async () => {
+      const sessionContext = this.captureSessionContext();
+      this.assertSessionContext(sessionContext);
+      const attempts = [];
+
+      const attemptRequest = async (candidateKeyId) => {
+        const result = await this.requestSpaceKeyAndWait(cleanSpaceId, candidateKeyId, { sessionContext });
+        attempts.push({
+          keyId: candidateKeyId,
+          requested: result?.requested === true,
+          recovered: result?.recovered === true,
+          timedOut: result?.timedOut === true,
+          requestError: result?.requestError || null
+        });
+        if (!result?.recovered) return null;
+        const authority = this.spaceEncryptionAuthority(cleanSpaceId);
+        return activateSpaceKey(cleanSpaceId, candidateKeyId, { keyEpoch: authority.keyEpoch });
+      };
+
+      let recovered = await attemptRequest(cleanKeyId);
+      if (recovered) {
+        dispatch('p2p:key-self-healed', { spaceId: cleanSpaceId, keyId: cleanKeyId, strategy: 'authorized-replica' });
+        return recovered;
+      }
+
+      if (navigator.onLine && getSessionToken()) {
+        try {
+          await this.refreshBootstrap({ requestSnapshots: false });
+          this.assertSessionContext(sessionContext);
+        } catch (error) {
+          if (this.isSessionContextChangedError(error)) throw error;
+          attempts.push({ stage: 'refresh-authority', requestError: error });
+        }
+      }
+
+      const refreshedAuthority = this.spaceEncryptionAuthority(cleanSpaceId);
+      const refreshedKeyId = String(refreshedAuthority.keyId || '').trim();
+      if (refreshedKeyId && await hasSpaceKey(cleanSpaceId, refreshedKeyId)) {
+        recovered = await activateSpaceKey(cleanSpaceId, refreshedKeyId, { keyEpoch: refreshedAuthority.keyEpoch });
+        dispatch('p2p:key-self-healed', { spaceId: cleanSpaceId, keyId: refreshedKeyId, strategy: 'refreshed-authority' });
+        return recovered;
+      }
+      if (refreshedKeyId) {
+        recovered = await attemptRequest(refreshedKeyId);
+        if (recovered) {
+          dispatch('p2p:key-self-healed', { spaceId: cleanSpaceId, keyId: refreshedKeyId, strategy: 'refreshed-authorized-replica' });
+          return recovered;
+        }
+      }
+
+      const currentUserId = String(this.user?.userId || '').trim();
+      const canRotateForInvitation = options.allowOwnerRecoveryRotation === true
+        && refreshedAuthority.space?.ownerUserId === currentUserId
+        && Boolean(refreshedKeyId)
+        && refreshedAuthority.rotationRequired !== true;
+      if (canRotateForInvitation) {
+        const rotated = await ensureSpaceKey(cleanSpaceId, { rotate: true, activate: false });
+        if (rotated?.keyId && rotated.keyId !== refreshedKeyId) {
+          const activation = await this.activateAuthoritativeSpaceKey(cleanSpaceId, rotated.keyId, refreshedKeyId);
+          this.assertSessionContext(sessionContext);
+          let distribution = null;
+          try {
+            distribution = await this.distributeSpaceKey(cleanSpaceId, rotated.keyId);
+          } catch (error) {
+            dispatch('p2p:key-distribution-pending', {
+              spaceId: cleanSpaceId,
+              keyId: rotated.keyId,
+              stage: 'invitation-key-self-heal',
+              error
+            });
+          }
+          const active = await getActiveSpaceKey(cleanSpaceId) || {
+            ...rotated,
+            keyEpoch: Math.max(0, Number(activation.space?.encryptionKeyEpoch || 0))
+          };
+          dispatch('p2p:key-self-healed', {
+            spaceId: cleanSpaceId,
+            keyId: active.keyId,
+            strategy: 'owner-rotation',
+            distributionComplete: distribution?.complete === true
+          });
+          return { ...active, distribution };
+        }
+      }
+
+      dispatch('p2p:key-self-heal-failed', {
+        spaceId: cleanSpaceId,
+        keyId: refreshedKeyId || cleanKeyId,
+        attempts: attempts.map((attempt) => ({
+          keyId: String(attempt?.keyId || '').trim(),
+          stage: String(attempt?.stage || '').trim(),
+          requested: attempt?.requested === true,
+          recovered: attempt?.recovered === true,
+          timedOut: attempt?.timedOut === true,
+          errorCode: String(attempt?.requestError?.code || '').trim(),
+          status: Number(attempt?.requestError?.status || attempt?.requestError?.statusCode || 0) || 0
+        }))
+      });
+      return null;
+    })();
+
+    this.missingSpaceKeyRecoveryPromises.set(recoveryScope, recovery);
+    try {
+      return await recovery;
+    } finally {
+      if (this.missingSpaceKeyRecoveryPromises.get(recoveryScope) === recovery) {
+        this.missingSpaceKeyRecoveryPromises.delete(recoveryScope);
+      }
+    }
+  }
+
   async ensureCurrentSpaceKey(spaceId = '', options = {}) {
     const cleanSpaceId = String(spaceId || '').trim();
     const authority = this.spaceEncryptionAuthority(cleanSpaceId);
@@ -4644,13 +4829,18 @@ export class SemillaP2PClient {
       return activateSpaceKey(cleanSpaceId, authority.keyId, { keyEpoch: authority.keyEpoch });
     }
     if (options.requestIfMissing !== false) {
-      await this.requestSpaceKey(cleanSpaceId, authority.keyId, { force: true }).catch(() => false);
+      const recovered = await this.recoverMissingSpaceKey(cleanSpaceId, authority.keyId, {
+        allowOwnerRecoveryRotation: options.allowOwnerRecoveryRotation === true
+      });
+      if (recovered) return recovered;
     }
+    const latestAuthority = this.spaceEncryptionAuthority(cleanSpaceId);
     const error = new Error('Este dispositivo todavía no tiene la clave activa del proyecto.');
     error.code = 'P2P_SPACE_KEY_MISSING';
     error.retryable = true;
+    error.recoveryAttempted = options.requestIfMissing !== false;
     error.spaceId = cleanSpaceId;
-    error.keyId = authority.keyId;
+    error.keyId = String(latestAuthority.keyId || authority.keyId || '').trim();
     throw error;
   }
 
@@ -5888,6 +6078,7 @@ export class SemillaP2PClient {
       this.invitationEscrowAuthority = null;
       this.invitationEscrowMaxBytes = 0;
       this.keyRequestTimes.clear();
+      this.missingSpaceKeyRecoveryPromises.clear();
       this.invitationEscrowRecoveryAttempts.clear();
       this.rejectedKeyEnvelopeSources.clear();
       this.clearRejectedKeyEnvelopeRetryTimers();
@@ -7086,7 +7277,7 @@ export class SemillaP2PClient {
       throw error;
     }
 
-    const activeKey = await this.ensureCurrentSpaceKey(cleanSpaceId, { requireAuthority: true });
+    const activeKey = await this.ensureCurrentSpaceKey(cleanSpaceId, { requireAuthority: true, allowOwnerRecoveryRotation: true });
     this.assertSessionContext(sessionContext);
     if (navigator.onLine && getSessionToken()) {
       await this.flushOutbox();
@@ -7701,7 +7892,7 @@ export class SemillaP2PClient {
     if (encryptedExistingSpace) {
       await this.ensureInvitationSourceCurrent(requestedSpaceId, sessionContext);
       this.assertSessionContext(sessionContext);
-      await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true });
+      await this.ensureCurrentSpaceKey(requestedSpaceId, { requireAuthority: true, allowOwnerRecoveryRotation: true });
       this.assertSessionContext(sessionContext);
       bootstrapEscrow = await this.buildInvitationBootstrapEscrow(requestedSpaceId, sessionContext, { auditTraceId, invitationScope: options.invitationScope || 'project', invitationGroupId: options.invitationGroupId || '' });
       this.assertSessionContext(sessionContext);
