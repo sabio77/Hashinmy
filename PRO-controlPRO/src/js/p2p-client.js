@@ -5582,6 +5582,7 @@ export class SemillaP2PClient {
             sessionContext,
             {
               forceSnapshot: true,
+              deferKeyWait: true,
               auditTraceId: String(context.auditTraceId || '').trim()
             }
           ).catch((error) => {
@@ -5605,7 +5606,10 @@ export class SemillaP2PClient {
             space,
             invitations.received,
             sessionContext,
-            { auditTraceId: String(context.auditTraceId || '').trim() }
+            {
+              deferKeyWait: true,
+              auditTraceId: String(context.auditTraceId || '').trim()
+            }
           ).catch((error) => {
             if (this.isSessionContextChangedError(error)) throw error;
             dispatch('p2p:invitation-bootstrap-recovery-deferred', {
@@ -5616,7 +5620,13 @@ export class SemillaP2PClient {
           });
           this.assertSessionContext(sessionContext);
         }
-        await this.ensureCurrentSpaceKey(space.spaceId).catch((error) => {
+        // Mantiene el orden contractual de recuperación previo a `await this.ensureCurrentSpaceKey(space.spaceId)`,
+        // pero desactiva aquí cualquier recuperación recursiva que pueda reentrar al bootstrap.
+        // No se inicia una recuperación que vuelva a ejecutar refreshBootstrap() desde
+        // dentro de applyBootstrapData(): ese refresh quedaría esperando esta misma cola
+        // de bootstrap y podría mantener el inicio en "Conectando…" indefinidamente.
+        // La solicitud de clave ya se dejó encolada arriba; el stream la completará al abrir.
+        await this.ensureCurrentSpaceKey(space.spaceId, { requestIfMissing: false }).catch((error) => {
           dispatch('p2p:crypto-locked', { spaceId: space.spaceId, error });
           return false;
         });
@@ -7752,28 +7762,56 @@ export class SemillaP2PClient {
     if (!invitation?.invitationId) {
       let keyRecovery = null;
       if (!localKeyAvailable && activeKeyId) {
-        keyRecovery = await this.requestSpaceKeyAndWait(spaceId, activeKeyId, { sessionContext }).catch((error) => {
-          if (this.isSessionContextChangedError(error)) throw error;
-          return { recovered: false, requested: false, requestError: error };
-        });
+        if (options.deferKeyWait === true) {
+          // Durante applyBootstrapData() el SSE todavía no se abre. Esperar aquí una
+          // respuesta de clave bloquea innecesariamente cada espacio y, si luego se llama
+          // a ensureCurrentSpaceKey(), puede producir una espera circular con la cola de
+          // bootstrap. En ese contexto solo dejamos la solicitud durable en el backend.
+          keyRecovery = await this.requestSpaceKey(spaceId, activeKeyId, { force: true })
+            .then((requested) => ({ recovered: false, requested: requested === true, deferred: requested === true }))
+            .catch((error) => {
+              if (this.isSessionContextChangedError(error)) throw error;
+              return { recovered: false, requested: false, deferred: false, requestError: error };
+            });
+        } else {
+          keyRecovery = await this.requestSpaceKeyAndWait(spaceId, activeKeyId, { sessionContext }).catch((error) => {
+            if (this.isSessionContextChangedError(error)) throw error;
+            return { recovered: false, requested: false, requestError: error };
+          });
+        }
         this.assertSessionContext(sessionContext);
       }
       const keyRecovered = keyRecovery?.recovered === true;
-      invitationAuditLog(keyRecovered ? 'frontend.recovery.key-fallback' : 'frontend.recovery.skipped', {
+      const keyRequested = keyRecovery?.requested === true;
+      const reason = keyRecovered
+        ? 'accepted-invitation-missing-key-recovered'
+        : keyRequested && options.deferKeyWait === true
+          ? 'accepted-invitation-missing-key-requested'
+          : 'accepted-invitation-missing';
+      invitationAuditLog(keyRecovered
+        ? 'frontend.recovery.key-fallback'
+        : keyRequested && options.deferKeyWait === true
+          ? 'frontend.recovery.key-requested'
+          : 'frontend.recovery.skipped', {
         auditTraceId,
         spaceId,
         deviceId: sessionContext.deviceId,
         activeKeyId,
         localKeyAvailable,
         keyRecovered,
-        keyRequested: keyRecovery?.requested === true,
+        keyRequested,
+        keyWaitDeferred: keyRecovery?.deferred === true,
         receivedInvitationCount: Array.isArray(receivedInvitations) ? receivedInvitations.length : 0,
-        reason: 'accepted-invitation-missing'
+        reason
       });
       return {
         recovered: false,
         keyRecovered,
-        reason: keyRecovered ? 'accepted-invitation-missing-key-recovered' : 'accepted-invitation-missing'
+        keyRequested,
+        reason: keyRecovered ? 'accepted-invitation-missing-key-recovered'
+          : keyRequested && options.deferKeyWait === true
+            ? 'accepted-invitation-missing-key-requested'
+            : 'accepted-invitation-missing'
       };
     }
     const invitationId = String(invitation.invitationId || '').trim();
