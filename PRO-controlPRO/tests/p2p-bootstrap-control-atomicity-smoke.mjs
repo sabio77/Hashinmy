@@ -107,6 +107,7 @@ const fetchMethod = clientSource.slice(fetchStart, fetchEnd);
 const fetchHarness = `
 const requests = [];
 async function listSpaces() { return []; }
+async function listKnownSpaceIds() { return []; }
 async function listStateRevisions() { return {}; }
 function apiPost(path, body) { return new Promise((resolve, reject) => requests.push({ path, body, resolve, reject })); }
 class TestClient {

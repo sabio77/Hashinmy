@@ -799,6 +799,7 @@ const metaRecords = new Map();
 const getMeta = async (key, fallback = null) => metaRecords.has(key) ? structuredClone(metaRecords.get(key)) : structuredClone(fallback);
 const setMeta = async (key, value) => { metaRecords.set(key, structuredClone(value)); return value; };
 const listSpaces = async () => [];
+const listKnownSpaceIds = async () => [];
 const saveSpaces = async () => {};
 const listStateRevisions = async () => ({});
 const enqueueOutbox = async (item) => {

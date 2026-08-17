@@ -602,6 +602,29 @@ async function replaceSpacesInStores(stores = {}, spaces = [], options = {}) {
   };
 }
 
+export async function listKnownSpaceIds() {
+  return withStores(
+    [STORES.spaces, STORES.entities, STORES.outbox, STORES.snapshots, STORES.meta],
+    'readonly',
+    async (stores) => {
+      const [existingSpaces, entityRecords, outboxRecords, snapshotRecords, metaRecords] = await Promise.all([
+        requestToPromise(stores[STORES.spaces].getAll()),
+        requestToPromise(stores[STORES.entities].getAll()),
+        requestToPromise(stores[STORES.outbox].getAll()),
+        requestToPromise(stores[STORES.snapshots].getAll()),
+        requestToPromise(stores[STORES.meta].getAll())
+      ]);
+      return Array.from(new Set([
+        ...(existingSpaces || []).map(recordSpaceId),
+        ...(entityRecords || []).map(recordSpaceId),
+        ...(outboxRecords || []).map(recordSpaceId),
+        ...(snapshotRecords || []).map(snapshotRecordSpaceId),
+        ...metadataSpaceIds(metaRecords)
+      ].map(cleanSpaceId).filter(Boolean))).slice(0, 1_000);
+    }
+  );
+}
+
 export async function replaceSpaces(spaces = [], options = {}) {
   return withStores(
     [STORES.spaces, STORES.entities, STORES.outbox, STORES.snapshots, STORES.meta],

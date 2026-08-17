@@ -534,6 +534,7 @@ export const replaceBootstrapControlState=async(spaces,invitations)=>({spaces,in
 export const saveControlStateAtomically=async({spaces=[],invitations=[]}={})=>({spaces,invitations});
 export const purgeLocalSpace=async(spaceId)=>({spaceId,purged:true,entities:1,outbox:1,snapshots:1});
 export const listSpaces=async()=>[];
+export const listKnownSpaceIds=async()=>[];
 export const saveInvitations=async()=>{};
 export const replaceInvitations=async()=>{};
 export const listInvitations=async()=>[];

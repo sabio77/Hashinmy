@@ -12,6 +12,7 @@ import {
   saveControlStateAtomically,
   purgeLocalSpace,
   listSpaces,
+  listKnownSpaceIds,
   listInvitations,
   getEntity,
   listEntities,
@@ -84,6 +85,7 @@ const DEFAULT_SNAPSHOT_MAX_CHUNKS = 500;
 const SNAPSHOT_EVENT_SAFETY_BYTES = 12 * 1024;
 const SNAPSHOT_TRANSFER_EVENT_OVERHEAD_BYTES = 2 * 1024;
 const RETRY_BASE_MS = 1200;
+const REALTIME_READY_TIMEOUT_MS = 15 * 1000;
 const SERVER_RETRY_FALLBACK_MS = 5000;
 const SERVER_RETRY_MAX_MS = 60 * 60 * 1000;
 const ACK_BATCH_DELAY_MS = 250;
@@ -95,6 +97,7 @@ const ATOMIC_BATCH_ASSEMBLY_TIMEOUT_MS = 15 * 1000;
 const TAB_STATE_REQUEST_RETRY_BASE_MS = 1500;
 const TAB_STATE_REQUEST_RETRY_MAX_MS = 12000;
 const TAB_STATE_REQUEST_TARGETED_RETRY_LIMIT = 3;
+const TAB_STATE_REQUEST_RECOVERY_ATTEMPTS = 4;
 const KEY_ENVELOPE_REJECTION_TTL_MS = 5 * 60 * 1000;
 const MISSING_SPACE_KEY_RECOVERY_WAIT_MS = 2400;
 const INVITATION_ESCROW_RECOVERY_RETRY_MS = 60 * 1000;
@@ -3605,6 +3608,14 @@ export class SemillaP2PClient {
       this.tabStateRequestTimer = 0;
       if (!this.isSessionContextCurrent(sessionContext)
         || cleanRequestId !== this.pendingTabStateRequestId) return;
+      if (this.pendingTabStateRequestAttempt === TAB_STATE_REQUEST_RECOVERY_ATTEMPTS) {
+        dispatch('p2p:connection', {
+          state: 'disconnected',
+          deviceId: sessionContext.deviceId,
+          sharedTab: true
+        });
+        this.tabCoordinator.requestLeadership().catch(() => false);
+      }
       this.sendPendingTabStateRequest(cleanRequestId);
     }, delayMs);
     return true;
@@ -5733,9 +5744,12 @@ export class SemillaP2PClient {
     // Consumir antes del primer await evita que dos bootstrap concurrentes
     // compartan accidentalmente los objetivos de recuperación.
     this.nextBootstrapSnapshotSpaceIds = [];
-    const localSpaces = await listSpaces();
+    const [localSpaces, durableKnownSpaceIds] = await Promise.all([
+      listSpaces(),
+      listKnownSpaceIds()
+    ]);
     this.assertSessionContext(sessionContext);
-    const stateRevisions = await listStateRevisions(localSpaces.map((space) => space.spaceId));
+    const stateRevisions = await listStateRevisions(durableKnownSpaceIds);
     this.assertSessionContext(sessionContext);
     const lifecycleReceipts = await this.completedLifecycleReceipts(
       localSpaces.map((space) => space.spaceId),
@@ -5744,10 +5758,17 @@ export class SemillaP2PClient {
     this.assertSessionContext(sessionContext);
     const auditTraceId = String(auditContext?.auditTraceId || '').trim();
     const auditSource = String(auditContext?.auditSource || auditContext?.source || '').trim();
+    const knownSpaceIds = Array.from(new Set([
+      ...durableKnownSpaceIds,
+      ...localSpaces.map((space) => String(space?.spaceId || '').trim()),
+      ...Object.keys(this.recoveryRequirements || {}),
+      ...snapshotSpaceIds
+    ].filter(Boolean))).slice(0, 1_000);
     const bootstrapRequest = {
       device: this.device,
       requestSnapshots,
       snapshotSpaceIds,
+      knownSpaceIds,
       stateRevisions,
       lifecycleReceipts,
       excludedSnapshotSourceDeviceIdsBySpace: requestSnapshots === false
@@ -6190,11 +6211,31 @@ export class SemillaP2PClient {
       const isCurrentSource = () => this.realtimeLeader
         && this.eventSource === source
         && this.isSessionContextCurrent(sessionContext);
+      let readyReceived = false;
+      let readyTimer = window.setTimeout(() => {
+        readyTimer = 0;
+        if (readyReceived || !isCurrentSource()) return;
+        const error = new Error('El canal en tiempo real no confirmó su estado listo dentro del tiempo permitido.');
+        error.code = 'P2P_REALTIME_READY_TIMEOUT';
+        error.retryable = true;
+        dispatch('p2p:error', { error, stage: 'realtime-ready-timeout' });
+        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId });
+        if (this.eventSource === source) this.eventSource = null;
+        source.close();
+        this.scheduleReconnect();
+      }, REALTIME_READY_TIMEOUT_MS);
+      const clearReadyTimer = () => {
+        if (!readyTimer) return;
+        window.clearTimeout(readyTimer);
+        readyTimer = 0;
+      };
       source.addEventListener('p2p_ready', () => {
         if (!isCurrentSource()) {
           source.close();
           return;
         }
+        readyReceived = true;
+        clearReadyTimer();
         this.retryCount = 0;
         this.scheduleAck(this.lastProcessedSequence, { immediate: true });
         dispatch('p2p:connection', { state: 'connected', deviceId: sessionContext.deviceId });
@@ -6253,6 +6294,7 @@ export class SemillaP2PClient {
         }
       });
       source.onerror = () => {
+        clearReadyTimer();
         if (!isCurrentSource()) {
           source.close();
           return;
@@ -6267,10 +6309,12 @@ export class SemillaP2PClient {
       try {
         this.assertSessionContext(sessionContext);
         if (!this.realtimeLeader) {
+          clearReadyTimer();
           source.close();
           return null;
         }
       } catch (error) {
+        clearReadyTimer();
         source.close();
         throw error;
       }
@@ -6281,6 +6325,16 @@ export class SemillaP2PClient {
     this.openPromise = opening;
     try {
       return await opening;
+    } catch (error) {
+      if (this.isSessionContextCurrent(sessionContext)
+        && !this.manualClose
+        && this.started
+        && this.realtimeLeader
+        && getSessionToken()) {
+        dispatch('p2p:connection', { state: 'disconnected', deviceId: sessionContext.deviceId });
+        if (this.isRetryableTransportError(error)) this.scheduleReconnect();
+      }
+      throw error;
     } finally {
       if (this.openPromise === opening) this.openPromise = null;
     }
@@ -7696,16 +7750,31 @@ export class SemillaP2PClient {
       .sort((left, right) => (Date.parse(right?.respondedAt || right?.updatedAt || right?.createdAt || '') || 0)
         - (Date.parse(left?.respondedAt || left?.updatedAt || left?.createdAt || '') || 0))[0];
     if (!invitation?.invitationId) {
-      invitationAuditLog('frontend.recovery.skipped', {
+      let keyRecovery = null;
+      if (!localKeyAvailable && activeKeyId) {
+        keyRecovery = await this.requestSpaceKeyAndWait(spaceId, activeKeyId, { sessionContext }).catch((error) => {
+          if (this.isSessionContextChangedError(error)) throw error;
+          return { recovered: false, requested: false, requestError: error };
+        });
+        this.assertSessionContext(sessionContext);
+      }
+      const keyRecovered = keyRecovery?.recovered === true;
+      invitationAuditLog(keyRecovered ? 'frontend.recovery.key-fallback' : 'frontend.recovery.skipped', {
         auditTraceId,
         spaceId,
         deviceId: sessionContext.deviceId,
         activeKeyId,
         localKeyAvailable,
+        keyRecovered,
+        keyRequested: keyRecovery?.requested === true,
         receivedInvitationCount: Array.isArray(receivedInvitations) ? receivedInvitations.length : 0,
         reason: 'accepted-invitation-missing'
       });
-      return { recovered: false, reason: 'accepted-invitation-missing' };
+      return {
+        recovered: false,
+        keyRecovered,
+        reason: keyRecovered ? 'accepted-invitation-missing-key-recovered' : 'accepted-invitation-missing'
+      };
     }
     const invitationId = String(invitation.invitationId || '').trim();
     const lastAttemptAt = Math.max(0, Number(this.invitationEscrowRecoveryAttempts.get(invitationId) || 0));
