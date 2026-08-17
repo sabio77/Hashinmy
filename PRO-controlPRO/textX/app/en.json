@@ -270,7 +270,8 @@
     "responseError": "The invitation could not be answered.",
     "acceptedAccessRevoked": "The invitation was accepted, but access was revoked before synchronization could finish.",
     "acceptedSyncing": "Invitation accepted. The shared copy is being recovered before editing is enabled.",
-    "projectDescription": "Share only this project with the selected permissions."
+    "projectDescription": "Share only this project with the selected permissions.",
+    "rejectCleanup": "Reject the invitation and clear any incomplete link so a new invitation can be received."
   },
   "permissions": {
     "denied": "Your permissions do not allow this action.",

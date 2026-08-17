@@ -136,12 +136,15 @@ for (const needle of [
   "const groupComplete = group.type !== 'panel'",
   "item.dataset.groupState = groupComplete ? 'ready' : 'preparing'",
   "const ids = groupInvitations.map((item) => item.invitationId).filter(Boolean)",
-  "if (group.type === 'panel' && !groupComplete) {",
+  "if (group.type === 'panel' && !groupComplete && decision !== 'reject') {",
   'button.disabled = true',
-  "button.dataset.invitationIds = ids.join(',')"
+  "button.dataset.invitationIds = ids.join(',')",
+  "invitationRejectLog('frontend.ui.reject-click'",
+  "invitationRejectLog('frontend.ui.reject-complete'"
 ]) {
-  if (!app.includes(needle)) throw new Error(`La interfaz podría volver a aceptar un panel incompleto: ${needle}`);
+  if (!app.includes(needle)) throw new Error(`La interfaz perdió la protección de aceptar incompleto o la salida de rechazo: ${needle}`);
 }
+if (!app.includes("decision === 'reject'")) throw new Error('El botón Rechazar dejó de mantenerse disponible durante una preparación incompleta.');
 
 const groupResponseStart = client.indexOf("  async respondToInvitationGroup(invitationIds = [], decision = 'accept', options = {}) {");
 const groupResponseEnd = client.indexOf("\n  async respondToInvitation(invitationId = '', decision = 'accept', options = {}) {", groupResponseStart);
@@ -159,6 +162,17 @@ for (const needle of [
   if (!groupResponse.includes(needle)) throw new Error(`La respuesta de panel perdió su commit agrupado: ${needle}`);
 }
 if (groupResponse.includes('await this.respondToInvitation(')) throw new Error('La respuesta de panel volvió a responder proyecto por proyecto desde el cliente.');
+for (const needle of [
+  "const rejectingRequested = requestedDecision === 'reject'",
+  "invitationRejectLog('frontend.client.group-reject-begin'",
+  'const removedSpaceIds = normalizeSnapshotSpaceIds(data?.removedSpaceIds || [])',
+  'await purgeLocalSpace(spaceId)',
+  'await purgeSpaceCrypto(spaceId)',
+  'this.removeSpaceFromBootstrapState(spaceId)',
+  "invitationRejectLog('frontend.client.group-reject-complete'"
+]) {
+  if (!groupResponse.includes(needle)) throw new Error(`El cliente perdió la limpieza local del rechazo agrupado: ${needle}`);
+}
 
 for (const id of ['invite-dialog-title', 'invite-dialog-description', 'panel-access-dialog', 'panel-access-list', 'panel-access-status']) {
   if (!html.includes(`id="${id}"`)) throw new Error(`Falta el control de interfaz requerido: ${id}`);

@@ -102,8 +102,8 @@
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "82eac67e8dcb22e9d3402fc7c138437b632942e597bfe0b44d70025197b00f19",
-      "bytes": 500858
+      "sha256": "3059f35b3c79a4e733ae826fd521706ac4bcf2a1831d63144db1de1ae72aa29e",
+      "bytes": 504209
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -122,8 +122,8 @@
     },
     {
       "url": "./src/js/p2p-invitation-audit.js",
-      "sha256": "eb0109b4377ff2ea05b5b344867d380afb1b9a121ceeea7f5a8a75772283d8ec",
-      "bytes": 9748
+      "sha256": "ef8ef7154ff26ecef1579875c5f238dbd04fce5a0e878289874e9bfedb124a96",
+      "bytes": 10285
     },
     {
       "url": "./src/js/project-domain.js",
@@ -157,8 +157,8 @@
     },
     {
       "url": "./src/js/app.js",
-      "sha256": "fedfa7d8645ab936da72aa31a9978a76785b9d9b8b94222afe66d12e3628b103",
-      "bytes": 179077
+      "sha256": "071a3fa5927f5f007e8d6f34279ec5499b256c8e1d7ac3cc869b80804ddbe6ec",
+      "bytes": 180421
     },
     {
       "url": "./textX/languages.json",
@@ -167,8 +167,8 @@
     },
     {
       "url": "./textX/app/es.json",
-      "sha256": "69f3ee10682f160bbd56098b45565d46494c0760cc72894a09c00532ff0d0de6",
-      "bytes": 26633
+      "sha256": "5bee3814244f59ca66f78c16f93cbfece30a5fc44ace80d59a935e990e483781",
+      "bytes": 26765
     },
     {
       "url": "./textX/seo/es.json",
@@ -177,8 +177,8 @@
     },
     {
       "url": "./textX/app/ar.json",
-      "sha256": "d3420eeaf89efcb6d23b4b053ab03011240ff4e92e2b8493270d261a764a7c1c",
-      "bytes": 31872
+      "sha256": "c74f851defd05e93506dd0f0fb6e3d53797439f124862f2c4d127b0f96882500",
+      "bytes": 32015
     },
     {
       "url": "./textX/seo/ar.json",
@@ -187,8 +187,8 @@
     },
     {
       "url": "./textX/app/en.json",
-      "sha256": "ff9f704ccb23efa825b2c198eaa972951489609703b325ee731ef93b916b2224",
-      "bytes": 25035
+      "sha256": "346c37f5b7b7e4760d6c4716bc91670273e4f6f09d225915b7abbeaee8ce669e",
+      "bytes": 25148
     },
     {
       "url": "./textX/seo/en.json",

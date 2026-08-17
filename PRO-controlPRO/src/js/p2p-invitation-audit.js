@@ -1,6 +1,7 @@
 import { P2P_APPLICATION_ID } from './application-scope.js';
 
 const AUDIT_PREFIX = '[XXXinvXXX][P2P_INVITATION_AUDIT]';
+const REJECT_AUDIT_PREFIX = '[XXXinvRECHxxx][P2P_INVITATION_REJECT]';
 const SENSITIVE_AUDIT_MARKER = 'XXXsenXXX';
 const AUDIT_ENTITY_MANIFEST_LIMIT = 400;
 const PROJECT_ROOT_ENTITY_TYPE = 'admin.project';
@@ -199,6 +200,21 @@ export function invitationAuditError(error = null) {
 // la marca literal XXXsenXXX y debe retirarse al finalizar el diagnóstico.
 export function XXXsenXXX(detail = null) {
   return { [SENSITIVE_AUDIT_MARKER]: detail };
+}
+
+
+export function invitationRejectLog(stage = '', detail = {}) {
+  const entry = {
+    at: new Date().toISOString(),
+    applicationId: P2P_APPLICATION_ID,
+    stage: clean(stage, 160),
+    ...(detail && typeof detail === 'object' && !Array.isArray(detail) ? detail : { detail })
+  };
+  console.info(REJECT_AUDIT_PREFIX, entry);
+  try {
+    globalThis.dispatchEvent?.(new CustomEvent('p2p:invitation-reject-audit', { detail: entry }));
+  } catch {}
+  return entry;
 }
 
 export function invitationAuditLog(stage = '', detail = {}) {

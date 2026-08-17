@@ -34,6 +34,7 @@ import {
   invitationAuditEntitySummary,
   invitationAuditError,
   invitationAuditLog,
+  invitationRejectLog,
   maskInvitationAuditEmail,
   XXXsenXXX
 } from './p2p-invitation-audit.js';
@@ -1280,9 +1281,12 @@ function renderInvitations() {
     const actions = document.createElement('div'); actions.className = 'invitation-actions';
     for (const [decision, label, className] of [['reject', t('invite.reject', 'Rechazar'), 'button button-ghost button-compact'], ['accept', t('invite.accept', 'Aceptar'), 'button button-primary button-compact']]) {
       const button = document.createElement('button'); button.type = 'button'; button.className = className; button.dataset.invitationId = invitation.invitationId; button.dataset.invitationIds = ids.join(','); button.dataset.invitationGroupId = group.type === 'panel' ? group.groupId : ''; button.dataset.decision = decision; button.textContent = label;
-      if (group.type === 'panel' && !groupComplete) {
+      if (group.type === 'panel' && !groupComplete && decision !== 'reject') {
         button.disabled = true;
         button.title = t('panel.syncingDescription', 'Los paneles aparecen únicamente cuando todos sus proyectos autorizados están disponibles y validados en este dispositivo.');
+      }
+      if (decision === 'reject') {
+        button.title = t('invite.rejectCleanup', 'Rechaza la invitación y limpia cualquier vinculación incompleta para poder recibir una nueva invitación.');
       }
       actions.append(button);
     }
@@ -2677,6 +2681,14 @@ async function respondInvitation(event) {
     decision: String(button.dataset.decision || '').trim(),
     isPanelGroup
   });
+  if (String(button.dataset.decision || '').trim().toLowerCase() === 'reject') {
+    invitationRejectLog('frontend.ui.reject-click', {
+      auditTraceId,
+      invitationIds: ids,
+      invitationGroupId: String(button.dataset.invitationGroupId || '').trim(),
+      isPanelGroup
+    });
+  }
   setP2PBusy(true);
   state.panelResponseInProgress = isPanelGroup;
   try {
@@ -2704,6 +2716,15 @@ async function respondInvitation(event) {
     if (!(state.p2pState.invitations.received || []).some((item) => item.status === 'pending')) closeDialog(elements.invitationsDialog);
     const message = accessRevoked ? t('invite.acceptedAccessRevoked', 'La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.') : replicaPending ? t('invite.acceptedSyncing', 'Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.') : canonicalDecision === 'accept' ? (isPanelGroup ? t('panel.accepted', 'Panel aceptado y sincronizado.') : t('invite.accepted', 'Invitación aceptada.')) : (isPanelGroup ? t('panel.rejected', 'Invitación del panel rechazada.') : t('invite.rejected', 'Invitación rechazada.'));
     setStatus(elements.dashboardStatus, message, accessRevoked || replicaPending ? 'warning' : 'success');
+    if (String(button.dataset.decision || '').trim().toLowerCase() === 'reject') {
+      invitationRejectLog('frontend.ui.reject-complete', {
+        auditTraceId,
+        invitationIds: ids,
+        invitationGroupId: String(button.dataset.invitationGroupId || result?.invitationGroupId || '').trim(),
+        removedSpaceIds: Array.isArray(result?.removedSpaceIds) ? result.removedSpaceIds : [],
+        alreadyCleaned: result?.alreadyCleaned === true
+      });
+    }
   } catch (error) {
     invitationAuditLog('frontend.ui.response-error', {
       auditTraceId,
@@ -2715,6 +2736,14 @@ async function respondInvitation(event) {
       recoveryRequirements: semillaP2P.recoveryRequirements || {},
       ...XXXsenXXX({ error, bootstrapState: semillaP2P.bootstrapState, recoveryRequirements: semillaP2P.recoveryRequirements || {} })
     });
+    if (String(button.dataset.decision || '').trim().toLowerCase() === 'reject') {
+      invitationRejectLog('frontend.ui.reject-error', {
+        auditTraceId,
+        invitationIds: ids,
+        invitationGroupId: String(button.dataset.invitationGroupId || '').trim(),
+        error: invitationAuditError(error)
+      });
+    }
     state.panelResponseInProgress = false;
     applyP2PState(semillaP2P.bootstrapState, { auditTraceId, source: 'invitation-response-error' });
     setStatus(elements.dashboardStatus, error?.message || t('invite.responseError', 'No se pudo responder la invitación.'), 'error');

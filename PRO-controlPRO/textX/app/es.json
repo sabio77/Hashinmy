@@ -270,7 +270,8 @@
     "responseError": "No se pudo responder la invitación.",
     "acceptedAccessRevoked": "La invitación fue aceptada, pero el acceso fue revocado antes de completar la sincronización.",
     "acceptedSyncing": "Invitación aceptada. Estamos recuperando la copia compartida antes de habilitar la edición.",
-    "projectDescription": "Comparte únicamente este proyecto con los permisos seleccionados."
+    "projectDescription": "Comparte únicamente este proyecto con los permisos seleccionados.",
+    "rejectCleanup": "Rechaza la invitación y limpia cualquier vinculación incompleta para poder recibir una nueva invitación."
   },
   "permissions": {
     "denied": "Tus permisos no permiten realizar esta acción.",

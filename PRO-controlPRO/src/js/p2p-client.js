@@ -40,6 +40,7 @@ import {
   invitationAuditEscrowSummary,
   invitationAuditError,
   invitationAuditLog,
+  invitationRejectLog,
   maskInvitationAuditEmail,
   XXXsenXXX
 } from './p2p-invitation-audit.js';
@@ -9028,12 +9029,21 @@ export class SemillaP2PClient {
       .filter(Boolean)));
     if (!ids.length) throw new Error('No hay invitaciones de panel pendientes para responder.');
 
+    const requestedDecision = String(decision || '').trim().toLowerCase();
+    const rejectingRequested = requestedDecision === 'reject';
     const responseRequest = {
       invitationIds: ids,
-      decision,
+      decision: requestedDecision || decision,
       deviceId: sessionContext.deviceId,
       auditTraceId
     };
+    if (rejectingRequested) {
+      invitationRejectLog('frontend.client.group-reject-begin', {
+        auditTraceId,
+        invitationIds: ids,
+        deviceId: sessionContext.deviceId
+      });
+    }
     invitationAuditLog('frontend.panel-response.begin', {
       auditTraceId,
       invitationIds: ids,
@@ -9057,6 +9067,15 @@ export class SemillaP2PClient {
           error: invitationAuditError(error),
           ...XXXsenXXX({ responseRequest, error })
         });
+        if (rejectingRequested) {
+          invitationRejectLog('frontend.client.group-reject-backend-error', {
+            auditTraceId,
+            invitationIds: ids,
+            attempt: attempt + 1,
+            retryDelayMs,
+            error: invitationAuditError(error)
+          });
+        }
         if (!retryDelayMs || attempt >= PANEL_INVITATION_RESPONSE_MAX_ATTEMPTS - 1) throw error;
         dispatch('p2p:invitation-group-resume', {
           invitationIds: ids,
@@ -9092,9 +9111,10 @@ export class SemillaP2PClient {
     await this.fenceBootstrapResponses(sessionContext);
 
     const results = Array.isArray(data?.results) ? data.results : [];
-    if (!results.length) throw new Error('El backend no devolvió las invitaciones del panel respondido.');
+    if (!results.length && !rejectingRequested && data?.alreadyCleaned !== true) throw new Error('El backend no devolvió las invitaciones del panel respondido.');
     const invitations = results.map((result) => result?.invitation).filter(Boolean);
     const spaces = results.map((result) => result?.space).filter(Boolean);
+    const removedSpaceIds = normalizeSnapshotSpaceIds(data?.removedSpaceIds || []);
     if (invitations.length !== results.length) {
       const error = new Error('El backend devolvió una respuesta de panel incompleta.');
       error.code = 'P2P_INVITATION_GROUP_INCOMPLETE';
@@ -9198,6 +9218,15 @@ export class SemillaP2PClient {
         ...XXXsenXXX({ spaces: localStateAudit.map((item) => item.rawAudit) })
       });
     } else {
+      for (const spaceId of removedSpaceIds) {
+        await purgeLocalSpace(spaceId).catch(() => null);
+        await purgeSpaceCrypto(spaceId).catch(() => null);
+        this.removeSpaceFromBootstrapState(spaceId);
+      }
+      if (removedSpaceIds.length) {
+        this.recoveryRequirements = await updateRecoveryRequirements({ retainSpaceIds: this.readableSpaceIds() });
+        this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
+      }
       await this.refreshBootstrap({ requestSnapshots: false, auditTraceId, auditSource: 'panel-invitation-response' }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
         dispatch('p2p:bootstrap-deferred', {
@@ -9212,7 +9241,7 @@ export class SemillaP2PClient {
     invitationAuditLog('frontend.panel-response.complete', {
       auditTraceId,
       invitationGroupId: String(data?.invitationGroupId || '').trim(),
-      decision,
+      decision: requestedDecision || decision,
       accessRevoked,
       replicaPending,
       spaces: results.map((result) => ({
@@ -9224,10 +9253,21 @@ export class SemillaP2PClient {
       })),
       deviceId: sessionContext.deviceId
     });
+    if (rejectingRequested) {
+      invitationRejectLog('frontend.client.group-reject-complete', {
+        auditTraceId,
+        invitationGroupId: String(data?.invitationGroupId || '').trim(),
+        invitationIds: ids,
+        removedSpaceIds,
+        alreadyCleaned: data?.alreadyCleaned === true,
+        deviceId: sessionContext.deviceId
+      });
+    }
     return {
       ...data,
       results,
       invitations: results.map((result) => result?.invitation).filter(Boolean),
+      removedSpaceIds,
       accessRevoked,
       replicaPending
     };
@@ -9237,6 +9277,15 @@ export class SemillaP2PClient {
     const sessionContext = this.captureSessionContext();
     this.assertSessionContext(sessionContext);
     const auditTraceId = String(options.auditTraceId || '').trim() || createInvitationAuditTraceId('invitation_response');
+    const requestedDecision = String(decision || '').trim().toLowerCase();
+    const rejectingRequested = requestedDecision === 'reject';
+    if (rejectingRequested) {
+      invitationRejectLog('frontend.client.reject-begin', {
+        auditTraceId,
+        invitationId: String(invitationId || '').trim(),
+        deviceId: sessionContext.deviceId
+      });
+    }
     invitationAuditLog('frontend.response.begin', {
       auditTraceId,
       invitationId: String(invitationId || '').trim(),
@@ -9246,7 +9295,7 @@ export class SemillaP2PClient {
     let data = null;
     const responseRequest = {
       invitationId,
-      decision,
+      decision: requestedDecision || decision,
       deviceId: sessionContext.deviceId,
       auditTraceId
     };
@@ -9256,11 +9305,18 @@ export class SemillaP2PClient {
       invitationAuditLog('frontend.response.backend-error', {
         auditTraceId,
         invitationId: String(invitationId || '').trim(),
-        decision,
+        decision: requestedDecision || decision,
         deviceId: sessionContext.deviceId,
         error: invitationAuditError(error),
         ...XXXsenXXX({ responseRequest, error })
       });
+      if (rejectingRequested) {
+        invitationRejectLog('frontend.client.reject-backend-error', {
+          auditTraceId,
+          invitationId: String(invitationId || '').trim(),
+          error: invitationAuditError(error)
+        });
+      }
       throw error;
     }
     this.assertSessionContext(sessionContext);
@@ -9277,7 +9333,8 @@ export class SemillaP2PClient {
       ...XXXsenXXX({ backendResponse: data })
     });
     await this.fenceBootstrapResponses(sessionContext);
-    const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, decision);
+    const canonicalDecision = resolveCanonicalInvitationDecision(data.invitation, requestedDecision || decision);
+    const removedSpaceIds = normalizeSnapshotSpaceIds(data?.removedSpaceIds || []);
     const committedControlState = prepareCommittedControlState({
       spaces: data.space ? [data.space] : [],
       invitations: data.invitation ? [data.invitation] : []
@@ -9321,6 +9378,15 @@ export class SemillaP2PClient {
       data.accessRevoked = replicaState.explicitlyRevoked;
       data.replicaPending = replicaState.replicaPending;
     } else {
+      for (const spaceId of removedSpaceIds) {
+        await purgeLocalSpace(spaceId).catch(() => null);
+        await purgeSpaceCrypto(spaceId).catch(() => null);
+        this.removeSpaceFromBootstrapState(spaceId);
+      }
+      if (removedSpaceIds.length) {
+        this.recoveryRequirements = await updateRecoveryRequirements({ retainSpaceIds: this.readableSpaceIds() });
+        this.snapshotRecoveryRequired = Object.keys(this.recoveryRequirements).length > 0;
+      }
       await this.refreshBootstrap({ requestSnapshots: false, auditTraceId, auditSource: 'invitation-response' }).catch((error) => {
         if (this.isSessionContextChangedError(error)) throw error;
         dispatch('p2p:bootstrap-deferred', {
@@ -9363,7 +9429,16 @@ export class SemillaP2PClient {
       authorizationPendingReason: String(data?.space?.authorizationPendingReason || '').trim(),
       deviceId: sessionContext.deviceId
     });
-    return data;
+    if (rejectingRequested) {
+      invitationRejectLog('frontend.client.reject-complete', {
+        auditTraceId,
+        invitationId: String(data?.invitation?.invitationId || invitationId || '').trim(),
+        removedSpaceIds,
+        alreadyCleaned: data?.alreadyCleaned === true,
+        deviceId: sessionContext.deviceId
+      });
+    }
+    return { ...data, removedSpaceIds };
   }
 
   async leave(spaceId = '') {
