@@ -990,8 +990,12 @@ export async function decryptOperationEvent(event = {}) {
     const requiresEncryption = operation.encrypted === true || Number(operation.encryptionVersion || 0) === ENCRYPTION_VERSION;
     for (const source of Array.isArray(operation.payload?.entities) ? operation.payload.entities : []) {
       const encryptedValue = encryptedPayloadShape(source?.value || {});
+      const canonicalSource = { ...(source || {}) };
+      delete canonicalSource.encrypted;
+      delete canonicalSource.encryptionVersion;
+      delete canonicalSource.keyId;
       if (source.deleted) {
-        entities.push({ ...source, value: null });
+        entities.push({ ...canonicalSource, value: null });
         continue;
       }
       if (!encryptedValue) {
@@ -1001,7 +1005,7 @@ export async function decryptOperationEvent(event = {}) {
             'snapshot_entity_unprotected'
           );
         }
-        entities.push(source);
+        entities.push(canonicalSource);
         continue;
       }
       const value = await decryptJson(event.spaceId, source.value, (keyId) => [
@@ -1013,7 +1017,7 @@ export async function decryptOperationEvent(event = {}) {
         Number(source.stateRevision || source.spaceSequence || 0),
         source.operationType || ''
       ].join('|'));
-      entities.push({ ...source, value });
+      entities.push({ ...canonicalSource, value });
     }
     return {
       ...event,

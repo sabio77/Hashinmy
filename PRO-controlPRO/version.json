@@ -92,8 +92,8 @@
     },
     {
       "url": "./src/js/p2p-crypto.js",
-      "sha256": "579971689ea052f9368c09baf619c49567833fd34b718737b6da8bf8802faec6",
-      "bytes": 46396
+      "sha256": "dd94d57c85e25385632aac3476b67c487984507206ff97e9b7c7bd66ff31d222",
+      "bytes": 46600
     },
     {
       "url": "./src/js/p2p-tab-coordinator.js",

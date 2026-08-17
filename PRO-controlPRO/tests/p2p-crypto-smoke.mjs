@@ -364,14 +364,15 @@ if (!cryptoLayer.isRejectedEncryptedPayloadError(tamperError)
 }
 
 await cryptoLayer.setP2PCryptoContext(source.userId, source.deviceId);
-const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [{
+const canonicalSnapshotEntity = {
   entityType: 'admin.project',
   entityId: 'project_000001',
   value: { name: 'Proyecto cifrado', budget: 42000000 },
   stateRevision: 7,
   operationType: 'entity.put',
   deleted: false
-}]);
+};
+const snapshotEntities = await cryptoLayer.encryptSnapshotEntities(spaceId, [canonicalSnapshotEntity]);
 await cryptoLayer.setP2PCryptoContext(guest.userId, guest.deviceId);
 const snapshotEvent = await cryptoLayer.decryptOperationEvent({
   eventId: 'evt_snapshot_secure',
@@ -388,6 +389,15 @@ const snapshotEvent = await cryptoLayer.decryptOperationEvent({
 });
 if (snapshotEvent.operation.payload.entities[0]?.value?.budget !== 42000000) {
   throw new Error('El snapshot cifrado no se reconstruyó con fidelidad.');
+}
+const decryptedSnapshotEntity = snapshotEvent.operation.payload.entities[0];
+if (JSON.stringify(decryptedSnapshotEntity) !== JSON.stringify(canonicalSnapshotEntity)) {
+  throw new Error('El snapshot descifrado conservó metadatos de transporte y alteraría snapshotDigest al validar la copia inicial.');
+}
+for (const transportField of ['encrypted', 'encryptionVersion', 'keyId']) {
+  if (Object.prototype.hasOwnProperty.call(decryptedSnapshotEntity, transportField)) {
+    throw new Error(`El snapshot descifrado filtró el metadato de transporte ${transportField}.`);
+  }
 }
 
 const delayedSpaceId = 'space_delayed_key_000001';
