@@ -2,15 +2,17 @@
 
 Esta semilla usa señales complementarias por eventos para actualizar una app ya instalada sin polling.
 
-## 1. Señal principal: `version.json`
+## 1. Señal única que autoriza recarga: `version.json`
 
-La app instalada consulta `version.json` con `cache: no-store` únicamente cuando ocurre un evento real de ciclo de vida: inicio, foco, visibilidad, reconexión, `pageshow`, `updatefound` o `controllerchange`. Si detecta un cambio en `version`, `build`, `releasedAt`, `channel` o huellas de assets, agenda una recarga automática.
+La app instalada consulta `version.json` con `cache: no-store` cuando ocurre un evento real de ciclo de vida: inicio, foco, visibilidad, reconexión, `pageshow`, `updatefound` o `controllerchange`. Esos eventos **solo disparan la comprobación**. La página se recarga únicamente cuando la identidad de release servida por `version.json` es distinta de la identidad embebida en la página que está ejecutándose. Un `Service Worker` en `waiting`, `installed` o un `controllerchange` nunca autoriza una recarga por sí mismo.
+
+`tools/generate-release.py` genera un `build` nuevo y `releasedAt` nuevo en cada ejecución cuando no se pasan valores explícitos. Como `render.yaml` ejecuta ese generador durante cada build, cada deploy de Render obtiene una identidad distinta. Esto convierte el deploy en la única causa válida de una recarga automática, incluso si otra pestaña ya actualizó valores compartidos en `localStorage`.
 
 ## 2. Señal secundaria: huellas de archivos críticos
 
 El archivo `version.json` contiene huellas SHA-256 de los archivos críticos generadas por `tools/generate-release.py`. El cliente compara esas huellas sin descargar todos los archivos críticos en cada revisión. Cuando el manifiesto de release cambia, pide al Service Worker precargar los `criticalAssets` por evento real; esto ayuda a que idiomas nuevos, logo e íconos queden disponibles tras la recarga sin usar polling.
 
-Existe un fallback directo opcional para errores humanos, pero no usa polling: solo puede ejecutarse cuando una revisión por evento ya está ocurriendo y respeta una ventana mínima entre corridas. Esta verificación directa ahora tolera assets opcionales ausentes, registra el estado `missing` y detecta cuando aparece o cambia `assets/ui/ui_logo_principal_96x96.png` o cualquiera de los iconos PWA esperados en `assets/pwa`.
+Existe un fallback directo opcional para diagnóstico de errores humanos, pero está desactivado por defecto y nunca autoriza una recarga. Si detecta un archivo modificado sin una identidad de release nueva, la app conserva la interfaz actual y espera un deploy válido. La verificación tolera assets opcionales ausentes y puede registrar cuándo aparece o cambia `assets/ui/ui_logo_principal_96x96.png` o cualquiera de los iconos PWA esperados en `assets/pwa`.
 
 ## 3. Service Worker
 

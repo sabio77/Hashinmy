@@ -285,6 +285,13 @@ def iso_now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def automatic_build_id() -> str:
+    # Cada ejecución del build representa un deploy distinto. Los microsegundos
+    # evitan reutilizar accidentalmente la identidad anterior incluso en builds
+    # consecutivos muy cercanos.
+    return datetime.now(timezone.utc).astimezone().strftime("%Y%m%d%H%M%S%f")
+
+
 def flatten_keys(payload: Dict[str, Any], prefix: str = "") -> List[str]:
     if not isinstance(payload, dict):
         raise ValueError("El archivo JSON de idioma debe ser un objeto en la raíz.")
@@ -629,8 +636,8 @@ def main() -> None:
 
     current = read_json(VERSION_FILE)
     version = args.version or current.get("version") or "1.0.0"
-    build = args.build or current.get("build") or datetime.now().strftime("%Y%m%d%H%M%S")
-    released_at = args.released_at or current.get("releasedAt") or iso_now()
+    build = args.build or automatic_build_id()
+    released_at = args.released_at or iso_now()
 
     backend_url = update_runtime_config_file(require_backend=args.require_backend or render_environment())
     language_manifest = discover_languages(released_at)
@@ -656,9 +663,10 @@ def main() -> None:
         "forceReload": current.get("forceReload", True),
         "message": "Semilla PWA local-first con almacenamiento persistente supervisado, invitaciones por correo, sincronización SSE/POST, replay temporal, Web Push y autenticación Google.",
         "updateStrategy": {
-            "mode": "auto-reload",
+            "mode": "deploy-only-auto-reload",
             "primarySignal": "version.json",
-            "assetFingerprintSignal": "criticalAssets",
+            "reloadAuthorization": "version-identity-change-only",
+            "assetFingerprintSignal": "diagnostic-only",
             "clientPolling": "disabled",
             "clientChecks": ["startup", "focus", "visibilitychange", "online", "pageshow", "service-worker-updatefound", "controllerchange"],
             "multiTabCoordination": True,

@@ -1632,11 +1632,36 @@ def main() -> None:
 
     if "updateCheckIntervalMs: 0" not in config or "periodicUpdateChecksEnabled: false" not in config:
         fail("config.js debe dejar desactivadas las revisiones periódicas.")
+    if "directFingerprintFallbackEnabled: false" not in config or "fingerprintCheckEnabled: false" not in config:
+        fail("config.js debe impedir que las huellas directas actúen como señal normal de actualización.")
     for optional_asset in ["./assets/ui/ui_logo_principal_96x96.png", "./assets/pwa/pwa_launcher_any_192x192.png", "./assets/pwa/pwa_launcher_any_512x512.png"]:
         if optional_asset not in config:
             fail(f"config.js debe vigilar cambios del asset opcional: {optional_asset}")
     if "fetchBytesNoStore" not in manager or "missing:0" not in manager:
         fail("pwa-update-manager.js debe tolerar assets opcionales ausentes y detectar cuando aparezcan.")
+    for forbidden in [
+        "scheduleReload('controllerchange')",
+        "scheduleReload('service-worker-waiting')",
+        "scheduleReload('service-worker-installed')",
+        "scheduleReload('direct-fingerprint-changed')",
+        "scheduleReload(message.reason || 'broadcast-deploy-confirmed'",
+    ]:
+        if forbidden in manager:
+            fail(f"Un evento no confirmado por version.json todavía puede recargar la interfaz: {forbidden}")
+    if "installingWorker.state === 'installed' && navigator.serviceWorker.controller" in manager:
+        fail("Un controller de otra app/scope no puede convertir la primera instalación en una actualización.")
+    for required in [
+        "checkNow('controllerchange', { force: true })",
+        "checkNow('service-worker-waiting', { force: true })",
+        "checkNow('service-worker-installed', { force: true })",
+        "checkNow('broadcast-update-found', { force: true })",
+        "isCurrentPageControlledByRegistration",
+        "confirmedDeploymentKey === state.currentVersionKey",
+        "scheduleReload('deploy-confirmed', deployment.serverVersionKey)",
+        "BroadcastChannel es solo una señal para adelantar la comprobación",
+    ]:
+        if required not in manager:
+            fail(f"pwa-update-manager.js perdió la compuerta de recarga exclusiva por deploy: {required}")
 
     skeleton = (ROOT / "src/js/skeleton-screen.js").read_text(encoding="utf-8")
     for needle in ["DEFAULT_DELAY_MS = 500", "begin", "track", "decorateAsync", "aria-busy", "is-skeletonscreen-active"]:
@@ -1741,7 +1766,7 @@ def main() -> None:
         fail("sinBACKEND debe quedar desactivado por defecto en Render para conservar el flujo normal con memoriaBACKEND.")
 
     generator = (ROOT / "tools/generate-release.py").read_text(encoding="utf-8")
-    for needle in ["discover_languages", "textX/app/*.json", "metadata_precache_urls", "update_metadata_file", "update_config_file", "update_runtime_config_file", "normalize_backend_url", "--require-backend", "render_environment", "os.environ.get(\"sinBACKEND\")", "APP_SIN_BACKEND", "discover_prompt_assets", "update_manifest_icon_revisions", "icon_rev", "validate_language_key_parity", "codeSource", "src/js/application-scope.js", "src/js/skeleton-screen.js", "src/js/p2p-durability.js", "src/js/p2p-tab-coordinator.js", "src/js/p2p-invitation-intent.js", "src/js/p2p-permissions.js"]:
+    for needle in ["discover_languages", "textX/app/*.json", "metadata_precache_urls", "update_metadata_file", "update_config_file", "update_runtime_config_file", "normalize_backend_url", "--require-backend", "render_environment", "os.environ.get(\"sinBACKEND\")", "APP_SIN_BACKEND", "discover_prompt_assets", "update_manifest_icon_revisions", "icon_rev", "validate_language_key_parity", "automatic_build_id", "build = args.build or automatic_build_id()", "released_at = args.released_at or iso_now()", "codeSource", "src/js/application-scope.js", "src/js/skeleton-screen.js", "src/js/p2p-durability.js", "src/js/p2p-tab-coordinator.js", "src/js/p2p-invitation-intent.js", "src/js/p2p-permissions.js"]:
         if needle not in generator:
             fail(f"tools/generate-release.py no conserva autodetección/sincronización robusta: {needle}")
 

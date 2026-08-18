@@ -926,11 +926,27 @@ self.addEventListener('notificationclick', function openP2PNotification(event) {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
       if (isApplicationClientUrl(client.url || '')) {
+        // Una notificación P2P nunca debe provocar una navegación/recarga de una
+        // ventana ya abierta. Entregamos el intent por mensajería y solo enfocamos
+        // la app; la única recarga automática autorizada sigue siendo un deploy
+        // confirmado por version.json en PWAUpdateManager.
+        client.postMessage({
+          type: 'P2P_PUSH_RECEIVED',
+          payload: {
+            type: event.notification?.data?.type || 'p2p.notification',
+            invitationId: event.notification?.data?.invitationId || '',
+            spaceId: event.notification?.data?.spaceId || '',
+            recipientUserId,
+            recipientDeviceId
+          },
+          source: 'notification-click'
+        });
         await client.focus();
-        if ('navigate' in client) await client.navigate(targetUrl.href);
         return;
       }
     }
+    // Si la app no está abierta, abrir una ventana no reemplaza ni recarga una
+    // interfaz existente y conserva el deep-link validado de la notificación.
     await self.clients.openWindow(targetUrl.href);
   })());
 });

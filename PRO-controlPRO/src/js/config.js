@@ -8,8 +8,8 @@ window.APP_SEED_CONFIG = Object.freeze({
   // de forma controlada y toda la aplicación continúa usando memoriaBACKEND.
   sinBACKEND: window.APP_RUNTIME_CONFIG?.sinBACKEND === true,
 
-  // Sin polling: las verificaciones ocurren por eventos reales de ciclo de vida
-  // (inicio, foco, visibilidad, reconexión, pageshow, updatefound y controllerchange).
+  // Sin polling: los eventos de ciclo de vida solo disparan una comprobación.
+  // La interfaz únicamente puede recargarse si version.json confirma un deploy nuevo.
   periodicUpdateChecksEnabled: false,
   updateCheckIntervalMs: 0,
   updateCheckOnFocus: true,
@@ -38,9 +38,9 @@ window.APP_SEED_CONFIG = Object.freeze({
   prefetchReleaseAssetsOnCheck: true,
   prefetchReleaseAssetsMax: 120,
 
-  // Respaldo opcional contra error humano. No ejecuta polling: solo puede correr
-  // cuando ocurre una revisión por evento y respeta una ventana mínima entre corridas.
-  directFingerprintFallbackEnabled: true,
+  // Diagnóstico opcional contra mutaciones fuera del pipeline de deploy. Aunque se
+  // habilite, sus huellas nunca autorizan una recarga automática de la interfaz.
+  directFingerprintFallbackEnabled: false,
   directFingerprintFallbackIntervalMs: 300000,
   directFingerprintCheckFiles: [
       './index.html',
@@ -112,7 +112,7 @@ window.APP_SEED_CONFIG = Object.freeze({
     ],
 
   // Compatibilidad con la versión anterior del manager.
-  fingerprintCheckEnabled: true,
+  fingerprintCheckEnabled: false,
   fingerprintCheckFiles: [
       './index.html',
       './manifest.webmanifest',

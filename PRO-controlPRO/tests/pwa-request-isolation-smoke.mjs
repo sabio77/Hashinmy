@@ -146,7 +146,9 @@ assert.deepEqual(rootWorker.posted.map((item) => item.client), ['root']);
 rootWorker.context.readPushAccountBinding = async () => ({ userId: 'user_root', deviceId: 'device_root_0001' });
 await dispatchNotificationClick(rootWorker, 'https://hashinmy.com/contabilidad/?p2pInvitation=inv_1', 'user_root', 'device_root_0001');
 assert.deepEqual(rootWorker.focused, ['root']);
-assert.equal(rootWorker.navigated[0].url, 'https://hashinmy.com/index.html');
+assert.equal(rootWorker.navigated.length, 0);
+assert.equal(rootWorker.posted.at(-1).payload?.payload?.recipientUserId, 'user_root');
+assert.equal(rootWorker.posted.at(-1).payload?.source, 'notification-click');
 
 const childWorker = createWorker('contabilidad');
 assert.equal(childWorker.context.isApplicationOwnedUrl('https://hashinmy.com/contabilidad/', { navigation: true }), true);
@@ -162,6 +164,8 @@ assert.deepEqual(childWorker.posted.map((item) => item.client), ['contabilidad']
 childWorker.context.readPushAccountBinding = async () => ({ userId: 'user_contabilidad', deviceId: 'device_contabilidad_0001' });
 await dispatchNotificationClick(childWorker, 'https://hashinmy.com/facturacion/?p2pInvitation=inv_2', 'user_contabilidad', 'device_contabilidad_0001');
 assert.deepEqual(childWorker.focused, ['contabilidad']);
-assert.equal(childWorker.navigated[0].url, 'https://hashinmy.com/contabilidad/index.html');
+assert.equal(childWorker.navigated.length, 0);
+assert.equal(childWorker.posted.at(-1).payload?.payload?.recipientUserId, 'user_contabilidad');
+assert.equal(childWorker.posted.at(-1).payload?.source, 'notification-click');
 
-console.log('OK: el Service Worker raíz no intercepta, cachea, recarga, notifica ni enfoca apps hermanas; cada worker de carpeta permanece limitado a su ruta.');
+console.log('OK: el Service Worker raíz no intercepta apps hermanas y una notificación P2P enfoca la app abierta sin navegar ni recargarla.');

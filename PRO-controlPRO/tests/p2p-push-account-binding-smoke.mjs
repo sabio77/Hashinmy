@@ -215,8 +215,10 @@ assert.equal(JSON.stringify(worker.posted), JSON.stringify([{ type: 'P2P_PUSH_SU
 worker.posted.length = 0;
 await dispatchNotificationClick(worker, worker.notifications[0]);
 assert.equal(worker.focused.length, 1);
-assert.equal(worker.navigated.length, 1);
+assert.equal(worker.navigated.length, 0);
 assert.equal(worker.opened.length, 0);
+assert.equal(worker.posted.at(-1)?.type, 'P2P_PUSH_RECEIVED');
+assert.equal(worker.posted.at(-1)?.source, 'notification-click');
 
 const unownedResult = await dispatchBinding(
   worker,
@@ -255,7 +257,7 @@ assert.equal(staleDeviceClear?.deviceId, deviceAReplacement);
 worker.posted.length = 0;
 await dispatchNotificationClick(worker, worker.notifications[0]);
 assert.equal(worker.focused.length, 1);
-assert.equal(worker.navigated.length, 1);
+assert.equal(worker.navigated.length, 0);
 assert.equal(worker.opened.length, 0);
 assert.equal(worker.posted.at(-1)?.reason, 'click_device_mismatch');
 
@@ -316,7 +318,7 @@ assert.equal(worker.notifications[2].closed, true);
 worker.posted.length = 0;
 await dispatchNotificationClick(worker, worker.notifications[2]);
 assert.equal(worker.focused.length, 1);
-assert.equal(worker.navigated.length, 1);
+assert.equal(worker.navigated.length, 0);
 assert.equal(worker.opened.length, 0);
 assert.equal(worker.posted.at(-1)?.reason, 'click_account_mismatch');
 

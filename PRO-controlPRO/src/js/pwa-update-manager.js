@@ -23,10 +23,10 @@
     releaseManifestAssetsEnabled: true,
     prefetchReleaseAssetsOnCheck: true,
     prefetchReleaseAssetsMax: 120,
-    directFingerprintFallbackEnabled: true,
+    directFingerprintFallbackEnabled: false,
     directFingerprintFallbackIntervalMs: 300000,
     directFingerprintCheckFiles: [],
-    fingerprintCheckEnabled: true,
+    fingerprintCheckEnabled: false,
     fingerprintCheckFiles: []
   }, userConfig));
 
@@ -83,8 +83,7 @@
       payload.version,
       payload.build,
       payload.releasedAt || payload.updatedAt,
-      payload.channel || payload.updateChannel,
-      payload.releaseId
+      payload.channel || payload.updateChannel
     ].filter(Boolean).join('|');
   }
 
@@ -310,14 +309,16 @@
     state.lastServerPayload = payload;
 
     var serverVersionKey = normalizeVersion(payload);
+    var loadedVersionKey = state.currentVersionKey || '';
     var storedVersionKey = localStorage.getItem(storageKeys.version) || '';
-    var versionChanged = false;
+    var deploymentChanged = Boolean(serverVersionKey && loadedVersionKey && serverVersionKey !== loadedVersionKey);
 
-    if (!storedVersionKey) {
-      localStorage.setItem(storageKeys.version, serverVersionKey || state.currentVersionKey);
-    } else if (serverVersionKey && serverVersionKey !== storedVersionKey) {
+    // localStorage es solo memoria auxiliar entre pestañas. La autorización real
+    // de recarga compara el release servido con el release embebido en la página
+    // actualmente cargada. Así una pestaña suspendida no pierde el deploy aunque
+    // otra pestaña ya haya actualizado el valor compartido.
+    if (serverVersionKey && serverVersionKey !== storedVersionKey) {
       localStorage.setItem(storageKeys.version, serverVersionKey);
-      versionChanged = true;
     }
 
     var serverAssetsKey = config.releaseManifestAssetsEnabled ? normalizeReleaseAssets(payload) : '';
@@ -337,7 +338,7 @@
       }
     }
 
-    if (serverAssetsKey && (firstAssetSnapshot || versionChanged || assetsChanged || releasePrefetchPending)) {
+    if (serverAssetsKey && (firstAssetSnapshot || deploymentChanged || assetsChanged || releasePrefetchPending)) {
       prefetchReleaseAssets(payload, serverAssetsKey).catch(function prefetchFailed(error) {
         if (navigator.onLine) {
           console.warn('[PWAUpdateManager] No se pudieron precargar assets del release:', error);
@@ -345,7 +346,11 @@
       });
     }
 
-    return versionChanged || assetsChanged || Boolean(payload && payload.forceReload && versionChanged);
+    return {
+      deploymentChanged: deploymentChanged,
+      serverVersionKey: serverVersionKey,
+      assetsChanged: assetsChanged
+    };
   }
 
   function canReloadNow(reasonKey) {
@@ -361,15 +366,20 @@
     return true;
   }
 
-  function scheduleReload(reason) {
-    var reasonKey = reason || 'update';
+  function scheduleReload(reason, deploymentKey) {
+    var reasonKey = reason || 'deploy-confirmed';
+    var confirmedDeploymentKey = String(deploymentKey || '');
 
-    if (!config.autoReloadWhenVersionChanges || state.reloadArmed) return;
-    if (!canReloadNow(reasonKey)) return;
+    // Regla central: ningún evento de navegador, Service Worker, foco, SSE o P2P
+    // puede recargar la interfaz. Solo un release distinto confirmado por
+    // version.json respecto al release que está ejecutando esta página.
+    if (!confirmedDeploymentKey || confirmedDeploymentKey === state.currentVersionKey) return false;
+    if (!config.autoReloadWhenVersionChanges || state.reloadArmed) return false;
+    if (!canReloadNow(confirmedDeploymentKey)) return false;
 
     state.reloadArmed = true;
-    showStatus(translate('pwa.updateFound', 'Actualización encontrada. La app se recargará para aplicar los cambios.'), 'ok');
-    broadcastUpdate({ type: 'UPDATE_FOUND', reason: reasonKey });
+    showStatus(translate('pwa.updateFound', 'Nueva versión publicada. La app se recargará para aplicar el deploy.'), 'ok');
+    broadcastUpdate({ type: 'UPDATE_FOUND', reason: reasonKey, deploymentKey: confirmedDeploymentKey });
 
     if (state.registration && state.registration.waiting) {
       state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -377,12 +387,13 @@
 
     setTimeout(function reloadApp() {
       sessionStorage.setItem(storageKeys.lastReloadAt, Date.now().toString());
-      sessionStorage.setItem(storageKeys.lastReloadKey, reasonKey);
+      sessionStorage.setItem(storageKeys.lastReloadKey, confirmedDeploymentKey);
 
       var url = new URL(window.location.href);
       url.searchParams.set('app_updated', Date.now().toString());
       window.location.replace(url.toString());
     }, Number(config.autoReloadDelayMs || 700));
+    return true;
   }
 
   async function askWaitingWorkerToActivate(registration) {
@@ -390,19 +401,48 @@
     registration.waiting.postMessage({ type: 'SKIP_WAITING' });
   }
 
+  function isCurrentPageControlledByRegistration(registration) {
+    var controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+    var activeWorker = registration && registration.active;
+    if (!controller || !activeWorker) return false;
+    if (controller === activeWorker) return true;
+
+    try {
+      return new URL(controller.scriptURL, window.location.href).toString() ===
+        new URL(activeWorker.scriptURL, window.location.href).toString();
+    } catch (error) {
+      return false;
+    }
+  }
+
   function watchRegistration(registration) {
     state.registration = registration;
 
-    askWaitingWorkerToActivate(registration);
+    // Un worker en espera puede ser consecuencia de un deploy, pero no es
+    // autorización suficiente para recargar. Se activa y version.json decide.
+    if (registration.waiting && isCurrentPageControlledByRegistration(registration)) {
+      askWaitingWorkerToActivate(registration);
+      checkNow('service-worker-waiting', { force: true }).catch(function waitingWorkerCheckFailed(error) {
+        if (navigator.onLine) {
+          console.warn('[PWAUpdateManager] No se pudo confirmar el deploy del worker en espera:', error);
+        }
+      });
+    } else {
+      askWaitingWorkerToActivate(registration);
+    }
 
     registration.addEventListener('updatefound', function handleUpdateFound() {
       var installingWorker = registration.installing;
       if (!installingWorker) return;
 
       installingWorker.addEventListener('statechange', function handleStateChange() {
-        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        if (installingWorker.state === 'installed' && isCurrentPageControlledByRegistration(registration)) {
           askWaitingWorkerToActivate(registration);
-          scheduleReload('service-worker-installed');
+          checkNow('service-worker-installed', { force: true }).catch(function installedWorkerCheckFailed(error) {
+            if (navigator.onLine) {
+              console.warn('[PWAUpdateManager] No se pudo confirmar el deploy del worker instalado:', error);
+            }
+          });
         }
       });
     });
@@ -421,15 +461,18 @@
         await state.registration.update();
       }
 
-      var versionChanged = await checkVersionEndpoint().catch(function versionCheckFailed(error) {
+      var deployment = await checkVersionEndpoint().catch(function versionCheckFailed(error) {
         if (navigator.onLine) {
           console.warn('[PWAUpdateManager] No se pudo verificar version.json:', error);
         }
-        return false;
+        return { deploymentChanged: false, serverVersionKey: '', assetsChanged: false };
       });
 
+      // Las huellas directas se conservan únicamente como diagnóstico de integridad.
+      // Nunca autorizan una recarga: una mutación sin release debe corregirse con
+      // un deploy normal para obtener una identidad nueva en version.json.
       var directFingerprintChanged = false;
-      if (!versionChanged) {
+      if (!deployment.deploymentChanged) {
         directFingerprintChanged = await checkDirectFingerprints().catch(function directFingerprintFailed(error) {
           if (navigator.onLine) {
             console.warn('[PWAUpdateManager] No se pudo verificar huellas directas:', error);
@@ -438,9 +481,13 @@
         });
       }
 
-      if (versionChanged || directFingerprintChanged) {
-        scheduleReload(versionChanged ? 'version-or-release-manifest-changed' : 'direct-fingerprint-changed');
+      if (deployment.deploymentChanged) {
+        scheduleReload('deploy-confirmed', deployment.serverVersionKey);
         return true;
+      }
+
+      if (directFingerprintChanged || deployment.assetsChanged) {
+        console.warn('[PWAUpdateManager] Se detectó contenido distinto sin identidad de deploy nueva; no se recargará la interfaz hasta un deploy válido.');
       }
 
       if (reason === 'manual') {
@@ -523,7 +570,17 @@
     if (message.fromTabId === tabId) return;
 
     if (message.type === 'UPDATE_FOUND') {
-      scheduleReload(message.reason || 'broadcast-update-found');
+      if (state.reloadArmed) return;
+
+      // BroadcastChannel es solo una señal para adelantar la comprobación. Nunca
+      // es una autoridad de release: otra pestaña (o cualquier script del mismo
+      // origen) no puede ordenar una recarga pasando un deploymentKey arbitrario.
+      // Cada pestaña debe confirmar por sí misma version.json antes de recargar.
+      checkNow('broadcast-update-found', { force: true }).catch(function broadcastDeployCheckFailed(error) {
+        if (navigator.onLine) {
+          console.warn('[PWAUpdateManager] No se pudo confirmar el deploy anunciado por otra pestaña:', error);
+        }
+      });
     }
   }
 
@@ -682,9 +739,16 @@
       watchRegistration(registration);
 
       navigator.serviceWorker.addEventListener('controllerchange', function handleControllerChange() {
-        if (!state.reloadArmed) {
-          scheduleReload('controllerchange');
-        }
+        if (state.reloadArmed) return;
+
+        // clients.claim() también dispara controllerchange durante la primera
+        // instalación. Ese evento por sí solo no autoriza una recarga: primero
+        // debe existir evidencia de un release nuevo en version.json/huellas.
+        checkNow('controllerchange', { force: true }).catch(function controllerChangeCheckFailed(error) {
+          if (navigator.onLine) {
+            console.warn('[PWAUpdateManager] No se pudo verificar el release tras controllerchange:', error);
+          }
+        });
       });
 
       navigator.serviceWorker.addEventListener('message', function handleServiceWorkerMessage(event) {
