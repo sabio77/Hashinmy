@@ -101,10 +101,13 @@ const state = {
   projectFilterQuery: '',
   inviteContext: null,
   panelResponseInProgress: false,
-  panelAccessOwnerUserId: ''
+  panelAccessOwnerUserId: '',
+  navigationSessionId: ''
 };
 
 const MISSING_PROJECT_RECOVERY_COOLDOWN_MS = 60 * 1000;
+const APP_NAVIGATION_HISTORY_KEY = '__semillaP2PNavigation';
+let navigationSessionSequence = 0;
 
 let externalSessionQueue = Promise.resolve();
 
@@ -502,6 +505,8 @@ function resetUserScopedInterface() {
   state.inviteContext = null;
   state.panelResponseInProgress = false;
   state.panelAccessOwnerUserId = '';
+  state.navigationSessionId = '';
+  clearCurrentNavigationHistoryState();
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
   state.invitationRefreshSequence += 1;
   state.storageDurability = null;
@@ -529,6 +534,7 @@ function showAuth(message = '') {
 
 function showWorkspace(user = {}, options = {}) {
   state.user = user;
+  state.navigationSessionId = `${Date.now().toString(36)}-${++navigationSessionSequence}`;
   if (options.persist !== false) setCachedUser(user);
   elements.authCard?.classList.add('hidden');
   elements.workspace?.classList.remove('hidden');
@@ -777,6 +783,7 @@ async function refreshProjects(auditContext = {}) {
   renderDashboard(auditContext);
   renderTrash();
   if (state.selectedSpaceId) renderProject();
+  synchronizeNavigationHistory('replace');
   if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
@@ -1642,45 +1649,239 @@ function renderProject() {
   else if (authorizationUnconfirmed) setStatus(elements.projectStatus, replicaRecoveryPending ? t('p2p.replicaRecovery', 'La invitación ya fue aceptada. Esta copia permanece en solo lectura hasta recibir y validar el estado compartido completo.') : t('p2p.authorizationUnconfirmed', 'La copia local fue conservada porque el backend no confirmó la membresía ni emitió una revocación explícita. Puedes consultar la información, pero la edición y la sincronización quedan bloqueadas hasta recuperar la autorización.'), 'warning');
 }
 
-function showDashboard() {
+function rawAppNavigationHistoryState(historyState = window.history?.state) {
+  const navigation = historyState && typeof historyState === 'object'
+    ? historyState[APP_NAVIGATION_HISTORY_KEY]
+    : null;
+  if (!navigation || typeof navigation !== 'object') return null;
+  if (navigation.version !== 1 || navigation.applicationId !== P2P_APPLICATION_ID) return null;
+  return navigation;
+}
+
+function currentSessionNavigationHistoryState(historyState = window.history?.state) {
+  const navigation = rawAppNavigationHistoryState(historyState);
+  const userId = String(state.user?.userId || '').trim();
+  if (!navigation || !userId || !state.navigationSessionId) return null;
+  if (navigation.sessionId !== state.navigationSessionId || navigation.userId !== userId) return null;
+  return navigation;
+}
+
+function currentNavigationDescriptor() {
+  const userId = String(state.user?.userId || '').trim();
+  if (!userId || !state.navigationSessionId) return null;
+  if (state.selectedSpaceId) {
+    const data = state.projects.get(state.selectedSpaceId);
+    if (data && !data.project.isTrashed) {
+      return {
+        version: 1,
+        applicationId: P2P_APPLICATION_ID,
+        sessionId: state.navigationSessionId,
+        userId,
+        level: 'project',
+        hasDirectoryParent: panelDirectoryRequired(),
+        panelOwnerUserId: panelOwnerUserId(data.space) || state.selectedPanelOwnerUserId || userId,
+        spaceId: state.selectedSpaceId
+      };
+    }
+  }
+  if (panelDirectoryRequired() && !state.selectedPanelOwnerUserId) {
+    return {
+      version: 1,
+      applicationId: P2P_APPLICATION_ID,
+      sessionId: state.navigationSessionId,
+      userId,
+      level: 'directory',
+      hasDirectoryParent: false,
+      panelOwnerUserId: '',
+      spaceId: ''
+    };
+  }
+  return {
+    version: 1,
+    applicationId: P2P_APPLICATION_ID,
+    sessionId: state.navigationSessionId,
+    userId,
+    level: 'panel',
+    hasDirectoryParent: panelDirectoryRequired(),
+    panelOwnerUserId: state.selectedPanelOwnerUserId || userId,
+    spaceId: ''
+  };
+}
+
+function sameNavigationDescriptor(left = null, right = null) {
+  if (!left || !right) return false;
+  return left.version === right.version
+    && left.applicationId === right.applicationId
+    && left.sessionId === right.sessionId
+    && left.userId === right.userId
+    && left.level === right.level
+    && left.hasDirectoryParent === right.hasDirectoryParent
+    && left.panelOwnerUserId === right.panelOwnerUserId
+    && left.spaceId === right.spaceId;
+}
+
+function synchronizeNavigationHistory(mode = 'replace') {
+  const navigation = currentNavigationDescriptor();
+  if (!navigation || !window.history) return false;
+  const current = currentSessionNavigationHistoryState(window.history.state);
+  if (sameNavigationDescriptor(current, navigation)) return true;
+  const historyState = window.history.state && typeof window.history.state === 'object'
+    ? { ...window.history.state }
+    : {};
+  historyState[APP_NAVIGATION_HISTORY_KEY] = navigation;
+  try {
+    if (mode === 'push' && typeof window.history.pushState === 'function') {
+      window.history.pushState(historyState, '');
+    } else if (typeof window.history.replaceState === 'function') {
+      window.history.replaceState(historyState, '');
+    } else {
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.info('[SemillaP2P] El navegador no permitió registrar la navegación interna:', error);
+    return false;
+  }
+}
+
+function clearCurrentNavigationHistoryState() {
+  if (!window.history || typeof window.history.replaceState !== 'function') return;
+  const historyState = window.history.state && typeof window.history.state === 'object'
+    ? { ...window.history.state }
+    : null;
+  if (!historyState || !(APP_NAVIGATION_HISTORY_KEY in historyState)) return;
+  delete historyState[APP_NAVIGATION_HISTORY_KEY];
+  try { window.history.replaceState(historyState, ''); } catch {}
+}
+
+function ensurePanelDirectoryHistoryParent(navigation = null) {
+  if (!navigation || navigation.level !== 'panel' || navigation.hasDirectoryParent === true || !panelDirectoryRequired()) return false;
+  if (!window.history || typeof window.history.replaceState !== 'function' || typeof window.history.pushState !== 'function') return false;
+  const panelNavigation = currentNavigationDescriptor();
+  if (!panelNavigation || panelNavigation.level !== 'panel') return false;
+  const baseHistoryState = window.history.state && typeof window.history.state === 'object'
+    ? { ...window.history.state }
+    : {};
+  const directoryNavigation = {
+    ...panelNavigation,
+    level: 'directory',
+    hasDirectoryParent: false,
+    panelOwnerUserId: '',
+    spaceId: ''
+  };
+  try {
+    window.history.replaceState({ ...baseHistoryState, [APP_NAVIGATION_HISTORY_KEY]: directoryNavigation }, '');
+    window.history.pushState({ ...baseHistoryState, [APP_NAVIGATION_HISTORY_KEY]: { ...panelNavigation, hasDirectoryParent: true } }, '');
+    return true;
+  } catch (error) {
+    console.info('[SemillaP2P] No se pudo reparar la jerarquía de navegación del panel:', error);
+    return false;
+  }
+}
+
+function showDashboard(options = {}) {
   state.selectedSpaceId = '';
   clearAccessConfirmation();
   elements.projectView.classList.add('hidden');
   elements.dashboardView.classList.remove('hidden');
   setStatus(elements.projectStatus, '');
   renderDashboard();
+  if (options.historyMode !== 'none') synchronizeNavigationHistory(options.historyMode || 'replace');
 }
 
-function openPanel(ownerUserId = '') {
+function openPanel(ownerUserId = '', options = {}) {
   const cleanOwnerUserId = String(ownerUserId || '').trim();
-  if (!cleanOwnerUserId || !panelOwnerIdsWithAccess().includes(cleanOwnerUserId)) return;
-  if (cleanOwnerUserId !== state.user?.userId && !panelIsComplete(cleanOwnerUserId)) return;
+  if (!cleanOwnerUserId || !panelOwnerIdsWithAccess().includes(cleanOwnerUserId)) return false;
+  if (cleanOwnerUserId !== state.user?.userId && !panelIsComplete(cleanOwnerUserId)) return false;
   state.selectedPanelOwnerUserId = cleanOwnerUserId;
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
-  renderDashboard();
+  showDashboard({ historyMode: 'none' });
+  if (options.historyMode !== 'none') synchronizeNavigationHistory(options.historyMode || 'push');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  return true;
 }
 
-function showPanelDirectory() {
-  if (!panelDirectoryRequired()) return;
+function showPanelDirectory(options = {}) {
+  if (!panelDirectoryRequired()) return false;
   state.selectedPanelOwnerUserId = '';
   state.projectFilterQuery = '';
   if (elements.projectFilterInput) elements.projectFilterInput.value = '';
-  renderDashboard();
+  showDashboard({ historyMode: 'none' });
+  if (options.historyMode !== 'none') synchronizeNavigationHistory(options.historyMode || 'replace');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  return true;
 }
 
-function openProject(spaceId) {
+function openProject(spaceId, options = {}) {
   const data = state.projects.get(spaceId);
-  if (!data || data.project.isTrashed) return;
+  if (!data || data.project.isTrashed) return false;
   state.selectedSpaceId = spaceId;
   state.selectedPanelOwnerUserId = panelOwnerUserId(data.space) || state.selectedPanelOwnerUserId;
   elements.dashboardView.classList.add('hidden');
   elements.projectView.classList.remove('hidden');
   renderProject();
+  if (options.historyMode !== 'none') synchronizeNavigationHistory(options.historyMode || 'push');
   semillaP2P.refreshReplicaHealth([spaceId]).catch(() => null);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  return true;
+}
+
+function restoreNavigationHistoryState(navigation = null) {
+  if (!navigation) return false;
+  const ownerUserId = String(navigation.panelOwnerUserId || '').trim();
+  if (navigation.level === 'project') {
+    const data = state.projects.get(String(navigation.spaceId || '').trim());
+    if (data && !data.project.isTrashed) return openProject(data.space.spaceId, { historyMode: 'none' });
+  } else if (navigation.level === 'panel') {
+    if (ownerUserId && panelOwnerIdsWithAccess().includes(ownerUserId) && (ownerUserId === state.user?.userId || panelIsComplete(ownerUserId))) {
+      state.selectedPanelOwnerUserId = ownerUserId;
+      state.projectFilterQuery = '';
+      if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+      showDashboard({ historyMode: 'none' });
+      ensurePanelDirectoryHistoryParent(navigation);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return true;
+    }
+  } else if (navigation.level === 'directory' && panelDirectoryRequired()) {
+    return showPanelDirectory({ historyMode: 'none' });
+  }
+
+  state.selectedPanelOwnerUserId = panelDirectoryRequired() ? '' : String(state.user?.userId || '').trim();
+  state.projectFilterQuery = '';
+  if (elements.projectFilterInput) elements.projectFilterInput.value = '';
+  showDashboard({ historyMode: 'none' });
+  synchronizeNavigationHistory('replace');
+  return false;
+}
+
+function requestAppNavigationBack(fallback) {
+  const navigation = currentSessionNavigationHistoryState(window.history?.state);
+  if (navigation && ['project', 'panel'].includes(navigation.level) && typeof window.history?.back === 'function') {
+    window.history.back();
+    return;
+  }
+  fallback?.();
+}
+
+function handleAppNavigationPopState(event) {
+  const rawNavigation = rawAppNavigationHistoryState(event.state);
+  if (!rawNavigation) return;
+  const navigation = currentSessionNavigationHistoryState(event.state);
+  if (!navigation) {
+    if (typeof window.history?.back === 'function') window.history.back();
+    return;
+  }
+  if (navigation.level === 'directory' && !panelDirectoryRequired()) {
+    if (typeof window.history?.back === 'function') window.history.back();
+    return;
+  }
+  const activeNavigation = currentNavigationDescriptor();
+  if (sameNavigationDescriptor(activeNavigation, navigation)) {
+    if (typeof window.history?.back === 'function') window.history.back();
+    return;
+  }
+  restoreNavigationHistoryState(navigation);
 }
 
 function applyP2PState(nextState = {}, auditContext = {}) {
@@ -3152,8 +3353,8 @@ elements.projectList?.addEventListener('click', (event) => {
   if (open) openProject(open.dataset.openProject);
 });
 elements.panelContextActions?.addEventListener('click', (event) => handlePanelActionButton(event.target.closest('button[data-panel-action]')));
-elements.backToPanelsButton?.addEventListener('click', showPanelDirectory);
-elements.backButton?.addEventListener('click', showDashboard);
+elements.backToPanelsButton?.addEventListener('click', () => requestAppNavigationBack(() => showPanelDirectory({ historyMode: 'replace' })));
+elements.backButton?.addEventListener('click', () => requestAppNavigationBack(() => showDashboard({ historyMode: 'replace' })));
 elements.addPurchaseButton?.addEventListener('click', () => openRecordForm('purchase')); elements.addIncomeButton?.addEventListener('click', () => openRecordForm('income')); elements.addProjectionButton?.addEventListener('click', () => openRecordForm('projection')); elements.recordForm?.addEventListener('submit', submitRecord);
 [elements.purchaseList, elements.projectionList, elements.incomeList].forEach((list) => list?.addEventListener('click', (event) => {
   const menu = event.target.closest('button[data-action-menu-scope]');
@@ -3184,6 +3385,8 @@ elements.accessConfirmButton?.addEventListener('click', executeAccessAction); el
 document.addEventListener('click', (event) => { const button = event.target.closest('[data-close-dialog]'); if (button) closeDialog(byId(button.dataset.closeDialog)); });
 elements.actionMenuDialog?.addEventListener('close', () => { state.actionMenuContext = null; clearActionMenuConfirmation(); setStatus(elements.actionMenuStatus, ''); });
 document.addEventListener('app-language-ready', () => { renderInvitations(); renderDevices(); renderDashboard(); renderTrash(); renderStorageDurability(); if (state.selectedSpaceId) { renderProject(); if (elements.accessDialog?.open) renderAccessManagement(); } if (elements.actionMenuDialog?.open) renderActionMenu(); setConnectionState(elements.connectionStatus?.dataset.state || 'connecting'); window.AppAssetLoader?.hydrate(document); });
+
+window.addEventListener('popstate', handleAppNavigationPopState);
 
 subscribeSessionTokenChanges(({ token }) => {
   queueExternalSessionSynchronization(token);

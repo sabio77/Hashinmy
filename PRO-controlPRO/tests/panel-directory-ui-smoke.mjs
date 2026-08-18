@@ -19,13 +19,47 @@ for (const needle of [
   "configureDashboardChrome('panel-directory')",
   "configureDashboardChrome('panel-projects', ownerUserId, panelProjects)",
   'function openPanel(',
-  'function showPanelDirectory()',
+  'function showPanelDirectory(options = {})',
   "state.selectedPanelOwnerUserId = panelOwnerUserId(data.space) || state.selectedPanelOwnerUserId",
   "if (!directoryWasRequired && panelDirectoryRequired()) state.selectedPanelOwnerUserId = ''",
-  "elements.backToPanelsButton?.addEventListener('click', showPanelDirectory)",
+  "elements.backToPanelsButton?.addEventListener('click', () => requestAppNavigationBack(() => showPanelDirectory({ historyMode: 'replace' })))",
+  "elements.backButton?.addEventListener('click', () => requestAppNavigationBack(() => showDashboard({ historyMode: 'replace' })))",
+  "window.addEventListener('popstate', handleAppNavigationPopState)",
+  "window.history.pushState(historyState, '')",
+  "window.history.replaceState(historyState, '')",
+  "applicationId: P2P_APPLICATION_ID",
+  "sessionId: state.navigationSessionId",
+  "level: 'project'",
+  "level: 'panel'",
+  "level: 'directory'",
+  "hasDirectoryParent: panelDirectoryRequired()",
+  'function ensurePanelDirectoryHistoryParent(',
+  "navigation.level === 'directory' && !panelDirectoryRequired()",
+  'sameNavigationDescriptor(activeNavigation, navigation)',
   "delete elements.dashboardView.dataset.dashboardMode"
 ]) {
   if (!app.includes(needle)) throw new Error(`La navegación panel→proyectos perdió el contrato: ${needle}`);
+}
+
+
+const historyStart = app.indexOf("function rawAppNavigationHistoryState(");
+const historyEnd = app.indexOf('\nfunction applyP2PState', historyStart);
+if (historyStart < 0 || historyEnd <= historyStart) throw new Error('No se pudo aislar la navegación integrada con History API.');
+const historyNavigation = app.slice(historyStart, historyEnd);
+for (const needle of [
+  "if (!rawNavigation) return;",
+  "if (!navigation) {",
+  "window.history.back();",
+  "restoreNavigationHistoryState(navigation)",
+  "panelOwnerIdsWithAccess().includes(ownerUserId)",
+  "panelIsComplete(ownerUserId)",
+  "ensurePanelDirectoryHistoryParent(navigation)",
+  "synchronizeNavigationHistory(options.historyMode || 'push')"
+]) {
+  if (!historyNavigation.includes(needle)) throw new Error(`La navegación Atrás perdió una protección obligatoria: ${needle}`);
+}
+if (historyNavigation.includes('event.preventDefault()')) {
+  throw new Error('La vista raíz no debe cancelar el Back normal de Chrome/PWA.');
 }
 
 const panelCardStart = app.indexOf("function createPanelCard(ownerUserId = '', projects = []) {");
