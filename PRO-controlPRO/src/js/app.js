@@ -97,10 +97,6 @@ const state = {
   invitationRefreshSequence: 0,
   missingProjectRecoveryActive: false,
   missingProjectRecoveryAt: new Map(),
-  missingProjectRecoveryPendingSpaceIds: new Set(),
-  terminalInvitationRecoverySpaceIds: new Set(),
-  missingProjectRecoveryRetryTimer: 0,
-  missingProjectRecoveryRetryAt: 0,
   missingProjectRecoveryAuditContext: {},
   projectFilterQuery: '',
   inviteContext: null,
@@ -505,11 +501,6 @@ function resetUserScopedInterface() {
   state.concurrentConflictOperations.clear();
   state.missingProjectRecoveryActive = false;
   state.missingProjectRecoveryAt.clear();
-  state.missingProjectRecoveryPendingSpaceIds.clear();
-  state.terminalInvitationRecoverySpaceIds.clear();
-  if (state.missingProjectRecoveryRetryTimer) window.clearTimeout(state.missingProjectRecoveryRetryTimer);
-  state.missingProjectRecoveryRetryTimer = 0;
-  state.missingProjectRecoveryRetryAt = 0;
   state.projectFilterQuery = '';
   state.inviteContext = null;
   state.panelResponseInProgress = false;
@@ -590,69 +581,14 @@ function resolvedProjectData(space, entities) {
   };
 }
 
-function scheduleMissingProjectRecoveryDrain(auditContext = state.missingProjectRecoveryAuditContext || {}) {
-  if (
-    state.missingProjectRecoveryActive
-    || !state.missingProjectRecoveryPendingSpaceIds.size
-    || !state.user
-    || !getSessionToken()
-    || navigator.onLine === false
-  ) return false;
-
-  const now = Date.now();
-  const dueAt = Math.min(...[...state.missingProjectRecoveryPendingSpaceIds].map((spaceId) => Math.max(
-    now,
-    Number(state.missingProjectRecoveryAt.get(spaceId) || 0) + MISSING_PROJECT_RECOVERY_COOLDOWN_MS
-  )));
-  if (!Number.isFinite(dueAt)) return false;
-  if (state.missingProjectRecoveryRetryTimer) window.clearTimeout(state.missingProjectRecoveryRetryTimer);
-  state.missingProjectRecoveryRetryAt = dueAt;
-  state.missingProjectRecoveryRetryTimer = window.setTimeout(() => {
-    state.missingProjectRecoveryRetryTimer = 0;
-    state.missingProjectRecoveryRetryAt = 0;
-    if (!state.user || !getSessionToken() || navigator.onLine === false) return;
-    recoverMissingProjectCards(
-      [...state.missingProjectRecoveryPendingSpaceIds],
-      auditContext && typeof auditContext === 'object' ? auditContext : state.missingProjectRecoveryAuditContext
-    ).catch(() => null);
-  }, Math.max(0, dueAt - now));
-  return true;
-}
-
 async function recoverMissingProjectCards(spaceIds = [], auditContext = state.missingProjectRecoveryAuditContext || {}) {
-  const requestedSpaceIds = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
-    .map((spaceId) => String(spaceId || '').trim())
-    .filter(Boolean)));
-  if (!requestedSpaceIds.length || !state.user || !getSessionToken()) return false;
-
-  requestedSpaceIds.forEach((spaceId) => state.missingProjectRecoveryPendingSpaceIds.add(spaceId));
-  if (auditContext && typeof auditContext === 'object') state.missingProjectRecoveryAuditContext = auditContext;
-  if (state.missingProjectRecoveryActive) {
-    invitationAuditLog('frontend.ui.missing-project-recovery.queued', {
-      auditTraceId: String(auditContext?.auditTraceId || '').trim(),
-      auditSource: String(auditContext?.source || '').trim(),
-      requestedSpaceIds,
-      pendingSpaceIds: [...state.missingProjectRecoveryPendingSpaceIds]
-    });
-    return false;
-  }
-
+  if (state.missingProjectRecoveryActive || !state.user || !getSessionToken()) return false;
   const now = Date.now();
-  const candidates = [...state.missingProjectRecoveryPendingSpaceIds]
+  const candidates = Array.from(new Set((Array.isArray(spaceIds) ? spaceIds : [])
+    .map((spaceId) => String(spaceId || '').trim())
+    .filter(Boolean)))
     .filter((spaceId) => now - Number(state.missingProjectRecoveryAt.get(spaceId) || 0) >= MISSING_PROJECT_RECOVERY_COOLDOWN_MS);
-  if (!candidates.length) {
-    scheduleMissingProjectRecoveryDrain(auditContext);
-    return false;
-  }
-
-  if (state.missingProjectRecoveryRetryTimer) window.clearTimeout(state.missingProjectRecoveryRetryTimer);
-  state.missingProjectRecoveryRetryTimer = 0;
-  state.missingProjectRecoveryRetryAt = 0;
-  candidates.forEach((spaceId) => state.missingProjectRecoveryPendingSpaceIds.delete(spaceId));
-
-  const recoveryUserId = String(state.user?.userId || '').trim();
-  const recoverySessionToken = getSessionToken();
-  const retryAfterCurrentRun = new Set();
+  if (!candidates.length) return false;
 
   invitationAuditLog('frontend.ui.missing-project-recovery.begin', {
     auditTraceId: String(auditContext?.auditTraceId || '').trim(),
@@ -679,9 +615,6 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
       ? recoveryState.invitationRecovery
       : null;
     const discardedSpaceIds = new Set((invitationRecovery?.removedSpaceIds || []).map((spaceId) => String(spaceId || '').trim()).filter(Boolean));
-    const terminalUnresolvedSpaceIds = new Set((invitationRecovery?.unresolvedSpaceIds || [])
-      .map((spaceId) => String(spaceId || '').trim())
-      .filter(Boolean));
     const unresolved = [];
     const recoveryAudit = [];
     for (const spaceId of candidates) {
@@ -699,35 +632,8 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
         });
       }
       const loaded = projectRecord(space, entities).loaded;
-      const replicaRecoveryPending = isReplicaRecoveryPending(space);
-      const converged = loaded && !replicaRecoveryPending && !terminalUnresolvedSpaceIds.has(spaceId);
-      recoveryAudit.push({
-        spaceId,
-        loaded,
-        replicaRecoveryPending,
-        converged,
-        entitySummary: invitationAuditEntitySummary(entities),
-        rawAudit: { space, entities }
-      });
-      if (!converged) unresolved.push(spaceId);
-    }
-    const recoveredSpaceIds = candidates.filter((spaceId) => !unresolved.includes(spaceId));
-    recoveredSpaceIds.forEach((spaceId) => state.terminalInvitationRecoverySpaceIds.delete(spaceId));
-    const terminalizeUnresolved = (invitationRecovery?.attemptsUsed || 0) >= 3
-      && invitationRecovery?.completed !== true;
-    if (terminalizeUnresolved) {
-      let selectedProjectTerminalized = false;
-      for (const spaceId of unresolved) {
-        const space = state.p2pState.spaces.find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
-        if (space && panelOwnerUserId(space) !== String(state.user?.userId || '').trim()) {
-          state.terminalInvitationRecoverySpaceIds.add(spaceId);
-          state.projects.delete(spaceId);
-          if (state.selectedSpaceId === spaceId) selectedProjectTerminalized = true;
-        }
-      }
-      if (selectedProjectTerminalized) showDashboard({ historyMode: 'replace' });
-      else renderDashboard(auditContext);
-      renderTrash();
+      recoveryAudit.push({ spaceId, loaded, entitySummary: invitationAuditEntitySummary(entities), rawAudit: { space, entities } });
+      if (!loaded) unresolved.push(spaceId);
     }
     invitationAuditLog('frontend.ui.missing-project-recovery.result', {
       auditTraceId: String(auditContext?.auditTraceId || '').trim(),
@@ -747,8 +653,6 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
       ...XXXsenXXX({ recoveryState, spaces: recoveryAudit.map((item) => item.rawAudit) })
     });
     if (invitationRecovery?.discarded === true) {
-      discardedSpaceIds.forEach((spaceId) => state.terminalInvitationRecoverySpaceIds.delete(spaceId));
-      applyP2PState(semillaP2P.bootstrapState, auditContext);
       setStatus(
         elements.dashboardStatus,
         discardedSpaceIds.size === 1
@@ -759,7 +663,6 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
       return false;
     }
     if (invitationRecovery?.cleanupPending === true) {
-      terminalUnresolvedSpaceIds.forEach((spaceId) => retryAfterCurrentRun.add(spaceId));
       setStatus(
         elements.dashboardStatus,
         t('p2p.invitationRecoveryCleanupPending', 'La invitación agotó 3 intentos de recuperación. La limpieza automática se reintentará cuando el servicio vuelva a estar disponible.'),
@@ -781,9 +684,6 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
         'warning'
       );
     } else {
-      if (recoveredSpaceIds.some((spaceId) => !state.projects.has(spaceId))) {
-        applyP2PState(semillaP2P.bootstrapState, auditContext);
-      }
       setStatus(
         elements.dashboardStatus,
         candidates.length === 1
@@ -801,10 +701,6 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
       error: invitationAuditError(error),
       ...XXXsenXXX({ error, bootstrapState: state.p2pState })
     });
-    const status = Number(error?.status || 0);
-    if (!status || status >= 500 || [401, 408, 425, 429].includes(status)) {
-      candidates.forEach((spaceId) => retryAfterCurrentRun.add(spaceId));
-    }
     setStatus(
       elements.dashboardStatus,
       error?.message || t('p2p.missingProjectDeferred', 'El espacio compartido incompleto se ocultó. Volverá a mostrarse cuando una réplica válida pueda recuperarlo.'),
@@ -812,14 +708,7 @@ async function recoverMissingProjectCards(spaceIds = [], auditContext = state.mi
     );
     return false;
   } finally {
-    const sameRecoverySession = String(state.user?.userId || '').trim() === recoveryUserId
-      && getSessionToken() === recoverySessionToken;
-    if (sameRecoverySession) {
-      candidates.forEach((spaceId) => state.missingProjectRecoveryPendingSpaceIds.delete(spaceId));
-      retryAfterCurrentRun.forEach((spaceId) => state.missingProjectRecoveryPendingSpaceIds.add(spaceId));
-      state.missingProjectRecoveryActive = false;
-      scheduleMissingProjectRecoveryDrain(state.missingProjectRecoveryAuditContext);
-    }
+    state.missingProjectRecoveryActive = false;
   }
 }
 
@@ -879,20 +768,6 @@ async function refreshProjects(auditContext = {}) {
   const missingProjectSpaceIds = entries
     .filter(([, data]) => !data.project.loaded)
     .map(([spaceId]) => spaceId);
-  const pendingReplicaProjectSpaceIds = entries
-    .filter(([, data]) => data.project.loaded && isReplicaRecoveryPending(data.space))
-    .map(([spaceId]) => spaceId);
-  const activeSpaceIds = new Set(spaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean));
-  for (const spaceId of [...state.terminalInvitationRecoverySpaceIds]) {
-    const space = spaces.find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
-    if (!activeSpaceIds.has(spaceId) || (space && !isReplicaRecoveryPending(space))) {
-      state.terminalInvitationRecoverySpaceIds.delete(spaceId);
-    }
-  }
-  const recoveryProjectSpaceIds = Array.from(new Set([
-    ...missingProjectSpaceIds,
-    ...pendingReplicaProjectSpaceIds
-  ]));
   invitationAuditLog('frontend.ui.project-root-check', {
     auditTraceId: String(auditContext?.auditTraceId || '').trim(),
     auditSource: String(auditContext?.source || '').trim(),
@@ -900,21 +775,16 @@ async function refreshProjects(auditContext = {}) {
     expectedSpaceIds: spaces.map((space) => String(space?.spaceId || '').trim()).filter(Boolean),
     loadedSpaceIds: entries.filter(([, data]) => data.project.loaded).map(([spaceId]) => spaceId),
     missingProjectSpaceIds,
-    pendingReplicaProjectSpaceIds,
-    recoveryProjectSpaceIds,
-    missingCount: missingProjectSpaceIds.length,
-    pendingReplicaCount: pendingReplicaProjectSpaceIds.length
+    missingCount: missingProjectSpaceIds.length
   });
-  state.projects = new Map(entries.filter(([spaceId, data]) => (
-    data.project.loaded && !state.terminalInvitationRecoverySpaceIds.has(spaceId)
-  )));
+  state.projects = new Map(entries.filter(([, data]) => data.project.loaded));
   const selected = state.selectedSpaceId ? state.projects.get(state.selectedSpaceId) : null;
   if (state.selectedSpaceId && (!selected || selected.project.isTrashed)) showDashboard();
   renderDashboard(auditContext);
   renderTrash();
   if (state.selectedSpaceId) renderProject();
   synchronizeNavigationHistory('replace');
-  if (recoveryProjectSpaceIds.length) recoverMissingProjectCards(recoveryProjectSpaceIds, auditContext).catch(() => null);
+  if (missingProjectSpaceIds.length) recoverMissingProjectCards(missingProjectSpaceIds).catch(() => null);
 }
 
 function renderPortfolioMetrics(projectsOverride = null) {
@@ -1109,14 +979,6 @@ function partiallyAcceptedPanelInvitationForOwner(ownerUserId = '') {
   return [...groups.values()].some((statuses) => statuses.has('accepted') && statuses.has('pending'));
 }
 
-function panelHasTerminalInvitationRecovery(ownerUserId = '') {
-  if (!ownerUserId || !state.terminalInvitationRecoverySpaceIds.size) return false;
-  return (state.p2pState.spaces || []).some((space) => (
-    panelOwnerUserId(space) === ownerUserId
-    && state.terminalInvitationRecoverySpaceIds.has(String(space?.spaceId || '').trim())
-  ));
-}
-
 function panelIsComplete(ownerUserId = '') {
   if (!ownerUserId) return false;
   if (partiallyAcceptedPanelInvitationForOwner(ownerUserId)) return false;
@@ -1244,10 +1106,7 @@ function renderPanelDirectory(ownerIds = []) {
   });
   let hiddenPanels = 0;
   for (const ownerUserId of orderedOwnerIds) {
-    if (ownerUserId !== ownUserId && !panelIsComplete(ownerUserId)) {
-      if (!panelHasTerminalInvitationRecovery(ownerUserId)) hiddenPanels += 1;
-      continue;
-    }
+    if (ownerUserId !== ownUserId && !panelIsComplete(ownerUserId)) { hiddenPanels += 1; continue; }
     elements.projectList.append(createPanelCard(ownerUserId, projectsForPanel(ownerUserId)));
   }
   if (hiddenPanels > 0) {
@@ -3093,11 +2952,7 @@ async function respondInvitation(event) {
     });
   }
   setP2PBusy(true);
-  // Bloquea la hidratación/watchdog durante cualquier respuesta de invitación.
-  // En invitaciones individuales también se emiten estados intermedios antes de
-  // terminar escrow + bootstrap; dejar correr la recuperación ahí crea una carrera
-  // que puede contabilizar fallos o limpiar una membresía todavía en aceptación.
-  state.panelResponseInProgress = true;
+  state.panelResponseInProgress = isPanelGroup;
   try {
     const result = isPanelGroup
       ? await semillaP2P.respondToInvitationGroup(ids, button.dataset.decision, { auditTraceId })
@@ -3428,7 +3283,6 @@ window.addEventListener('p2p:space-deleted', (event) => {
 window.addEventListener('p2p:authorization-unconfirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.authorizationUnconfirmedDashboard', 'Se conservaron proyectos locales cuya autorización no pudo confirmarse. Permanecen disponibles en modo de solo lectura para evitar pérdida de datos.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-pending', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryDashboard', 'La invitación fue aceptada. El proyecto permanecerá en solo lectura hasta recuperar y validar su copia completa.'), 'warning'); });
 window.addEventListener('p2p:replica-recovery-confirmed', () => { applyP2PState(semillaP2P.bootstrapState); setStatus(elements.dashboardStatus, t('p2p.replicaRecoveryConfirmed', 'La copia compartida quedó sincronizada. Ya puedes trabajar en el proyecto.'), 'success'); });
-window.addEventListener('p2p:invitation-recovery-discarded', () => { applyP2PState(semillaP2P.bootstrapState); });
 window.addEventListener('p2p:error', (event) => {
   const stage = String(event.detail?.stage || '').trim();
   if (['recover', 'foreground-recover', 'realtime', 'realtime-ready-timeout'].includes(stage)) setConnectionState('disconnected');
@@ -3539,9 +3393,6 @@ subscribeSessionTokenChanges(({ token }) => {
 });
 window.addEventListener('online', () => {
   if (!state.user && getSessionToken()) queueExternalSessionSynchronization(getSessionToken());
-  if (state.user && state.missingProjectRecoveryPendingSpaceIds.size) {
-    scheduleMissingProjectRecoveryDrain(state.missingProjectRecoveryAuditContext);
-  }
 });
 
 restoreSession();

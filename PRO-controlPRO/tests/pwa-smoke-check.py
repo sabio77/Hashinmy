@@ -65,7 +65,6 @@ REQUIRED_FILES = [
     "tests/session-isolation-smoke.mjs",
     "tests/p2p-invitation-intent-smoke.mjs",
     "tests/p2p-invitation-escrow-smoke.mjs",
-    "tests/p2p-invitation-recovery-watchdog-smoke.mjs",
     "tests/p2p-panel-sharing-smoke.mjs",
     "tests/p2p-control-mutation-atomicity-smoke.mjs",
     "tests/p2p-retry-after-smoke.mjs",
@@ -523,21 +522,6 @@ def assert_invitation_escrow_bootstrap() -> None:
     )
     if result.returncode != 0:
         fail(f"Falló la semilla cifrada de invitaciones: {result.stderr.strip() or result.stdout.strip()}")
-
-def assert_invitation_recovery_watchdog() -> None:
-    node = shutil.which("node")
-    if not node:
-        print("ADVERTENCIA: node no está disponible; se omite prueba del watchdog de recuperación de invitaciones.", file=sys.stderr)
-        return
-    result = subprocess.run(
-        [node, str(ROOT / "tests" / "p2p-invitation-recovery-watchdog-smoke.mjs")],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        fail(f"Falló el watchdog terminal de recuperación de invitaciones: {result.stderr.strip() or result.stdout.strip()}")
-
 
 def assert_control_mutation_atomicity() -> None:
     node = shutil.which("node")
@@ -1513,7 +1497,6 @@ def main() -> None:
     assert_trash_lifecycle()
     assert_invitation_notification_intent()
     assert_invitation_escrow_bootstrap()
-    assert_invitation_recovery_watchdog()
     assert_control_mutation_atomicity()
     assert_retry_after_recovery()
     assert_application_scope()
