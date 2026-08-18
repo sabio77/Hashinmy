@@ -6855,6 +6855,7 @@ export class SemillaP2PClient {
                 forceSnapshot: true,
                 deferKeyWait: false,
                 ignoreCooldown: true,
+                requestMaxAttempts: 1,
                 auditTraceId
               }
             );
@@ -6866,29 +6867,52 @@ export class SemillaP2PClient {
         const entities = await listEntities(spaceId).catch(() => []);
         this.assertSessionContext(sessionContext);
         const loaded = projectRootLoaded(entities);
-        if (!loaded) nextUnresolved.push(spaceId);
-        const reason = loaded
-          ? 'project_root_loaded'
-          : directRecoveryError?.code || directRecoveryError?.message
+        let replicaRecoveryConfirmed = false;
+        let convergenceError = null;
+        if (loaded && this.isSpaceReplicaRecoveryPending(spaceId)) {
+          try {
+            await this.reconcileSnapshotRecovery(sessionContext);
+            this.assertSessionContext(sessionContext);
+            replicaRecoveryConfirmed = await this.confirmRecoveredReplicaAuthorization(spaceId, sessionContext);
+            this.assertSessionContext(sessionContext);
+          } catch (error) {
+            if (this.isSessionContextChangedError(error)) throw error;
+            convergenceError = error;
+          }
+        }
+        const currentSpace = (this.bootstrapState.spaces || [])
+          .find((candidate) => String(candidate?.spaceId || '').trim() === spaceId) || null;
+        const replicaRecoveryPending = this.isSpaceReplicaRecoveryPending(spaceId);
+        const converged = loaded && !replicaRecoveryPending;
+        if (!converged) nextUnresolved.push(spaceId);
+        const reason = converged
+          ? replicaRecoveryConfirmed ? 'replica_recovery_confirmed' : 'project_root_loaded'
+          : convergenceError?.code || convergenceError?.message
+            || (loaded && replicaRecoveryPending ? 'replica_recovery_pending' : '')
+            || directRecoveryError?.code || directRecoveryError?.message
             || directRecovery?.reason
             || bootstrapError?.code || bootstrapError?.message
-            || (!space ? 'space_missing_from_bootstrap' : !invitation ? 'accepted_invitation_missing' : 'project_root_missing');
+            || (!currentSpace ? 'space_missing_from_bootstrap' : !invitation ? 'accepted_invitation_missing' : 'project_root_missing');
         attemptSpaces.push({
           spaceId,
           loaded,
+          converged,
+          replicaRecoveryPending,
+          replicaRecoveryConfirmed,
           invitationId: String(invitation?.invitationId || '').trim(),
           invitationGroupId: String(invitation?.invitationGroupId || '').trim(),
           invitationScope: String(invitation?.invitationScope || '').trim(),
-          authorizationState: String(space?.authorizationState || '').trim(),
-          authorizationPendingReason: String(space?.authorizationPendingReason || '').trim(),
+          authorizationState: String(currentSpace?.authorizationState || '').trim(),
+          authorizationPendingReason: String(currentSpace?.authorizationPendingReason || '').trim(),
           directRecovery: directRecovery ? {
             recovered: directRecovery.recovered === true,
             reason: String(directRecovery.reason || '').trim()
           } : null,
           directRecoveryError: invitationAuditError(directRecoveryError),
+          convergenceError: invitationAuditError(convergenceError),
           reason,
           entities: invitationAuditEntitySummary(entities),
-          rawAudit: { invitation, space, directRecovery, directRecoveryError, entities }
+          rawAudit: { invitation, space: currentSpace, directRecovery, directRecoveryError, convergenceError, entities }
         });
       }
       unresolvedSpaceIds = nextUnresolved;
@@ -6924,7 +6948,37 @@ export class SemillaP2PClient {
         };
       }
       if (attempt < INCOMPLETE_INVITATION_RECOVERY_MAX_ATTEMPTS) {
-        await new Promise((resolve) => window.setTimeout(resolve, INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS * attempt));
+        const baseRetryDelayMs = INCOMPLETE_INVITATION_RECOVERY_RETRY_BASE_MS * attempt;
+        const serverDirectedRetryMs = attemptSpaces.reduce((maximum, item) => {
+          const errors = [item?.rawAudit?.directRecoveryError, item?.rawAudit?.convergenceError, bootstrapError];
+          return errors.reduce((currentMaximum, error) => {
+            if (!error) return currentMaximum;
+            const retryAfterSeconds = Number(error?.retryAfterSeconds || 0);
+            if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+              return Math.max(
+                currentMaximum,
+                Math.min(SERVER_RETRY_MAX_MS, Math.ceil(retryAfterSeconds * 1000))
+              );
+            }
+            const code = String(error?.code || '').trim().toUpperCase();
+            if (Number(error?.status || 0) === 429 || code.endsWith('_RATE_LIMITED')) {
+              return Math.max(currentMaximum, serverRecoveryDelayMilliseconds(error, attempt - 1));
+            }
+            return currentMaximum;
+          }, maximum);
+        }, 0);
+        const retryDelayMs = Math.max(baseRetryDelayMs, serverDirectedRetryMs);
+        invitationAuditLog('frontend.incomplete-recovery.retry-scheduled', {
+          auditTraceId,
+          auditSource,
+          attempt,
+          nextAttempt: attempt + 1,
+          retryDelayMs,
+          serverDirected: serverDirectedRetryMs > baseRetryDelayMs,
+          unresolvedSpaceIds,
+          deviceId: sessionContext.deviceId
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs));
       }
     }
 
@@ -8772,13 +8826,14 @@ export class SemillaP2PClient {
     });
 
     let data = null;
+    const requestMaxAttempts = Math.min(3, Math.max(1, Math.floor(Number(options.requestMaxAttempts || 3))));
     try {
       data = await apiPost('/api/p2p/invitations/respond', {
         invitationId,
         decision: 'accept',
         deviceId: sessionContext.deviceId,
         auditTraceId
-      });
+      }, { maxAttempts: requestMaxAttempts });
     } catch (error) {
       invitationAuditLog('frontend.recovery.error', {
         auditTraceId,

@@ -226,10 +226,10 @@ assert.equal(appSource.includes('money(absoluteMoneyValue(record.varianceAmount 
 assert.equal(appSource.includes('const today = localDateValue()'), true, 'El formulario debe usar el día calendario local del dispositivo.');
 assert.equal(appSource.includes('new Date().toISOString().slice(0, 10)'), false, 'La interfaz no debe volver a derivar fechas administrativas desde UTC.');
 assert.equal(appSource.includes('Math.abs(record.varianceAmount || 0)'), false, 'Math.abs no admite BigInt y no debe reaparecer en la ruta de renderizado monetario.');
-assert.equal(appSource.includes('state.projects = new Map(entries.filter(([, data]) => data.project.loaded))'), true, 'La interfaz no debe materializar cards de espacios sin proyecto raíz.');
+assert.equal(/state\.projects = new Map\(entries\.filter\(\(\[spaceId, data\]\) => \([\s\S]*data\.project\.loaded[\s\S]*!state\.terminalInvitationRecoverySpaceIds\.has\(spaceId\)[\s\S]*\)\)\);/.test(appSource), true, 'La interfaz no debe materializar cards de espacios sin proyecto raíz ni réplicas invitadas que ya agotaron su recuperación terminal.');
 assert.equal(appSource.includes('projectRootEntityPresent: Boolean(data.project._entity)'), true, 'La auditoría debe distinguir entidad raíz presente de proyecto realmente hidratado.');
 assert.equal(appSource.includes("projectRootValuePresent: Boolean(data.project._entity?.value && typeof data.project._entity.value === 'object')"), true, 'La auditoría debe indicar explícitamente si la raíz contiene datos utilizables.');
-assert.equal(appSource.includes('recoverMissingProjectCards(missingProjectSpaceIds)'), true, 'Los espacios incompletos deben intentar recuperar una réplica antes de permanecer ocultos.');
+assert.equal(appSource.includes('recoverMissingProjectCards(recoveryProjectSpaceIds, auditContext)'), true, 'Los espacios incompletos y las cards en replica_recovery deben entrar al mismo watchdog antes de permanecer ocultos o bloqueados.');
 assert.equal(appSource.includes('projectMatchesFilter(item.project, normalizedFilter)'), true, 'La lista debe aplicar el filtro local sin consultar memoriaBACKEND.');
 assert.equal(appSource.includes("elements.projectFilterInput?.addEventListener('input'"), true, 'El filtro debe reaccionar mientras el usuario escribe.');
 
