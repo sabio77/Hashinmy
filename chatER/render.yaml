@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: chater-appweb
+    runtime: static
+    buildCommand: python tools/generate-runtime-config.py --require-backend
+    staticPublishPath: .
+    envVars:
+      - key: APP_BACKEND_URL
+        sync: false
+    headers:
+      - path: /runtime-config.js
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /sw.js
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0
+      - path: /index.html
+        name: Cache-Control
+        value: no-store, no-cache, must-revalidate, max-age=0

@@ -1,8 +1,9 @@
-const CACHE_NAME = 'chater-static-v90-contact-share-ready';
+const CACHE_NAME = 'chater-static-v91-runtime-backend-config';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',
   './theme-bootstrap.js',
+  './runtime-config.js',
   './app.js',
   './api.js',
   './firebase.auth.js',

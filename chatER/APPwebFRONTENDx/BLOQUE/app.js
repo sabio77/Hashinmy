@@ -1112,6 +1112,7 @@ function profileSharePreviewVersion(profileOrCode = {}) {
   const source = [
     profileOrCode.profileCode || '',
     String(profileOrCode.displayName || '').trim().slice(0, 120),
+    String(profileOrCode.photoUrl || '').trim().slice(0, 600),
     profileOrCode.updatedAt || ''
   ].join('|');
   return stablePreviewVersion(source);

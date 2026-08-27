@@ -1,11 +1,11 @@
 const sessionKey = 'chater_session_token';
 
 export function getBackendUrl() {
-  const explicit = String(window.chatER_BACKEND_URL || window.CHATER_BACKEND_URL || '').trim().replace(/\/$/, '');
-  if (explicit) return explicit;
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:10000';
-  return 'https://mapsx.app';
+  const runtimeBackendUrl = String(window.APP_RUNTIME_CONFIG?.backendUrl || '').trim().replace(/\/$/, '');
+  const legacyExplicitUrl = String(window.chatER_BACKEND_URL || window.CHATER_BACKEND_URL || '').trim().replace(/\/$/, '');
+  const backendUrl = runtimeBackendUrl || legacyExplicitUrl;
+  if (backendUrl) return backendUrl;
+  throw new Error('APP_BACKEND_URL no está configurada para esta instalación de chatER.');
 }
 
 export function getSessionToken() {
