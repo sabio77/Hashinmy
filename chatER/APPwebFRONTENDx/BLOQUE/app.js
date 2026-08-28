@@ -1,4 +1,4 @@
-import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl } from './api.js';
+import { apiGet, post, getBackendUrl, getSessionToken, setSessionToken, uploadToSignedUrl, withTrafficClientId } from './api.js';
 import { signInWithGooglePopup, signOutFirebaseSession, getFirebaseWebConfigError } from './firebase.auth.js';
 import {
   extractLinkPreviewUrls,
@@ -17,18 +17,53 @@ const clientIdKey = 'chater_client_id';
 const realtimeLeaderStorageKey = 'chater_realtime_leader_v1';
 const realtimeBusStorageKey = 'chater_realtime_bus_v1';
 const realtimeLastEventPrefix = 'chater_realtime_last_event_v1';
+const realtimeTokenCacheKey = 'chater_realtime_token_v1';
+const realtimeRetryAfterStorageKey = 'chater_realtime_retry_after_v1';
+const realtimeBackoffStorageKey = 'chater_realtime_backoff_v1';
+const bootstrapRestoreLeaderStorageKey = 'chater_bootstrap_restore_leader_v1';
+const bootstrapRestoreSnapshotStoragePrefix = 'chater_bootstrap_restore_snapshot_v1';
+const realtimeTokenRefreshSkewMs = 60 * 1000;
 const realtimeChannelName = 'chater_realtime_channel_v1';
 const realtimeLeaderLeaseMs = 15000;
 const realtimeLeaderRenewMs = 5000;
 const realtimeElectionMs = 7000;
 const realtimeHiddenReleaseMs = 12000;
+const realtimePeerActivityTtlMs = Math.max(realtimeHiddenReleaseMs * 2, realtimeElectionMs * 3);
 const realtimeStableConnectionMs = 30000;
 const realtimeShortConnectionMs = 10000;
+const realtimeBackoffStorageTtlMs = 30 * 60 * 1000;
+const realtimeLeadershipSettleMs = 120;
+const bootstrapRestoreLeaderLeaseMs = 8000;
+const bootstrapRestoreLeaderRenewMs = 2500;
+const bootstrapRestorePeerWaitMs = 220;
+const bootstrapRestoreLeaderMaxWaitMs = 30000;
+const bootstrapRestoreSnapshotFreshMs = 15000;
+const bootstrapRestoreSnapshotStorageTtlMs = 3000;
+const bootstrapRestoreSnapshotGraceMs = 1000;
+const chatListFreshReuseMs = 15 * 1000;
+const messageHistoryFreshReuseMs = 30 * 1000;
+const typingSignalRefreshMs = 4000;
+const typingIdleDelayMs = 1800;
+let imageCompressorLoadPromise = null;
 const draftStoragePrefix = 'chater_draft_v1';
 const draftOriginStorageKey = 'chater_draft_origin_v1';
 const draftSaveDelayMs = 7 * 1000;
+const draftRemoteSyncMinIntervalMs = 30 * 1000;
 const outboxStoragePrefix = 'chater_outbox_v1';
+const outboxRetryLeaderStoragePrefix = 'chater_outbox_retry_leader_v1';
+const outboxRetryLeaderLeaseMs = 30000;
+const outboxRetryLeaderRenewMs = 10000;
+const outboxRetryLeadershipSettleMs = 90;
+const outboxRetryBaseMs = 2000;
+const outboxRetryMaxMs = 5 * 60 * 1000;
+const outboxRetryServerMaxMs = 2 * 60 * 60 * 1000;
 const deliveryAckQueueStorageKey = 'chater_delivery_ack_queue_v1';
+const deliveryAckMaxAttempts = 10;
+const deliveryAckMaxAgeMs = 24 * 60 * 60 * 1000;
+const deliveryAckBatchDelayMs = 180;
+const deliveryAckBatchMaxItems = 40;
+const pushRegistrationCacheKey = 'chater_push_registration_v1';
+const pushRegistrationRefreshMs = 24 * 60 * 60 * 1000;
 const privacyModeKey = 'chater_privacy_mode_v1';
 const privacyLockStorageKey = 'chater_privacy_lock_v1';
 const privacyLockAutoMs = 5 * 60 * 1000;
@@ -149,6 +184,8 @@ const smartReplySuggestionLimit = 4;
 const contactPreviewRetryDelayMs = 4500;
 const contactPreviewMaxAttempts = 3;
 const contactPreviewRequestTimeoutMs = 6500;
+const contactPreviewBatchMaxItems = 24;
+const contactPreviewBatchDelayMs = 35;
 
 function hasInstallDismissedPersisted() {
   try { return localStorage.getItem(installDismissedStorageKey) === '1'; } catch { return false; }
@@ -158,8 +195,13 @@ const state = {
   config: null,
   user: null,
   contacts: [],
+  contactsNextCursor: null,
+  contactsHasMore: false,
+  contactsLoading: false,
   contactLinkPreviews: new Map(),
   contactLinkPreviewInFlight: new Set(),
+  contactLinkPreviewQueue: new Map(),
+  contactLinkPreviewBatchTimer: 0,
   contactLinkPreviewRetryTimers: new Map(),
   contactShareModalOpen: false,
   contactShareTargetProfile: null,
@@ -167,14 +209,25 @@ const state = {
   contactSharePage: 0,
   contactShareSending: false,
   chats: [],
+  chatsNextCursor: null,
+  chatsHasMore: false,
+  chatsLoading: false,
+  chatListPaginationDirty: false,
+  chatListLoadedMode: 'active',
+  chatListLoadedAt: 0,
+  chatListModeRequests: new Map(),
   labels: [],
   chatLabelsByChatId: new Map(),
   labelsLoading: false,
+  labelsLoaded: false,
   labelsModalOpen: false,
   labelsSaving: false,
   blockedContactsOpen: false,
   blockedContacts: [],
   blockedContactsLoading: false,
+  blockedContactsLoaded: false,
+  blockedContactsNextCursor: null,
+  blockedContactsHasMore: false,
   contactNicknameModalOpen: false,
   contactNicknameTarget: null,
   contactNicknameDraft: '',
@@ -184,8 +237,15 @@ const state = {
   archivedView: false,
   chatListMode: 'active',
   messagesByChat: new Map(),
+  messageHistoryCoverageByChat: new Map(),
+  messageHistoryRequestsByChat: new Map(),
+  readRequestsByChat: new Map(),
+  messageSyncCursorByChat: new Map(),
+  messageBaselineLoadedChats: new Set(),
+  pinnedMessagesByChat: new Map(),
   deliveryAckInFlight: new Set(),
   deliveryAckRetryTimer: 0,
+  deliveryAckRetryAt: 0,
   renderedMessageCountByChat: new Map(),
   renderedActiveChatId: '',
   renderCache: {
@@ -201,7 +261,9 @@ const state = {
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
   realtimeShortDisconnects: 0,
+  realtimeAttemptStartedAt: 0,
   realtimeOpenedAt: 0,
+  realtimeConnectedOnce: false,
   realtimeStableTimer: 0,
   realtimeManualClose: false,
   realtimeLeader: false,
@@ -210,9 +272,15 @@ const state = {
   realtimeLeaseTimer: 0,
   realtimeElectionTimer: 0,
   realtimeHiddenTimer: 0,
+  realtimePeerActivity: new Map(),
   realtimeCoordinatorReady: false,
   realtimeSeenEventIds: new Set(),
   realtimeResyncPromise: null,
+  realtimeRetryBlocked: false,
+  realtimeRetryNotBefore: 0,
+  bootstrapRestoreWaiter: null,
+  realtimePreBootstrapEnvelopes: [],
+  bootstrapAppliedAt: 0,
   installPrompt: null,
   installDismissed: hasInstallDismissedPersisted(),
   installRelatedCheckDone: false,
@@ -221,12 +289,28 @@ const state = {
   pushState: 'idle',
   serviceWorkerRegistration: null,
   typingTimer: 0,
+  typingSignalActive: false,
+  typingSignalChatId: '',
+  typingSignalLastSentAt: 0,
   draftSaveTimer: 0,
   draftSyncTimers: new Map(),
   draftOriginId: '',
   draftInputVersion: 0,
   draftInputMetaByChat: new Map(),
   draftLastClearedAtByChat: new Map(),
+  // Evita un HTTP Response /draft/get cada vez que el usuario reabre el mismo chat.
+  // La marca solo vive durante la sesión de frontend y se invalida ante cambios SSE
+  // o un bootstrap/resync, de modo que nunca sustituye una lectura necesaria.
+  draftRemoteLoadedChats: new Set(),
+  // Evita volver a crear una HTTP Response /draft/save cuando distintos eventos de
+  // ciclo de vida intentan persistir exactamente el mismo borrador ya confirmado.
+  // También permite que dos disparadores simultáneos compartan la misma petición.
+  draftLastSyncedTextByChat: new Map(),
+  // El guardado local conserva su debounce corto, pero las versiones sucesivas del
+  // mismo borrador se agrupan antes de cruzar HTTP. Los flush de ciclo de vida
+  // siguen siendo inmediatos para no sacrificar recuperación entre dispositivos.
+  draftRemoteLastAttemptAtByChat: new Map(),
+  draftSyncInFlightByChat: new Map(),
   draftLoadSeq: 0,
   outboxMessages: [],
   outboxSyncing: false,
@@ -238,9 +322,13 @@ const state = {
   chatSearchOpen: false,
   chatSearchResults: [],
   chatSearchLoading: false,
+  chatSearchNextCursor: null,
+  chatSearchHasMore: false,
   starredPanelOpen: false,
   starredMessages: [],
   starredLoading: false,
+  starredNextCursor: null,
+  starredHasMore: false,
   quickRepliesOpen: false,
   slashCommandsOpen: false,
   iconInsertPanelOpen: false,
@@ -273,6 +361,7 @@ const state = {
   compactMode: false,
   scheduleModalOpen: false,
   scheduledMessages: [],
+  scheduledLoadedChatId: '',
   scheduledLoading: false,
   schedulingMessage: false,
   pollModalOpen: false,
@@ -282,10 +371,16 @@ const state = {
   globalSearchResults: [],
   globalSearchLoading: false,
   globalSearchSearchedChats: 0,
+  globalSearchNextCursor: null,
+  globalSearchHasMore: false,
   globalStarredOpen: false,
   globalStarredMessages: [],
   globalStarredLoading: false,
   globalStarredScannedChats: 0,
+  globalStarredNextCursor: null,
+  globalStarredHasMore: false,
+  globalStarredLoaded: false,
+  globalStarredDirty: true,
   draftsOpen: false,
   drafts: [],
   draftsLoading: false,
@@ -302,6 +397,7 @@ const state = {
   dateJumpChatId: '',
   privateNotesOpen: false,
   privateNotes: [],
+  privateNotesLoadedChatId: '',
   privateNotesLoading: false,
   privateNoteSaving: false,
   privateNoteEditingId: '',
@@ -309,6 +405,7 @@ const state = {
   reminderMessage: null,
   reminderDraftText: '',
   reminders: [],
+  remindersLoadedChatId: '',
   remindersLoading: false,
   reminderSaving: false,
   voiceRecognition: null,
@@ -348,6 +445,7 @@ let appNavigationHistorySyncFrame = 0;
 let appNavigationHistoryHandlingPop = false;
 let appNavigationHistoryReconcilingTo = null;
 let appNavigationHistoryObserver = null;
+let globalSearchRequestSequence = 0;
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -380,16 +478,28 @@ const els = {
 
 
 function getClientId() {
-  if (state.clientId) return state.clientId;
-  const existing = localStorage.getItem(clientIdKey) || '';
-  if (existing) {
-    state.clientId = existing;
-    return existing;
+  try {
+    const stored = String(localStorage.getItem(clientIdKey) || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 120);
+    // localStorage es la autoridad compartida entre pestañas. Releerlo evita que dos
+    // aperturas simultáneas conserven IDs distintos después de una carrera de primer uso.
+    if (stored) {
+      state.clientId = stored;
+      return stored;
+    }
+    if (state.clientId) {
+      localStorage.setItem(clientIdKey, state.clientId);
+      return state.clientId;
+    }
+    const randomPart = window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `client_${Date.now()}`;
+    localStorage.setItem(clientIdKey, state.clientId);
+    return state.clientId;
+  } catch {
+    if (state.clientId) return state.clientId;
+    const randomPart = window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `client_${Date.now()}`;
+    return state.clientId;
   }
-  const randomPart = window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  state.clientId = String(randomPart).replace(/[^a-z0-9_-]/gi, '').slice(0, 120) || `client_${Date.now()}`;
-  localStorage.setItem(clientIdKey, state.clientId);
-  return state.clientId;
 }
 
 function getDraftOriginId() {
@@ -490,7 +600,12 @@ function canUseInlineFallbackForPrepared(prepared = {}) {
 function normalizeAttachmentClient(attachment = null) {
   if (!attachment || typeof attachment !== 'object') return null;
   const attachmentId = String(attachment.attachmentId || attachment.id || '').trim();
-  const url = String(attachment.url || attachment.publicUrl || attachment.readUrl || '').trim();
+  const publicUrl = String(attachment.publicUrl || '').trim();
+  const readUrl = String(attachment.readUrl || '').trim();
+  const signedUrlExpiresAt = String(attachment.signedUrlExpiresAt || '').trim();
+  let url = String(attachment.url || publicUrl || readUrl).trim();
+  const signedExpiryMs = Date.parse(signedUrlExpiresAt || '');
+  if (Number.isFinite(signedExpiryMs) && signedExpiryMs <= Date.now() + 5000 && readUrl && readUrl !== url) url = readUrl;
   if (!attachmentId || !url) return null;
   const kind = String(attachment.kind || attachment.mediaKind || '').trim().toLowerCase() === 'image' ? 'image' : 'file';
   return {
@@ -502,8 +617,9 @@ function normalizeAttachmentClient(attachment = null) {
     width: Math.max(0, Number(attachment.width || 0) || 0),
     height: Math.max(0, Number(attachment.height || 0) || 0),
     url,
-    publicUrl: String(attachment.publicUrl || '').trim(),
-    readUrl: String(attachment.readUrl || '').trim()
+    publicUrl,
+    readUrl,
+    signedUrlExpiresAt
   };
 }
 
@@ -555,6 +671,17 @@ function syncAttachmentImageOrientationFromElement(image = null) {
 
 function syncRenderedAttachmentImageOrientations(root = els.messages) {
   root?.querySelectorAll?.('.ce-attachment--image img')?.forEach((image) => {
+    const fallbackUrl = String(image.dataset.attachmentFallbackUrl || '').trim();
+    if (fallbackUrl && image.dataset.ceAttachmentFallbackBound !== '1') {
+      image.dataset.ceAttachmentFallbackBound = '1';
+      image.addEventListener('error', () => {
+        if (image.dataset.ceAttachmentFallbackUsed === '1') return;
+        image.dataset.ceAttachmentFallbackUsed = '1';
+        const button = image.closest('[data-open-image-viewer]');
+        if (button) button.dataset.imageUrl = fallbackUrl;
+        image.src = fallbackUrl;
+      });
+    }
     const syncAndRefreshLayout = () => {
       syncAttachmentImageOrientationFromElement(image);
       scheduleScrollBottomButtonUpdate();
@@ -573,12 +700,16 @@ function renderMessageAttachment(attachment = null) {
   const normalized = normalizeAttachmentClient(attachment);
   if (!normalized) return '';
   const size = normalized.sizeBytes ? ` · ${formatFileSize(normalized.sizeBytes)}` : '';
+  const fallbackUrl = normalized.readUrl && normalized.readUrl !== normalized.url ? normalized.readUrl : '';
+  const fallbackAttrs = fallbackUrl
+    ? ` data-attachment-fallback-url="${escapeHtml(fallbackUrl)}" data-attachment-signed-expires-at="${escapeHtml(normalized.signedUrlExpiresAt || '')}"`
+    : '';
   if (normalized.kind === 'image') {
     const orientation = attachmentImageOrientationClass(normalized);
     const imageLabel = `Ver imagen adjunta ${normalized.fileName}`;
-    return `<figure class="ce-attachment ce-attachment--image ce-attachment--${escapeHtml(orientation)}" data-image-orientation="${escapeHtml(orientation)}"><button class="ce-attachment__image-button" type="button" data-open-image-viewer="1" data-image-url="${escapeHtml(normalized.url)}" data-image-alt="${escapeHtml(normalized.fileName)}" aria-label="${escapeHtml(imageLabel)}"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy" /></button></figure>`;
+    return `<figure class="ce-attachment ce-attachment--image ce-attachment--${escapeHtml(orientation)}" data-image-orientation="${escapeHtml(orientation)}"><button class="ce-attachment__image-button" type="button" data-open-image-viewer="1" data-image-url="${escapeHtml(normalized.url)}" data-image-alt="${escapeHtml(normalized.fileName)}" aria-label="${escapeHtml(imageLabel)}"><img src="${escapeHtml(normalized.url)}" alt="${escapeHtml(normalized.fileName)}" loading="lazy"${fallbackAttrs} /></button></figure>`;
   }
-  return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
+  return `<a class="ce-attachment ce-attachment--file" href="${escapeHtml(normalized.url)}" target="_blank" rel="noopener noreferrer" download="${escapeHtml(normalized.fileName)}"${fallbackAttrs}><span class="ce-attachment__icon" aria-hidden="true">${uiIcon('attachment')}</span><span><strong>${escapeHtml(normalized.fileName)}</strong><em>${escapeHtml(normalized.mimeType)}${escapeHtml(size)}</em></span></a>`;
 }
 
 function shouldRenderMessageTextBody(text = '', attachment = null) {
@@ -1108,7 +1239,13 @@ function renderAttachmentPicker() {
   els.attachmentPickerPanel.classList.remove('hidden');
   if (state.attachmentPickerView === 'chater') {
     const contacts = attachmentPickerContactRows();
-    els.attachmentPickerPanel.innerHTML = `<div class="ce-attachment-picker__head"><button type="button" class="ce-attachment-picker__back" data-attachment-picker-back="1" aria-label="Volver">${uiIcon('arrowRight')}</button><span><strong>Contacto ChatER</strong><small>Elige un contacto agregado para compartirlo.</small></span></div><div class="ce-attachment-picker__contacts">${contacts.length ? contacts.map((contact) => `<button type="button" class="ce-attachment-picker__contact" data-attachment-chater-contact-id="${escapeHtml(contact.userId)}">${avatar(contact, 'small')}<span><strong>${escapeHtml(contactDisplayName(contact))}</strong><small>${escapeHtml(contactDisplaySubtitle(contact))}</small></span></button>`).join('') : '<div class="ce-attachment-picker__empty">No tienes contactos ChatER con perfil compartible.</div>'}</div>`;
+    const contactRows = contacts.length
+      ? contacts.map((contact) => `<button type="button" class="ce-attachment-picker__contact" data-attachment-chater-contact-id="${escapeHtml(contact.userId)}">${avatar(contact, 'small')}<span><strong>${escapeHtml(contactDisplayName(contact))}</strong><small>${escapeHtml(contactDisplaySubtitle(contact))}</small></span></button>`).join('')
+      : '<div class="ce-attachment-picker__empty">No hay contactos ChatER cargados con perfil compartible.</div>';
+    const loadMoreContactsButton = state.contactsHasMore
+      ? `<button type="button" class="ce-link" data-load-more-attachment-contacts="1"${state.contactsLoading ? ' disabled' : ''}>${state.contactsLoading ? 'Cargando contactos...' : 'Cargar más contactos'}</button>`
+      : '';
+    els.attachmentPickerPanel.innerHTML = `<div class="ce-attachment-picker__head"><button type="button" class="ce-attachment-picker__back" data-attachment-picker-back="1" aria-label="Volver">${uiIcon('arrowRight')}</button><span><strong>Contacto ChatER</strong><small>Elige un contacto agregado para compartirlo.</small></span></div><div class="ce-attachment-picker__contacts">${contactRows}${loadMoreContactsButton}</div>`;
     return;
   }
   const options = [
@@ -1360,13 +1497,60 @@ function isImageAttachmentFile(file = null) {
   return Boolean(file && mime.startsWith('image/') && mime !== 'image/gif' && mime !== 'image/svg+xml' && !name.endsWith('.svg'));
 }
 
-async function prepareFileForR2(file, onProgress = () => {}, options = {}) {
-  if (!file) throw new Error('Selecciona un archivo para adjuntar.');
-  if (isImageAttachmentFile(file)) {
+function versionedLazyFrontendAssetUrl(relativePath = '') {
+  const target = new URL(String(relativePath || ''), import.meta.url);
+  const releaseVersion = new URL(import.meta.url).searchParams.get('v');
+  if (releaseVersion) target.searchParams.set('v', releaseVersion);
+  return target.href;
+}
+
+function loadLazyClassicScript(relativePath = '') {
+  const src = versionedLazyFrontendAssetUrl(relativePath);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.chaterLazyAsset = src;
+    script.addEventListener('load', () => resolve(true), { once: true });
+    script.addEventListener('error', () => {
+      script.remove();
+      reject(new Error('No se pudo cargar el módulo de compresión de imágenes.'));
+    }, { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureImageWebpCompressor() {
+  const existing = window.ChatERImageWebpCompressorLego;
+  if (existing?.compress) return existing;
+  if (imageCompressorLoadPromise) return imageCompressorLoadPromise;
+
+  imageCompressorLoadPromise = (async () => {
+    if (!window.IMAGENwebpCOMPRESIONxBloque?.compress) {
+      await loadLazyClassicScript('../../IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js');
+    }
+    if (!window.ChatERImageWebpCompressorLego?.compress) {
+      await loadLazyClassicScript('../../IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js');
+    }
     const compressor = window.ChatERImageWebpCompressorLego;
     if (!compressor?.compress) {
       throw new Error('El bloque IMAGENwebpCOMPRESIONx no está disponible; la imagen no se enviará sin compresión WebP garantizada.');
     }
+    return compressor;
+  })();
+
+  try {
+    return await imageCompressorLoadPromise;
+  } catch (error) {
+    imageCompressorLoadPromise = null;
+    throw error;
+  }
+}
+
+async function prepareFileForR2(file, onProgress = () => {}, options = {}) {
+  if (!file) throw new Error('Selecciona un archivo para adjuntar.');
+  if (isImageAttachmentFile(file)) {
+    const compressor = await ensureImageWebpCompressor();
     const result = await compressor.compress(file, {
       maxBytes: R2_IMAGE_MAX_BYTES,
       maxDimension: 1600,
@@ -1721,13 +1905,27 @@ function stablePreviewVersion(value = '') {
   return `pv_${(hash >>> 0).toString(36)}`;
 }
 
+const profileShareCacheSchema = 'profile-share-v2';
+
+function profileShareVersionText(value = '', max = 500) {
+  return String(value || '')
+    .replace(/[\x00-\x1F\x7F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, Math.max(0, Number(max || 0)));
+}
+
 function profileSharePreviewVersion(profileOrCode = {}) {
   if (!profileOrCode || typeof profileOrCode === 'string') return '';
   const source = [
+    profileShareCacheSchema,
     profileOrCode.profileCode || '',
-    String(profileOrCode.displayName || '').trim().slice(0, 120),
-    String(profileOrCode.photoUrl || '').trim().slice(0, 600),
-    profileOrCode.updatedAt || ''
+    profileShareVersionText(profileOrCode.email || '', 240),
+    profileShareVersionText(profileOrCode.displayName || '', 120),
+    profileShareVersionText(profileOrCode.photoUrl || '', 600),
+    profileOrCode.updatedAt || '',
+    String(state.config?.backendPublicUrl || getBackendUrl() || '').trim().replace(/\/+$/, ''),
+    String(state.config?.staticSiteUrl || window.location.href || '').trim().replace(/\/+$/, '')
   ].join('|');
   return stablePreviewVersion(source);
 }
@@ -2405,9 +2603,124 @@ function applyLabelCatalog(items = []) {
   }
   state.labels = labels;
   state.chatLabelsByChatId = byChat;
+  state.labelsLoaded = true;
   if (state.activeLabelFilter && !labels.some((item) => item.label.toLowerCase() === state.activeLabelFilter.toLowerCase())) {
     state.activeLabelFilter = '';
   }
+}
+
+function applyChatLabelMemberships(input = {}, { replaceKnown = false } = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return;
+  let labels = normalizeLabelCatalog(state.labels || []).map((item) => ({ ...item, chatIds: [...(item.chatIds || [])] }));
+  if (replaceKnown) {
+    state.chatLabelsByChatId.clear();
+    labels = labels.map((item) => ({ ...item, chatIds: [] }));
+  }
+
+  for (const [rawChatId, rawLabels] of Object.entries(input)) {
+    const chatId = String(rawChatId || '').trim();
+    if (!chatId) continue;
+    const memberships = normalizeChatLabelList(rawLabels || []);
+
+    labels = labels.map((item) => ({
+      ...item,
+      chatIds: (item.chatIds || []).filter((knownChatId) => knownChatId !== chatId)
+    }));
+
+    if (memberships.length) state.chatLabelsByChatId.set(chatId, memberships);
+    else state.chatLabelsByChatId.delete(chatId);
+
+    for (const label of memberships) {
+      const lower = label.toLowerCase();
+      let index = labels.findIndex((item) => item.label.toLowerCase() === lower);
+      if (index < 0) {
+        labels.push({ label, count: 1, chatIds: [chatId], createdAt: '', updatedAt: '' });
+        continue;
+      }
+      const item = labels[index];
+      const chatIds = Array.from(new Set([...(item.chatIds || []), chatId]));
+      labels[index] = { ...item, count: Math.max(Number(item.count || 0), chatIds.length), chatIds };
+    }
+
+  }
+
+  state.labels = normalizeLabelCatalog(labels);
+}
+
+function applyLabelDelta(data = {}) {
+  const chatId = String(data.chatId || '').trim();
+  const nextLabels = normalizeChatLabelList(data.labels || []);
+  const nextLower = new Set(nextLabels.map((label) => label.toLowerCase()));
+  const changes = Array.isArray(data.labelChanges) ? data.labelChanges : [];
+  let labels = normalizeLabelCatalog(state.labels || []).map((item) => ({ ...item, chatIds: [...(item.chatIds || [])] }));
+
+  if (chatId) {
+    labels = labels.map((item) => {
+      const member = nextLower.has(item.label.toLowerCase());
+      const chatIds = (item.chatIds || []).filter((id) => id !== chatId);
+      if (member) chatIds.push(chatId);
+      return { ...item, chatIds: Array.from(new Set(chatIds)) };
+    });
+    if (nextLabels.length) state.chatLabelsByChatId.set(chatId, [...nextLabels]);
+    else state.chatLabelsByChatId.delete(chatId);
+  }
+
+  for (const change of changes) {
+    const cleanLabel = normalizeChatLabelName(change?.label || '');
+    if (!cleanLabel) continue;
+    const lower = cleanLabel.toLowerCase();
+    const count = Math.max(0, Number(change?.count || 0));
+    if (change?.deleted === true || count <= 0) {
+      labels = labels.filter((item) => item.label.toLowerCase() !== lower);
+      for (const [knownChatId, knownLabels] of state.chatLabelsByChatId.entries()) {
+        const filtered = normalizeChatLabelList(knownLabels).filter((label) => label.toLowerCase() !== lower);
+        if (filtered.length) state.chatLabelsByChatId.set(knownChatId, filtered);
+        else state.chatLabelsByChatId.delete(knownChatId);
+      }
+      continue;
+    }
+
+    let index = labels.findIndex((item) => item.label.toLowerCase() === lower);
+    const existing = index >= 0 ? labels[index] : null;
+    const chatIds = existing ? [...(existing.chatIds || [])] : [];
+    if (chatId) {
+      const filtered = chatIds.filter((id) => id !== chatId);
+      if (nextLower.has(lower)) filtered.push(chatId);
+      chatIds.splice(0, chatIds.length, ...Array.from(new Set(filtered)));
+    }
+    const nextItem = {
+      label: cleanLabel,
+      count,
+      chatIds,
+      createdAt: String(change?.createdAt || existing?.createdAt || '').trim(),
+      updatedAt: String(change?.updatedAt || existing?.updatedAt || '').trim()
+    };
+    if (index >= 0) labels[index] = nextItem;
+    else labels.push(nextItem);
+
+    for (const [knownChatId, knownLabels] of state.chatLabelsByChatId.entries()) {
+      const normalized = normalizeChatLabelList(knownLabels).map((label) => label.toLowerCase() === lower ? cleanLabel : label);
+      state.chatLabelsByChatId.set(knownChatId, normalized);
+    }
+  }
+
+  state.labels = normalizeLabelCatalog(labels);
+  if (state.activeLabelFilter && !state.labels.some((item) => item.label.toLowerCase() === state.activeLabelFilter.toLowerCase())) {
+    state.activeLabelFilter = '';
+  }
+}
+
+function removeLabelFromState(label = '') {
+  const cleanLabel = normalizeChatLabelName(label);
+  const lower = cleanLabel.toLowerCase();
+  if (!cleanLabel) return;
+  state.labels = normalizeLabelCatalog(state.labels).filter((item) => item.label.toLowerCase() !== lower);
+  for (const [chatId, knownLabels] of state.chatLabelsByChatId.entries()) {
+    const filtered = normalizeChatLabelList(knownLabels).filter((item) => item.toLowerCase() !== lower);
+    if (filtered.length) state.chatLabelsByChatId.set(chatId, filtered);
+    else state.chatLabelsByChatId.delete(chatId);
+  }
+  if (state.activeLabelFilter?.toLowerCase() === lower) state.activeLabelFilter = '';
 }
 
 function getLabelsForChat(chatId = '') {
@@ -2426,7 +2739,7 @@ function chatHasActiveLabel(chat = {}) {
 
 async function loadChatLabels({ force = false } = {}) {
   if (!state.user || state.labelsLoading) return state.labels;
-  if (!force && state.labels.length) return state.labels;
+  if (!force && state.labelsLoaded) return state.labels;
   state.labelsLoading = true;
   renderLabelFilters();
   try {
@@ -2453,7 +2766,7 @@ async function openLabelsModal() {
   state.labelsModalOpen = true;
   state.labelsDraft = getLabelsForChat(chat.chatId).join(', ');
   renderLabelsModal();
-  await loadChatLabels({ force: !state.labels.length }).catch(() => null);
+  await loadChatLabels({ force: !state.labelsLoaded }).catch(() => null);
   if (!state.labelsDraft) state.labelsDraft = getLabelsForChat(chat.chatId).join(', ');
   renderLabelsModal();
   window.setTimeout(() => els.chatLabelsInput?.focus(), 0);
@@ -2540,8 +2853,9 @@ async function saveLabelsFromModal() {
   state.labelsSaving = true;
   renderLabelsModal();
   try {
-    const data = await post('/api/chats/labels/save', { chatId: chat.chatId, labels });
-    applyLabelCatalog(data.allLabels || []);
+    const data = await post('/api/chats/labels/save', { chatId: chat.chatId, labels, compactResponse: true });
+    if (Array.isArray(data.allLabels)) applyLabelCatalog(data.allLabels);
+    else applyLabelDelta(data);
     state.labelsDraft = normalizeChatLabelList(data.labels || labels).join(', ');
     closeLabelsModal();
     showTemporaryDraftStatus(labels.length ? 'Etiquetas guardadas para este chat.' : 'Etiquetas quitadas de este chat.');
@@ -2557,8 +2871,9 @@ async function deleteChatLabel(label = '') {
   if (!cleanLabel) return;
   const ok = window.confirm(`¿Eliminar la etiqueta “${cleanLabel}” de todos tus chats?`);
   if (!ok) return;
-  const data = await post('/api/chats/labels/delete', { label: cleanLabel });
-  applyLabelCatalog(data.allLabels || []);
+  const data = await post('/api/chats/labels/delete', { label: cleanLabel, compactResponse: true });
+  if (Array.isArray(data.allLabels)) applyLabelCatalog(data.allLabels);
+  else removeLabelFromState(data.label || cleanLabel);
   showTemporaryDraftStatus(`Etiqueta “${cleanLabel}” eliminada.`);
   renderAll();
 }
@@ -2570,6 +2885,67 @@ function safeStorageKeyPart(value = '') {
 function outboxStorageKey() {
   const userId = safeStorageKeyPart(state.user?.userId || '');
   return userId ? `${outboxStoragePrefix}:${userId}` : '';
+}
+
+function outboxRetryLeaderStorageKey() {
+  const userId = safeStorageKeyPart(state.user?.userId || '');
+  return userId ? `${outboxRetryLeaderStoragePrefix}:${userId}` : '';
+}
+
+function readOutboxRetryLease() {
+  const key = outboxRetryLeaderStorageKey();
+  if (!key) return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch { return null; }
+}
+
+function writeOutboxRetryLease(expiresAt = Date.now() + outboxRetryLeaderLeaseMs) {
+  const key = outboxRetryLeaderStorageKey();
+  if (!key || !state.user?.userId) return false;
+  const lease = {
+    owner: getRealtimeTabId(),
+    userId: String(state.user.userId),
+    expiresAt: Math.max(Date.now() + 1000, Number(expiresAt || 0))
+  };
+  try { localStorage.setItem(key, JSON.stringify(lease)); } catch { return false; }
+  const stored = readOutboxRetryLease();
+  return stored?.owner === lease.owner
+    && String(stored?.userId || '') === lease.userId
+    && Number(stored?.expiresAt || 0) > Date.now();
+}
+
+function clearOutboxRetryLeaseIfOwned() {
+  const key = outboxRetryLeaderStorageKey();
+  if (!key) return;
+  const lease = readOutboxRetryLease();
+  if (lease?.owner !== getRealtimeTabId()) return;
+  try { localStorage.removeItem(key); } catch {}
+}
+
+function claimOutboxRetryLeadership() {
+  if (!state.user?.userId) return false;
+  const now = Date.now();
+  const current = readOutboxRetryLease();
+  const owned = current?.owner === getRealtimeTabId()
+    && String(current?.userId || '') === String(state.user.userId);
+  const available = !current
+    || Number(current.expiresAt || 0) <= now
+    || String(current.userId || '') !== String(state.user.userId);
+  if (!owned && !available) return false;
+  return writeOutboxRetryLease(now + outboxRetryLeaderLeaseMs);
+}
+
+async function settleOutboxRetryLeadership() {
+  const jitter = Math.round(Math.random() * outboxRetryLeadershipSettleMs);
+  await new Promise((resolve) => window.setTimeout(resolve, outboxRetryLeadershipSettleMs + jitter));
+  const lease = readOutboxRetryLease();
+  return Boolean(
+    lease?.owner === getRealtimeTabId()
+    && String(lease?.userId || '') === String(state.user?.userId || '')
+    && Number(lease?.expiresAt || 0) > Date.now()
+  );
 }
 
 function normalizeQueuedMessage(item = {}) {
@@ -2594,6 +2970,8 @@ function normalizeQueuedMessage(item = {}) {
     updatedAt: item.updatedAt && !Number.isNaN(Date.parse(item.updatedAt)) ? item.updatedAt : createdAt,
     status,
     attempts: Math.max(0, Number(item.attempts || 0)),
+    retryable: item.retryable !== false,
+    nextAttemptAt: Math.max(0, Number(item.nextAttemptAt || 0)),
     lastError: String(item.lastError || '').trim().slice(0, 240)
   };
 }
@@ -2666,6 +3044,38 @@ function isRecoverableSendError(error = {}) {
   return !status || /fetch|network|conexi[oó]n|internet|offline|load failed|networkerror/.test(message);
 }
 
+function isDefinitiveHttpError(error = {}) {
+  const status = Number(error?.status || 0);
+  if (!status || [408, 425, 429].includes(status)) return false;
+  return status >= 400 && status < 500;
+}
+
+function isSessionInvalidatingHttpError(error = {}) {
+  // /api/bootstrap responde 401 cuando la sesión ya no existe. Otros estados
+  // (incluidos 403/404/429/5xx) pueden ser de política, despliegue, gateway o
+  // presupuesto y no deben convertir una falla temporal en un cierre de sesión.
+  return Number(error?.status || 0) === 401;
+}
+
+function nextOutboxRetryAt(error = {}, attempts = 1) {
+  if (navigator.onLine === false) return 0;
+  const retryAfter = Math.max(0, Number(error?.retryAfterMs || 0));
+  if (retryAfter > 0) return Date.now() + Math.min(outboxRetryServerMaxMs, retryAfter);
+  const exponent = Math.min(7, Math.max(0, Number(attempts || 1) - 1));
+  const jitter = 0.75 + (Math.random() * 0.5);
+  const delay = Math.min(outboxRetryMaxMs, Math.round(outboxRetryBaseMs * (2 ** exponent) * jitter));
+  return Date.now() + Math.max(outboxRetryBaseMs, delay);
+}
+
+function nextPendingOutboxRetryAt() {
+  const now = Date.now();
+  return state.outboxMessages
+    .filter((item) => item.retryable !== false && Number(item.attempts || 0) < 6)
+    .map((item) => Math.max(0, Number(item.nextAttemptAt || 0)))
+    .filter((value) => value > now)
+    .sort((a, b) => a - b)[0] || 0;
+}
+
 function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', replyToMessageId = '', replyTo = null, silent = false, ephemeralSeconds = 0, attachment = null, error = null } = {}) {
   const now = new Date().toISOString();
   const normalizedAttachment = normalizeAttachmentClient(attachment);
@@ -2683,6 +3093,7 @@ function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', re
     updatedAt: now,
     status: 'queued',
     attempts: 0,
+    nextAttemptAt: isRecoverableSendError(error) ? nextOutboxRetryAt(error, 1) : 0,
     lastError: error?.message || ''
   }, { render: false });
   if (!queued) return null;
@@ -2694,11 +3105,14 @@ function enqueueOutboxMessage({ chatId = '', text = '', clientMessageId = '', re
 function renderQueuedMessage(queued = {}) {
   const failed = queued.status === 'failed';
   const sending = queued.status === 'sending';
+  const retryStopped = failed && queued.retryable === false;
   const queuedAttachment = normalizeAttachmentClient(queued.attachment || null);
   const queuedText = renderMessageTextBody(queued.text, queuedAttachment);
   const statusText = sending
     ? 'Enviando pendiente...'
-    : (failed ? `Pendiente sin enviar${queued.lastError ? ` · ${queued.lastError}` : ''}` : 'Pendiente · se enviará al recuperar conexión');
+    : (failed
+      ? `${retryStopped ? 'Reintento automático detenido' : 'Pendiente sin enviar'}${queued.lastError ? ` · ${queued.lastError}` : ''}`
+      : 'Pendiente · se enviará al recuperar conexión');
   const replyPreview = queued.replyTo?.text
     ? `<button class="ce-reply-preview" type="button" disabled aria-label="Mensaje respondido pendiente"><strong>${uiIcon('reply')} ${escapeHtml(messageSenderLabel(queued.replyTo.senderUserId))}</strong><span>${escapeHtml(compactText(queued.replyTo.text))}</span></button>`
     : '';
@@ -2719,7 +3133,17 @@ function renderQueuedMessage(queued = {}) {
 async function sendQueuedOutboxMessage(queued = {}) {
   const normalized = normalizeQueuedMessage(queued);
   if (!normalized || !state.user) return false;
-  upsertQueuedMessage({ ...normalized, status: 'sending', attempts: normalized.attempts + 1, updatedAt: new Date().toISOString(), lastError: '' }, { render: true });
+  const attemptNumber = normalized.attempts + 1;
+  upsertQueuedMessage({
+    ...normalized,
+    status: 'sending',
+    attempts: attemptNumber,
+    // Si el contexto se congela o muere con el fetch en vuelo, otra pestaña espera
+    // al menos la ventana del lease antes de volver a gastar una HTTP Response.
+    nextAttemptAt: Date.now() + outboxRetryLeaderLeaseMs,
+    updatedAt: new Date().toISOString(),
+    lastError: ''
+  }, { render: true });
   try {
     const data = await post('/api/chats/send', {
       chatId: normalized.chatId,
@@ -2741,10 +3165,13 @@ async function sendQueuedOutboxMessage(queued = {}) {
     upsertQueuedMessage({
       ...normalized,
       status: 'failed',
-      attempts: normalized.attempts + 1,
+      attempts: attemptNumber,
+      retryable: recoverable,
+      nextAttemptAt: recoverable ? nextOutboxRetryAt(error, attemptNumber) : 0,
       updatedAt: new Date().toISOString(),
       lastError: recoverable ? 'Sin conexión o servidor no disponible' : (error?.message || 'No se pudo enviar')
     }, { render: true });
+    scheduleNextOutboxRetry();
     return false;
   }
 }
@@ -2752,22 +3179,45 @@ async function sendQueuedOutboxMessage(queued = {}) {
 async function retryQueuedOutboxMessages({ chatId = '', silent = false, force = false } = {}) {
   if (!state.user || state.outboxSyncing) return { sent: 0, failed: 0 };
   if (!force && navigator.onLine === false) return { sent: 0, failed: state.outboxMessages.length };
+  // localStorage comparte la cola entre pestañas/PWA. Sin un lease compartido,
+  // cada contexto puede reintentar el mismo clientMessageId y consumir una HTTP
+  // Response aunque el backend deduplique el mensaje. Solo el ganador del lease
+  // ejecuta la ráfaga y el resto recibe el resultado mediante el evento storage.
+  if (!claimOutboxRetryLeadership()) return { sent: 0, failed: 0, skipped: 'peer-retrying' };
+  if (!await settleOutboxRetryLeadership()) return { sent: 0, failed: 0, skipped: 'peer-retrying' };
+  loadOutboxState();
+  const now = Date.now();
   const targets = state.outboxMessages
     .filter((item) => !chatId || item.chatId === chatId)
-    .filter((item) => force || item.attempts < 6);
-  if (!targets.length) return { sent: 0, failed: 0 };
+    .filter((item) => force || item.retryable !== false)
+    .filter((item) => force || item.attempts < 6)
+    .filter((item) => force || Number(item.nextAttemptAt || 0) <= now);
+  if (!targets.length) {
+    clearOutboxRetryLeaseIfOwned();
+    scheduleNextOutboxRetry();
+    return { sent: 0, failed: 0 };
+  }
   state.outboxSyncing = true;
+  const renewTimer = window.setInterval(() => {
+    const lease = readOutboxRetryLease();
+    if (lease?.owner !== getRealtimeTabId()) return;
+    writeOutboxRetryLease(Date.now() + outboxRetryLeaderLeaseMs);
+  }, outboxRetryLeaderRenewMs);
   let sent = 0;
   let failed = 0;
   try {
     renderAll();
     for (const item of targets) {
+      const lease = readOutboxRetryLease();
+      if (lease?.owner !== getRealtimeTabId() || Number(lease?.expiresAt || 0) <= Date.now()) break;
       const ok = await sendQueuedOutboxMessage(item);
       if (ok) sent += 1;
       else failed += 1;
       if (!ok && navigator.onLine === false) break;
     }
   } finally {
+    window.clearInterval(renewTimer);
+    clearOutboxRetryLeaseIfOwned();
     state.outboxSyncing = false;
     renderAll();
   }
@@ -2783,8 +3233,17 @@ function scheduleOutboxRetry(delayMs = 900) {
   if (state.outboxRetryTimer) window.clearTimeout(state.outboxRetryTimer);
   state.outboxRetryTimer = window.setTimeout(() => {
     state.outboxRetryTimer = 0;
+    if (document.visibilityState !== 'visible' || navigator.onLine === false) return;
     retryQueuedOutboxMessages({ silent: true }).catch(() => null);
   }, Math.max(0, Number(delayMs || 0)));
+}
+
+function scheduleNextOutboxRetry() {
+  if (!state.user || navigator.onLine === false) return false;
+  const retryAt = nextPendingOutboxRetryAt();
+  if (!retryAt) return false;
+  scheduleOutboxRetry(Math.max(0, retryAt - Date.now()));
+  return true;
 }
 
 function chatDraftStorageKey(chatId = state.activeChatId) {
@@ -2909,22 +3368,49 @@ function applyRemoteDraftToActiveInput(chatId = state.activeChatId, text = '', s
 async function syncDraftToServer(chatId = state.activeChatId, text = '', { announce = false } = {}) {
   const cleanChatId = String(chatId || '').trim();
   if (!state.user || !cleanChatId) return;
+  const draftText = String(text || '');
+  if (state.draftLastSyncedTextByChat.has(cleanChatId) && state.draftLastSyncedTextByChat.get(cleanChatId) === draftText) {
+    state.draftRemoteLoadedChats.add(cleanChatId);
+    if (announce && cleanChatId === state.activeChatId && draftText.trim()) setDraftStatus('Borrador guardado y sincronizado.');
+    return { ok: true, skipped: 'already-synced' };
+  }
+  const currentSync = state.draftSyncInFlightByChat.get(cleanChatId);
+  if (currentSync?.promise && currentSync.text === draftText) {
+    const data = await currentSync.promise;
+    if (announce && data && cleanChatId === state.activeChatId && draftText.trim()) setDraftStatus('Borrador guardado y sincronizado.');
+    return data;
+  }
   const requestStartedAt = Date.now();
+  state.draftRemoteLastAttemptAtByChat.set(cleanChatId, requestStartedAt);
   const payload = {
     chatId: cleanChatId,
-    text: String(text || ''),
+    text: draftText,
     clientId: getClientId(),
     draftOriginId: getDraftOriginId()
   };
+  const promise = (async () => {
+    try {
+      const data = await post('/api/chats/draft/save', payload);
+      state.draftRemoteLoadedChats.add(cleanChatId);
+      state.draftLastSyncedTextByChat.set(cleanChatId, draftText);
+      if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return data;
+      if (data.draft?.text) writeDraftPayload(cleanChatId, data.draft.text, remoteDraftSavedMs(data.draft) || Date.now());
+      else removeLocalDraftPayload(cleanChatId);
+      return data;
+    } catch {
+      if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return null;
+      return null;
+    }
+  })();
+  state.draftSyncInFlightByChat.set(cleanChatId, { text: draftText, promise });
   try {
-    const data = await post('/api/chats/draft/save', payload);
-    if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return;
-    if (data.draft?.text) writeDraftPayload(cleanChatId, data.draft.text, remoteDraftSavedMs(data.draft) || Date.now());
-    else removeLocalDraftPayload(cleanChatId);
-    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador guardado y sincronizado.');
-  } catch {
-    if (wasDraftClearedAfter(cleanChatId, requestStartedAt)) return;
-    if (announce && cleanChatId === state.activeChatId && String(text || '').trim()) setDraftStatus('Borrador guardado en este dispositivo. Se sincronizará cuando haya conexión.');
+    const data = await promise;
+    if (announce && cleanChatId === state.activeChatId && draftText.trim()) {
+      setDraftStatus(data ? 'Borrador guardado y sincronizado.' : 'Borrador guardado en este dispositivo. Se sincronizará cuando haya conexión.');
+    }
+    return data;
+  } finally {
+    if (state.draftSyncInFlightByChat.get(cleanChatId)?.promise === promise) state.draftSyncInFlightByChat.delete(cleanChatId);
   }
 }
 
@@ -2949,6 +3435,16 @@ function scheduleRemoteDraftSync(chatId = state.activeChatId, text = '', { delay
   state.draftSyncTimers.set(cleanChatId, timer);
 }
 
+function scheduleThrottledRemoteDraftSync(chatId = state.activeChatId, text = '', { announce = false } = {}) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!state.user || !cleanChatId) return 0;
+  const lastAttemptAt = Number(state.draftRemoteLastAttemptAtByChat.get(cleanChatId) || 0);
+  const elapsed = lastAttemptAt > 0 ? Math.max(0, Date.now() - lastAttemptAt) : draftRemoteSyncMinIntervalMs;
+  const delay = Math.max(0, draftRemoteSyncMinIntervalMs - elapsed);
+  scheduleRemoteDraftSync(cleanChatId, text, { delay, announce });
+  return delay;
+}
+
 function cancelActiveDraftSaveTimer() {
   if (!state.draftSaveTimer) return false;
   window.clearTimeout(state.draftSaveTimer);
@@ -2961,14 +3457,21 @@ function markActiveDraftInputChanged() {
   rememberDraftInputMeta(state.activeChatId, els.messageInput?.value || '');
 }
 
-function saveDraftSnapshot(chatId = state.activeChatId, text = '', { announce = false } = {}) {
+function saveDraftSnapshot(chatId = state.activeChatId, text = '', { announce = false, remoteMode = 'immediate' } = {}) {
   const cleanChatId = String(chatId || '').trim();
   if (!cleanChatId || !state.user) return;
   cancelRemoteDraftSync(cleanChatId);
   const draftText = String(text || '');
   if (draftText.trim()) {
     const saved = writeDraftPayload(cleanChatId, draftText, Date.now());
-    syncDraftToServer(cleanChatId, draftText, { announce }).catch(() => null);
+    if (remoteMode === 'throttled') {
+      const delay = scheduleThrottledRemoteDraftSync(cleanChatId, draftText, { announce });
+      if (announce && saved && delay > 0 && cleanChatId === state.activeChatId) {
+        setDraftStatus('Borrador guardado en este dispositivo. Sincronización pendiente.');
+      }
+    } else {
+      syncDraftToServer(cleanChatId, draftText, { announce }).catch(() => null);
+    }
     if (announce && !saved && cleanChatId === state.activeChatId) setDraftStatus('No se pudo guardar el borrador en este dispositivo.');
   } else {
     removeLocalDraftPayload(cleanChatId);
@@ -2986,41 +3489,53 @@ function saveActiveDraft({ announce = false } = {}) {
 function scheduleActiveDraftSave() {
   markActiveDraftInputChanged();
   cancelActiveDraftSaveTimer();
+  cancelRemoteDraftSync(state.activeChatId);
   if (!els.messageInput || !state.user || !state.activeChatId || state.editingMessage?.messageId) return;
   const chatId = state.activeChatId;
   const textAtLastInput = els.messageInput.value || '';
   state.draftSaveTimer = window.setTimeout(() => {
     state.draftSaveTimer = 0;
-    saveDraftSnapshot(chatId, textAtLastInput, { announce: true });
+    saveDraftSnapshot(chatId, textAtLastInput, { announce: true, remoteMode: 'throttled' });
   }, draftSaveDelayMs);
 }
 
-async function loadDraftForChat(chatId = state.activeChatId) {
+async function loadDraftForChat(chatId = state.activeChatId, { prefetchedDraft = null, usePrefetchedDraft = false } = {}) {
   if (!els.messageInput || state.editingMessage?.messageId) return;
+  const cleanChatId = String(chatId || '').trim();
   const loadSeq = Number(state.draftLoadSeq || 0) + 1;
   state.draftLoadSeq = loadSeq;
   const inputVersionAtStart = Number(state.draftInputVersion || 0);
-  const localDraft = readDraftPayload(chatId);
+  const localDraft = readDraftPayload(cleanChatId);
   const localText = typeof localDraft?.text === 'string' ? localDraft.text : '';
   els.messageInput.value = localText;
   setDraftStatus(localText.trim() ? 'Borrador recuperado en este chat.' : '');
-  if (!state.user || !chatId) return;
+  if (!state.user || !cleanChatId) return;
+  // Una vez que este chat fue sincronizado correctamente, las mutaciones de borrador
+  // llegan por SSE. Reabrirlo no necesita otra respuesta HTTP hasta que la marca se
+  // invalide por un cambio remoto o un resync de estado.
+  if (state.draftRemoteLoadedChats.has(cleanChatId) && !usePrefetchedDraft) return;
   try {
-    const data = await post('/api/chats/draft/get', { chatId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
-    const remoteDraft = data.draft || null;
-    if (state.activeChatId !== chatId || state.editingMessage?.messageId || state.draftLoadSeq !== loadSeq) return;
+    // La primera página de mensajes puede traer el borrador en el mismo envelope. Así la
+    // apertura inicial del chat consume una sola HTTP Response en vez de messages + draft/get.
+    const remoteDraft = usePrefetchedDraft
+      ? (prefetchedDraft || null)
+      : ((await post('/api/chats/draft/get', { chatId: cleanChatId, draftOriginId: getDraftOriginId(), clientId: getClientId() })).draft || null);
+    state.draftRemoteLoadedChats.add(cleanChatId);
+    state.draftLastSyncedTextByChat.set(cleanChatId, String(remoteDraft?.text || ''));
+    if (state.activeChatId !== cleanChatId || state.editingMessage?.messageId || state.draftLoadSeq !== loadSeq) return;
     if (Number(state.draftInputVersion || 0) !== inputVersionAtStart) return;
     const remoteText = typeof remoteDraft?.text === 'string' ? remoteDraft.text : '';
     const remoteMs = remoteDraftSavedMs(remoteDraft);
     const localMs = Number(localDraft?.savedAt || 0);
     if (remoteText.trim() && remoteMs >= localMs && remoteText !== els.messageInput.value) {
-      writeDraftPayload(chatId, remoteText, remoteMs || Date.now());
+      writeDraftPayload(cleanChatId, remoteText, remoteMs || Date.now());
       els.messageInput.value = remoteText;
       setDraftStatus('Borrador sincronizado desde tu cuenta.');
       updateComposerControls();
     }
   } catch {
     // El borrador local sigue disponible aunque la sincronización remota no responda.
+    // No marcamos el chat como sincronizado para permitir un reintento futuro útil.
   }
 }
 
@@ -3076,6 +3591,42 @@ function renderDraftsModal() {
   }).join('');
 }
 
+function applyDraftListRealtimeDelta(eventType = '', draft = null, chatId = '', eventMs = Date.now()) {
+  if (!state.draftsOpen) return false;
+  const cleanChatId = String(draft?.chatId || chatId || '').trim();
+  if (!cleanChatId) return false;
+  const index = state.drafts.findIndex((item) => String(item?.chatId || '') === cleanChatId);
+  const current = index >= 0 ? state.drafts[index] : null;
+  const currentMs = remoteDraftSavedMs(current || {});
+  const safeEventMs = Math.max(0, Number(eventMs || 0));
+
+  if (eventType === 'chat.draft.deleted') {
+    // Un delete retrasado no puede borrar de la lista un borrador más nuevo ya visto.
+    if (current && currentMs && safeEventMs && safeEventMs < currentMs) return false;
+    if (index >= 0) state.drafts.splice(index, 1);
+    renderDraftsModal();
+    return index >= 0;
+  }
+
+  if (eventType !== 'chat.draft.updated' || !draft || typeof draft !== 'object') return false;
+  const remoteMs = remoteDraftSavedMs(draft);
+  if (current && currentMs && remoteMs && remoteMs < currentMs) return false;
+  const chat = current?.chat || state.chats.find((item) => item.chatId === cleanChatId) || null;
+  const next = {
+    ...(current || {}),
+    ...draft,
+    chatId: cleanChatId,
+    excerpt: compactText(draft.text || current?.text || '', 180),
+    ...(chat ? { chat } : {})
+  };
+  if (index >= 0) state.drafts[index] = next;
+  else state.drafts.unshift(next);
+  state.drafts.sort((a, b) => remoteDraftSavedMs(b) - remoteDraftSavedMs(a));
+  if (state.drafts.length > 80) state.drafts.length = 80;
+  renderDraftsModal();
+  return true;
+}
+
 async function loadDrafts({ silent = false } = {}) {
   if (!state.user) return [];
   state.draftsLoading = !silent;
@@ -3083,6 +3634,23 @@ async function loadDrafts({ silent = false } = {}) {
   try {
     const data = await post('/api/chats/drafts/list', { limit: 80 });
     state.drafts = Array.isArray(data.drafts) ? data.drafts : [];
+    // La lista ya entrega el borrador completo: reutilizamos esa respuesta como fuente
+    // autoritativa para no pedir /draft/get al abrir uno de los chats listados.
+    for (const draft of state.drafts) {
+      const cleanChatId = String(draft?.chatId || '').trim();
+      if (!cleanChatId) continue;
+      const remoteText = String(draft?.text || '');
+      const remoteMs = remoteDraftSavedMs(draft);
+      const localMs = Number(readDraftPayload(cleanChatId)?.savedAt || 0);
+      if (remoteText.trim() && remoteMs >= localMs) {
+        writeDraftPayload(cleanChatId, remoteText, remoteMs || Date.now());
+        state.draftRemoteLoadedChats.add(cleanChatId);
+        state.draftLastSyncedTextByChat.set(cleanChatId, remoteText);
+      } else if (remoteMs < localMs) {
+        state.draftRemoteLoadedChats.delete(cleanChatId);
+        state.draftLastSyncedTextByChat.delete(cleanChatId);
+      }
+    }
     return state.drafts;
   } finally {
     state.draftsLoading = false;
@@ -3115,7 +3683,15 @@ function mergeDraftChatIntoState(chat = {}) {
 }
 
 async function openDraftFromList(chatId = '') {
-  const draft = state.drafts.find((item) => item.chatId === chatId) || null;
+  let draft = state.drafts.find((item) => item.chatId === chatId) || null;
+  const hasKnownChat = Boolean(draft?.chat || state.chats.some((item) => item.chatId === chatId));
+  if (draft && !hasKnownChat) {
+    // Un delta SSE nuevo puede pertenecer a un chat archivado aún no materializado en
+    // esta pestaña. Hidratamos solo bajo acción explícita del usuario, evitando que
+    // cada autosalvado remoto vuelva a disparar /api/chats/drafts/list.
+    await loadDrafts({ silent: true }).catch(() => null);
+    draft = state.drafts.find((item) => item.chatId === chatId) || draft;
+  }
   if (draft?.chat) mergeDraftChatIntoState(draft.chat);
   closeDraftsModal();
   await selectChat(chatId);
@@ -3133,6 +3709,8 @@ async function deleteDraftFromList(chatId = '') {
   if (!cleanChatId) return;
   await post('/api/chats/draft/delete', { chatId: cleanChatId, draftOriginId: getDraftOriginId(), clientId: getClientId() });
   removeLocalDraftPayload(cleanChatId);
+  state.draftRemoteLoadedChats.add(cleanChatId);
+  state.draftLastSyncedTextByChat.set(cleanChatId, '');
   state.drafts = state.drafts.filter((draft) => draft.chatId !== cleanChatId);
   if (state.activeChatId === cleanChatId && !state.editingMessage?.messageId) {
     if (els.messageInput) els.messageInput.value = '';
@@ -3700,8 +4278,8 @@ async function savePrivateNoteFromSlash(args = '') {
     showTemporaryDraftStatus('Escribe la nota después de /nota o guárdala desde el panel.', 4200);
     return { clearComposer: false };
   }
-  const data = await post('/api/chats/private-notes/save', { chatId: state.activeChatId, text });
-  state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes;
+  const data = await post('/api/chats/private-notes/save', { chatId: state.activeChatId, text, compactResponse: true });
+  applyPrivateNoteUpsert(data.note);
   showTemporaryDraftStatus('Nota privada guardada desde comando rápido.');
   return { clearComposer: true };
 }
@@ -4530,14 +5108,22 @@ function insertQuickReplyText(replyId = '') {
   closeQuickRepliesPanel();
 }
 
+function applyQuickReplyUpsert(reply = null) {
+  if (!reply?.replyId || !reply?.text) return;
+  state.quickReplies = [reply, ...(Array.isArray(state.quickReplies) ? state.quickReplies : []).filter((item) => item?.replyId !== reply.replyId)]
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+    .slice(0, 40);
+}
+
 async function saveCurrentTextAsQuickReply() {
   const text = String(els.messageInput?.value || '').trim();
   if (!text) {
     showTemporaryDraftStatus('Escribe una frase antes de guardarla como respuesta rápida.');
     return;
   }
-  const data = await post('/api/quick-replies/save', { text });
-  state.quickReplies = Array.isArray(data.quickReplies) ? data.quickReplies : [];
+  const data = await post('/api/quick-replies/save', { text, compactResponse: true });
+  if (Array.isArray(data.quickReplies)) state.quickReplies = data.quickReplies;
+  else applyQuickReplyUpsert(data.quickReply || null);
   state.quickRepliesLoaded = true;
   showTemporaryDraftStatus('Respuesta rápida guardada para tu cuenta.');
   renderQuickRepliesPanel();
@@ -4547,7 +5133,7 @@ async function deleteQuickReply(replyId = '') {
   if (!replyId) return;
   const ok = window.confirm('¿Eliminar esta respuesta rápida?');
   if (!ok) return;
-  const data = await post('/api/quick-replies/delete', { replyId });
+  const data = await post('/api/quick-replies/delete', { replyId, compactResponse: true });
   state.quickReplies = Array.isArray(data.quickReplies) ? data.quickReplies : state.quickReplies.filter((item) => item.replyId !== replyId);
   state.quickRepliesLoaded = true;
   showTemporaryDraftStatus('Respuesta rápida eliminada.');
@@ -4556,6 +5142,30 @@ async function deleteQuickReply(replyId = '') {
 
 function privateNoteCounter() {
   return `${Array.isArray(state.privateNotes) ? state.privateNotes.length : 0}/80 notas`;
+}
+
+function sortPrivateNotesState() {
+  state.privateNotes = (Array.isArray(state.privateNotes) ? state.privateNotes : [])
+    .filter((note) => note?.noteId)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+    .slice(0, 80);
+}
+
+function applyPrivateNoteUpsert(note = null) {
+  if (!note?.noteId) return false;
+  const index = state.privateNotes.findIndex((item) => item.noteId === note.noteId);
+  if (index >= 0) state.privateNotes[index] = { ...state.privateNotes[index], ...note };
+  else state.privateNotes.unshift(note);
+  sortPrivateNotesState();
+  return true;
+}
+
+function applyPrivateNoteDelete(noteId = '') {
+  const cleanNoteId = String(noteId || '').trim();
+  if (!cleanNoteId) return false;
+  const previousLength = state.privateNotes.length;
+  state.privateNotes = state.privateNotes.filter((item) => item.noteId !== cleanNoteId);
+  return state.privateNotes.length !== previousLength;
 }
 
 function resetPrivateNoteEditor() {
@@ -4608,15 +5218,18 @@ function renderPrivateNotesModal() {
 
 async function loadPrivateNotes({ force = false } = {}) {
   if (!state.activeChatId || state.privateNotesLoading) return;
-  if (state.privateNotes.length && !force) {
+  const requestedChatId = state.activeChatId;
+  if (!force && state.privateNotesLoadedChatId === requestedChatId) {
     renderPrivateNotesModal();
     return;
   }
   state.privateNotesLoading = true;
   renderPrivateNotesModal();
   try {
-    const data = await post('/api/chats/private-notes/list', { chatId: state.activeChatId });
+    const data = await post('/api/chats/private-notes/list', { chatId: requestedChatId });
+    if (state.activeChatId !== requestedChatId) return;
     state.privateNotes = Array.isArray(data.notes) ? data.notes : [];
+    state.privateNotesLoadedChatId = requestedChatId;
   } finally {
     state.privateNotesLoading = false;
     renderPrivateNotesModal();
@@ -4625,11 +5238,12 @@ async function loadPrivateNotes({ force = false } = {}) {
 
 async function openPrivateNotesModal() {
   if (!state.activeChatId) return;
+  const requestedChatId = state.activeChatId;
   state.privateNotesOpen = true;
-  state.privateNotes = [];
+  if (state.privateNotesLoadedChatId !== requestedChatId) state.privateNotes = [];
   resetPrivateNoteEditor();
   renderPrivateNotesModal();
-  await loadPrivateNotes({ force: true });
+  await loadPrivateNotes();
   window.setTimeout(() => els.privateNotesTextarea?.focus(), 0);
 }
 
@@ -4658,9 +5272,11 @@ async function savePrivateNoteFromModal() {
     const data = await post('/api/chats/private-notes/save', {
       chatId: state.activeChatId,
       noteId: state.privateNoteEditingId || '',
-      text
+      text,
+      compactResponse: true
     });
-    state.privateNotes = Array.isArray(data.notes) ? data.notes : [];
+    applyPrivateNoteUpsert(data.note);
+    state.privateNotesLoadedChatId = state.activeChatId;
     resetPrivateNoteEditor();
     showTemporaryDraftStatus(wasEditing ? 'Nota privada actualizada.' : 'Nota privada guardada para este chat.');
   } finally {
@@ -4673,8 +5289,9 @@ async function deletePrivateNote(noteId = '') {
   if (!noteId || !state.activeChatId) return;
   const ok = window.confirm('¿Eliminar esta nota privada? Solo se elimina de tu cuenta.');
   if (!ok) return;
-  const data = await post('/api/chats/private-notes/delete', { chatId: state.activeChatId, noteId });
-  state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes.filter((item) => item.noteId !== noteId);
+  const data = await post('/api/chats/private-notes/delete', { chatId: state.activeChatId, noteId, compactResponse: true });
+  applyPrivateNoteDelete(data.noteId || noteId);
+  state.privateNotesLoadedChatId = state.activeChatId;
   if (state.privateNoteEditingId === noteId) resetPrivateNoteEditor();
   showTemporaryDraftStatus('Nota privada eliminada.');
   renderPrivateNotesModal();
@@ -4750,15 +5367,18 @@ function renderReminderModal() {
 
 async function loadReminders({ force = false } = {}) {
   if (!state.activeChatId || state.remindersLoading) return;
-  if (!force && state.reminders.some((item) => item.chatId === state.activeChatId)) {
+  if (!force && state.remindersLoadedChatId === state.activeChatId) {
     renderReminderModal();
     return;
   }
+  const requestedChatId = state.activeChatId;
   state.remindersLoading = true;
   renderReminderModal();
   try {
-    const data = await post('/api/chats/reminders/list', { chatId: state.activeChatId, limit: 80 });
+    const data = await post('/api/chats/reminders/list', { chatId: requestedChatId, limit: 80 });
+    if (state.activeChatId !== requestedChatId) return;
     state.reminders = Array.isArray(data.reminders) ? data.reminders : [];
+    state.remindersLoadedChatId = requestedChatId;
   } finally {
     state.remindersLoading = false;
     renderReminderModal();
@@ -4773,7 +5393,7 @@ async function openReminderModal(messageId = '') {
   if (els.reminderText) els.reminderText.value = state.reminderDraftText;
   setDefaultReminderDateTime();
   renderReminderModal();
-  await loadReminders({ force: true });
+  await loadReminders();
   window.setTimeout(() => els.reminderDateTime?.focus(), 0);
 }
 
@@ -4789,7 +5409,7 @@ async function openReminderFromChatBrief(messageId = '') {
   if (els.reminderDateTime) els.reminderDateTime.value = '';
   setDefaultReminderDateTime();
   renderReminderModal();
-  await loadReminders({ force: true });
+  await loadReminders();
   showTemporaryDraftStatus('Pendiente listo para guardar como recordatorio privado.');
   window.setTimeout(() => els.reminderDateTime?.focus(), 0);
 }
@@ -4968,10 +5588,102 @@ async function getReadyServiceWorkerRegistration() {
   return state.serviceWorkerRegistration;
 }
 
+function pushSubscriptionMeta() {
+  return {
+    clientId: getClientId(),
+    platform: navigator.platform || '',
+    appMode: getAppMode(),
+    language: navigator.language || 'es-CO'
+  };
+}
+
+async function pushSubscriptionFingerprint(subscription = null, meta = {}) {
+  const json = subscription?.toJSON?.() || subscription || {};
+  const raw = JSON.stringify({
+    userId: String(state.user?.userId || ''),
+    clientId: String(meta.clientId || ''),
+    endpoint: String(json.endpoint || ''),
+    expirationTime: json.expirationTime || null,
+    p256dh: String(json.keys?.p256dh || ''),
+    auth: String(json.keys?.auth || ''),
+    platform: String(meta.platform || ''),
+    appMode: String(meta.appMode || ''),
+    language: String(meta.language || '')
+  });
+  try {
+    if (crypto?.subtle && typeof TextEncoder !== 'undefined') {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+  } catch {}
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a_${(hash >>> 0).toString(16)}`;
+}
+
+function readPushRegistrationCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(pushRegistrationCacheKey) || 'null');
+    return cached && typeof cached === 'object' ? cached : null;
+  } catch { return null; }
+}
+
+function clearPushRegistrationCache() {
+  try { localStorage.removeItem(pushRegistrationCacheKey); } catch {}
+}
+
+function isPushRegistrationFresh(fingerprint = '') {
+  if (!fingerprint || !state.user?.userId) return false;
+  const cached = readPushRegistrationCache();
+  const registeredAt = Number(cached?.registeredAt || 0);
+  return String(cached?.userId || '') === String(state.user.userId)
+    && String(cached?.fingerprint || '') === String(fingerprint)
+    && registeredAt > 0
+    && Date.now() - registeredAt < pushRegistrationRefreshMs;
+}
+
+function rememberPushRegistration(fingerprint = '') {
+  if (!fingerprint || !state.user?.userId) return false;
+  try {
+    localStorage.setItem(pushRegistrationCacheKey, JSON.stringify({
+      userId: String(state.user.userId),
+      fingerprint: String(fingerprint),
+      registeredAt: Date.now()
+    }));
+    return true;
+  } catch { return false; }
+}
+
+async function registerPushSubscription(subscription = null, { force = false } = {}) {
+  if (!subscription?.toJSON) return false;
+  const meta = pushSubscriptionMeta();
+  const fingerprint = await pushSubscriptionFingerprint(subscription, meta);
+  if (!force && isPushRegistrationFresh(fingerprint)) return true;
+  await post('/api/push/subscribe', { subscription: subscription.toJSON(), meta });
+  rememberPushRegistration(fingerprint);
+  return true;
+}
+
+function embeddedWebPushConfig() {
+  if (!state.config || !Object.prototype.hasOwnProperty.call(state.config, 'webPush')) return null;
+  const webPush = state.config.webPush;
+  if (!webPush || typeof webPush !== 'object') return null;
+  return { enabled: webPush.enabled === true, publicKey: String(webPush.publicKey || '') };
+}
+
+async function getWebPushConfig() {
+  const embedded = embeddedWebPushConfig();
+  if (embedded) return embedded;
+  return apiGet('/api/push/public-key');
+}
+
 async function enableWebPushNotifications() {
   if (!state.user) return false;
   if (!hasPushSupport()) throw new Error('Este navegador no soporta notificaciones web push.');
-  const keyData = await apiGet('/api/push/public-key');
+  const keyData = await getWebPushConfig();
   if (!keyData.enabled || !keyData.publicKey) throw new Error('El backend todavía no tiene configuradas las claves Web Push.');
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
@@ -4988,15 +5700,7 @@ async function enableWebPushNotifications() {
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
   });
-  await post('/api/push/subscribe', {
-    subscription: subscription.toJSON(),
-    meta: {
-      clientId: getClientId(),
-      platform: navigator.platform || '',
-      appMode: getAppMode(),
-      language: navigator.language || 'es-CO'
-    }
-  });
+  await registerPushSubscription(subscription, { force: true });
   state.pushState = 'enabled';
   state.pushDismissed = true;
   updatePushBanner();
@@ -5010,17 +5714,14 @@ async function ensureExistingPushSubscriptionRegistered() {
     const registration = await getReadyServiceWorkerRegistration();
     let subscription = await registration?.pushManager?.getSubscription?.();
     if (!subscription) {
-      const keyData = await apiGet('/api/push/public-key');
+      const keyData = await getWebPushConfig();
       if (!keyData.enabled || !keyData.publicKey || !registration?.pushManager) return false;
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
       });
     }
-    await post('/api/push/subscribe', {
-      subscription: subscription.toJSON(),
-      meta: { clientId: getClientId(), platform: navigator.platform || '', appMode: getAppMode(), language: navigator.language || 'es-CO' }
-    });
+    await registerPushSubscription(subscription);
     state.pushState = 'enabled';
     updatePushBanner();
     requestServiceWorkerDeliveryAckFlush();
@@ -5039,6 +5740,7 @@ async function unregisterCurrentPushSubscription() {
     const endpoint = subscription.endpoint || '';
     await post('/api/push/unsubscribe', { endpoint }).catch(() => null);
     await subscription.unsubscribe().catch(() => null);
+    clearPushRegistrationCache();
     state.pushState = 'idle';
     state.pushDismissed = false;
     return true;
@@ -5066,6 +5768,10 @@ function showGuest() {
   state.globalStarredMessages = [];
   state.globalStarredLoading = false;
   state.globalStarredScannedChats = 0;
+  state.globalStarredNextCursor = null;
+  state.globalStarredHasMore = false;
+  state.globalStarredLoaded = false;
+  state.globalStarredDirty = true;
   closeCommandPalette();
   state.privacyLock.locked = false;
   state.privacyLock.mode = 'closed';
@@ -5089,10 +5795,11 @@ async function loginWithGoogle() {
     const google = await signInWithGooglePopup(state.config.firebaseWebConfig || {});
     setStatus('Validando sesión...');
     const data = await post('/api/auth/google-login', { idToken: google.idToken });
+    clearCachedRealtimeToken();
     setSessionToken(data.sessionToken);
     applyBootstrap(data);
+    broadcastRealtime({ type: 'bootstrap-shared', data }, { persistSmall: false });
     showAuthenticated();
-    await loadChatLabels({ force: true }).catch(() => null);
     await openRealtime();
     await ensureExistingPushSubscriptionRegistered();
     await consumeAddFromUrl();
@@ -5107,20 +5814,50 @@ async function loginWithGoogle() {
 }
 
 function applyBootstrap(data = {}) {
+  state.realtimeRetryBlocked = false;
+  if (data.clientConfig && typeof data.clientConfig === 'object') {
+    state.config = { ok: true, ...(state.config || {}), ...data.clientConfig };
+  }
+  // Bootstrap inicial o de recuperación redefine la base conocida; la próxima apertura
+  // de cada chat puede hacer una única lectura remota de borrador y luego volver a SSE.
+  state.draftRemoteLoadedChats.clear();
+  state.draftLastSyncedTextByChat.clear();
+  state.messageHistoryCoverageByChat.clear();
+  state.messageHistoryRequestsByChat.clear();
+  state.draftRemoteLastAttemptAtByChat.clear();
   state.user = data.user || null;
+  state.globalStarredDirty = true;
+  const realtimeCursor = String(data.realtimeCursor || '').trim().slice(0, 180);
+  if (realtimeCursor) rememberRealtimeLastEventId(realtimeCursor);
   state.contacts = (Array.isArray(data.contacts) ? data.contacts : []).map((contact) => ({
     ...contact,
     contactName: contact.contactName || contact.nickname || contact.displayName || contact.email || 'Contacto'
   }));
   state.contacts.sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+  const bootstrapContactsCursor = data.contactsPage?.nextCursor;
+  state.contactsNextCursor = bootstrapContactsCursor !== null && bootstrapContactsCursor !== undefined && Number.isFinite(Number(bootstrapContactsCursor))
+    ? Number(bootstrapContactsCursor)
+    : null;
+  state.contactsHasMore = Boolean(data.contactsPage?.hasMore && state.contactsNextCursor !== null);
+  state.contactsLoading = false;
   state.chats = Array.isArray(data.chats) ? data.chats : [];
+  state.chatsNextCursor = data.chatsPage?.nextCursor ?? null;
+  state.chatsHasMore = Boolean(data.chatsPage?.hasMore && state.chatsNextCursor);
+  state.chatsLoading = false;
+  state.chatListPaginationDirty = false;
+  state.chatListLoadedMode = 'active';
+  state.chatListLoadedAt = Date.now();
   state.notificationPreferences = normalizeNotificationPreferences(data.notificationPreferences || {});
   loadPrivacyLockForCurrentUser({ lockOnRestore: false });
-  state.labels = [];
-  state.chatLabelsByChatId = new Map();
+  applyLabelCatalog(Array.isArray(data.labels) ? data.labels : []);
+  if (data.chatLabelsByChatId && typeof data.chatLabelsByChatId === 'object') {
+    applyChatLabelMemberships(data.chatLabelsByChatId, { replaceKnown: true });
+  }
   state.activeLabelFilter = '';
   loadOutboxState();
   sortChats();
+  state.bootstrapAppliedAt = Date.now();
+  flushPreBootstrapRealtimeEnvelopes();
 }
 
 
@@ -5140,18 +5877,29 @@ function unreadChatsCount() {
 
 async function markAllChatsRead() {
   if (!state.user) return;
-  const data = await post('/api/chats/read-all', { includeArchived: true, limit: 250 });
+  const data = await post('/api/chats/read-all', { includeArchived: true, limit: 250, compactResponse: true });
   const updatedChats = Array.isArray(data.chats) ? data.chats : [];
+  const updatedChatIds = new Set([
+    ...(Array.isArray(data.chatIds) ? data.chatIds : []),
+    ...updatedChats.map((chat) => chat?.chatId)
+  ].map((chatId) => String(chatId || '').trim()).filter(Boolean));
   for (const chat of updatedChats) upsertChat(chat);
-  if (state.chatListMode === 'unread') {
-    state.chats = state.chats.map((chat) => updatedChats.find((item) => item.chatId === chat.chatId) || chat);
+  if (updatedChatIds.size) {
+    state.chats = state.chats.map((chat) => updatedChatIds.has(chat.chatId)
+      ? { ...chat, unread: 0 }
+      : chat);
   }
-  const count = Number(data.updatedCount || updatedChats.length || 0);
+  const count = Number(data.updatedCount || updatedChatIds.size || 0);
+  if (state.chatListMode === 'unread' && count && state.chatsHasMore) {
+    // Marcar leídos invalida el cursor del listado no leído, pero no justifica otra
+    // HTTP Response inmediata: la primera página se reconstruye solo si el usuario
+    // pide continuar cargando después de aplicar el estado compacto local.
+    state.chatListPaginationDirty = true;
+  }
   showTemporaryDraftStatus(count
     ? `${count} ${count === 1 ? 'chat retirado' : 'chats retirados'} de no leídos sin enviar confirmación de lectura.`
     : 'No había chats sin leer.');
-  if (state.chatListMode === 'unread' && count) await loadChats({ unreadOnly: true, mode: 'unread' }).catch(() => null);
-  else renderAll();
+  renderAll();
 }
 
 function showChatListMode(mode = 'active') {
@@ -5167,8 +5915,42 @@ function showChatListMode(mode = 'active') {
   renderLabelFilters();
 }
 
+function canReuseLoadedChatListMode(mode = 'active') {
+  const requestedMode = normalizeChatListMode(mode);
+  if (state.chatListPaginationDirty) return false;
+  if (normalizeChatListMode(state.chatListMode) !== requestedMode) return false;
+  if (normalizeChatListMode(state.chatListLoadedMode) !== requestedMode) return false;
+  const loadedAt = Number(state.chatListLoadedAt || 0);
+  const recentlyLoaded = loadedAt > 0 && Date.now() - loadedAt <= chatListFreshReuseMs;
+  return recentlyLoaded || hasHealthySharedRealtimeLease();
+}
+
+async function activateChatListMode(mode = 'active') {
+  if (!state.user) return false;
+  const requestedMode = normalizeChatListMode(mode);
+  if (canReuseLoadedChatListMode(requestedMode)) {
+    showChatListMode(requestedMode);
+    renderAll();
+    return false;
+  }
+  showChatListMode(requestedMode);
+  const existingRequest = state.chatListModeRequests.get(requestedMode);
+  if (existingRequest) return existingRequest;
+  const request = loadChats({
+    includeArchived: requestedMode === 'archived',
+    unreadOnly: requestedMode === 'unread',
+    mode: requestedMode
+  });
+  state.chatListModeRequests.set(requestedMode, request);
+  try {
+    return await request;
+  } finally {
+    if (state.chatListModeRequests.get(requestedMode) === request) state.chatListModeRequests.delete(requestedMode);
+  }
+}
+
 async function loadChats({ includeArchived = state.archivedView, unreadOnly = false, mode = '' } = {}) {
-  if (!state.user) return;
+  if (!state.user) return false;
   const requestedMode = normalizeChatListMode(mode || (unreadOnly ? 'unread' : (includeArchived ? 'archived' : 'active')));
   const data = await post('/api/chats/list', {
     includeArchived: requestedMode === 'archived',
@@ -5177,32 +5959,125 @@ async function loadChats({ includeArchived = state.archivedView, unreadOnly = fa
   });
   state.archivedView = requestedMode === 'archived';
   state.chatListMode = requestedMode;
+  state.chatListLoadedMode = requestedMode;
+  state.chatListLoadedAt = Date.now();
   state.chats = Array.isArray(data.chats) ? data.chats : [];
+  state.chatsNextCursor = data.page?.nextCursor ?? null;
+  state.chatsHasMore = Boolean(data.page?.hasMore && state.chatsNextCursor);
+  state.chatsLoading = false;
+  state.chatListPaginationDirty = false;
+  if (data.chatLabelsByChatId && typeof data.chatLabelsByChatId === 'object') {
+    applyChatLabelMemberships(data.chatLabelsByChatId, { replaceKnown: true });
+  }
   sortChats();
   if (state.activeChatId && requestedMode !== 'unread' && !state.chats.some((chat) => chat.chatId === state.activeChatId)) clearActiveChatState();
   showChatListMode(requestedMode);
   renderAll();
+  return true;
+}
+
+async function loadMoreChats() {
+  if (!state.user || state.chatsLoading) return false;
+  const requestedMode = normalizeChatListMode(state.chatListMode);
+  // Una mutación local puede invalidar únicamente el cursor de paginación (por ejemplo,
+  // archivar un chat fijado). No gastamos otra HTTP Response en el momento de la mutación:
+  // reconstruimos la primera página solo si el usuario realmente pide continuar cargando.
+  if (state.chatListPaginationDirty) {
+    await loadChats({
+      includeArchived: requestedMode === 'archived',
+      unreadOnly: requestedMode === 'unread',
+      mode: requestedMode
+    });
+    return true;
+  }
+  if (!state.chatsHasMore || !state.chatsNextCursor) return false;
+  state.chatsLoading = true;
+  renderChats();
+  try {
+    const data = await post('/api/chats/list', {
+      includeArchived: requestedMode === 'archived',
+      unreadOnly: requestedMode === 'unread',
+      limit: 80,
+      cursor: state.chatsNextCursor
+    });
+    for (const chat of Array.isArray(data.chats) ? data.chats : []) {
+      const index = state.chats.findIndex((item) => item.chatId === chat.chatId);
+      if (index >= 0) state.chats[index] = { ...state.chats[index], ...chat };
+      else state.chats.push(chat);
+    }
+    if (data.chatLabelsByChatId && typeof data.chatLabelsByChatId === 'object') {
+      applyChatLabelMemberships(data.chatLabelsByChatId);
+    }
+    state.chatsNextCursor = data.page?.nextCursor ?? null;
+    state.chatsHasMore = Boolean(data.page?.hasMore && state.chatsNextCursor);
+    sortChats();
+    return true;
+  } finally {
+    state.chatsLoading = false;
+    renderChats();
+  }
+}
+
+async function loadMoreContacts() {
+  if (!state.user || state.contactsLoading || !state.contactsHasMore || state.contactsNextCursor === null) return false;
+  state.contactsLoading = true;
+  renderContacts();
+  try {
+    const data = await post('/api/contacts/list', { limit: 80, cursor: state.contactsNextCursor });
+    for (const contact of Array.isArray(data.contacts) ? data.contacts : []) upsertContact(contact);
+    const nextCursorRaw = data.page?.nextCursor;
+    state.contactsNextCursor = nextCursorRaw !== null && nextCursorRaw !== undefined && Number.isFinite(Number(nextCursorRaw))
+      ? Number(nextCursorRaw)
+      : null;
+    state.contactsHasMore = Boolean(data.page?.hasMore && state.contactsNextCursor !== null);
+    return true;
+  } finally {
+    state.contactsLoading = false;
+    renderContacts();
+  }
 }
 
 async function bootstrapExistingSession() {
   if (!getSessionToken()) return false;
+  let data;
   try {
-    const data = await post('/api/bootstrap', {});
-    applyBootstrap(data);
-    showAuthenticated();
-    if (state.privacyLock.enabled) lockPrivacyScreen();
-    await loadChatLabels({ force: true }).catch(() => null);
-    await openRealtime();
-    await ensureExistingPushSubscriptionRegistered();
-    await consumeAddFromUrl();
-    await consumeChatFromUrl();
-    scheduleOutboxRetry(1200);
-    flushDeliveryAckQueue({ force: true }).catch(() => null);
-    return true;
-  } catch {
+    data = await getCoordinatedBootstrapForExistingSession();
+  } catch (error) {
+    finishBootstrapRestoreWaiter(null);
+    clearBootstrapRestoreLeaseIfOwned();
+    state.realtimePreBootstrapEnvelopes = [];
+    if (!isSessionInvalidatingHttpError(error)) throw error;
+    clearCachedRealtimeToken();
+    clearRealtimeRetryDeferral();
+    clearRealtimeReconnectBackoff();
+    state.realtimePeerActivity.clear();
     setSessionToken('');
     return false;
   }
+
+  applyBootstrap(data);
+  // Reanuncia el bootstrap ya aplicado mientras la concesión sigue viva para cubrir
+  // pestañas que iniciaron la espera justo después de la primera difusión del líder.
+  broadcastRealtime({ type: 'bootstrap-shared', data }, { persistSmall: false });
+  showAuthenticated();
+  if (state.privacyLock.enabled) lockPrivacyScreen();
+
+  // El bootstrap autenticado ya validó la sesión. Un fallo posterior al preparar SSE
+  // no debe borrar una sesión válida ni forzar login + bootstrap adicionales. Los
+  // errores recuperables conservan el liderazgo y usan el backoff coordinado de SSE;
+  // los definitivos quedan bloqueados por openRealtime sin degradar el bootstrap.
+  try {
+    await openRealtime();
+  } catch (error) {
+    if (!isDefinitiveHttpError(error) && !isRealtimeRetryDeferred()) scheduleRealtimeReconnect();
+  }
+
+  await ensureExistingPushSubscriptionRegistered();
+  await consumeAddFromUrl();
+  await consumeChatFromUrl();
+  scheduleOutboxRetry(1200);
+  flushDeliveryAckQueue({ force: true }).catch(() => null);
+  return true;
 }
 
 function getRealtimeTabId() {
@@ -5217,6 +6092,229 @@ function getRealtimeTabId() {
   } catch {
     return (state.realtimeTabId = state.realtimeTabId || `${Date.now()}_${Math.random().toString(16).slice(2)}`);
   }
+}
+
+function realtimeSessionCoordinationKey(sessionToken = getSessionToken()) {
+  const token = String(sessionToken || '').trim();
+  if (!token) return '';
+  let hash = 2166136261;
+  for (let index = 0; index < token.length; index += 1) {
+    hash ^= token.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `session_${(hash >>> 0).toString(16)}`;
+}
+
+function bootstrapRestoreSnapshotStorageKey(sessionKey = '') {
+  const cleanSessionKey = String(sessionKey || '').trim();
+  return cleanSessionKey ? `${bootstrapRestoreSnapshotStoragePrefix}:${cleanSessionKey}` : '';
+}
+
+function readSharedBootstrapSnapshot(sessionKey = '', { notBefore = 0 } = {}) {
+  const key = bootstrapRestoreSnapshotStorageKey(sessionKey);
+  if (!key) return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    if (!parsed
+      || String(parsed.sessionKey || '') !== String(sessionKey || '')
+      || Number(parsed.expiresAt || 0) <= Date.now()
+      || !parsed.data
+      || typeof parsed.data !== 'object') {
+      localStorage.removeItem(key);
+      return null;
+    }
+    if (Number(parsed.publishedAt || 0) < Math.max(0, Number(notBefore || 0))) return null;
+    return parsed.data;
+  } catch { return null; }
+}
+
+function persistSharedBootstrapSnapshot(sessionKey = '', data = null) {
+  const key = bootstrapRestoreSnapshotStorageKey(sessionKey);
+  if (!key || !data || typeof data !== 'object') return false;
+  try {
+    const publishedAt = Date.now();
+    localStorage.setItem(key, JSON.stringify({
+      sessionKey: String(sessionKey),
+      publishedAt,
+      expiresAt: publishedAt + bootstrapRestoreSnapshotStorageTtlMs,
+      data
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readBootstrapRestoreLease() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(bootstrapRestoreLeaderStorageKey) || 'null');
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch { return null; }
+}
+
+function writeBootstrapRestoreLease(sessionKey = '', expiresAt = Date.now() + bootstrapRestoreLeaderLeaseMs) {
+  const cleanSessionKey = String(sessionKey || '').trim();
+  if (!cleanSessionKey) return false;
+  const lease = {
+    owner: getRealtimeTabId(),
+    clientId: getClientId(),
+    sessionKey: cleanSessionKey,
+    expiresAt
+  };
+  try { localStorage.setItem(bootstrapRestoreLeaderStorageKey, JSON.stringify(lease)); } catch { return false; }
+  const stored = readBootstrapRestoreLease();
+  return stored?.owner === lease.owner && stored?.sessionKey === cleanSessionKey;
+}
+
+function clearBootstrapRestoreLeaseIfOwned() {
+  const lease = readBootstrapRestoreLease();
+  if (lease?.owner !== getRealtimeTabId()) return;
+  try { localStorage.removeItem(bootstrapRestoreLeaderStorageKey); } catch {}
+}
+
+function claimBootstrapRestoreLeadership(sessionKey = '') {
+  const cleanSessionKey = String(sessionKey || '').trim();
+  if (!cleanSessionKey) return false;
+  const now = Date.now();
+  const current = readBootstrapRestoreLease();
+  const owned = current?.owner === getRealtimeTabId() && current?.sessionKey === cleanSessionKey;
+  const available = !current || Number(current.expiresAt || 0) <= now || String(current.sessionKey || '') !== cleanSessionKey;
+  if (!owned && !available) return false;
+  return writeBootstrapRestoreLease(cleanSessionKey, now + bootstrapRestoreLeaderLeaseMs);
+}
+
+async function settleBootstrapRestoreLeadership(sessionKey = '') {
+  const jitter = Math.round(Math.random() * realtimeLeadershipSettleMs);
+  await new Promise((resolve) => window.setTimeout(resolve, realtimeLeadershipSettleMs + jitter));
+  const lease = readBootstrapRestoreLease();
+  return Boolean(
+    lease?.owner === getRealtimeTabId()
+    && String(lease.sessionKey || '') === String(sessionKey || '')
+    && Number(lease.expiresAt || 0) > Date.now()
+  );
+}
+
+function finishBootstrapRestoreWaiter(data = null) {
+  const waiter = state.bootstrapRestoreWaiter;
+  if (!waiter) return false;
+  state.bootstrapRestoreWaiter = null;
+  if (waiter.timeout) window.clearTimeout(waiter.timeout);
+  if (waiter.poll) window.clearInterval(waiter.poll);
+  waiter.resolve(data);
+  return true;
+}
+
+function waitForSharedBootstrap(sessionKey = '', { timeoutMs = bootstrapRestorePeerWaitMs, followLease = false } = {}) {
+  if (!sessionKey) return Promise.resolve(null);
+  if (state.bootstrapRestoreWaiter) finishBootstrapRestoreWaiter(null);
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const waiter = {
+      sessionKey,
+      startedAt,
+      resolve,
+      timeout: window.setTimeout(() => finishBootstrapRestoreWaiter(null), Math.max(50, Number(timeoutMs || 0))),
+      poll: window.setInterval(() => {
+        const shared = readSharedBootstrapSnapshot(sessionKey, { notBefore: startedAt - bootstrapRestoreSnapshotGraceMs });
+        if (shared) {
+          finishBootstrapRestoreWaiter(shared);
+          return;
+        }
+        if (!followLease) return;
+        const lease = readBootstrapRestoreLease();
+        const leaseActive = lease
+          && String(lease.sessionKey || '') === sessionKey
+          && Number(lease.expiresAt || 0) > Date.now();
+        if (!leaseActive || Date.now() - startedAt >= bootstrapRestoreLeaderMaxWaitMs) finishBootstrapRestoreWaiter(null);
+      }, 100)
+    };
+    state.bootstrapRestoreWaiter = waiter;
+  });
+}
+
+function buildShareableBootstrapSnapshot() {
+  if (!state.user?.userId || !getSessionToken() || !state.config) return null;
+  if (normalizeChatListMode(state.chatListMode) !== 'active' || state.archivedView) return null;
+  const recentlyBootstrapped = Date.now() - Number(state.bootstrapAppliedAt || 0) <= bootstrapRestoreSnapshotFreshMs;
+  if (!recentlyBootstrapped && !hasHealthySharedRealtimeLease()) return null;
+  return {
+    ok: true,
+    clientConfig: { ...state.config },
+    user: { ...state.user },
+    contacts: (Array.isArray(state.contacts) ? state.contacts : []).map((contact) => ({ ...contact })),
+    contactsPage: { nextCursor: state.contactsNextCursor, hasMore: Boolean(state.contactsHasMore) },
+    chats: (Array.isArray(state.chats) ? state.chats : []).map((chat) => ({ ...chat })),
+    chatsPage: { nextCursor: state.chatsNextCursor, hasMore: Boolean(state.chatsHasMore) },
+    realtimeCursor: loadRealtimeLastEventId(),
+    notificationPreferences: { ...(state.notificationPreferences || {}) },
+    labels: (Array.isArray(state.labels) ? state.labels : []).map((label) => ({ ...label }))
+  };
+}
+
+function flushPreBootstrapRealtimeEnvelopes() {
+  if (!state.user?.userId || !state.realtimePreBootstrapEnvelopes.length) return;
+  const pending = state.realtimePreBootstrapEnvelopes.splice(0, state.realtimePreBootstrapEnvelopes.length);
+  for (const envelope of pending) {
+    if (String(envelope?.userId || '') !== String(state.user.userId)) continue;
+    applyRealtimeBusEnvelope(envelope);
+  }
+}
+
+async function getCoordinatedBootstrapForExistingSession() {
+  const sessionToken = getSessionToken();
+  const sessionKey = realtimeSessionCoordinationKey(sessionToken);
+  if (!sessionToken || !sessionKey) throw new Error('La sesión local no está disponible.');
+  ensureRealtimeCoordinator();
+
+  // bootstrap-request es un mensaje diminuto y también viaja por el evento storage.
+  // Así la coordinación sigue funcionando cuando BroadcastChannel no está disponible.
+  const peerWait = waitForSharedBootstrap(sessionKey, { timeoutMs: bootstrapRestorePeerWaitMs });
+  broadcastRealtime({ type: 'bootstrap-request' }, { persistSmall: true });
+  const sharedFromPeer = await peerWait;
+  if (sharedFromPeer) return sharedFromPeer;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (claimBootstrapRestoreLeadership(sessionKey)) {
+      if (await settleBootstrapRestoreLeadership(sessionKey)) {
+        const renewTimer = window.setInterval(() => {
+          const lease = readBootstrapRestoreLease();
+          if (lease?.owner !== getRealtimeTabId() || String(lease.sessionKey || '') !== sessionKey) return;
+          writeBootstrapRestoreLease(sessionKey);
+        }, bootstrapRestoreLeaderRenewMs);
+        let completed = false;
+        try {
+          const data = await post('/api/bootstrap', {});
+          completed = true;
+          persistSharedBootstrapSnapshot(sessionKey, data);
+          broadcastRealtime({ type: 'bootstrap-shared', data }, { persistSmall: false });
+          return data;
+        } finally {
+          window.clearInterval(renewTimer);
+          if (completed) window.setTimeout(clearBootstrapRestoreLeaseIfOwned, 750);
+          else clearBootstrapRestoreLeaseIfOwned();
+        }
+      }
+      clearBootstrapRestoreLeaseIfOwned();
+    }
+
+    const lease = readBootstrapRestoreLease();
+    const leaseActive = lease
+      && String(lease.sessionKey || '') === sessionKey
+      && Number(lease.expiresAt || 0) > Date.now();
+    if (leaseActive) {
+      const shared = await waitForSharedBootstrap(sessionKey, {
+        timeoutMs: bootstrapRestoreLeaderMaxWaitMs,
+        followLease: true
+      });
+      if (shared) return shared;
+    }
+  }
+
+  // Fallback de disponibilidad: solo se alcanza si el almacenamiento compartido no
+  // pudo coordinarse o el líder desapareció repetidamente. Nunca se bloquea el acceso.
+  const data = await post('/api/bootstrap', {});
+  persistSharedBootstrapSnapshot(sessionKey, data);
+  return data;
 }
 
 function realtimeLastEventKey() {
@@ -5235,6 +6333,52 @@ function rememberRealtimeLastEventId(eventId = '') {
   const key = realtimeLastEventKey();
   if (!clean || !key) return;
   try { localStorage.setItem(key, clean); } catch {}
+}
+
+function clearCachedRealtimeToken() {
+  try { localStorage.removeItem(realtimeTokenCacheKey); } catch {}
+}
+
+function loadCachedRealtimeToken() {
+  if (!state.user?.userId || !getSessionToken()) return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(realtimeTokenCacheKey) || 'null');
+    const token = String(cached?.token || '').trim();
+    const expiresAtMs = Date.parse(cached?.expiresAt || '');
+    if (!token
+      || String(cached?.userId || '') !== String(state.user.userId)
+      || String(cached?.clientId || '') !== getClientId()
+      || !Number.isFinite(expiresAtMs)
+      || expiresAtMs <= Date.now() + realtimeTokenRefreshSkewMs) {
+      clearCachedRealtimeToken();
+      return null;
+    }
+    return { realtimeToken: token, expiresAt: new Date(expiresAtMs).toISOString(), fromCache: true };
+  } catch {
+    clearCachedRealtimeToken();
+    return null;
+  }
+}
+
+function rememberCachedRealtimeToken(tokenData = {}) {
+  const token = String(tokenData?.realtimeToken || '').trim();
+  const expiresAtMs = Date.parse(tokenData?.expiresAt || '');
+  if (!token || !state.user?.userId || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) return null;
+  const cached = {
+    token,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    userId: String(state.user.userId),
+    clientId: getClientId()
+  };
+  try { localStorage.setItem(realtimeTokenCacheKey, JSON.stringify(cached)); } catch {}
+  return { realtimeToken: cached.token, expiresAt: cached.expiresAt, fromCache: false };
+}
+
+async function getRealtimeTokenForStream() {
+  const cached = loadCachedRealtimeToken();
+  if (cached) return cached;
+  const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+  return rememberCachedRealtimeToken(tokenData) || { ...tokenData, fromCache: false };
 }
 
 function rememberRealtimeSeenEvent(eventId = '') {
@@ -5273,26 +6417,248 @@ function clearRealtimeLeaseIfOwned() {
   try { localStorage.removeItem(realtimeLeaderStorageKey); } catch {}
 }
 
+function realtimeRetryNotBefore() {
+  let storedUntil = 0;
+  try {
+    const stored = JSON.parse(localStorage.getItem(realtimeRetryAfterStorageKey) || 'null');
+    if (stored && String(stored.userId || '') === String(state.user?.userId || '')) {
+      storedUntil = Math.max(0, Number(stored.until || 0));
+      if (storedUntil <= Date.now()) localStorage.removeItem(realtimeRetryAfterStorageKey);
+    }
+  } catch {}
+  const until = Math.max(Number(state.realtimeRetryNotBefore || 0), storedUntil);
+  if (until <= Date.now()) {
+    state.realtimeRetryNotBefore = 0;
+    return 0;
+  }
+  state.realtimeRetryNotBefore = until;
+  return until;
+}
+
+function isRealtimeRetryDeferred() {
+  return realtimeRetryNotBefore() > Date.now();
+}
+
+function clearRealtimeRetryDeferral() {
+  state.realtimeRetryNotBefore = 0;
+  try {
+    const stored = JSON.parse(localStorage.getItem(realtimeRetryAfterStorageKey) || 'null');
+    if (!stored || String(stored.userId || '') === String(state.user?.userId || '')) {
+      localStorage.removeItem(realtimeRetryAfterStorageKey);
+    }
+  } catch {}
+}
+
+function readRealtimeBackoffState() {
+  const empty = { retryCount: 0, shortDisconnects: 0, until: 0, updatedAt: 0 };
+  if (!state.user?.userId) return empty;
+  try {
+    const stored = JSON.parse(localStorage.getItem(realtimeBackoffStorageKey) || 'null');
+    if (!stored || String(stored.userId || '') !== String(state.user.userId)) return empty;
+    const updatedAt = Math.max(0, Number(stored.updatedAt || 0));
+    if (!updatedAt || Date.now() - updatedAt > realtimeBackoffStorageTtlMs) {
+      localStorage.removeItem(realtimeBackoffStorageKey);
+      return empty;
+    }
+    return {
+      retryCount: Math.max(0, Math.min(8, Number(stored.retryCount || 0))),
+      shortDisconnects: Math.max(0, Math.min(6, Number(stored.shortDisconnects || 0))),
+      until: Math.max(0, Number(stored.until || 0)),
+      updatedAt
+    };
+  } catch { return empty; }
+}
+
+function syncRealtimeBackoffState() {
+  const shared = readRealtimeBackoffState();
+  state.realtimeRetryCount = Math.max(Number(state.realtimeRetryCount || 0), shared.retryCount);
+  state.realtimeShortDisconnects = Math.max(Number(state.realtimeShortDisconnects || 0), shared.shortDisconnects);
+  return shared;
+}
+
+function realtimeBackoffNotBefore() {
+  const shared = syncRealtimeBackoffState();
+  return shared.until > Date.now() ? shared.until : 0;
+}
+
+function persistRealtimeBackoffState({ retryCount, shortDisconnects, until } = {}) {
+  if (!state.user?.userId) return 0;
+  const shared = readRealtimeBackoffState();
+  const resolvedRetryCount = retryCount ?? Math.max(state.realtimeRetryCount, shared.retryCount);
+  const resolvedShortDisconnects = shortDisconnects ?? Math.max(state.realtimeShortDisconnects, shared.shortDisconnects);
+  const resolvedUntil = until ?? shared.until;
+  const payload = {
+    userId: String(state.user.userId),
+    retryCount: Math.max(0, Math.min(8, Number(resolvedRetryCount || 0))),
+    shortDisconnects: Math.max(0, Math.min(6, Number(resolvedShortDisconnects || 0))),
+    until: Math.max(0, Number(resolvedUntil || 0)),
+    updatedAt: Date.now()
+  };
+  state.realtimeRetryCount = payload.retryCount;
+  state.realtimeShortDisconnects = payload.shortDisconnects;
+  try { localStorage.setItem(realtimeBackoffStorageKey, JSON.stringify(payload)); } catch {}
+  return payload.until;
+}
+
+function clearRealtimeReconnectBackoff() {
+  state.realtimeRetryCount = 0;
+  state.realtimeShortDisconnects = 0;
+  try {
+    const stored = JSON.parse(localStorage.getItem(realtimeBackoffStorageKey) || 'null');
+    if (!stored || String(stored.userId || '') === String(state.user?.userId || '')) {
+      localStorage.removeItem(realtimeBackoffStorageKey);
+    }
+  } catch {}
+}
+
+function deferRealtimeReconnect(retryAfterMs = 0, { announce = true } = {}) {
+  if (!state.user?.userId) return 0;
+  const safeDelay = Math.max(15000, Math.min(2 * 60 * 60 * 1000, Number(retryAfterMs || 0) || 5 * 60 * 1000));
+  const until = Math.max(realtimeRetryNotBefore(), Date.now() + safeDelay);
+  state.realtimeRetryNotBefore = until;
+  try {
+    localStorage.setItem(realtimeRetryAfterStorageKey, JSON.stringify({ userId: String(state.user.userId), until }));
+  } catch {}
+  if (announce) broadcastRealtime({ type: 'retry-deferred', until }, { persistSmall: true });
+  if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true, announce: false });
+  else closeRealtime();
+  return until;
+}
+
 function broadcastRealtime(message = {}, { persistSmall = true } = {}) {
-  const envelope = { ...message, userId: String(state.user?.userId || ''), sender: getRealtimeTabId(), at: Date.now() };
+  const envelope = {
+    ...message,
+    userId: String(state.user?.userId || ''),
+    sessionKey: realtimeSessionCoordinationKey(),
+    sender: getRealtimeTabId(),
+    at: Date.now()
+  };
   try { state.realtimeChannel?.postMessage(envelope); } catch {}
-  if (persistSmall && message.type !== 'bootstrap') {
+  if (persistSmall && message.type !== 'bootstrap' && message.type !== 'bootstrap-shared') {
     try { localStorage.setItem(realtimeBusStorageKey, JSON.stringify(envelope)); } catch {}
   }
 }
 
+function noteRealtimePeerActivity(envelope = {}) {
+  const sender = String(envelope.sender || '').trim();
+  const sessionKey = String(envelope.sessionKey || '').trim();
+  if (!sender || sender === getRealtimeTabId() || !sessionKey) return;
+  if (envelope.visible !== true) {
+    state.realtimePeerActivity.delete(sender);
+    return;
+  }
+  state.realtimePeerActivity.set(sender, {
+    sessionKey,
+    at: Math.max(0, Number(envelope.at || Date.now()))
+  });
+}
+
+function announceRealtimeClientActivity(visible = document.visibilityState === 'visible') {
+  if (!state.user?.userId || !getSessionToken()) return;
+  broadcastRealtime(
+    { type: 'client-activity', visible: Boolean(visible) },
+    { persistSmall: !state.realtimeChannel }
+  );
+}
+
+function hasRecentVisibleRealtimePeer() {
+  const now = Date.now();
+  const sessionKey = realtimeSessionCoordinationKey();
+  let hasVisiblePeer = false;
+  for (const [sender, activity] of state.realtimePeerActivity.entries()) {
+    const stale = !activity
+      || activity.sessionKey !== sessionKey
+      || now - Number(activity.at || 0) > realtimePeerActivityTtlMs;
+    if (stale) {
+      state.realtimePeerActivity.delete(sender);
+      continue;
+    }
+    hasVisiblePeer = true;
+  }
+  return hasVisiblePeer;
+}
+
+function armRealtimeHiddenRelease(delay = realtimeHiddenReleaseMs) {
+  if (state.realtimeHiddenTimer) window.clearTimeout(state.realtimeHiddenTimer);
+  state.realtimeHiddenTimer = window.setTimeout(() => {
+    state.realtimeHiddenTimer = 0;
+    if (document.visibilityState !== 'hidden' || !state.realtimeLeader) return;
+    // Si otra pestaña/PWA de la misma sesión sigue visible, la SSE existente sigue
+    // siendo actividad relevante. Mantener al líder oculto evita cerrar y volver a
+    // abrir el mismo transporte únicamente por un cambio de pestaña.
+    if (hasRecentVisibleRealtimePeer()) {
+      armRealtimeHiddenRelease();
+      return;
+    }
+    releaseRealtimeLeadership({ closeTransport: true });
+  }, Math.max(250, Number(delay) || realtimeHiddenReleaseMs));
+}
+
 function applyRealtimeBusEnvelope(envelope = {}) {
   if (!envelope || envelope.sender === getRealtimeTabId()) return;
-  if (!state.user?.userId || String(envelope.userId || '') !== String(state.user.userId)) return;
+  const localSessionKey = realtimeSessionCoordinationKey();
+  if (!localSessionKey) return;
+  const envelopeSessionKey = String(envelope.sessionKey || '');
+  const isBootstrapCoordinationMessage = envelope.type === 'bootstrap-request' || envelope.type === 'bootstrap-shared';
+  // Los mensajes nuevos se aíslan por sesión. Para eventos legacy sin sessionKey mantenemos
+  // compatibilidad durante un despliegue gradual y, más abajo, exigimos el mismo userId.
+  if (envelopeSessionKey && envelopeSessionKey !== localSessionKey) return;
+  if (isBootstrapCoordinationMessage && envelopeSessionKey !== localSessionKey) return;
+
+  if (envelope.type === 'bootstrap-request') {
+    const snapshot = buildShareableBootstrapSnapshot();
+    if (snapshot) {
+      persistSharedBootstrapSnapshot(localSessionKey, snapshot);
+      broadcastRealtime({ type: 'bootstrap-shared', target: envelope.sender, data: snapshot }, { persistSmall: false });
+    }
+    return;
+  }
+
+  if (envelope.type === 'bootstrap-shared') {
+    const waiter = state.bootstrapRestoreWaiter;
+    if (!waiter || waiter.sessionKey !== localSessionKey) return;
+    if (envelope.target && envelope.target !== getRealtimeTabId()) return;
+    finishBootstrapRestoreWaiter(envelope.data || null);
+    return;
+  }
+
+  if (!state.user?.userId) {
+    if (envelope.type === 'event') {
+      state.realtimePreBootstrapEnvelopes.push(envelope);
+      if (state.realtimePreBootstrapEnvelopes.length > 80) state.realtimePreBootstrapEnvelopes.shift();
+    }
+    return;
+  }
+  if (String(envelope.userId || '') !== String(state.user.userId)) return;
+  if (envelope.type === 'client-activity') {
+    noteRealtimePeerActivity(envelope);
+    if (state.realtimeLeader && document.visibilityState === 'hidden' && envelope.visible === true) {
+      armRealtimeHiddenRelease();
+    }
+    return;
+  }
   if (envelope.type === 'event') {
     const eventId = String(envelope.eventId || '').trim();
-    if (eventId) rememberRealtimeLastEventId(eventId);
+    if (eventId && envelope.payload?.replayable !== false) rememberRealtimeLastEventId(eventId);
     if (!rememberRealtimeSeenEvent(eventId)) return;
     handleRealtimeEvent(envelope.payload || {});
     return;
   }
   if (envelope.type === 'bootstrap' && envelope.data) {
+    state.messageBaselineLoadedChats.clear();
+    state.messageSyncCursorByChat.clear();
     applyBootstrap(envelope.data);
+    return;
+  }
+  if (envelope.type === 'retry-deferred') {
+    const until = Math.max(Date.now(), Number(envelope.until || 0));
+    if (until > Date.now()) deferRealtimeReconnect(until - Date.now(), { announce: false });
+    return;
+  }
+  if (envelope.type === 'retry-blocked') {
+    state.realtimeRetryBlocked = true;
+    if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true, announce: false });
+    else closeRealtime();
     return;
   }
   if (envelope.type === 'leader-release') scheduleRealtimeElection(40);
@@ -5313,13 +6679,48 @@ function ensureRealtimeCoordinator() {
       try { applyRealtimeBusEnvelope(JSON.parse(event.newValue)); } catch {}
       return;
     }
+    if (event.key === realtimeBackoffStorageKey && state.user) {
+      if (!event.newValue) {
+        state.realtimeRetryCount = 0;
+        state.realtimeShortDisconnects = 0;
+        return;
+      }
+      syncRealtimeBackoffState();
+      const until = realtimeBackoffNotBefore();
+      if (until > Date.now() && state.realtimeLeader && !state.realtimeReconnectTimer) {
+        closeRealtime({ releaseLeadership: false });
+        armRealtimeReconnect(until - Date.now());
+      }
+      return;
+    }
+    if (state.user && event.key === outboxStorageKey()) {
+      loadOutboxState();
+      renderAll();
+      scheduleNextOutboxRetry();
+      return;
+    }
+    if (state.user && event.key === outboxRetryLeaderStorageKey() && !event.newValue && state.outboxMessages.length) {
+      scheduleNextOutboxRetry();
+      return;
+    }
+    if (event.key?.startsWith(`${bootstrapRestoreSnapshotStoragePrefix}:`) && state.bootstrapRestoreWaiter) {
+      const waiter = state.bootstrapRestoreWaiter;
+      const shared = readSharedBootstrapSnapshot(waiter.sessionKey, {
+        notBefore: Number(waiter.startedAt || 0) - bootstrapRestoreSnapshotGraceMs
+      });
+      if (shared) finishBootstrapRestoreWaiter(shared);
+      return;
+    }
     if (event.key === realtimeLeaderStorageKey && state.user && document.visibilityState === 'visible') {
       const lease = readRealtimeLease();
       if (!lease || Number(lease.expiresAt || 0) <= Date.now()) scheduleRealtimeElection(80);
     }
   });
   state.realtimeElectionTimer = window.setInterval(() => {
-    if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    if (state.user && getSessionToken() && document.visibilityState === 'visible' && navigator.onLine !== false) {
+      announceRealtimeClientActivity(true);
+    }
+    if (!state.user || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
     if (state.realtimeLeader) {
       const lease = readRealtimeLease();
       if (lease?.owner !== getRealtimeTabId()) releaseRealtimeLeadership({ closeTransport: true, announce: false });
@@ -5330,11 +6731,18 @@ function ensureRealtimeCoordinator() {
       openRealtime().catch(() => scheduleRealtimeReconnect());
     }
   }, realtimeElectionMs);
+  if (state.user && getSessionToken() && document.visibilityState === 'visible' && navigator.onLine !== false) {
+    announceRealtimeClientActivity(true);
+  }
 }
 
 function renewRealtimeLeadership() {
   if (!state.realtimeLeader) return;
-  if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) {
+  // La visibilidad no invalida el lease por sí sola: el handler de visibilitychange
+  // conserva una breve gracia y libera el stream con realtimeHiddenTimer si la app
+  // sigue oculta. Cerrar aquí en cada tick de 5 s anulaba esa gracia y convertía
+  // cambios breves de pestaña/app en una nueva HTTP Response SSE al regresar.
+  if (!state.user || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred() || navigator.onLine === false) {
     releaseRealtimeLeadership({ closeTransport: true });
     return;
   }
@@ -5347,7 +6755,7 @@ function renewRealtimeLeadership() {
 
 function claimRealtimeLeadership() {
   ensureRealtimeCoordinator();
-  if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return false;
+  if (!state.user || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred() || document.visibilityState !== 'visible' || navigator.onLine === false) return false;
   const now = Date.now();
   const current = readRealtimeLease();
   const owned = current?.owner === getRealtimeTabId();
@@ -5372,9 +6780,26 @@ function releaseRealtimeLeadership({ closeTransport = true, announce = true } = 
 
 function scheduleRealtimeElection(delay = 100) {
   window.setTimeout(() => {
-    if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    if (!state.user || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
     openRealtime().catch(() => scheduleRealtimeReconnect());
   }, Math.max(20, Number(delay) || 100));
+}
+
+async function settleRealtimeLeadership() {
+  const jitter = Math.round(Math.random() * realtimeLeadershipSettleMs);
+  await new Promise((resolve) => window.setTimeout(resolve, realtimeLeadershipSettleMs + jitter));
+  const lease = readRealtimeLease();
+  const ownsSettledLease = Boolean(
+    state.realtimeLeader
+    && lease?.owner === getRealtimeTabId()
+    && String(lease?.userId || '') === String(state.user?.userId || '')
+    && String(lease?.clientId || '') === getClientId()
+    && Number(lease?.expiresAt || 0) > Date.now()
+  );
+  if (!ownsSettledLease && state.realtimeLeader) {
+    releaseRealtimeLeadership({ closeTransport: true, announce: false });
+  }
+  return ownsSettledLease;
 }
 
 function closeRealtime({ releaseLeadership = false } = {}) {
@@ -5386,6 +6811,7 @@ function closeRealtime({ releaseLeadership = false } = {}) {
   state.realtimeStableTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
+  state.realtimeAttemptStartedAt = 0;
   state.realtimeOpenedAt = 0;
   if (releaseLeadership) releaseRealtimeLeadership({ closeTransport: false });
 }
@@ -5394,9 +6820,21 @@ function isRealtimeStreamUsable() {
   return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
 }
 
+function hasHealthySharedRealtimeLease() {
+  if (!state.user?.userId || state.realtimeRetryBlocked || isRealtimeRetryDeferred() || navigator.onLine === false) return false;
+  const lease = readRealtimeLease();
+  if (!lease
+    || Number(lease.expiresAt || 0) <= Date.now()
+    || String(lease.userId || '') !== String(state.user.userId)) return false;
+  if (lease.owner !== getRealtimeTabId()) return true;
+  return Boolean(state.eventSource && state.eventSource.readyState === EventSource.OPEN && state.realtimeOpenedAt > 0);
+}
+
 async function resyncRealtimeStateOnce() {
   if (state.realtimeResyncPromise) return state.realtimeResyncPromise;
   const promise = (async () => {
+    state.messageBaselineLoadedChats.clear();
+    state.messageSyncCursorByChat.clear();
     const data = await post('/api/bootstrap', {});
     applyBootstrap(data);
     broadcastRealtime({ type: 'bootstrap', data }, { persistSmall: false });
@@ -5409,7 +6847,13 @@ async function resyncRealtimeStateOnce() {
 
 async function openRealtime() {
   ensureRealtimeCoordinator();
+  if (state.realtimeRetryBlocked || isRealtimeRetryDeferred()) return null;
   if (!claimRealtimeLeadership()) return null;
+  const sharedBackoffUntil = realtimeBackoffNotBefore();
+  if (sharedBackoffUntil > Date.now()) {
+    armRealtimeReconnect(sharedBackoffUntil - Date.now());
+    return null;
+  }
   if (state.realtimeOpeningPromise) return state.realtimeOpeningPromise;
   if (isRealtimeStreamUsable()) return state.eventSource;
   const openSeq = state.realtimeOpenSeq + 1;
@@ -5420,21 +6864,47 @@ async function openRealtime() {
     state.realtimeManualClose = false;
     if (state.eventSource) state.eventSource.close();
     state.eventSource = null;
-    const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
+    // localStorage no ofrece compare-and-swap. Una breve ventana de asentamiento hace
+    // que, ante aperturas simultáneas, solo el dueño final del lease llegue a gastar
+    // la HTTP Response de /api/realtime/token y la posterior respuesta SSE.
+    if (!await settleRealtimeLeadership()) return null;
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken() || !state.realtimeLeader) return null;
+    let tokenData;
+    try {
+      tokenData = await getRealtimeTokenForStream();
+    } catch (error) {
+      const retryAfterMs = Math.max(0, Number(error?.retryAfterMs || 0));
+      if (retryAfterMs > 0) {
+        // Si el breaker/rate-limit ya indicó cuándo volver, respétalo también antes
+        // de abrir EventSource para no gastar respuestas de token durante la ventana.
+        deferRealtimeReconnect(retryAfterMs, { announce: true });
+      } else if (isDefinitiveHttpError(error)) {
+        state.realtimeRetryBlocked = true;
+        broadcastRealtime({ type: 'retry-blocked' });
+        releaseRealtimeLeadership({ closeTransport: true, announce: false });
+      }
+      throw error;
+    }
     if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken() || !state.realtimeLeader) return null;
     const token = encodeURIComponent(tokenData.realtimeToken || '');
     if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
     const lastEventId = loadRealtimeLastEventId();
     const resume = lastEventId ? `&lastEventId=${encodeURIComponent(lastEventId)}` : '';
-    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}${resume}`);
+    const reconnect = state.realtimeConnectedOnce ? '&reconnect=1' : '';
+    state.realtimeAttemptStartedAt = Date.now();
+    const source = new EventSource(withTrafficClientId(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}${resume}${reconnect}`));
+    let streamReady = false;
     source.addEventListener('chater_ready', () => {
       if (state.eventSource !== source) return;
+      streamReady = true;
+      state.realtimeRetryBlocked = false;
+      clearRealtimeRetryDeferral();
       state.realtimeOpenedAt = Date.now();
+      state.realtimeConnectedOnce = true;
       if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
       state.realtimeStableTimer = window.setTimeout(() => {
         if (state.eventSource !== source || source.readyState === EventSource.CLOSED) return;
-        state.realtimeRetryCount = 0;
-        state.realtimeShortDisconnects = 0;
+        clearRealtimeReconnectBackoff();
       }, realtimeStableConnectionMs);
     });
     source.addEventListener('chater_event', (event) => {
@@ -5442,7 +6912,7 @@ async function openRealtime() {
       try {
         const payload = JSON.parse(event.data || '{}');
         const eventId = String(event.lastEventId || payload.eventId || '').trim();
-        if (eventId) rememberRealtimeLastEventId(eventId);
+        if (eventId && payload.replayable !== false) rememberRealtimeLastEventId(eventId);
         if (!rememberRealtimeSeenEvent(eventId)) return;
         handleRealtimeEvent(payload);
         broadcastRealtime({ type: 'event', eventId, payload });
@@ -5453,13 +6923,36 @@ async function openRealtime() {
       try {
         const control = JSON.parse(event.data || '{}');
         if (control.type === 'resync_required') resyncRealtimeStateOnce().catch(() => null);
+        if (control.type === 'retry_later') {
+          deferRealtimeReconnect(control.retryAfterMs, { announce: true });
+        }
+        if (control.type === 'realtime_token_invalid') {
+          // Solo el backend puede afirmar que el capability dejó de ser válido. Los
+          // fallos de red/gateway antes de `chater_ready` conservan el token vigente y
+          // evitan gastar una HTTP Response extra pidiendo /api/realtime/token.
+          clearCachedRealtimeToken();
+          if (state.eventSource === source) {
+            source.close();
+            state.eventSource = null;
+          }
+          if (!state.realtimeManualClose && getSessionToken() && state.realtimeLeader && !isRealtimeRetryDeferred()) {
+            scheduleRealtimeReconnect();
+          }
+        }
       } catch {}
     });
     source.onerror = () => {
       if (state.eventSource !== source) return;
-      const duration = state.realtimeOpenedAt ? Date.now() - state.realtimeOpenedAt : 0;
+      // Un error previo a `chater_ready` también puede ser una caída de red o gateway.
+      // No invalidamos el capability por inferencia: el backend envía
+      // `realtime_token_invalid` cuando la causa sí es definitiva.
+      // Una caída antes de chater_ready también consumió (o intentó consumir) una
+      // HTTP Response SSE. Medimos desde que se creó EventSource para que fallos de
+      // handshake/gateway muy cortos aumenten la penalización y no formen tormentas.
+      const durationAnchor = state.realtimeOpenedAt || state.realtimeAttemptStartedAt;
+      const duration = durationAnchor ? Date.now() - durationAnchor : 0;
       if (duration > 0 && duration < realtimeShortConnectionMs) state.realtimeShortDisconnects = Math.min(6, state.realtimeShortDisconnects + 1);
-      if (state.realtimeManualClose || !getSessionToken() || !state.realtimeLeader) {
+      if (state.realtimeManualClose || !getSessionToken() || !state.realtimeLeader || isRealtimeRetryDeferred()) {
         closeRealtime();
         return;
       }
@@ -5480,27 +6973,44 @@ async function openRealtime() {
   }
 }
 
-function scheduleRealtimeReconnect() {
-  if (!state.realtimeLeader || state.realtimeReconnectTimer || !getSessionToken()) return;
-  if (state.eventSource) state.eventSource.close();
-  state.eventSource = null;
-  if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
-  state.realtimeStableTimer = 0;
-  const penalty = Math.min(4, state.realtimeShortDisconnects);
-  const exponent = Math.min(6, state.realtimeRetryCount + penalty);
-  const base = Math.min(60000, 1800 * (2 ** exponent));
-  const jitter = 0.7 + (Math.random() * 0.6);
-  const delay = Math.round(base * jitter);
-  state.realtimeRetryCount = Math.min(8, state.realtimeRetryCount + 1);
+function armRealtimeReconnect(delayMs = 0) {
+  if (!state.realtimeLeader || state.realtimeReconnectTimer || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred()) return false;
+  const delay = Math.max(50, Number(delayMs || 0));
   state.realtimeReconnectTimer = window.setTimeout(async () => {
     state.realtimeReconnectTimer = 0;
-    if (!getSessionToken() || !state.user || !state.realtimeLeader || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    if (!getSessionToken() || !state.user || !state.realtimeLeader || isRealtimeRetryDeferred() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
     try {
       await openRealtime();
     } catch {
       scheduleRealtimeReconnect();
     }
   }, delay);
+  return true;
+}
+
+function scheduleRealtimeReconnect() {
+  if (!state.realtimeLeader || state.realtimeReconnectTimer || !getSessionToken() || state.realtimeRetryBlocked || isRealtimeRetryDeferred()) return;
+  if (state.eventSource) state.eventSource.close();
+  state.eventSource = null;
+  state.realtimeAttemptStartedAt = 0;
+  state.realtimeOpenedAt = 0;
+  if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
+  state.realtimeStableTimer = 0;
+  const shared = syncRealtimeBackoffState();
+  const retryCount = Math.max(Number(state.realtimeRetryCount || 0), Number(shared.retryCount || 0));
+  const shortDisconnects = Math.max(Number(state.realtimeShortDisconnects || 0), Number(shared.shortDisconnects || 0));
+  const penalty = Math.min(4, shortDisconnects);
+  const exponent = Math.min(6, retryCount + penalty);
+  const base = Math.min(60000, 1800 * (2 ** exponent));
+  const jitter = 0.7 + (Math.random() * 0.6);
+  const delay = Math.round(base * jitter);
+  const until = Math.max(Number(shared.until || 0), Date.now() + delay);
+  persistRealtimeBackoffState({
+    retryCount: Math.min(8, retryCount + 1),
+    shortDisconnects,
+    until
+  });
+  armRealtimeReconnect(until - Date.now());
 }
 
 function sortChats() {
@@ -5513,12 +7023,17 @@ function sortChats() {
 function clearActiveChatState() {
   stopPresenceRefresh();
   if (state.voiceDictating) stopVoiceDictation({ announce: false });
+  const previousChatId = state.activeChatId;
+  if (state.typingTimer) window.clearTimeout(state.typingTimer);
+  state.typingTimer = 0;
+  if (previousChatId) sendTyping(false, { chatId: previousChatId }).catch(() => null);
   state.activeChatId = '';
   state.replyToMessage = null;
   state.editingMessage = null;
   state.forwardingMessage = null;
   state.scheduleModalOpen = false;
   state.scheduledMessages = [];
+  state.scheduledLoadedChatId = '';
   state.scheduledLoading = false;
   state.schedulingMessage = false;
   state.highlightedMessageId = '';
@@ -5527,9 +7042,13 @@ function clearActiveChatState() {
   state.selectionDeleteBusy = false;
   state.starredPanelOpen = false;
   state.starredMessages = [];
+  state.starredNextCursor = null;
+  state.starredHasMore = false;
   state.chatSearchQuery = '';
   state.chatSearchOpen = false;
   state.chatSearchResults = [];
+  state.chatSearchNextCursor = null;
+  state.chatSearchHasMore = false;
   state.quickRepliesOpen = false;
   closeLinkLibrary();
   closeContactNicknameModal();
@@ -5543,6 +7062,9 @@ function removeChat(chatId = '') {
   const cleanChatId = String(chatId || '').trim();
   if (!cleanChatId) return;
   state.chats = state.chats.filter((item) => item.chatId !== cleanChatId);
+  state.pinnedMessagesByChat.delete(cleanChatId);
+  state.messageHistoryCoverageByChat.delete(cleanChatId);
+  state.messageHistoryRequestsByChat.delete(cleanChatId);
   if (state.activeChatId === cleanChatId) clearActiveChatState();
 }
 
@@ -5713,23 +7235,7 @@ async function postContactPreviewWithTimeout(body = {}) {
     ? window.setTimeout(() => controller.abort(), contactPreviewRequestTimeoutMs)
     : null;
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    const token = getSessionToken();
-    if (token) headers['X-Session-Token'] = token;
-    const response = await fetch(`${getBackendUrl()}/api/contacts/preview-code`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body || {}),
-      signal: controller?.signal
-    });
-    const data = await response.json().catch(() => ({ ok: false, message: 'Respuesta inválida' }));
-    if (!response.ok || data.ok === false) {
-      const error = new Error(data.message || 'Error en la solicitud');
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
-    return data;
+    return await post('/api/contacts/preview-code', body || {}, { signal: controller?.signal });
   } catch (error) {
     if (/AbortError/i.test(error?.name || '')) {
       const timeoutError = new Error('La vista previa del contacto tardó demasiado.');
@@ -5743,11 +7249,106 @@ async function postContactPreviewWithTimeout(body = {}) {
   }
 }
 
+async function postContactPreviewBatchWithTimeout(items = []) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller
+    ? window.setTimeout(() => controller.abort(), contactPreviewRequestTimeoutMs)
+    : null;
+  try {
+    return await post('/api/contacts/preview-code/batch', { items }, { signal: controller?.signal });
+  } catch (error) {
+    if (/AbortError/i.test(error?.name || '')) {
+      const timeoutError = new Error('Las vistas previas de contactos tardaron demasiado.');
+      timeoutError.status = 0;
+      timeoutError.retryable = true;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+}
+
+function applyContactPreviewFailure(candidate = {}, previousAttempts = 0, error = null) {
+  const key = contactPreviewKey(candidate.code);
+  if (!key) return;
+  const retryable = !error?.status || error.status >= 500 || navigator.onLine === false;
+  const attempts = Math.max(0, Number(previousAttempts || 0)) + 1;
+  const shouldKeepTrying = retryable && attempts < contactPreviewMaxAttempts;
+  const retryDelay = contactPreviewRetryDelayMs * attempts;
+  setContactLinkPreview(candidate.code, {
+    code: candidate.code,
+    status: shouldKeepTrying ? 'loading' : 'missing',
+    profile: null,
+    saved: false,
+    retryable: shouldKeepTrying,
+    retryableExhausted: retryable && !shouldKeepTrying,
+    attempts,
+    nextRetryAt: shouldKeepTrying ? Date.now() + retryDelay : 0
+  });
+  if (shouldKeepTrying) scheduleContactPreviewRetry(key, retryDelay);
+}
+
+function scheduleContactPreviewBatchFlush(delayMs = contactPreviewBatchDelayMs) {
+  if (state.contactLinkPreviewBatchTimer || !state.contactLinkPreviewQueue.size || !state.user) return;
+  state.contactLinkPreviewBatchTimer = window.setTimeout(() => {
+    state.contactLinkPreviewBatchTimer = 0;
+    flushContactPreviewBatch().catch(() => null);
+  }, Math.max(0, Number(delayMs) || contactPreviewBatchDelayMs));
+}
+
+async function flushContactPreviewBatch() {
+  if (!state.user || !state.contactLinkPreviewQueue.size) return;
+  const queuedEntries = Array.from(state.contactLinkPreviewQueue.entries()).slice(0, contactPreviewBatchMaxItems);
+  const batch = [];
+  for (const [key, queued] of queuedEntries) {
+    state.contactLinkPreviewQueue.delete(key);
+    if (!queued?.candidate || state.contactLinkPreviewInFlight.has(key)) continue;
+    state.contactLinkPreviewInFlight.add(key);
+    batch.push({ key, ...queued });
+  }
+  if (!batch.length) {
+    scheduleContactPreviewBatchFlush();
+    return;
+  }
+
+  try {
+    const data = await postContactPreviewBatchWithTimeout(batch.map(({ candidate }) => ({
+      code: candidate.code,
+      link: candidate.url || candidate.visible || ''
+    })));
+    const byCode = new Map((Array.isArray(data.previews) ? data.previews : []).map((preview) => [contactPreviewKey(preview.code), preview]));
+    for (const item of batch) {
+      const preview = byCode.get(item.key);
+      if (preview?.status === 'ready' && preview?.profile?.userId) {
+        setContactLinkPreview(item.candidate.code, {
+          code: preview.code || item.candidate.code,
+          status: 'ready',
+          profile: preview.profile || preview.contact || null,
+          saved: Boolean(preview.saved)
+        });
+        continue;
+      }
+      if (preview?.status === 'missing') {
+        setContactLinkPreview(item.candidate.code, { code: item.candidate.code, status: 'missing', profile: null, saved: false });
+        continue;
+      }
+      applyContactPreviewFailure(item.candidate, item.previousAttempts, { status: 503 });
+    }
+  } catch (error) {
+    for (const item of batch) applyContactPreviewFailure(item.candidate, item.previousAttempts, error);
+  } finally {
+    for (const item of batch) state.contactLinkPreviewInFlight.delete(item.key);
+    renderAll();
+    if (state.contactLinkPreviewQueue.size) scheduleContactPreviewBatchFlush();
+  }
+}
+
 function queueChatERContactPreviewLoads(candidates = []) {
   if (!state.user) return;
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
     const key = contactPreviewKey(candidate.code);
-    if (!key || state.contactLinkPreviewInFlight.has(key)) continue;
+    if (!key || state.contactLinkPreviewInFlight.has(key) || state.contactLinkPreviewQueue.has(key)) continue;
     const localPreview = localContactPreviewForCode(candidate.code);
     if (localPreview) {
       setContactLinkPreview(candidate.code, localPreview);
@@ -5757,38 +7358,9 @@ function queueChatERContactPreviewLoads(candidates = []) {
     if (existingPreview && !shouldRetryContactLinkPreview(existingPreview)) continue;
     const previousAttempts = Math.max(0, Number(existingPreview?.attempts || 0));
     cancelContactPreviewRetry(key);
-    state.contactLinkPreviewInFlight.add(key);
-    postContactPreviewWithTimeout({ code: candidate.code, link: candidate.url || candidate.visible || '' })
-      .then((data) => {
-        setContactLinkPreview(candidate.code, {
-          code: data.code || candidate.code,
-          status: 'ready',
-          profile: data.profile || data.contact || null,
-          saved: Boolean(data.saved)
-        });
-      })
-      .catch((error) => {
-        const retryable = !error?.status || error.status >= 500 || navigator.onLine === false;
-        const attempts = previousAttempts + 1;
-        const shouldKeepTrying = retryable && attempts < contactPreviewMaxAttempts;
-        const retryDelay = contactPreviewRetryDelayMs * attempts;
-        setContactLinkPreview(candidate.code, {
-          code: candidate.code,
-          status: shouldKeepTrying ? 'loading' : 'missing',
-          profile: null,
-          saved: false,
-          retryable: shouldKeepTrying,
-          retryableExhausted: retryable && !shouldKeepTrying,
-          attempts,
-          nextRetryAt: shouldKeepTrying ? Date.now() + retryDelay : 0
-        });
-        if (shouldKeepTrying) scheduleContactPreviewRetry(key, retryDelay);
-      })
-      .finally(() => {
-        state.contactLinkPreviewInFlight.delete(key);
-        renderAll();
-      });
+    state.contactLinkPreviewQueue.set(key, { candidate, previousAttempts });
   }
+  scheduleContactPreviewBatchFlush();
 }
 
 async function saveSharedContactFromCode(code = '') {
@@ -5871,6 +7443,7 @@ function deliveryAckQueueStorageForCurrentUser() {
 
 function readDeliveryAckQueue() {
   try {
+    const now = Date.now();
     const parsed = JSON.parse(localStorage.getItem(deliveryAckQueueStorageForCurrentUser()) || '[]');
     return (Array.isArray(parsed) ? parsed : [])
       .map((item) => ({
@@ -5883,7 +7456,10 @@ function readDeliveryAckQueue() {
         nextAttemptAt: Number(item.nextAttemptAt || 0),
         attempts: Math.max(0, Number(item.attempts || 0))
       }))
-      .filter((item) => item.chatId && item.messageId)
+      .filter((item) => item.chatId
+        && item.messageId
+        && item.attempts < deliveryAckMaxAttempts
+        && now - item.firstQueuedAt <= deliveryAckMaxAgeMs)
       .slice(-250);
   } catch {
     return [];
@@ -5911,56 +7487,86 @@ function removeDeliveryAckFromQueue(chatId = '', messageId = '') {
 }
 
 function queueDeliveryAck(message = {}, { attempted = false } = {}) {
-  if (!shouldAcknowledgeDelivery(message)) return;
+  if (!shouldAcknowledgeDelivery(message)) return false;
   const key = deliveryAckQueueKey(message.chatId, message.messageId);
   const now = Date.now();
   const queue = readDeliveryAckQueue();
   const index = queue.findIndex((item) => deliveryAckQueueKey(item.chatId, item.messageId) === key);
   const previous = index >= 0 ? queue[index] : null;
-  const attempts = attempted ? Math.min(12, Number(previous?.attempts || 0) + 1) : Number(previous?.attempts || 0);
+  const firstQueuedAt = Number(previous?.firstQueuedAt || now);
+  const attempts = attempted ? Number(previous?.attempts || 0) + 1 : Number(previous?.attempts || 0);
+  if (attempts >= deliveryAckMaxAttempts || now - firstQueuedAt > deliveryAckMaxAgeMs) {
+    removeDeliveryAckFromQueue(message.chatId, message.messageId);
+    return false;
+  }
   const delay = attempted ? Math.min(5 * 60 * 1000, 1000 * (2 ** Math.min(8, attempts))) : 0;
   const next = {
     chatId: String(message.chatId || '').trim(),
     messageId: String(message.messageId || '').trim(),
     senderUserId: String(message.senderUserId || '').trim(),
     createdAt: String(message.createdAt || '').trim(),
-    firstQueuedAt: Number(previous?.firstQueuedAt || now),
+    firstQueuedAt,
     lastAttemptAt: attempted ? now : Number(previous?.lastAttemptAt || 0),
-    nextAttemptAt: now + delay,
+    // Un replay SSE o un evento repetido no puede adelantar el backoff ya ganado.
+    nextAttemptAt: attempted
+      ? now + delay
+      : previous
+        ? Math.max(now, Number(previous.nextAttemptAt || now))
+        : now,
     attempts
   };
   if (index >= 0) queue[index] = next;
   else queue.push(next);
   writeDeliveryAckQueue(queue);
+  return true;
 }
 
 function scheduleDeliveryAckRetry(delayMs = 4000) {
+  const delay = Math.max(100, Number(delayMs || 4000));
+  const targetAt = Date.now() + delay;
+  if (state.deliveryAckRetryTimer && Number(state.deliveryAckRetryAt || 0) > 0 && Number(state.deliveryAckRetryAt) <= targetAt) return;
   if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
+  state.deliveryAckRetryAt = targetAt;
   state.deliveryAckRetryTimer = window.setTimeout(() => {
     state.deliveryAckRetryTimer = 0;
+    state.deliveryAckRetryAt = 0;
     flushDeliveryAckQueue().catch(() => null);
-  }, Math.max(500, Number(delayMs || 4000)));
+  }, Math.max(100, targetAt - Date.now()));
 }
 
-async function acknowledgeMessageDelivered(message = {}, { fromQueue = false } = {}) {
+async function acknowledgeMessageDelivered(message = {}) {
   if (!shouldAcknowledgeDelivery(message)) return false;
   const key = deliveryAckQueueKey(message.chatId, message.messageId);
   if (state.deliveryAckInFlight.has(key)) return false;
-  if (!fromQueue) queueDeliveryAck(message);
-  state.deliveryAckInFlight.add(key);
-  try {
-    const data = await post('/api/chats/delivery', { chatId: message.chatId, messageId: message.messageId });
-    removeDeliveryAckFromQueue(message.chatId, message.messageId);
-    if (data.chat) upsertChat(data.chat);
-    if (data.message) upsertMessage(data.message);
-    return true;
-  } catch {
-    queueDeliveryAck(message, { attempted: true });
-    scheduleDeliveryAckRetry();
-    return false;
-  } finally {
-    state.deliveryAckInFlight.delete(key);
-  }
+  if (!queueDeliveryAck(message)) return false;
+  // Las confirmaciones recibidas por SSE se agrupan durante una ventana mínima.
+  // Así una ráfaga de mensajes consume una sola HTTP Response en lugar de una por mensaje.
+  scheduleDeliveryAckRetry(deliveryAckBatchDelayMs);
+  return true;
+}
+
+function deliveryAckResultKey(item = {}) {
+  return deliveryAckQueueKey(item.chatId, item.messageId);
+}
+
+function deliveryAckMessageFromQueueItem(item = {}) {
+  return {
+    chatId: item.chatId,
+    messageId: item.messageId,
+    senderUserId: item.senderUserId || 'pending',
+    createdAt: item.createdAt || ''
+  };
+}
+
+function scheduleNextDeliveryAckFlush() {
+  const pending = readDeliveryAckQueue();
+  if (!pending.length) return;
+  const now = Date.now();
+  const nextAttemptAt = pending.reduce((earliest, item) => {
+    const candidate = Math.max(now, Number(item.nextAttemptAt || 0));
+    return !earliest || candidate < earliest ? candidate : earliest;
+  }, 0);
+  scheduleDeliveryAckRetry(Math.max(100, nextAttemptAt - now));
 }
 
 async function flushDeliveryAckQueue({ force = false } = {}) {
@@ -5968,25 +7574,48 @@ async function flushDeliveryAckQueue({ force = false } = {}) {
   if (navigator.onLine === false && !force) return false;
   const now = Date.now();
   const queue = readDeliveryAckQueue();
-  const due = queue.filter((item) => force || Number(item.nextAttemptAt || 0) <= now).slice(0, 40);
-  if (!due.length) return false;
-  for (const item of due) {
-    await acknowledgeMessageDelivered({
-      chatId: item.chatId,
-      messageId: item.messageId,
-      senderUserId: item.senderUserId || 'pending',
-      createdAt: item.createdAt || ''
-    }, { fromQueue: true }).catch(() => null);
+  const due = queue
+    .filter((item) => !state.deliveryAckInFlight.has(deliveryAckResultKey(item)))
+    .filter((item) => Number(item.nextAttemptAt || 0) <= now || (force && Number(item.attempts || 0) === 0))
+    .slice(0, deliveryAckBatchMaxItems);
+  if (!due.length) {
+    scheduleNextDeliveryAckFlush();
+    return false;
   }
-  const pending = readDeliveryAckQueue();
-  if (pending.some((item) => Number(item.nextAttemptAt || 0) <= Date.now() + 5000)) scheduleDeliveryAckRetry(5000);
+
+  const keys = due.map(deliveryAckResultKey);
+  for (const key of keys) state.deliveryAckInFlight.add(key);
+  try {
+    const data = await post('/api/chats/delivery/batch', {
+      deliveries: due.map((item) => ({ chatId: item.chatId, messageId: item.messageId }))
+    });
+    const results = Array.isArray(data.results) ? data.results : [];
+    const byKey = new Map(results.map((item) => [deliveryAckResultKey(item), item]));
+    for (const item of due) {
+      const result = byKey.get(deliveryAckResultKey(item));
+      if (result && (result.confirmed === true || result.final === true)) {
+        removeDeliveryAckFromQueue(item.chatId, item.messageId);
+        continue;
+      }
+      queueDeliveryAck(deliveryAckMessageFromQueueItem(item), { attempted: true });
+    }
+  } catch (error) {
+    for (const item of due) {
+      if (isDefinitiveHttpError(error)) removeDeliveryAckFromQueue(item.chatId, item.messageId);
+      else queueDeliveryAck(deliveryAckMessageFromQueueItem(item), { attempted: true });
+    }
+  } finally {
+    for (const key of keys) state.deliveryAckInFlight.delete(key);
+  }
+
+  scheduleNextDeliveryAckFlush();
   return true;
 }
 
 function acknowledgeMessagesDelivered(messages = []) {
   const candidates = (Array.isArray(messages) ? messages : []).filter(shouldAcknowledgeDelivery);
-  for (const message of candidates) acknowledgeMessageDelivered(message).catch(() => null);
-  flushDeliveryAckQueue().catch(() => null);
+  for (const message of candidates) queueDeliveryAck(message);
+  if (candidates.length) scheduleDeliveryAckRetry(deliveryAckBatchDelayMs);
 }
 
 function renderChatSearchVisibility() {
@@ -6023,9 +7652,13 @@ function resetChatSearch({ keepInput = false } = {}) {
   state.chatSearchQuery = '';
   state.chatSearchResults = [];
   state.chatSearchLoading = false;
+  state.chatSearchNextCursor = null;
+  state.chatSearchHasMore = false;
   state.starredPanelOpen = false;
   state.starredMessages = [];
   state.starredLoading = false;
+  state.starredNextCursor = null;
+  state.starredHasMore = false;
   state.highlightedMessageId = '';
   if (!keepInput && els.chatSearchInput) els.chatSearchInput.value = '';
   renderSearchPanel();
@@ -6061,7 +7694,8 @@ function renderSearchPanel() {
             <span>${escapeHtml(msg.excerpt || msg.text || '')}</span>
           </button>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${state.starredHasMore ? '<button class="ce-link" type="button" data-starred-load-more="1">Cargar más destacados</button>' : ''}`;
     return;
   }
   if (!state.activeChatId || (!query && !state.chatSearchLoading)) {
@@ -6089,29 +7723,48 @@ function renderSearchPanel() {
           <span>${escapeHtml(msg.excerpt || msg.text || '')}</span>
         </button>`;
       }).join('')}
-    </div>`;
+    </div>
+    ${state.chatSearchHasMore ? '<button class="ce-link" type="button" data-search-load-more="1">Cargar más resultados</button>' : ''}`;
 }
 
-async function searchActiveChat(query = '') {
+async function searchActiveChat(query = '', { append = false } = {}) {
   const cleanQuery = String(query || '').trim();
+  const sameQuery = cleanQuery === state.chatSearchQuery;
   setChatSearchOpen(true);
   state.starredPanelOpen = false;
   if (!state.activeChatId || cleanQuery.length < 2) {
     state.chatSearchQuery = cleanQuery;
     state.chatSearchResults = [];
+    state.chatSearchNextCursor = null;
+    state.chatSearchHasMore = false;
     renderSearchPanel();
     return;
   }
+  const shouldAppend = Boolean(append && sameQuery && state.chatSearchHasMore && state.chatSearchNextCursor !== null);
   state.chatSearchLoading = true;
   state.chatSearchQuery = cleanQuery;
-  state.chatSearchResults = [];
+  if (!shouldAppend) {
+    state.chatSearchResults = [];
+    state.chatSearchNextCursor = null;
+    state.chatSearchHasMore = false;
+  }
   renderSearchPanel();
   try {
-    const data = await post('/api/chats/search', { chatId: state.activeChatId, query: cleanQuery, limit: 30 });
+    const data = await post('/api/chats/search', {
+      chatId: state.activeChatId,
+      query: cleanQuery,
+      limit: 30,
+      cursor: shouldAppend ? state.chatSearchNextCursor : null
+    });
+    const incoming = Array.isArray(data.matches) ? data.matches : [];
     state.chatSearchQuery = data.query || cleanQuery;
-    state.chatSearchResults = Array.isArray(data.matches) ? data.matches : [];
+    state.chatSearchResults = shouldAppend
+      ? Array.from(new Map([...state.chatSearchResults, ...incoming].map((message) => [message.messageId, message])).values())
+      : incoming;
+    state.chatSearchNextCursor = data.page?.nextCursor ?? null;
+    state.chatSearchHasMore = Boolean(data.page?.hasMore && state.chatSearchNextCursor !== null);
   } catch (error) {
-    state.chatSearchResults = [];
+    if (!shouldAppend) state.chatSearchResults = [];
     state.chatSearchQuery = cleanQuery;
     els.chatSearchPanel.classList.remove('hidden');
     els.chatSearchPanel.innerHTML = `<div class="ce-search-empty">${escapeHtml(error.message || 'No se pudo buscar en este chat.')}</div>`;
@@ -6122,20 +7775,34 @@ async function searchActiveChat(query = '') {
   renderSearchPanel();
 }
 
-async function loadStarredMessages() {
+async function loadStarredMessages({ append = false } = {}) {
   if (!state.activeChatId) return;
+  const shouldAppend = Boolean(append && state.starredHasMore && state.starredNextCursor !== null);
   setChatSearchOpen(true);
   state.starredPanelOpen = true;
   state.starredLoading = true;
-  state.starredMessages = [];
+  if (!shouldAppend) {
+    state.starredMessages = [];
+    state.starredNextCursor = null;
+    state.starredHasMore = false;
+  }
   state.chatSearchQuery = '';
   if (els.chatSearchInput) els.chatSearchInput.value = '';
   renderSearchPanel();
   try {
-    const data = await post('/api/chats/starred', { chatId: state.activeChatId, limit: 80 });
-    state.starredMessages = Array.isArray(data.messages) ? data.messages : [];
+    const data = await post('/api/chats/starred', {
+      chatId: state.activeChatId,
+      limit: 40,
+      cursor: shouldAppend ? state.starredNextCursor : null
+    });
+    const incoming = Array.isArray(data.messages) ? data.messages : [];
+    state.starredMessages = shouldAppend
+      ? Array.from(new Map([...state.starredMessages, ...incoming].map((message) => [message.messageId, message])).values())
+      : incoming;
+    state.starredNextCursor = data.page?.nextCursor ?? null;
+    state.starredHasMore = Boolean(data.page?.hasMore && state.starredNextCursor !== null);
   } catch (error) {
-    state.starredMessages = [];
+    if (!shouldAppend) state.starredMessages = [];
     els.chatSearchPanel.classList.remove('hidden');
     els.chatSearchPanel.innerHTML = `<div class="ce-search-empty">${escapeHtml(error.message || 'No se pudieron cargar los mensajes destacados.')}</div>`;
     return;
@@ -6169,10 +7836,30 @@ async function setMessagePinned(messageId = '', pinned = true) {
   if (!state.activeChatId || !messageId) return;
   const data = await post('/api/chats/message-pin', { chatId: state.activeChatId, messageId, pinned });
   if (data.chat) upsertChat(data.chat);
+  if (data.pinned && data.message?.messageId) cachePinnedMessagesForChat(state.activeChatId, [data.message]);
   syncPinnedStateForChat(state.activeChatId, data.pinnedMessageIds || data.chat?.pinnedMessageIds || []);
   upsertMessage(data.message);
   renderAll();
   showTemporaryDraftStatus(data.pinned ? 'Mensaje fijado en este chat.' : 'Mensaje desfijado.');
+}
+
+function invalidateMessageHistoryCoverage(chatId = '') {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  state.messageHistoryCoverageByChat.delete(cleanChatId);
+}
+
+function canReuseMessageHistory(chatId = '', maxMessages = 500) {
+  const cleanChatId = String(chatId || '').trim();
+  const coverage = cleanChatId ? state.messageHistoryCoverageByChat.get(cleanChatId) : null;
+  const cached = cleanChatId ? state.messagesByChat.get(cleanChatId) : null;
+  if (!coverage || !Array.isArray(cached)) return false;
+  const safeMax = Math.min(500, Math.max(1, Number(maxMessages || 500)));
+  const hasCoverage = Boolean(coverage.complete) || Number(coverage.maxMessages || 0) >= safeMax;
+  if (!hasCoverage) return false;
+  const loadedAt = Number(coverage.loadedAt || 0);
+  const recentlyLoaded = loadedAt > 0 && Date.now() - loadedAt <= messageHistoryFreshReuseMs;
+  return recentlyLoaded || hasHealthySharedRealtimeLease();
 }
 
 async function loadMessageHistoryPages(chatId = '', { maxMessages = 500, pageSize = 120 } = {}) {
@@ -6180,22 +7867,58 @@ async function loadMessageHistoryPages(chatId = '', { maxMessages = 500, pageSiz
   if (!cleanChatId) return [];
   const safeMax = Math.min(500, Math.max(1, Number(maxMessages || 500)));
   const safePageSize = Math.min(120, Math.max(20, Number(pageSize || 120)));
-  let cursor = 0;
-  let messages = [];
-  const maxPages = Math.ceil(safeMax / safePageSize) + 1;
-  for (let pageIndex = 0; pageIndex < maxPages && messages.length < safeMax; pageIndex += 1) {
-    const data = await post('/api/chats/messages', {
-      chatId: cleanChatId,
-      limit: Math.min(safePageSize, safeMax - messages.length),
-      cursor
-    });
-    const batch = Array.isArray(data.messages) ? data.messages : [];
-    if (batch.length) messages = [...batch, ...messages];
-    const nextCursor = Number(data.page?.nextCursor);
-    if (!data.page?.hasMore || !Number.isFinite(nextCursor) || nextCursor <= cursor) break;
-    cursor = nextCursor;
+  if (canReuseMessageHistory(cleanChatId, safeMax)) {
+    return (state.messagesByChat.get(cleanChatId) || []).slice(-safeMax);
   }
-  return messages.slice(-safeMax);
+
+  const existingRequest = state.messageHistoryRequestsByChat.get(cleanChatId);
+  if (existingRequest) {
+    const loaded = await existingRequest.promise;
+    if (Number(existingRequest.maxMessages || 0) >= safeMax || canReuseMessageHistory(cleanChatId, safeMax)) {
+      return (state.messagesByChat.get(cleanChatId) || loaded || []).slice(-safeMax);
+    }
+  }
+
+  const request = (async () => {
+    let cursor = 0;
+    let messages = [];
+    let complete = false;
+    const maxPages = Math.ceil(safeMax / safePageSize) + 1;
+    for (let pageIndex = 0; pageIndex < maxPages && messages.length < safeMax; pageIndex += 1) {
+      const data = await post('/api/chats/messages', {
+        chatId: cleanChatId,
+        limit: Math.min(safePageSize, safeMax - messages.length),
+        cursor
+      });
+      const batch = Array.isArray(data.messages) ? data.messages : [];
+      if (batch.length) messages = [...batch, ...messages];
+      const nextCursor = Number(data.page?.nextCursor);
+      const hasMore = Boolean(data.page?.hasMore);
+      if (!hasMore) {
+        complete = true;
+        break;
+      }
+      if (!Number.isFinite(nextCursor) || nextCursor <= cursor) break;
+      cursor = nextCursor;
+    }
+    const loaded = messages.slice(-safeMax);
+    state.messagesByChat.set(cleanChatId, loaded);
+    state.messageHistoryCoverageByChat.set(cleanChatId, {
+      loadedAt: Date.now(),
+      maxMessages: loaded.length,
+      complete
+    });
+    return loaded;
+  })();
+
+  state.messageHistoryRequestsByChat.set(cleanChatId, { maxMessages: safeMax, promise: request });
+  try {
+    return await request;
+  } finally {
+    if (state.messageHistoryRequestsByChat.get(cleanChatId)?.promise === request) {
+      state.messageHistoryRequestsByChat.delete(cleanChatId);
+    }
+  }
 }
 
 async function openSearchResult(messageId = '') {
@@ -6306,7 +8029,11 @@ function handleRealtimeEvent(payload = {}) {
   if (messageForThisUser) {
     if (messageForThisUser.clientMessageId) removeQueuedMessage(messageForThisUser.clientMessageId, { render: false });
     upsertMessage(messageForThisUser);
-    acknowledgeMessageDelivered(messageForThisUser).catch(() => null);
+    if (messageForThisUser.isPinned) cachePinnedMessagesForChat(messageForThisUser.chatId, [messageForThisUser]);
+    // Solo la pestaña líder posee el transporte SSE real. Las pestañas seguidoras
+    // reciben este mismo evento por BroadcastChannel/localStorage y no deben crear
+    // otra HTTP Response de confirmación para el mismo mensaje.
+    if (state.realtimeLeader) acknowledgeMessageDelivered(messageForThisUser).catch(() => null);
     if (state.replyToMessage?.messageId === messageForThisUser.messageId) {
       state.replyToMessage = isDeletedMessage(messageForThisUser) ? null : { ...state.replyToMessage, ...messageForThisUser };
     }
@@ -6331,32 +8058,79 @@ function handleRealtimeEvent(payload = {}) {
     shouldRender = true;
   }
   const isOwnDraftRealtimeEvent = isCurrentDraftOrigin(data.sourceDraftOriginId || data.draftOriginId || '');
-  if (payload.eventType === 'chat.draft.updated' && state.draftsOpen && !isOwnDraftRealtimeEvent) loadDrafts({ silent: true }).catch(() => null);
-  if (payload.eventType === 'chat.draft.updated' && !isOwnDraftRealtimeEvent && data.draft?.chatId === state.activeChatId && !state.editingMessage?.messageId) {
-    const remoteText = String(data.draft.text || '');
-    const remoteMs = remoteDraftSavedMs(data.draft);
-    const localMs = Number(readDraftPayload(state.activeChatId)?.savedAt || 0);
-    if (remoteText.trim() && remoteMs >= localMs && els.messageInput && remoteText !== els.messageInput.value && !isActiveDraftComposerProtected(state.activeChatId)) {
-      applyRemoteDraftToActiveInput(state.activeChatId, remoteText, remoteMs || Date.now(), 'Borrador sincronizado desde tu cuenta.');
+  const realtimeDraftChatId = String(data.draft?.chatId || data.chatId || payload.chatId || '').trim();
+  const realtimeDraftEventMs = Date.parse(payload.createdAt || '') || Date.now();
+  if (!isOwnDraftRealtimeEvent && (payload.eventType === 'chat.draft.updated' || payload.eventType === 'chat.draft.deleted')) {
+    // El SSE ya transporta el delta autoritativo del borrador. Mantener el panel con
+    // ese mismo delta evita convertir cada autosalvado de otra pestaña en una nueva
+    // HTTP Response /api/chats/drafts/list.
+    applyDraftListRealtimeDelta(payload.eventType, data.draft || null, realtimeDraftChatId, realtimeDraftEventMs);
+  }
+  if (payload.eventType === 'chat.draft.updated' && !isOwnDraftRealtimeEvent && realtimeDraftChatId) {
+    const remoteText = String(data.draft?.text || '');
+    const remoteMs = remoteDraftSavedMs(data.draft || {});
+    const localMs = Number(readDraftPayload(realtimeDraftChatId)?.savedAt || 0);
+    if (realtimeDraftChatId === state.activeChatId && !state.editingMessage?.messageId) {
+      if (remoteText.trim() && remoteMs >= localMs && els.messageInput && remoteText !== els.messageInput.value && !isActiveDraftComposerProtected(state.activeChatId)) {
+        applyRemoteDraftToActiveInput(state.activeChatId, remoteText, remoteMs || Date.now(), 'Borrador sincronizado desde tu cuenta.');
+        state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+        state.draftLastSyncedTextByChat.set(realtimeDraftChatId, remoteText);
+      } else if (isActiveDraftComposerProtected(state.activeChatId) || remoteMs < localMs) {
+        // Hay una edición local más nueva/en curso: no la sobrescribimos y permitimos
+        // una única reconciliación HTTP futura si SSE no logra resolver el conflicto.
+        state.draftRemoteLoadedChats.delete(realtimeDraftChatId);
+        if (remoteMs < localMs) state.draftLastSyncedTextByChat.delete(realtimeDraftChatId);
+      } else {
+        if (remoteText.trim() && remoteMs >= localMs) writeDraftPayload(realtimeDraftChatId, remoteText, remoteMs || Date.now());
+        state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+        if (remoteMs >= localMs) state.draftLastSyncedTextByChat.set(realtimeDraftChatId, remoteText);
+      }
+    } else if (remoteText.trim() && remoteMs >= localMs) {
+      // El evento SSE ya contiene el borrador completo. Actualizar la caché local evita
+      // una respuesta /draft/get cuando el usuario abra posteriormente este chat.
+      writeDraftPayload(realtimeDraftChatId, remoteText, remoteMs || Date.now());
+      state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+      state.draftLastSyncedTextByChat.set(realtimeDraftChatId, remoteText);
+    } else {
+      state.draftRemoteLoadedChats.delete(realtimeDraftChatId);
+      if (remoteMs < localMs) state.draftLastSyncedTextByChat.delete(realtimeDraftChatId);
     }
   }
-  if (payload.eventType === 'chat.draft.deleted' && state.draftsOpen && !isOwnDraftRealtimeEvent) loadDrafts({ silent: true }).catch(() => null);
-  if (payload.eventType === 'chat.draft.deleted' && !isOwnDraftRealtimeEvent && (data.chatId || payload.chatId) === state.activeChatId && !state.editingMessage?.messageId) {
-    const localDraft = readDraftPayload(state.activeChatId);
-    if (localDraft?.text && localDraft.text === els.messageInput?.value && !isActiveDraftComposerProtected(state.activeChatId)) {
-      removeLocalDraftPayload(state.activeChatId);
-      els.messageInput.value = '';
-      setDraftStatus('');
-      updateComposerControls();
+  if (payload.eventType === 'chat.draft.deleted' && !isOwnDraftRealtimeEvent && realtimeDraftChatId) {
+    const localDraft = readDraftPayload(realtimeDraftChatId);
+    const localMs = Number(localDraft?.savedAt || 0);
+    if (realtimeDraftChatId === state.activeChatId && !state.editingMessage?.messageId) {
+      if (localDraft?.text && localDraft.text === els.messageInput?.value && !isActiveDraftComposerProtected(state.activeChatId) && realtimeDraftEventMs >= localMs) {
+        removeLocalDraftPayload(state.activeChatId);
+        els.messageInput.value = '';
+        setDraftStatus('');
+        updateComposerControls();
+        state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+        state.draftLastSyncedTextByChat.set(realtimeDraftChatId, '');
+      } else if (!localDraft?.text && !isActiveDraftComposerProtected(state.activeChatId)) {
+        state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+        state.draftLastSyncedTextByChat.set(realtimeDraftChatId, '');
+      } else {
+        state.draftRemoteLoadedChats.delete(realtimeDraftChatId);
+      }
+    } else if (!localDraft?.text || realtimeDraftEventMs >= localMs) {
+      removeLocalDraftPayload(realtimeDraftChatId);
+      state.draftRemoteLoadedChats.add(realtimeDraftChatId);
+      state.draftLastSyncedTextByChat.set(realtimeDraftChatId, '');
+    } else {
+      state.draftRemoteLoadedChats.delete(realtimeDraftChatId);
     }
   }
   if ((payload.eventType === 'chat.privateNote.updated' || payload.eventType === 'chat.privateNote.deleted') && (data.chatId || payload.chatId) === state.activeChatId) {
-    state.privateNotes = Array.isArray(data.notes) ? data.notes : state.privateNotes;
+    if (payload.eventType === 'chat.privateNote.deleted') applyPrivateNoteDelete(data.noteId || data.note?.noteId || '');
+    else applyPrivateNoteUpsert(data.note);
     renderPrivateNotesModal();
   }
   if (payload.eventType === 'contact.block.updated' && data.targetUserId) {
     applyBlockStatusForTargetUser(data.targetUserId, data.blockStatus || {});
+    applyBlockedContactDelta({ targetUserId: data.targetUserId, blocked: Boolean(data.blocked), blockedContact: data.blockedContact || null });
     if (state.voiceDictating && isChatInteractionBlocked()) stopVoiceDictation({ announce: false });
+    if (state.blockedContactsOpen) renderBlockedContactsModal();
     shouldRender = true;
   }
   if (data.reminder?.reminderId) {
@@ -6371,8 +8145,10 @@ function handleRealtimeEvent(payload = {}) {
     if (payload.eventType === 'chat.reminder.due') showTemporaryDraftStatus(`Recordatorio: ${compactText(data.reminder.text || '', 140)}`, 5200);
     renderReminderModal();
   }
-  if ((payload.eventType === 'chat.labels.updated' || payload.eventType === 'chat.labels.deleted') && Array.isArray(data.allLabels)) {
-    applyLabelCatalog(data.allLabels);
+  if (payload.eventType === 'chat.labels.updated' || payload.eventType === 'chat.labels.deleted') {
+    if (Array.isArray(data.allLabels)) applyLabelCatalog(data.allLabels);
+    else if (payload.eventType === 'chat.labels.updated') applyLabelDelta(data);
+    else removeLabelFromState(data.label || '');
     if (payload.eventType === 'chat.labels.updated' && data.chatId === state.activeChatId && state.labelsModalOpen) {
       state.labelsDraft = normalizeChatLabelList(data.labels || []).join(', ');
       renderLabelsModal();
@@ -6383,6 +8159,10 @@ function handleRealtimeEvent(payload = {}) {
     const hiddenChatId = data.chatId || payload.chatId;
     const hiddenIds = new Set(data.messageIds.filter(Boolean));
     state.messagesByChat.set(hiddenChatId, (state.messagesByChat.get(hiddenChatId) || []).filter((message) => !hiddenIds.has(message.messageId)));
+    invalidateMessageHistoryCoverage(hiddenChatId);
+    const cachedPinned = (state.pinnedMessagesByChat.get(hiddenChatId) || []).filter((message) => !hiddenIds.has(message?.messageId));
+    if (cachedPinned.length) state.pinnedMessagesByChat.set(hiddenChatId, cachedPinned);
+    else state.pinnedMessagesByChat.delete(hiddenChatId);
     if (hiddenChatId === state.activeChatId) {
       for (const messageId of hiddenIds) state.selectedMessageIds?.delete?.(messageId);
       pruneMessageSelection();
@@ -6951,6 +8731,11 @@ function renderChats() {
   const visibleChats = getVisibleChats();
   if (!visibleChats.length) {
     const activeFilter = normalizeChatLabelName(state.activeLabelFilter || '');
+    if (state.chatsHasMore) {
+      const loadMoreOnly = `<div class="ce-list-toolbar" role="status"><span>No hay coincidencias en esta página.</span><button class="ce-link" type="button" data-load-more-chats="1"${state.chatsLoading ? ' disabled' : ''}>${state.chatsLoading ? 'Cargando chats...' : 'Cargar más chats'}</button></div>`;
+      setCachedHtml('chatListHtml', els.chatList, loadMoreOnly);
+      return;
+    }
     const emptyText = activeFilter
       ? `No hay chats con la etiqueta #${activeFilter} en esta bandeja.`
       : (state.chatListMode === 'unread'
@@ -6991,23 +8776,26 @@ function renderChats() {
     const pinButton = chat.isArchived ? '' : `<button class="ce-chat-pin${chat.isPinned ? ' active' : ''}" type="button" data-pin-chat-id="${escapeHtml(chat.chatId)}" data-pinned="${chat.isPinned ? '1' : '0'}" title="${escapeHtml(pinLabel)}" aria-label="${escapeHtml(pinLabel)}">${pinIcon}</button>`;
     const archiveButton = `<button class="ce-chat-archive${chat.isArchived ? ' active' : ''}" type="button" data-archive-chat-id="${escapeHtml(chat.chatId)}" data-archived="${chat.isArchived ? '1' : '0'}" title="${escapeHtml(archiveLabel)}" aria-label="${escapeHtml(archiveLabel)}">${archiveIcon}</button>`;
     return `<div class="ce-row ce-row--chat${active}${pinned}${chat.isMuted ? ' is-muted' : ''}${chat.isArchived ? ' is-archived' : ''}${blockedStatus.blocked ? ' is-blocked' : ''}${isChatOnline(chat) ? ' is-online' : ''}" data-chat-id="${escapeHtml(chat.chatId)}" role="button" tabindex="0" aria-label="Abrir ${escapeHtml(title)}">${renderChatAvatarWithPresence(chat, 'small', { profileAction: true })}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em title="${escapeHtml(subtitle)}">${escapeHtml(last)}</em>${renderChatLabelBadges(chat)}</span><span class="ce-row__meta">${archived}${blocked}${muted}${outbox}${unread}${pinButton}${archiveButton}</span></div>`;
-  }).join('')}`;
+  }).join('')}${state.chatsHasMore ? `<div class="ce-list-toolbar" role="status"><span>Mostrando ${visibleChats.length} chats</span><button class="ce-link" type="button" data-load-more-chats="1"${state.chatsLoading ? ' disabled' : ''}>${state.chatsLoading ? 'Cargando chats...' : 'Cargar más chats'}</button></div>` : ''}`;
   setCachedHtml('chatListHtml', els.chatList, chatListHtml);
 }
 
 function renderContacts() {
-  if (!state.contacts.length) {
+  if (!state.contacts.length && !state.contactsHasMore) {
     setCachedHtml('contactListHtml', els.contactList, '<div class="ce-empty">Todavía no tienes contactos guardados.</div>');
     return;
   }
-  const contactListHtml = state.contacts.map((contact) => {
+  const rows = state.contacts.map((contact) => {
     const title = contactDisplayName(contact);
     const subtitle = contactDisplaySubtitle(contact);
     const hasNickname = Boolean(String(contact.nickname || '').trim());
     const nicknameLabel = hasNickname ? 'Editar apodo privado' : 'Agregar apodo privado';
     return `<div class="ce-row ce-row--contact${hasNickname ? ' has-nickname' : ''}" data-contact-id="${escapeHtml(contact.userId)}" role="button" tabindex="0" aria-label="Abrir chat con ${escapeHtml(title)}">${avatar(contact, 'small')}<span class="ce-row__body"><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span><span class="ce-row__meta"><button class="ce-contact-alias-btn" type="button" data-edit-contact-nickname="${escapeHtml(contact.userId)}" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">${uiIcon('nickname')}</button></span></div>`;
   }).join('');
-  setCachedHtml('contactListHtml', els.contactList, contactListHtml);
+  const loadMore = state.contactsHasMore
+    ? `<div class="ce-list-toolbar" role="status"><span>Mostrando ${state.contacts.length} contactos</span><button class="ce-link" type="button" data-load-more-contacts="1"${state.contactsLoading ? ' disabled' : ''}>${state.contactsLoading ? 'Cargando contactos...' : 'Cargar más contactos'}</button></div>`
+    : '';
+  setCachedHtml('contactListHtml', els.contactList, `${rows}${loadMore}`);
 }
 
 function activeChat() {
@@ -7021,10 +8809,29 @@ function findActiveMessage(messageId = '') {
   return list.find((message) => message.messageId === cleanMessageId) || null;
 }
 
+function cachePinnedMessagesForChat(chatId = '', messages = []) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return;
+  const existing = state.pinnedMessagesByChat.get(cleanChatId) || [];
+  const byId = new Map(existing.filter((message) => message?.messageId).map((message) => [message.messageId, message]));
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (!message?.messageId || isDeletedMessage(message)) continue;
+    byId.set(message.messageId, { ...(byId.get(message.messageId) || {}), ...message });
+  }
+  const cached = Array.from(byId.values()).slice(-12);
+  if (cached.length) state.pinnedMessagesByChat.set(cleanChatId, cached);
+  else state.pinnedMessagesByChat.delete(cleanChatId);
+}
+
 function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
   const cleanChatId = String(chatId || '').trim();
   if (!cleanChatId) return;
   const pinned = new Set((Array.isArray(pinnedMessageIds) ? pinnedMessageIds : []).filter(Boolean));
+  const cached = (state.pinnedMessagesByChat.get(cleanChatId) || [])
+    .filter((message) => pinned.has(message?.messageId) && !isDeletedMessage(message));
+  if (cached.length) state.pinnedMessagesByChat.set(cleanChatId, cached);
+  else state.pinnedMessagesByChat.delete(cleanChatId);
+
   const list = state.messagesByChat.get(cleanChatId) || [];
   if (!list.length) return;
   let changed = false;
@@ -7037,12 +8844,40 @@ function syncPinnedStateForChat(chatId = '', pinnedMessageIds = []) {
   if (changed) state.messagesByChat.set(cleanChatId, updated);
 }
 
+async function ensurePinnedMessagesLoaded(chat = {}, messages = []) {
+  const chatId = String(chat?.chatId || '').trim();
+  const ids = Array.from(new Set((Array.isArray(chat?.pinnedMessageIds) ? chat.pinnedMessageIds : []).filter(Boolean))).slice(0, 3);
+  if (!chatId || !ids.length) {
+    if (chatId) state.pinnedMessagesByChat.delete(chatId);
+    return [];
+  }
+  const wanted = new Set(ids);
+  const recentPinned = (Array.isArray(messages) ? messages : [])
+    .filter((message) => wanted.has(message?.messageId) && !isDeletedMessage(message));
+  cachePinnedMessagesForChat(chatId, recentPinned);
+  syncPinnedStateForChat(chatId, ids);
+
+  const cachedIds = new Set((state.pinnedMessagesByChat.get(chatId) || []).map((message) => message?.messageId).filter(Boolean));
+  const missingIds = ids.filter((messageId) => !cachedIds.has(messageId));
+  if (!missingIds.length) return state.pinnedMessagesByChat.get(chatId) || [];
+
+  const data = await post('/api/chats/messages/by-ids', { chatId, messageIds: missingIds });
+  cachePinnedMessagesForChat(chatId, Array.isArray(data.messages) ? data.messages : []);
+  syncPinnedStateForChat(chatId, ids);
+  return state.pinnedMessagesByChat.get(chatId) || [];
+}
+
 function getPinnedMessagesForChat(chat = {}, messages = []) {
   const ids = Array.isArray(chat.pinnedMessageIds) ? chat.pinnedMessageIds.filter(Boolean) : [];
-  const byId = new Map((messages || []).filter((message) => message?.messageId).map((message) => [message.messageId, message]));
+  const cached = state.pinnedMessagesByChat.get(String(chat.chatId || '').trim()) || [];
+  const byId = new Map(cached.filter((message) => message?.messageId).map((message) => [message.messageId, message]));
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (message?.messageId) byId.set(message.messageId, message);
+  }
   const ordered = ids.map((messageId) => byId.get(messageId)).filter((message) => message && !isDeletedMessage(message));
-  const extra = (messages || []).filter((message) => message?.isPinned && !ids.includes(message.messageId) && !isDeletedMessage(message));
-  return [...ordered, ...extra].slice(0, 3);
+  const extra = [...cached, ...(messages || [])].filter((message) => message?.isPinned && !ids.includes(message.messageId) && !isDeletedMessage(message));
+  const uniqueExtra = Array.from(new Map(extra.map((message) => [message.messageId, message])).values());
+  return [...ordered, ...uniqueExtra].slice(0, 3);
 }
 
 function renderPinnedMessagesStrip(chat = {}, messages = []) {
@@ -7205,6 +9040,7 @@ async function deleteSelectedMessages(scope = 'me') {
     if (normalizedScope === 'me') {
       const hidden = new Set(Array.isArray(data.messageIds) ? data.messageIds : messageIds);
       state.messagesByChat.set(state.activeChatId, (state.messagesByChat.get(state.activeChatId) || []).filter((message) => !hidden.has(message.messageId)));
+      invalidateMessageHistoryCoverage(state.activeChatId);
       state.starredMessages = state.starredMessages.filter((message) => !hidden.has(message.messageId));
       state.globalStarredMessages = state.globalStarredMessages.filter((item) => !(item.chat?.chatId === state.activeChatId && hidden.has(item.message?.messageId)));
     } else {
@@ -7367,6 +9203,7 @@ function renderActiveChat() {
     state.forwardingMessage = null;
     state.privateNotesOpen = false;
     state.privateNotes = [];
+    state.privateNotesLoadedChatId = '';
     state.linkLibraryOpen = false;
     state.chatBriefOpen = false;
     state.chatBriefLoading = false;
@@ -7516,10 +9353,14 @@ function renderActiveChat() {
 }
 
 async function selectChat(chatId) {
-  const changedChat = state.activeChatId !== chatId;
+  const previousChatId = state.activeChatId;
+  const changedChat = previousChatId !== chatId;
   if (changedChat) {
     saveActiveDraft({ announce: false });
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
+    if (state.typingTimer) window.clearTimeout(state.typingTimer);
+    state.typingTimer = 0;
+    if (previousChatId) sendTyping(false, { chatId: previousChatId }).catch(() => null);
   }
   state.activeChatId = chatId;
   if (changedChat) {
@@ -7530,10 +9371,12 @@ async function selectChat(chatId) {
     state.forwardingMessage = null;
     state.scheduleModalOpen = false;
     state.scheduledMessages = [];
+    state.scheduledLoadedChatId = '';
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
     state.privateNotesOpen = false;
     state.privateNotes = [];
+    state.privateNotesLoadedChatId = '';
     state.linkLibraryOpen = false;
     state.chatBriefOpen = false;
     state.chatBriefLoading = false;
@@ -7542,34 +9385,96 @@ async function selectChat(chatId) {
     state.remindersOpen = false;
     state.reminderMessage = null;
     state.reminders = [];
+    state.remindersLoadedChatId = '';
     state.chatSearchOpen = false;
     resetChatSearch();
     renderAll();
   }
   const chatBeforeRead = activeChat();
-  const data = await post('/api/chats/messages', { chatId });
-  let messages = Array.isArray(data.messages) ? data.messages : [];
-  const pinnedIds = new Set((activeChat()?.pinnedMessageIds || []).filter(Boolean));
-  if (pinnedIds.size && [...pinnedIds].some((messageId) => !messages.some((message) => message.messageId === messageId))) {
-    const fullMessages = await loadMessageHistoryPages(chatId, { maxMessages: 500 });
-    messages = fullMessages.length ? fullMessages : messages;
+  const cachedMessages = state.messagesByChat.get(chatId) || [];
+  const syncCursor = String(state.messageSyncCursorByChat.get(chatId) || '').trim();
+  const canReuseRealtimeCache = state.messageBaselineLoadedChats.has(chatId)
+    && state.messagesByChat.has(chatId)
+    && hasHealthySharedRealtimeLease();
+
+  let incomingMessages = [];
+  let messages = cachedMessages;
+  let prefetchedDraft = null;
+  let hasPrefetchedDraft = false;
+  if (!canReuseRealtimeCache) {
+    const shouldIncludeDraft = !state.draftRemoteLoadedChats.has(chatId);
+    const data = await post('/api/chats/messages', {
+      chatId,
+      limit: 80,
+      ...(syncCursor ? { afterMessageId: syncCursor } : {}),
+      ...(shouldIncludeDraft ? { includeDraft: true } : {})
+    });
+    if (shouldIncludeDraft && Object.prototype.hasOwnProperty.call(data, 'draft')) {
+      prefetchedDraft = data.draft || null;
+      hasPrefetchedDraft = true;
+    }
+    incomingMessages = Array.isArray(data.messages) ? data.messages : [];
+    const resetRequired = !syncCursor || Boolean(data.page?.resetRequired);
+    if (resetRequired) {
+      invalidateMessageHistoryCoverage(chatId);
+      messages = incomingMessages;
+    } else {
+      messages = cachedMessages.slice();
+      const positions = new Map(messages.map((message, index) => [message?.messageId, index]).filter(([messageId]) => Boolean(messageId)));
+      for (const message of incomingMessages) {
+        if (!message?.messageId) continue;
+        const index = positions.get(message.messageId);
+        if (Number.isInteger(index)) messages[index] = { ...messages[index], ...message };
+        else {
+          positions.set(message.messageId, messages.length);
+          messages.push(message);
+        }
+      }
+    }
+    const nextSyncCursor = String(data.page?.syncCursor || '').trim();
+    if (nextSyncCursor) state.messageSyncCursorByChat.set(chatId, nextSyncCursor);
+    else if (resetRequired) state.messageSyncCursorByChat.delete(chatId);
+    state.messageBaselineLoadedChats.add(chatId);
   }
+
+  await ensurePinnedMessagesLoaded(activeChat(), messages).catch(() => null);
   rememberUnreadMarkerForChat(chatBeforeRead, messages);
   state.messagesByChat.set(chatId, messages);
-  acknowledgeMessagesDelivered(messages);
+  acknowledgeMessagesDelivered(incomingMessages);
   renderAll();
-  loadDraftForChat(chatId);
+  loadDraftForChat(chatId, hasPrefetchedDraft ? { prefetchedDraft, usePrefetchedDraft: true } : undefined);
   updateComposerControls();
   await markActiveRead();
 }
 
 async function markActiveRead() {
-  if (!canConfirmReadInActiveChat()) return;
-  try {
-    const data = await post('/api/chats/read', { chatId: state.activeChatId });
-    upsertChat(data.chat);
-    renderChats();
-  } catch {}
+  if (!canConfirmReadInActiveChat()) return false;
+  const chat = activeChat();
+  if (!chat || Number(chat.unread || 0) <= 0) return false;
+  const chatId = String(state.activeChatId || '').trim();
+  if (!chatId) return false;
+
+  // Scroll, selección de chat y eventos SSE pueden coincidir antes de que la primera
+  // confirmación actualice `unread`. Compartir la misma promesa evita gastar varias
+  // HTTP Responses para la misma lectura sin retrasar ni omitir la confirmación real.
+  const existingRequest = state.readRequestsByChat.get(chatId);
+  if (existingRequest) return existingRequest;
+
+  let request = null;
+  request = (async () => {
+    try {
+      const data = await post('/api/chats/read', { chatId });
+      upsertChat(data.chat);
+      renderChats();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (state.readRequestsByChat.get(chatId) === request) state.readRequestsByChat.delete(chatId);
+    }
+  })();
+  state.readRequestsByChat.set(chatId, request);
+  return request;
 }
 
 async function addContactByEmail(email) {
@@ -7679,9 +9584,12 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
       ...(queued || { chatId, text: messageText, clientMessageId, replyToMessageId, replyTo, attachment: normalizedAttachment, silent: Boolean(silent), ephemeralSeconds: normalizeEphemeralSeconds(ephemeralSeconds), createdAt: new Date().toISOString(), attempts: 0 }),
       status: 'failed',
       attempts: Math.max(1, Number(queued?.attempts || 1)),
+      retryable: true,
+      nextAttemptAt: nextOutboxRetryAt(error, Math.max(1, Number(queued?.attempts || 1))),
       updatedAt: new Date().toISOString(),
       lastError: error?.message || 'Sin conexión o servidor no disponible'
     }, { render: true });
+    scheduleNextOutboxRetry();
     showTemporaryDraftStatus('Mensaje guardado en pendientes. Se enviará automáticamente cuando vuelva la conexión.', 4600);
     sendTyping(false).catch(() => null);
   }
@@ -7834,16 +9742,18 @@ function renderContactShareModal() {
   state.contactSharePage = Math.min(Math.max(0, Number(state.contactSharePage || 0)), totalPages - 1);
   const start = state.contactSharePage * pageSize;
   const pageContacts = contacts.slice(start, start + pageSize);
-  if (!contacts.length) {
-    els.contactShareList.innerHTML = '<div class="ce-contact-share-empty">No hay contactos disponibles para enviar esta tarjeta. Agrega un contacto o cambia la búsqueda.</div>';
-  } else {
-    els.contactShareList.innerHTML = pageContacts.map((contact) => {
+  const shareRows = contacts.length
+    ? pageContacts.map((contact) => {
       const title = contactDisplayName(contact);
       const subtitle = contactDisplaySubtitle(contact);
       const disabled = state.contactShareSending ? ' disabled' : '';
       return `<button class="ce-contact-share-target" type="button" data-contact-share-target-id="${escapeHtml(contact.userId)}"${disabled} aria-label="Enviar contacto a ${escapeHtml(title)}">${avatar(contact, 'small')}<span><strong>${escapeHtml(title)}</strong><em>${escapeHtml(subtitle)}</em></span></button>`;
-    }).join('');
-  }
+    }).join('')
+    : '<div class="ce-contact-share-empty">No hay contactos disponibles entre los cargados. Cambia la búsqueda o carga más contactos.</div>';
+  const loadMoreShareContacts = state.contactsHasMore
+    ? `<button class="ce-link" type="button" data-load-more-share-contacts="1"${state.contactsLoading || state.contactShareSending ? ' disabled' : ''}>${state.contactsLoading ? 'Cargando contactos...' : 'Cargar más contactos'}</button>`
+    : '';
+  els.contactShareList.innerHTML = `${shareRows}${loadMoreShareContacts}`;
   if (els.contactSharePageInfo) els.contactSharePageInfo.textContent = `${state.contactSharePage + 1} de ${totalPages}`;
   if (els.btnContactSharePrev) els.btnContactSharePrev.disabled = state.contactSharePage <= 0 || state.contactShareSending;
   if (els.btnContactShareNext) els.btnContactShareNext.disabled = state.contactSharePage >= totalPages - 1 || state.contactShareSending;
@@ -8057,12 +9967,18 @@ function renderScheduleModal() {
 
 async function loadScheduledMessages({ force = false } = {}) {
   if (!state.activeChatId || state.scheduledLoading) return;
-  if (!force && state.scheduledMessages.some((item) => item.chatId === state.activeChatId)) return;
+  if (!force && state.scheduledLoadedChatId === state.activeChatId) {
+    renderScheduleModal();
+    return;
+  }
+  const requestedChatId = state.activeChatId;
   state.scheduledLoading = true;
   renderScheduleModal();
   try {
-    const data = await post('/api/chats/scheduled/list', { chatId: state.activeChatId, limit: 80 });
+    const data = await post('/api/chats/scheduled/list', { chatId: requestedChatId, limit: 80 });
+    if (state.activeChatId !== requestedChatId) return;
     state.scheduledMessages = Array.isArray(data.scheduledMessages) ? data.scheduledMessages : [];
+    state.scheduledLoadedChatId = requestedChatId;
   } finally {
     state.scheduledLoading = false;
     renderScheduleModal();
@@ -8089,7 +10005,7 @@ async function openScheduleModal({ allowEmptyText = true } = {}) {
     if (!els.scheduleDateTime.value) els.scheduleDateTime.value = toDateTimeLocalValue(defaultDate);
   }
   renderScheduleModal();
-  await loadScheduledMessages({ force: true }).catch((error) => {
+  await loadScheduledMessages().catch((error) => {
     els.scheduledList.innerHTML = `<div class="ce-scheduled-empty">${escapeHtml(error.message || 'No se pudieron cargar los mensajes programados.')}</div>`;
   });
 }
@@ -8214,6 +10130,40 @@ function applyBlockStatusForTargetUser(targetUserId = '', blockStatus = {}) {
   return changed;
 }
 
+function sortBlockedContactsState() {
+  state.blockedContacts = (Array.isArray(state.blockedContacts) ? state.blockedContacts : [])
+    .filter((item) => item?.targetUserId)
+    .sort((a, b) => String(b.blockedAt || '').localeCompare(String(a.blockedAt || '')));
+}
+
+function applyBlockedContactDelta({ targetUserId = '', blocked = false, blockedContact = null } = {}) {
+  if (!state.blockedContactsLoaded) return;
+  const cleanTarget = String(targetUserId || blockedContact?.targetUserId || '').trim();
+  if (!cleanTarget) return;
+  const existingIndex = state.blockedContacts.findIndex((item) => item?.targetUserId === cleanTarget);
+  if (!blocked) {
+    if (existingIndex >= 0) {
+      state.blockedContacts.splice(existingIndex, 1);
+      if (state.blockedContactsHasMore && Number.isFinite(Number(state.blockedContactsNextCursor))) {
+        state.blockedContactsNextCursor = Math.max(0, Number(state.blockedContactsNextCursor) - 1);
+      }
+    }
+    return;
+  }
+  if (!blockedContact?.targetUserId) {
+    state.blockedContactsLoaded = false;
+    return;
+  }
+  if (existingIndex >= 0) state.blockedContacts[existingIndex] = blockedContact;
+  else {
+    state.blockedContacts.push(blockedContact);
+    if (state.blockedContactsHasMore && Number.isFinite(Number(state.blockedContactsNextCursor))) {
+      state.blockedContactsNextCursor = Number(state.blockedContactsNextCursor) + 1;
+    }
+  }
+  sortBlockedContactsState();
+}
+
 async function setActiveContactBlocked(blocked = true) {
   const chat = activeChat();
   if (!chat?.chatId || isSelfChat(chat)) return;
@@ -8225,9 +10175,9 @@ async function setActiveContactBlocked(blocked = true) {
   }
   const data = await post('/api/contacts/block', { targetUserId, blocked: Boolean(blocked) });
   applyBlockStatusForTargetUser(targetUserId, data.blockStatus || {});
+  applyBlockedContactDelta({ targetUserId, blocked: Boolean(blocked), blockedContact: data.blockedContact || null });
   if (blocked && state.voiceDictating) stopVoiceDictation({ announce: false });
   if (blocked) state.quickRepliesOpen = false;
-  if (state.blockedContactsOpen) await loadBlockedContacts({ silent: true }).catch(() => null);
   renderAll();
   showTemporaryDraftStatus(blocked ? 'Contacto bloqueado. Puedes desbloquearlo desde el encabezado del chat.' : 'Contacto desbloqueado. Ya puedes enviar mensajes.');
 }
@@ -8244,13 +10194,31 @@ function blockedContactSubtitle(item = {}) {
   return item.targetUserId ? `ID: ${compactText(item.targetUserId, 36)}` : 'Perfil no disponible';
 }
 
-async function loadBlockedContacts({ silent = false } = {}) {
+async function loadBlockedContacts({ silent = false, force = false, append = false } = {}) {
   if (!state.user) return [];
+  if (state.blockedContactsLoading) return state.blockedContacts;
+  if (!force && !append && state.blockedContactsLoaded) {
+    renderBlockedContactsModal();
+    return state.blockedContacts;
+  }
+  if (append && !state.blockedContactsHasMore) return state.blockedContacts;
   state.blockedContactsLoading = true;
   if (!silent) renderBlockedContactsModal();
   try {
-    const data = await post('/api/contacts/blocks/list', {});
-    state.blockedContacts = Array.isArray(data.blockedContacts) ? data.blockedContacts : [];
+    const cursor = append ? state.blockedContactsNextCursor : null;
+    const data = await post('/api/contacts/blocks/list', { limit: 30, cursor });
+    const incoming = Array.isArray(data.blockedContacts) ? data.blockedContacts : [];
+    if (append) {
+      const byId = new Map(state.blockedContacts.map((item) => [item?.targetUserId, item]).filter(([id]) => id));
+      for (const item of incoming) if (item?.targetUserId) byId.set(item.targetUserId, item);
+      state.blockedContacts = Array.from(byId.values());
+    } else {
+      state.blockedContacts = incoming;
+    }
+    sortBlockedContactsState();
+    state.blockedContactsLoaded = true;
+    state.blockedContactsNextCursor = data.page?.nextCursor ?? null;
+    state.blockedContactsHasMore = Boolean(data.page?.hasMore);
     return state.blockedContacts;
   } finally {
     state.blockedContactsLoading = false;
@@ -8289,7 +10257,7 @@ function renderBlockedContactsModal(error = null) {
     els.blockedContactsList.innerHTML = '<div class="ce-blocked-contacts-empty">No tienes contactos bloqueados. Cuando bloquees a alguien, aparecerá aquí para que puedas gestionarlo sin buscar el chat.</div>';
     return;
   }
-  els.blockedContactsList.innerHTML = state.blockedContacts.map((item) => {
+  const itemsHtml = state.blockedContacts.map((item) => {
     const title = blockedContactTitle(item);
     const subtitle = blockedContactSubtitle(item);
     const date = item.blockedAt ? `Bloqueado el ${formatScheduleDateTime(item.blockedAt)}` : 'Bloqueo activo';
@@ -8303,6 +10271,10 @@ function renderBlockedContactsModal(error = null) {
       <button class="ce-link" type="button" data-unblock-contact-id="${escapeHtml(item.targetUserId || '')}">Desbloquear</button>
     </article>`;
   }).join('');
+  const moreHtml = state.blockedContactsHasMore
+    ? '<button class="ce-link" type="button" data-blocked-load-more="1">Cargar más contactos bloqueados</button>'
+    : '';
+  els.blockedContactsList.innerHTML = `${itemsHtml}${moreHtml}`;
 }
 
 async function unblockContactFromModal(targetUserId = '') {
@@ -8312,7 +10284,7 @@ async function unblockContactFromModal(targetUserId = '') {
   if (!ok) return;
   const data = await post('/api/contacts/block', { targetUserId: cleanTarget, blocked: false });
   applyBlockStatusForTargetUser(cleanTarget, data.blockStatus || {});
-  state.blockedContacts = state.blockedContacts.filter((item) => item.targetUserId !== cleanTarget);
+  applyBlockedContactDelta({ targetUserId: cleanTarget, blocked: false });
   renderAll();
   renderBlockedContactsModal();
   showTemporaryDraftStatus('Contacto desbloqueado desde la lista de bloqueados.');
@@ -8401,16 +10373,51 @@ async function markActiveChatUnread() {
 
 async function setChatArchived(chatId = '', archived = true) {
   if (!chatId) return;
+  const previousChat = state.chats.find((item) => item.chatId === chatId) || null;
   const data = await post('/api/chats/archive', { chatId, archived });
-  const wasActive = state.activeChatId === chatId;
-  if (wasActive && data.archived) clearActiveChatState();
-  await loadChats({ includeArchived: state.archivedView });
+  // La mutación ya devuelve el chat hidratado y también se replica por SSE. Aplicarla
+  // localmente evita una segunda HTTP Response inmediata a /api/chats/list.
+  upsertChat(data.chat);
+  if (state.chatListMode === 'active' && state.chatsHasMore && archived && previousChat?.isPinned) {
+    // Al salir un fijado cambia el offset del tramo pinned. Diferimos la reparación del
+    // cursor hasta que el usuario pulse "Cargar más", sin arriesgar saltos ni duplicados.
+    state.chatListPaginationDirty = true;
+  }
+  renderAll();
   showTemporaryDraftStatus(data.archived ? 'Chat archivado. Puedes verlo en Archivados.' : 'Chat restaurado a la lista principal.');
 }
 
-async function sendTyping(isTyping) {
-  if (!state.activeChatId || (isTyping && isChatInteractionBlocked())) return;
-  try { await post('/api/chats/typing', { chatId: state.activeChatId, isTyping }); } catch {}
+async function sendTyping(isTyping, options = {}) {
+  const chatId = String(options.chatId || state.activeChatId || '').trim();
+  if (!chatId || (isTyping && chatId === state.activeChatId && isChatInteractionBlocked())) return false;
+
+  const now = Date.now();
+  if (isTyping) {
+    const sameActiveSignal = state.typingSignalActive && state.typingSignalChatId === chatId;
+    if (sameActiveSignal && now - state.typingSignalLastSentAt < typingSignalRefreshMs) return false;
+    state.typingSignalActive = true;
+    state.typingSignalChatId = chatId;
+    state.typingSignalLastSentAt = now;
+  } else {
+    if (!state.typingSignalActive || state.typingSignalChatId !== chatId) return false;
+    state.typingSignalActive = false;
+    state.typingSignalChatId = '';
+    state.typingSignalLastSentAt = 0;
+  }
+
+  try {
+    await post('/api/chats/typing', { chatId, isTyping });
+    return true;
+  } catch {
+    // Si falló el alta, habilitamos un nuevo intento en la siguiente actividad.
+    // El cierre no se reintenta agresivamente: el receptor ya expira el indicador localmente.
+    if (isTyping && state.typingSignalActive && state.typingSignalChatId === chatId && state.typingSignalLastSentAt === now) {
+      state.typingSignalActive = false;
+      state.typingSignalChatId = '';
+      state.typingSignalLastSentAt = 0;
+    }
+    return false;
+  }
 }
 
 function openOwnQr() {
@@ -9035,6 +11042,8 @@ function resetGlobalSearchState({ keepQuery = false } = {}) {
   state.globalSearchResults = [];
   state.globalSearchLoading = false;
   state.globalSearchSearchedChats = 0;
+  state.globalSearchNextCursor = null;
+  state.globalSearchHasMore = false;
   if (!keepQuery && els.globalSearchInput) els.globalSearchInput.value = '';
 }
 
@@ -9068,7 +11077,8 @@ function renderGlobalSearchModal() {
   els.globalSearchModal.classList.toggle('hidden', !state.globalSearchOpen);
   if (!state.globalSearchOpen) return;
   const query = state.globalSearchQuery || String(els.globalSearchInput?.value || '').trim();
-  if (state.globalSearchLoading) {
+  const results = Array.isArray(state.globalSearchResults) ? state.globalSearchResults : [];
+  if (state.globalSearchLoading && !results.length) {
     els.globalSearchList.innerHTML = '<div class="ce-global-search-empty">Buscando en tus conversaciones...</div>';
     return;
   }
@@ -9080,13 +11090,17 @@ function renderGlobalSearchModal() {
     els.globalSearchList.innerHTML = '<div class="ce-global-search-empty">Escribe al menos 2 caracteres para iniciar la búsqueda.</div>';
     return;
   }
-  const results = Array.isArray(state.globalSearchResults) ? state.globalSearchResults : [];
+  const loadMore = state.globalSearchHasMore
+    ? `<button class="ce-link" type="button" data-global-search-load-more="1"${state.globalSearchLoading ? ' disabled' : ''}>${state.globalSearchLoading ? 'Cargando más...' : 'Cargar más resultados'}</button>`
+    : '';
   if (!results.length) {
-    els.globalSearchList.innerHTML = `<div class="ce-global-search-empty">No encontramos mensajes con “${escapeHtml(query)}”.</div>`;
+    els.globalSearchList.innerHTML = state.globalSearchHasMore
+      ? `<div class="ce-global-search-empty">Todavía no hay coincidencias en los chats revisados.</div>${loadMore}`
+      : `<div class="ce-global-search-empty">No encontramos mensajes con “${escapeHtml(query)}”.</div>`;
     return;
   }
   els.globalSearchList.innerHTML = `
-    <div class="ce-global-search-summary">${results.length} ${results.length === 1 ? 'resultado' : 'resultados'} en ${state.globalSearchSearchedChats || 'tus'} chats</div>
+    <div class="ce-global-search-summary">${results.length} ${results.length === 1 ? 'resultado' : 'resultados'} · ${state.globalSearchSearchedChats || 'tus'} chats revisados</div>
     ${results.map((item) => {
       const chat = item.chat || {};
       const message = item.message || {};
@@ -9096,39 +11110,63 @@ function renderGlobalSearchModal() {
         <span class="ce-global-search-result__head"><strong>${escapeHtml(globalSearchChatTitle(chat))}</strong>${archived}<em>${escapeHtml(formatMessageTime(message.createdAt))}</em></span>
         <span class="ce-global-search-result__body"><b>${mine ? 'Tú' : 'Contacto'}:</b> ${escapeHtml(message.excerpt || message.text || '')}</span>
       </button>`;
-    }).join('')}`;
+    }).join('')}
+    ${loadMore}`;
 }
 
-async function searchAllChats(query = '') {
+async function searchAllChats(query = '', { append = false } = {}) {
   const cleanQuery = String(query || '').trim();
-  state.globalSearchQuery = cleanQuery;
-  state.globalSearchResults = [];
-  state.globalSearchSearchedChats = 0;
+  if (!append) {
+    state.globalSearchQuery = cleanQuery;
+    state.globalSearchResults = [];
+    state.globalSearchSearchedChats = 0;
+    state.globalSearchNextCursor = null;
+    state.globalSearchHasMore = false;
+  }
   if (cleanQuery.length < 2) {
     state.globalSearchLoading = false;
     renderGlobalSearchModal();
     return;
   }
+  if (append && (!state.globalSearchHasMore || !state.globalSearchNextCursor)) return;
+
+  const requestSequence = ++globalSearchRequestSequence;
+  const cursor = append ? state.globalSearchNextCursor : null;
   state.globalSearchLoading = true;
   renderGlobalSearchModal();
   try {
-    const data = await post('/api/chats/search-all', { query: cleanQuery, limit: 60, perChatLimit: 500, includeArchived: true });
+    const data = await post('/api/chats/search-all', { query: cleanQuery, limit: 40, cursor, includeArchived: true });
+    if (requestSequence !== globalSearchRequestSequence || state.globalSearchQuery !== cleanQuery) return;
+    const incoming = Array.isArray(data.matches) ? data.matches : [];
+    const merged = append ? [...state.globalSearchResults, ...incoming] : incoming;
     state.globalSearchQuery = data.query || cleanQuery;
-    state.globalSearchResults = Array.isArray(data.matches) ? data.matches : [];
+    state.globalSearchResults = Array.from(new Map(merged.map((item) => [
+      `${item.chat?.chatId || ''}:${item.message?.messageId || ''}`,
+      item
+    ])).values()).sort((a, b) => (Date.parse(b.message?.createdAt || 0) || 0) - (Date.parse(a.message?.createdAt || 0) || 0));
     state.globalSearchSearchedChats = Number(data.searchedChats || 0);
-    for (const item of state.globalSearchResults) {
+    state.globalSearchNextCursor = data.page?.nextCursor || null;
+    state.globalSearchHasMore = Boolean(data.page?.hasMore && state.globalSearchNextCursor);
+    for (const item of incoming) {
       if (item.chat?.chatId) upsertChat(item.chat);
       if (item.message?.messageId) upsertMessage(item.message);
     }
   } catch (error) {
-    state.globalSearchResults = [];
-    state.globalSearchSearchedChats = 0;
-    els.globalSearchList.innerHTML = `<div class="ce-global-search-empty">${escapeHtml(error.message || 'No se pudo completar la búsqueda global.')}</div>`;
-    return;
+    if (requestSequence !== globalSearchRequestSequence) return;
+    if (append && state.globalSearchResults.length) {
+      showTemporaryDraftStatus(error.message || 'No se pudieron cargar más resultados.', 3200);
+    } else {
+      state.globalSearchResults = [];
+      state.globalSearchSearchedChats = 0;
+      state.globalSearchNextCursor = null;
+      state.globalSearchHasMore = false;
+      els.globalSearchList.innerHTML = `<div class="ce-global-search-empty">${escapeHtml(error.message || 'No se pudo completar la búsqueda global.')}</div>`;
+      return;
+    }
   } finally {
-    state.globalSearchLoading = false;
+    if (requestSequence === globalSearchRequestSequence) state.globalSearchLoading = false;
   }
-  renderGlobalSearchModal();
+  if (requestSequence === globalSearchRequestSequence) renderGlobalSearchModal();
 }
 
 async function openGlobalSearchResult(chatId = '', messageId = '') {
@@ -9150,13 +11188,18 @@ function renderGlobalStarredModal() {
   if (!els.globalStarredModal || !els.globalStarredList) return;
   els.globalStarredModal.classList.toggle('hidden', !state.globalStarredOpen);
   if (!state.globalStarredOpen) return;
-  if (state.globalStarredLoading) {
+  const items = Array.isArray(state.globalStarredMessages) ? state.globalStarredMessages : [];
+  if (state.globalStarredLoading && !items.length) {
     els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Cargando tus mensajes destacados...</div>';
     return;
   }
-  const items = Array.isArray(state.globalStarredMessages) ? state.globalStarredMessages : [];
+  const loadMore = state.globalStarredHasMore
+    ? `<button class="ce-link" type="button" data-global-starred-load-more="1"${state.globalStarredLoading ? ' disabled' : ''}>${state.globalStarredLoading ? 'Cargando más...' : 'Cargar más destacados'}</button>`
+    : '';
   if (!items.length) {
-    els.globalStarredList.innerHTML = '<div class="ce-global-starred-empty">Aún no tienes mensajes destacados. Usa la acción Destacar en cualquier mensaje para guardarlo aquí.</div>';
+    els.globalStarredList.innerHTML = state.globalStarredHasMore
+      ? `<div class="ce-global-starred-empty">No aparecieron destacados en los chats revisados hasta ahora.</div>${loadMore}`
+      : '<div class="ce-global-starred-empty">Aún no tienes mensajes destacados. Usa la acción Destacar en cualquier mensaje para guardarlo aquí.</div>';
     return;
   }
   els.globalStarredList.innerHTML = `
@@ -9173,18 +11216,41 @@ function renderGlobalStarredModal() {
         </button>
         <button class="ce-link" type="button" data-global-starred-unstar-chat-id="${escapeHtml(chat.chatId || '')}" data-global-starred-unstar-message-id="${escapeHtml(message.messageId || '')}">Quitar</button>
       </article>`;
-    }).join('')}`;
+    }).join('')}
+    ${loadMore}`;
 }
 
-async function loadGlobalStarredMessages({ silent = false } = {}) {
+async function loadGlobalStarredMessages({ silent = false, force = false, append = false } = {}) {
   if (!state.user) return [];
-  state.globalStarredLoading = !silent;
+  if (append && (!state.globalStarredHasMore || !state.globalStarredNextCursor)) return state.globalStarredMessages;
+  if (!append) {
+    if (!force && state.globalStarredLoaded && !state.globalStarredDirty) return state.globalStarredMessages;
+  }
+  if (force || (!append && state.globalStarredDirty)) {
+    state.globalStarredNextCursor = null;
+    state.globalStarredHasMore = false;
+    if (force) {
+      state.globalStarredMessages = [];
+      state.globalStarredScannedChats = 0;
+    }
+  }
+  state.globalStarredLoading = !silent || append;
   renderGlobalStarredModal();
   try {
-    const data = await post('/api/chats/starred/all', { limit: 100, perChatLimit: 500, includeArchived: true });
-    state.globalStarredMessages = Array.isArray(data.messages) ? data.messages : [];
+    const cursor = append ? state.globalStarredNextCursor : null;
+    const data = await post('/api/chats/starred/all', { limit: 40, cursor, includeArchived: true });
+    const incoming = Array.isArray(data.messages) ? data.messages : [];
+    const merged = append ? [...state.globalStarredMessages, ...incoming] : incoming;
+    state.globalStarredMessages = Array.from(new Map(merged.map((item) => [
+      `${item.chat?.chatId || ''}:${item.message?.messageId || ''}`,
+      item
+    ])).values()).sort((a, b) => (Date.parse(b.message?.createdAt || 0) || 0) - (Date.parse(a.message?.createdAt || 0) || 0));
     state.globalStarredScannedChats = Number(data.searchedChats || data.scannedChats || 0);
-    for (const item of state.globalStarredMessages) {
+    state.globalStarredNextCursor = data.page?.nextCursor || null;
+    state.globalStarredHasMore = Boolean(data.page?.hasMore && state.globalStarredNextCursor);
+    state.globalStarredLoaded = true;
+    state.globalStarredDirty = false;
+    for (const item of incoming) {
       if (item.chat?.chatId) upsertChat(item.chat);
       if (item.message?.messageId) upsertMessage(item.message);
     }
@@ -9213,7 +11279,7 @@ async function openGlobalStarredResult(chatId = '', messageId = '') {
 }
 
 function syncGlobalStarredMessage(message = {}) {
-  if (!message?.messageId || !message?.chatId || !state.globalStarredOpen) return;
+  if (!message?.messageId || !message?.chatId || !state.globalStarredLoaded) return;
   const index = state.globalStarredMessages.findIndex((item) => item.message?.messageId === message.messageId && item.chat?.chatId === message.chatId);
   if (!message.isStarred || isDeletedMessage(message)) {
     if (index >= 0) state.globalStarredMessages.splice(index, 1);
@@ -9935,6 +12001,7 @@ function bindEvents() {
   window.addEventListener('resize', handleMobileChatViewportChange, { passive: true });
   window.addEventListener('online', () => {
     if (state.user) {
+      if (document.visibilityState === 'visible') announceRealtimeClientActivity(true);
       scheduleRealtimeElection(80);
       resetRetryableContactLinkPreviews();
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
@@ -9942,21 +12009,20 @@ function bindEvents() {
     }
   });
   window.addEventListener('offline', () => {
+    announceRealtimeClientActivity(false);
     if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
     else closeRealtime();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       saveActiveDraft({ announce: false });
-      if (state.realtimeHiddenTimer) window.clearTimeout(state.realtimeHiddenTimer);
-      state.realtimeHiddenTimer = window.setTimeout(() => {
-        state.realtimeHiddenTimer = 0;
-        if (document.visibilityState === 'hidden' && state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
-      }, realtimeHiddenReleaseMs);
+      announceRealtimeClientActivity(false);
+      armRealtimeHiddenRelease();
     }
     if (document.visibilityState === 'visible' && state.user) {
       if (state.realtimeHiddenTimer) window.clearTimeout(state.realtimeHiddenTimer);
       state.realtimeHiddenTimer = 0;
+      announceRealtimeClientActivity(true);
       scheduleRealtimeElection(60);
       scheduleOutboxRetry(1400);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
@@ -9964,6 +12030,7 @@ function bindEvents() {
     }
   });
   window.addEventListener('pagehide', () => {
+    announceRealtimeClientActivity(false);
     if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
   });
   els.messages?.addEventListener('scroll', () => scheduleScrollBottomButtonUpdate(), { passive: true });
@@ -9984,14 +12051,26 @@ function bindEvents() {
     saveActiveDraft({ announce: false });
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
     stopPresenceRefresh();
+    clearOutboxRetryLeaseIfOwned();
     await unregisterCurrentPushSubscription().catch(() => null);
     await post('/api/auth/logout', {}).catch(() => null);
     await signOutFirebaseSession(state.config.firebaseWebConfig || {}).catch(() => null);
+    clearCachedRealtimeToken();
+    clearRealtimeRetryDeferral();
+    clearRealtimeReconnectBackoff();
+    state.realtimePeerActivity.clear();
     setSessionToken('');
     state.user = null;
+    state.realtimeConnectedOnce = false;
     state.contacts = [];
+    state.contactsNextCursor = null;
+    state.contactsHasMore = false;
+    state.contactsLoading = false;
     for (const timer of state.contactLinkPreviewRetryTimers.values()) window.clearTimeout(timer);
     state.contactLinkPreviewRetryTimers.clear();
+    if (state.contactLinkPreviewBatchTimer) window.clearTimeout(state.contactLinkPreviewBatchTimer);
+    state.contactLinkPreviewBatchTimer = 0;
+    state.contactLinkPreviewQueue.clear();
     state.contactLinkPreviews.clear();
     state.contactLinkPreviewInFlight.clear();
     state.contactShareModalOpen = false;
@@ -10000,8 +12079,15 @@ function bindEvents() {
     state.contactSharePage = 0;
     state.contactShareSending = false;
     state.chats = [];
+    state.chatsNextCursor = null;
+    state.chatsHasMore = false;
+    state.chatsLoading = false;
+    state.chatListLoadedMode = 'active';
+    state.chatListLoadedAt = 0;
+    state.chatListModeRequests.clear();
     state.labels = [];
     state.chatLabelsByChatId = new Map();
+    state.labelsLoaded = false;
     state.activeLabelFilter = '';
     state.labelsModalOpen = false;
     state.slashCommandsOpen = false;
@@ -10013,11 +12099,27 @@ function bindEvents() {
     state.globalStarredMessages = [];
     state.globalStarredLoading = false;
     state.globalStarredScannedChats = 0;
+    state.globalStarredNextCursor = null;
+    state.globalStarredHasMore = false;
+    state.globalStarredLoaded = false;
+    state.globalStarredDirty = true;
     state.blockedContactsOpen = false;
     state.blockedContacts = [];
+    state.blockedContactsLoaded = false;
+    state.blockedContactsNextCursor = null;
+    state.blockedContactsHasMore = false;
     state.labelsDraft = '';
     state.archivedView = false;
     state.messagesByChat.clear();
+    state.messageHistoryCoverageByChat.clear();
+    state.messageHistoryRequestsByChat.clear();
+    state.messageSyncCursorByChat.clear();
+    state.messageBaselineLoadedChats.clear();
+    state.draftRemoteLoadedChats.clear();
+    state.draftLastSyncedTextByChat.clear();
+    state.draftRemoteLastAttemptAtByChat.clear();
+    state.draftSyncInFlightByChat.clear();
+    state.pinnedMessagesByChat.clear();
     state.renderedMessageCountByChat.clear();
     state.renderedActiveChatId = '';
     state.scrollNewMessages = 0;
@@ -10028,12 +12130,14 @@ function bindEvents() {
     state.outboxRetryTimer = 0;
     if (state.deliveryAckRetryTimer) window.clearTimeout(state.deliveryAckRetryTimer);
     state.deliveryAckRetryTimer = 0;
+    state.deliveryAckRetryAt = 0;
     state.activeChatId = '';
     state.replyToMessage = null;
     state.editingMessage = null;
     state.forwardingMessage = null;
     state.scheduleModalOpen = false;
     state.scheduledMessages = [];
+    state.scheduledLoadedChatId = '';
     state.scheduledLoading = false;
     state.schedulingMessage = false;
     closePollModal();
@@ -10048,8 +12152,10 @@ function bindEvents() {
     closeChatBrief();
     closePrivateNotesModal();
     state.privateNotes = [];
+    state.privateNotesLoadedChatId = '';
     closeReminderModal();
     state.reminders = [];
+    state.remindersLoadedChatId = '';
     closeLabelsModal();
     closeCommandPalette();
     state.privacyLock.locked = false;
@@ -10152,15 +12258,25 @@ function bindEvents() {
     renderGlobalSearchModal();
   });
   els.globalSearchList?.addEventListener('click', (event) => {
+    const loadMore = event.target.closest('[data-global-search-load-more]');
+    if (loadMore && els.globalSearchList.contains(loadMore)) {
+      searchAllChats(state.globalSearchQuery, { append: true }).catch((error) => alert(error.message || 'No se pudieron cargar más resultados.'));
+      return;
+    }
     const row = event.target.closest('[data-global-search-chat-id]');
     if (!row || !els.globalSearchList.contains(row)) return;
     openGlobalSearchResult(row.dataset.globalSearchChatId || '', row.dataset.globalSearchMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el resultado.'));
   });
   els.btnCloseGlobalStarred?.addEventListener('click', closeGlobalStarred);
-  els.btnRefreshGlobalStarred?.addEventListener('click', () => loadGlobalStarredMessages().catch((error) => alert(error.message || 'No se pudieron actualizar los destacados.')));
+  els.btnRefreshGlobalStarred?.addEventListener('click', () => loadGlobalStarredMessages({ force: true }).catch((error) => alert(error.message || 'No se pudieron actualizar los destacados.')));
   els.globalStarredModal?.addEventListener('click', (event) => {
     if (event.target === els.globalStarredModal) {
       closeGlobalStarred();
+      return;
+    }
+    const loadMore = event.target.closest('[data-global-starred-load-more]');
+    if (loadMore && els.globalStarredModal.contains(loadMore)) {
+      loadGlobalStarredMessages({ append: true }).catch((error) => alert(error.message || 'No se pudieron cargar más destacados.'));
       return;
     }
     const unstar = event.target.closest('[data-global-starred-unstar-message-id]');
@@ -10523,6 +12639,14 @@ function bindEvents() {
       closeContactShareModal();
       return;
     }
+    const loadMoreButton = event.target.closest('[data-load-more-share-contacts]');
+    if (loadMoreButton && els.contactShareModal.contains(loadMoreButton)) {
+      event.preventDefault();
+      loadMoreContacts()
+        .then(() => renderContactShareModal())
+        .catch((error) => alert(error.message || 'No se pudieron cargar más contactos.'));
+      return;
+    }
     const targetButton = event.target.closest('[data-contact-share-target-id]');
     if (!targetButton || !els.contactShareModal.contains(targetButton)) return;
     event.preventDefault();
@@ -10617,12 +12741,18 @@ function bindEvents() {
   });
   els.btnCloseBlockedContacts?.addEventListener('click', closeBlockedContactsModal);
   els.btnRefreshBlockedContacts?.addEventListener('click', () => {
-    loadBlockedContacts({ silent: false }).catch((error) => alert(error.message || 'No se pudieron actualizar los contactos bloqueados.'));
+    loadBlockedContacts({ silent: false, force: true }).catch((error) => alert(error.message || 'No se pudieron actualizar los contactos bloqueados.'));
   });
   els.blockedContactsModal?.addEventListener('click', (event) => {
     if (event.target === els.blockedContactsModal) closeBlockedContactsModal();
   });
   els.blockedContactsList?.addEventListener('click', (event) => {
+    const loadMoreButton = event.target.closest('[data-blocked-load-more]');
+    if (loadMoreButton && els.blockedContactsList.contains(loadMoreButton)) {
+      event.preventDefault();
+      loadBlockedContacts({ silent: false, append: true }).catch((error) => alert(error.message || 'No se pudieron cargar más contactos bloqueados.'));
+      return;
+    }
     const unblockButton = event.target.closest('[data-unblock-contact-id]');
     if (unblockButton && els.blockedContactsList.contains(unblockButton)) {
       event.preventDefault();
@@ -10736,6 +12866,14 @@ function bindEvents() {
       renderAttachmentPicker();
       return;
     }
+    const loadMoreContactsButton = event.target.closest('[data-load-more-attachment-contacts]');
+    if (loadMoreContactsButton) {
+      event.preventDefault();
+      loadMoreContacts()
+        .then(() => renderAttachmentPicker())
+        .catch((error) => alert(error.message || 'No se pudieron cargar más contactos.'));
+      return;
+    }
     const chaterContact = event.target.closest('[data-attachment-chater-contact-id]');
     if (chaterContact) {
       event.preventDefault();
@@ -10771,6 +12909,14 @@ function bindEvents() {
     if (!state.attachmentPickerOpen) return;
     if (els.attachmentPickerPanel?.contains(event.target) || els.btnAttachFile?.contains(event.target)) return;
     closeAttachmentPicker();
+  });
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest?.('a.ce-attachment--file[data-attachment-fallback-url]');
+    if (!link) return;
+    const expiresAt = Date.parse(link.dataset.attachmentSignedExpiresAt || '');
+    if (!Number.isFinite(expiresAt) || expiresAt > Date.now() + 5000) return;
+    const fallbackUrl = String(link.dataset.attachmentFallbackUrl || '').trim();
+    if (fallbackUrl) link.href = fallbackUrl;
   });
   els.attachmentPreview?.addEventListener('click', (event) => {
     const imageButton = event.target.closest('[data-open-pending-image-viewer]');
@@ -10834,6 +12980,13 @@ function bindEvents() {
     els.contactEmailInput.value = '';
   });
   els.chatList.addEventListener('click', (event) => {
+    const loadMoreButton = event.target.closest('[data-load-more-chats]');
+    if (loadMoreButton && els.chatList.contains(loadMoreButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      loadMoreChats().catch((error) => alert(error.message || 'No se pudieron cargar más chats.'));
+      return;
+    }
     const profileButton = event.target.closest('[data-open-chat-profile]');
     if (profileButton && els.chatList.contains(profileButton)) {
       event.preventDefault();
@@ -10894,6 +13047,12 @@ function bindEvents() {
     selectChat(row.dataset.chatId).catch((error) => alert(error.message));
   });
   els.contactList.addEventListener('click', (event) => {
+    const loadMoreButton = event.target.closest('[data-load-more-contacts]');
+    if (loadMoreButton && els.contactList.contains(loadMoreButton)) {
+      event.preventDefault();
+      loadMoreContacts().catch((error) => alert(error.message || 'No se pudieron cargar más contactos.'));
+      return;
+    }
     const nicknameButton = event.target.closest('[data-edit-contact-nickname]');
     if (nicknameButton && els.contactList.contains(nicknameButton)) {
       event.preventDefault();
@@ -10925,6 +13084,16 @@ function bindEvents() {
   });
   els.btnClearSearch.addEventListener('click', () => resetChatSearch());
   els.chatSearchPanel.addEventListener('click', (event) => {
+    const searchMore = event.target.closest('[data-search-load-more]');
+    if (searchMore) {
+      searchActiveChat(state.chatSearchQuery, { append: true }).catch((error) => alert(error.message || 'No se pudieron cargar más resultados.'));
+      return;
+    }
+    const starredMore = event.target.closest('[data-starred-load-more]');
+    if (starredMore) {
+      loadStarredMessages({ append: true }).catch((error) => alert(error.message || 'No se pudieron cargar más destacados.'));
+      return;
+    }
     const row = event.target.closest('[data-search-message-id]');
     if (row) openSearchResult(row.dataset.searchMessageId).catch((error) => alert(error.message || 'No se pudo abrir el resultado.'));
   });
@@ -11150,16 +13319,13 @@ function bindEvents() {
     closeOpenMessageControls();
   });
   els.tabChats.addEventListener('click', () => {
-    showChatListMode('active');
-    loadChats({ includeArchived: false }).catch((error) => alert(error.message || 'No se pudieron cargar los chats.'));
+    activateChatListMode('active').catch((error) => alert(error.message || 'No se pudieron cargar los chats.'));
   });
   els.tabUnread?.addEventListener('click', () => {
-    showChatListMode('unread');
-    loadChats({ unreadOnly: true }).catch((error) => alert(error.message || 'No se pudieron cargar los chats no leídos.'));
+    activateChatListMode('unread').catch((error) => alert(error.message || 'No se pudieron cargar los chats no leídos.'));
   });
   els.tabArchived?.addEventListener('click', () => {
-    showChatListMode('archived');
-    loadChats({ includeArchived: true }).catch((error) => alert(error.message || 'No se pudieron cargar los chats archivados.'));
+    activateChatListMode('archived').catch((error) => alert(error.message || 'No se pudieron cargar los chats archivados.'));
   });
   els.tabContacts.addEventListener('click', showContactsTab);
   els.messageForm.addEventListener('submit', async (event) => {
@@ -11233,7 +13399,7 @@ function bindEvents() {
     renderSlashCommandsPanel();
     sendTyping(true);
     if (state.typingTimer) window.clearTimeout(state.typingTimer);
-    state.typingTimer = window.setTimeout(() => sendTyping(false), 1800);
+    state.typingTimer = window.setTimeout(() => sendTyping(false), typingIdleDelayMs);
   });
   els.messageInput.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.iconInsertPanelOpen) {
@@ -11315,18 +13481,15 @@ function bindEvents() {
 async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      const expectedScope = new URL('./', window.location.href).href;
+      const candidate = await navigator.serviceWorker.getRegistration(expectedScope).catch(() => null);
+      // Una navegación dentro del scope ya participa en el ciclo estándar de actualización
+      // del Service Worker. Reutilizar el registro exacto evita volver a solicitar sw.js
+      // desde JavaScript en cada arranque; solo registramos cuando todavía no existe.
+      const existingRegistration = candidate?.scope === expectedScope ? candidate : null;
+      const registration = existingRegistration
+        || await navigator.serviceWorker.register('./sw.js', { scope: './' });
       state.serviceWorkerRegistration = registration;
-      try {
-        const updateKey = 'chater_sw_update_checked_at_v1';
-        const lastCheck = Number(localStorage.getItem(updateKey) || 0);
-        const now = Date.now();
-        if (!lastCheck) localStorage.setItem(updateKey, String(now));
-        else if (now - lastCheck >= 6 * 60 * 60 * 1000) {
-          localStorage.setItem(updateKey, String(now));
-          registration.update().catch(() => null);
-        }
-      } catch {}
       requestServiceWorkerDeliveryAckFlush();
     } catch {}
   }
@@ -11341,9 +13504,18 @@ async function init() {
   installAppNavigationHistory();
   await registerServiceWorker();
   try {
+    if (getSessionToken()) {
+      const restored = await bootstrapExistingSession();
+      if (restored) {
+        // El bootstrap moderno ya contiene la configuración pública necesaria.
+        // Solo consultamos /api/config como compatibilidad con un backend anterior
+        // durante un despliegue escalonado, evitando una HTTP Response en el flujo normal.
+        if (!state.config) await loadConfig();
+        return;
+      }
+    }
     await loadConfig();
-    const restored = await bootstrapExistingSession();
-    if (!restored) showGuest();
+    showGuest();
   } catch (error) {
     setStatus(error.message || 'No se pudo conectar con chatER.');
     showGuest();

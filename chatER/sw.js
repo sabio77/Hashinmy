@@ -1,15 +1,30 @@
 const RELEASE_VERSION = 'dev';
 const CACHE_NAME = `chater-static-${RELEASE_VERSION}`;
 const versionedAsset = (asset = '') => `${asset}?v=${encodeURIComponent(RELEASE_VERSION)}`;
+// Esta lista la completa tools/generate-release.py durante el build. Si un PNG
+// opcional no existe en assets, el SW puede servir el placeholder geométrico sin
+// provocar primero un 404 garantizado. Cuando el PNG aparece en un release futuro,
+// el build lo marca aquí y el request vuelve a ir a la red/CDN normalmente.
+const BUNDLED_IMAGE_ASSETS = new Set([]);
+
+function geometricIconDataUrl(size = 192) {
+  const safeSize = Number(size) >= 512 ? 512 : 192;
+  const scale = safeSize / 100;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><rect width="100%" height="100%" rx="20%" fill="#0aa884"/><rect x="20%" y="25%" width="60%" height="43%" rx="12%" fill="white"/><path d="M25 65 L20 82 L43 68 Z" fill="white" transform="scale(${scale})"/><circle cx="40%" cy="47%" r="3.5%" fill="#0aa884"/><circle cx="50%" cy="47%" r="3.5%" fill="#0aa884"/><circle cx="60%" cy="47%" r="3.5%" fill="#0aa884"/></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}#chater-fallback-${safeSize}`;
+}
+
+function bundledIconUrl(size = 192) {
+  const safeSize = Number(size) >= 512 ? 512 : 192;
+  const asset = `./assets/icon-${safeSize}.png`;
+  return BUNDLED_IMAGE_ASSETS.has(asset) ? versionedAsset(asset) : geometricIconDataUrl(safeSize);
+}
 const CORE_ASSETS = [
   './index.html',
   ...[
     './styles.css',
     './theme-bootstrap.js',
     './runtime-config.js',
-    './app.js',
-    './api.js',
-    './firebase.auth.js',
     './APPwebFRONTENDx/conexion/index.js',
     './APPwebFRONTENDx/BLOQUE/app.js',
     './APPwebFRONTENDx/BLOQUE/api.js',
@@ -22,18 +37,16 @@ const CORE_ASSETS = [
   ].map(versionedAsset)
 ];
 
-const OPTIONAL_ASSETS = [
-  './assets/icon-192.png',
-  './assets/icon-512.png'
-];
-
 const DELIVERY_ACK_DB_NAME = 'chater-delivery-acks-v1';
 const DELIVERY_ACK_STORE_NAME = 'pendingAcks';
 const DELIVERY_ACK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const DELIVERY_ACK_MAX_BACKOFF_MS = 30 * 60 * 1000;
 const DELIVERY_ACK_MAX_ATTEMPTS = 12;
+const DELIVERY_ACK_BATCH_DELAY_MS = 160;
+const DELIVERY_ACK_BATCH_MAX_ITEMS = 20;
 const DELIVERY_ACK_SYNC_TAG = 'CHAT_ER_FLUSH_DELIVERY_ACKS';
 let deliveryAckDbPromise = null;
+let deliveryAckFlushPromise = null;
 
 function hasIndexedDbSupport() {
   return typeof indexedDB !== 'undefined';
@@ -112,7 +125,9 @@ async function listQueuedDeliveryAcks() {
 
 function nextDeliveryAckBackoffMs(attempts = 0) {
   const safeAttempts = Math.max(0, Math.min(12, Number(attempts || 0)));
-  return Math.min(DELIVERY_ACK_MAX_BACKOFF_MS, 1000 * (2 ** safeAttempts));
+  const exponential = Math.min(DELIVERY_ACK_MAX_BACKOFF_MS, 1000 * (2 ** safeAttempts));
+  const jittered = Math.round(exponential * (0.75 + Math.random() * 0.5));
+  return Math.min(DELIVERY_ACK_MAX_BACKOFF_MS, Math.max(500, jittered));
 }
 
 function isFinalDeliveryAckSkip(reason = '') {
@@ -124,7 +139,7 @@ async function sendDeliveryAckRequest(token = '', ackUrl = '') {
     method: 'POST',
     mode: 'cors',
     credentials: 'omit',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify({ token })
   });
   if (!response) return false;
@@ -166,56 +181,82 @@ async function queuePushDeliveryAck(payload = {}) {
       queuedAt,
       updatedAt: now,
       attempts: Math.max(0, Number(existing?.attempts || 0)),
-      nextAttemptAt: Math.min(Number(existing?.nextAttemptAt || now), now),
+      // Un Push duplicado no debe reiniciar el backoff de un ACK ya fallido.
+      nextAttemptAt: existing ? Math.max(now, Number(existing.nextAttemptAt || now)) : now,
       lastError: ''
     };
     await putQueuedDeliveryAck(item);
     await registerDeliveryAckSync();
     return true;
   } catch {
-    return sendDeliveryAckWithRetries(normalized.token, normalized.ackUrl, 3);
+    // No hagas red aquí: acknowledgePushDelivery conserva un único bloque de
+    // reintentos cuando IndexedDB no está disponible. De lo contrario, un fallo
+    // de almacenamiento seguido de un fallo de red duplicaría hasta 3+3 HTTP
+    // Responses para el mismo ACK de Push.
+    return false;
   }
 }
 
-async function flushQueuedDeliveryAckItem(item = {}, { force = false } = {}) {
+function deliveryAckBatchOutcome(result = {}) {
+  const skipped = String(result?.skipped || '').trim();
+  const confirmed = result?.confirmed === true || result?.delivered === true || result?.alreadyDelivered === true;
+  const final = confirmed || result?.final === true || isFinalDeliveryAckSkip(skipped);
+  return { confirmed, final, retryable: result?.retryable === true || !final, skipped };
+}
+
+async function sendDeliveryAckBatchRequest(items = [], ackUrl = '') {
+  const tokens = Array.from(new Set((Array.isArray(items) ? items : [])
+    .map((item) => String(item?.token || item?.key || '').trim())
+    .filter(Boolean)))
+    .slice(0, DELIVERY_ACK_BATCH_MAX_ITEMS);
+  if (!tokens.length || !ackUrl) return new Map();
+  const response = await fetch(ackUrl, {
+    method: 'POST',
+    mode: 'cors',
+    credentials: 'omit',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify({ tokens })
+  });
+  if (!response?.ok) throw new Error(`delivery_ack_batch_http_${Number(response?.status || 0)}`);
+  const data = await response.clone().json().catch(() => null);
+  if (!data || data.ok === false || !Array.isArray(data.results)) throw new Error('delivery_ack_batch_invalid_response');
+  const outcomes = new Map();
+  for (const result of data.results) {
+    const token = String(result?.token || '').trim();
+    if (!token || !tokens.includes(token)) continue;
+    outcomes.set(token, deliveryAckBatchOutcome(result));
+  }
+  return outcomes;
+}
+
+async function deferQueuedDeliveryAck(item = {}, error = null) {
   const key = String(item.key || item.token || '').trim();
   const token = String(item.token || key).trim();
   const ackUrl = String(item.ackUrl || '').trim();
   if (!key || !token || !ackUrl) return false;
   const now = Date.now();
-  const queuedAt = Number(item.queuedAt || now);
-  const expired = now - queuedAt > DELIVERY_ACK_MAX_AGE_MS;
-  const attempts = Math.max(0, Number(item.attempts || 0));
-  if (expired || attempts >= DELIVERY_ACK_MAX_ATTEMPTS) {
+  const nextAttempts = Math.max(0, Number(item.attempts || 0)) + 1;
+  if (nextAttempts >= DELIVERY_ACK_MAX_ATTEMPTS || now - Number(item.queuedAt || now) > DELIVERY_ACK_MAX_AGE_MS) {
     await deleteQueuedDeliveryAck(key).catch(() => null);
     return false;
   }
-  if (!force && Number(item.nextAttemptAt || 0) > now) return false;
-  try {
-    const sent = await sendDeliveryAckRequest(token, ackUrl);
-    if (sent) {
-      await deleteQueuedDeliveryAck(key).catch(() => null);
-      return true;
-    }
-    throw new Error('delivery_ack_http_failed');
-  } catch (error) {
-    const nextAttempts = attempts + 1;
-    await putQueuedDeliveryAck({
-      ...item,
-      key,
-      token,
-      ackUrl,
-      attempts: nextAttempts,
-      updatedAt: now,
-      lastError: String(error?.message || 'delivery_ack_failed').slice(0, 120),
-      nextAttemptAt: now + nextDeliveryAckBackoffMs(nextAttempts)
-    }).catch(() => null);
-    await registerDeliveryAckSync();
-    return false;
-  }
+  await putQueuedDeliveryAck({
+    ...item,
+    key,
+    token,
+    ackUrl,
+    attempts: nextAttempts,
+    updatedAt: now,
+    lastError: String(error?.message || 'delivery_ack_failed').slice(0, 120),
+    nextAttemptAt: now + nextDeliveryAckBackoffMs(nextAttempts)
+  }).catch(() => null);
+  await registerDeliveryAckSync();
+  return false;
 }
 
-async function flushQueuedDeliveryAcks(options = {}) {
+async function performQueuedDeliveryAckFlush(options = {}) {
+  // Una ventana mínima agrupa Push casi simultáneos antes de comprometer una HTTP Response.
+  if (!options.force) await sleep(DELIVERY_ACK_BATCH_DELAY_MS);
   let items = [];
   try {
     items = await listQueuedDeliveryAcks();
@@ -225,12 +266,57 @@ async function flushQueuedDeliveryAcks(options = {}) {
   const now = Date.now();
   const due = items
     .filter((item) => options.force || Number(item.nextAttemptAt || 0) <= now || now - Number(item.queuedAt || now) > DELIVERY_ACK_MAX_AGE_MS)
-    .slice(0, Math.max(1, Math.min(30, Number(options.limit || 20))));
-  let confirmed = 0;
+    .slice(0, Math.max(1, Math.min(DELIVERY_ACK_BATCH_MAX_ITEMS, Number(options.limit || DELIVERY_ACK_BATCH_MAX_ITEMS))));
+  if (!due.length) return { attempted: 0, confirmed: 0 };
+
+  const groups = new Map();
   for (const item of due) {
-    if (await flushQueuedDeliveryAckItem(item, options)) confirmed += 1;
+    const key = String(item.key || item.token || '').trim();
+    const token = String(item.token || key).trim();
+    const ackUrl = String(item.ackUrl || '').trim();
+    const expired = now - Number(item.queuedAt || now) > DELIVERY_ACK_MAX_AGE_MS;
+    if (!key || !token || !ackUrl || expired || Number(item.attempts || 0) >= DELIVERY_ACK_MAX_ATTEMPTS) {
+      if (key) await deleteQueuedDeliveryAck(key).catch(() => null);
+      continue;
+    }
+    if (!groups.has(ackUrl)) groups.set(ackUrl, []);
+    groups.get(ackUrl).push({ ...item, key, token, ackUrl });
+  }
+
+  let confirmed = 0;
+  for (const [ackUrl, group] of groups.entries()) {
+    let outcomes = new Map();
+    let requestError = null;
+    try {
+      outcomes = await sendDeliveryAckBatchRequest(group, ackUrl);
+    } catch (error) {
+      requestError = error;
+    }
+    for (const item of group) {
+      const outcome = outcomes.get(item.token);
+      if (outcome?.final === true) {
+        await deleteQueuedDeliveryAck(item.key).catch(() => null);
+        confirmed += 1;
+        continue;
+      }
+      await deferQueuedDeliveryAck(item, requestError || new Error('delivery_ack_batch_token_unconfirmed'));
+    }
   }
   return { attempted: due.length, confirmed };
+}
+
+async function flushQueuedDeliveryAcks(options = {}) {
+  // push/sync/message/fetch pueden dispararse casi a la vez en el mismo worker.
+  // Compartir el trabajo evita que dos vaciados lean la misma cola y dupliquen Responses.
+  if (deliveryAckFlushPromise) return deliveryAckFlushPromise;
+  deliveryAckFlushPromise = (async () => {
+    try {
+      return await performQueuedDeliveryAckFlush(options);
+    } finally {
+      deliveryAckFlushPromise = null;
+    }
+  })();
+  return deliveryAckFlushPromise;
 }
 
 async function acknowledgePushDelivery(payload = {}, options = {}) {
@@ -335,9 +421,15 @@ function buildFallbackIconPng(size = 192) {
   return concatBytes([signature, pngChunk('IHDR', ihdr), pngChunk('IDAT', zlibStore(raw)), pngChunk('IEND', new Uint8Array())]);
 }
 
+function fallbackIconAssetPath(pathname = '') {
+  const match = String(pathname || '').match(/\/assets\/(icon-(192|512)\.png)$/i);
+  return match ? `./assets/${match[1].toLowerCase()}` : '';
+}
+
 function fallbackIconResponse(pathname = '') {
-  if (!/\/assets\/icon-(192|512)\.png$/i.test(pathname)) return null;
-  const size = pathname.includes('512') ? 512 : 192;
+  const assetPath = fallbackIconAssetPath(pathname);
+  if (!assetPath) return null;
+  const size = assetPath.includes('512') ? 512 : 192;
   return new Response(buildFallbackIconPng(size), {
     status: 200,
     headers: {
@@ -360,8 +452,9 @@ async function safeCacheRequest(cache, asset) {
 
 async function cacheAssets() {
   const cache = await caches.open(CACHE_NAME);
+  // Los PNG de assets son opcionales por diseño: no se consultan durante install para
+  // evitar respuestas 404 garantizadas cuando todavía solo existe su prompt .txt.
   await Promise.allSettled(CORE_ASSETS.map((asset) => safeCacheRequest(cache, asset)));
-  await Promise.allSettled(OPTIONAL_ASSETS.map((asset) => safeCacheRequest(cache, asset)));
 }
 
 self.addEventListener('install', (event) => {
@@ -373,7 +466,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
-      .then(() => flushQueuedDeliveryAcks({ force: true }).catch(() => null))
+      .then(() => flushQueuedDeliveryAcks().catch(() => null))
   );
 });
 
@@ -389,19 +482,40 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || event.request.method !== 'GET') return;
 
+  const iconAssetPath = fallbackIconAssetPath(url.pathname);
   const iconFallback = fallbackIconResponse(url.pathname);
   const isNavigation = event.request.mode === 'navigate' || event.request.destination === 'document';
 
   event.respondWith((async () => {
+    if (isNavigation) {
+      // Todas las navegaciones dentro del scope consumen el mismo app-shell. Una URL
+      // con ?chat=, ?message= u otros parámetros no debe crear otra entrada de caché
+      // ni otra HTTP Response del Static Site si index.html ya quedó precargado.
+      const shell = await caches.match('./index.html');
+      if (shell) return shell;
+    }
     const cached = await caches.match(event.request);
     if (cached) return cached; // cache-first: una visita repetida no genera HTTP Responses para este recurso.
+    if (iconFallback && iconAssetPath && !BUNDLED_IMAGE_ASSETS.has(iconAssetPath)) {
+      // El build sabe que este archivo no existe. Servimos y cacheamos el PNG
+      // geométrico directamente, evitando una respuesta HTTP 404 inútil por cada
+      // release nuevo que todavía no tenga los assets gráficos definitivos.
+      await cacheSuccessfulResponse(event.request, iconFallback);
+      return iconFallback;
+    }
     try {
       const response = await fetch(event.request);
-      if (iconFallback && (!response || response.status === 404)) return iconFallback;
+      if (iconFallback && (!response || response.status === 404)) {
+        await cacheSuccessfulResponse(event.request, iconFallback);
+        return iconFallback;
+      }
       if (response?.ok) await cacheSuccessfulResponse(event.request, response);
       return response;
     } catch (error) {
-      if (iconFallback) return iconFallback;
+      if (iconFallback) {
+        await cacheSuccessfulResponse(event.request, iconFallback);
+        return iconFallback;
+      }
       if (isNavigation) {
         const shell = await caches.match('./index.html');
         if (shell) return shell;
@@ -435,8 +549,8 @@ self.addEventListener('push', (event) => {
     body: payload.body || 'Tienes un mensaje nuevo.',
     tag: payload.tag || 'chatER',
     renotify: true,
-    badge: './assets/icon-192.png',
-    icon: payload.sender?.photoUrl || './assets/icon-192.png',
+    badge: bundledIconUrl(192),
+    icon: payload.sender?.photoUrl || bundledIconUrl(192),
     data: {
       url: payload.url || './index.html',
       chatId: payload.chatId || '',
@@ -455,20 +569,24 @@ self.addEventListener('push', (event) => {
 self.addEventListener('message', (event) => {
   const type = String(event.data?.type || '').trim();
   if (type !== DELIVERY_ACK_SYNC_TAG) return;
-  const work = flushQueuedDeliveryAcks({ force: true }).catch(() => null);
+  const work = flushQueuedDeliveryAcks().catch(() => null);
   if (typeof event.waitUntil === 'function') event.waitUntil(work);
 });
 
 self.addEventListener('sync', (event) => {
   if (event.tag !== DELIVERY_ACK_SYNC_TAG) return;
-  event.waitUntil(flushQueuedDeliveryAcks({ force: true, limit: 20 }).catch(() => null));
+  event.waitUntil(flushQueuedDeliveryAcks({ limit: 20 }).catch(() => null));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = new URL(event.notification?.data?.url || './index.html', self.location.href).toString();
   event.waitUntil(Promise.allSettled([
-    acknowledgePushDelivery({ delivery: event.notification?.data?.delivery || null }, { retries: 3, force: true }),
+    // El evento push ya encoló el token antes de intentar confirmarlo. Al hacer click
+    // solo drenamos ACKs que sigan pendientes y cuyo backoff haya vencido: volver a
+    // encolar el token de la notificación recreaba una HTTP Response incluso cuando
+    // la confirmación original ya había sido aceptada y eliminada de IndexedDB.
+    flushQueuedDeliveryAcks({ limit: 20 }).catch(() => null),
     (async () => {
       const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of clientList) {

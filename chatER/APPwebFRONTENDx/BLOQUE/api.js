@@ -1,4 +1,40 @@
 const sessionKey = 'chater_session_token';
+const trafficClientIdKey = 'chater_client_id';
+let volatileTrafficClientId = '';
+
+function normalizeTrafficClientId(value = '') {
+  return String(value || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 120);
+}
+
+export function getTrafficClientId() {
+  try {
+    const stored = normalizeTrafficClientId(localStorage.getItem(trafficClientIdKey) || '');
+    if (stored) return stored;
+    const generated = normalizeTrafficClientId(window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`)
+      || `client_${Date.now()}`;
+    localStorage.setItem(trafficClientIdKey, generated);
+    return generated;
+  } catch {
+    if (volatileTrafficClientId) return volatileTrafficClientId;
+    volatileTrafficClientId = normalizeTrafficClientId(window.crypto?.randomUUID?.() || `client_${Date.now()}_${Math.random().toString(16).slice(2)}`)
+      || `client_${Date.now()}`;
+    return volatileTrafficClientId;
+  }
+}
+
+export function withTrafficClientId(url = '') {
+  const cleanUrl = String(url || '').trim();
+  if (!cleanUrl) return cleanUrl;
+  const clientId = getTrafficClientId();
+  if (!clientId) return cleanUrl;
+  try {
+    const parsed = new URL(cleanUrl, window.location.href);
+    parsed.searchParams.set('clientId', clientId);
+    return parsed.toString();
+  } catch {
+    return cleanUrl;
+  }
+}
 
 export function getBackendUrl() {
   const runtimeBackendUrl = String(window.APP_RUNTIME_CONFIG?.backendUrl || '').trim().replace(/\/$/, '');
@@ -24,20 +60,37 @@ export async function apiGet(path) {
   return data;
 }
 
-export async function post(path, body = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+function retryAfterMs(response) {
+  const raw = String(response?.headers?.get?.('Retry-After') || '').trim();
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(2 * 60 * 60 * 1000, Math.ceil(seconds * 1000));
+  const retryAt = Date.parse(raw);
+  if (!Number.isFinite(retryAt)) return 0;
+  return Math.min(2 * 60 * 60 * 1000, Math.max(0, retryAt - Date.now()));
+}
+
+export async function post(path, body = {}, options = {}) {
+  const payload = body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : {};
   const token = getSessionToken();
-  if (token) headers['X-Session-Token'] = token;
-  const response = await fetch(`${getBackendUrl()}${path}`, {
+  if (token && !payload.sessionToken) payload.sessionToken = token;
+  // text/plain es CORS-safelisted. Al llevar la sesión dentro del JSON serializado
+  // evitamos el preflight OPTIONS que application/json + X-Session-Token provocaba
+  // para cada endpoint, sin usar cookies ni exponer el token en la URL.
+  const response = await fetch(withTrafficClientId(`${getBackendUrl()}${path}`), {
     method: 'POST',
-    headers,
-    body: JSON.stringify(body || {})
+    mode: 'cors',
+    credentials: 'omit',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify(payload),
+    signal: options?.signal
   });
   const data = await response.json().catch(() => ({ ok: false, message: 'Respuesta inválida' }));
   if (!response.ok || data.ok === false) {
     const error = new Error(data.message || 'Error en la solicitud');
     error.status = response.status;
     error.data = data;
+    error.retryAfterMs = retryAfterMs(response);
     throw error;
   }
   return data;
