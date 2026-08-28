@@ -425,7 +425,7 @@ P2P_APLICACIONES_APROBADAS={"https://hashinmy.com":["PRO-controlPRO"]}
 APP_BACKEND_PUBLIC_URL=https://mapsx.app
 ```
 
-`APP_REDIS_URL`, `APP_FIREBASE_SERVICE` y `APP_FIREBASE_CREDENTIALS` también son obligatorias para que memoriaBACKEND inicie. `APP_WEB_PUSH_PUBLIC_KEY` y `APP_WEB_PUSH_PRIVATE_KEY` son opcionales, pero deben configurarse juntas para notificaciones con la PWA cerrada.
+`REDIS_URL`, `FIREBASE_SERVICE` y `FIREBASE_CREDENTIALS` también son obligatorias para que memoriaBACKEND inicie. `APP_WEB_PUSH_PUBLIC_KEY` y `APP_WEB_PUSH_PRIVATE_KEY` son opcionales, pero deben configurarse juntas para notificaciones con la PWA cerrada.
 
 En Firebase Authentication habilita Google y autoriza `hashinmy.com`. Las credenciales privadas de Service Account pertenecen únicamente a memoriaBACKEND; nunca deben copiarse a `appWEB`.
 
