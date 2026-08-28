@@ -11468,3 +11468,261 @@ body.ce-dark-mode .ce-contact-share-pager span {
     width: 100%;
   }
 }
+
+/* Vista previa de imágenes antes de enviar · visualizador flotante sobre messageForm. */
+#messageForm.ce-compose {
+  position: relative !important;
+}
+
+#messageForm > #attachmentPreview.ce-attachment-preview {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(100% + 8px) !important;
+  z-index: 35 !important;
+  width: min(760px, calc(100% - 12px)) !important;
+  max-width: calc(100vw - 18px) !important;
+  min-height: 0 !important;
+  max-height: min(36dvh, 280px) !important;
+  margin: 0 !important;
+  padding: 10px !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(15, 118, 110, 0.2) !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--ce-panel) 94%, transparent) !important;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.22) !important;
+  backdrop-filter: blur(18px) saturate(1.16);
+  -webkit-backdrop-filter: blur(18px) saturate(1.16);
+  overflow: hidden !important;
+  white-space: normal !important;
+}
+
+#messageForm > #attachmentPreview.ce-attachment-preview:not(.ce-attachment-preview--gallery) {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+#messageForm > #attachmentPreview.ce-attachment-preview.hidden {
+  display: none !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__loading {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px 2px;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__loading span:last-child,
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head > span {
+  min-width: 0;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  padding: 0 2px;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head strong,
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head em,
+#messageForm > #attachmentPreview .ce-attachment-preview__loading strong,
+#messageForm > #attachmentPreview .ce-attachment-preview__loading em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head strong,
+#messageForm > #attachmentPreview .ce-attachment-preview__loading strong {
+  color: var(--ce-text);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head em,
+#messageForm > #attachmentPreview .ce-attachment-preview__loading em {
+  margin-top: 2px;
+  color: var(--ce-muted);
+  font-size: 0.73rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__clear-all {
+  width: auto !important;
+  height: 30px !important;
+  flex: 0 0 auto;
+  padding: 0 11px !important;
+  border: 1px solid rgba(217, 48, 37, 0.16) !important;
+  border-radius: 999px !important;
+  background: rgba(217, 48, 37, 0.08) !important;
+  color: var(--ce-danger) !important;
+  font-size: 0.73rem;
+  font-weight: 900;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(112px, 18vw, 146px);
+  gap: 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  padding: 1px 2px 5px;
+  scrollbar-width: thin;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__item {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--ce-bg-soft) 70%, var(--ce-panel));
+  scroll-snap-align: start;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb,
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image {
+  width: 100% !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  display: block !important;
+  overflow: hidden;
+  background: rgba(17, 27, 33, 0.08) !important;
+  cursor: zoom-in;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb {
+  aspect-ratio: 1 / 0.82;
+  border-radius: 14px 14px 9px 9px !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image {
+  width: 56px !important;
+  height: 56px !important;
+  aspect-ratio: 1;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb img,
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  border-radius: inherit !important;
+  object-fit: cover;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb:hover img,
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb:focus-visible img,
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image:hover img,
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image:focus-visible img {
+  transform: scale(1.035);
+  filter: brightness(0.96);
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb:focus-visible,
+#messageForm > #attachmentPreview .ce-attachment-preview__single-image:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ce-accent) 42%, transparent) !important;
+  outline-offset: 2px;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px !important;
+  height: 28px !important;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.42) !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(8px);
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove:hover,
+#messageForm > #attachmentPreview .ce-attachment-preview__remove:focus-visible {
+  background: rgba(185, 28, 28, 0.92) !important;
+  color: #ffffff !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__index {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.66);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__caption {
+  display: block;
+  min-width: 0;
+  padding: 7px 8px 8px;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__caption strong,
+#messageForm > #attachmentPreview .ce-attachment-preview__caption em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__caption strong {
+  color: var(--ce-text);
+  font-size: 0.73rem;
+  font-weight: 850;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__caption em {
+  margin-top: 2px;
+  color: var(--ce-muted);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  #messageForm > #attachmentPreview.ce-attachment-preview {
+    bottom: calc(100% + 6px) !important;
+    width: calc(100vw - 14px) !important;
+    max-height: min(34dvh, 236px) !important;
+    padding: 8px !important;
+    border-radius: 17px !important;
+  }
+
+  #messageForm > #attachmentPreview .ce-attachment-preview__gallery {
+    grid-auto-columns: clamp(104px, 34vw, 132px);
+    gap: 7px;
+  }
+
+  #messageForm > #attachmentPreview .ce-attachment-preview__gallery-head em {
+    max-width: 58vw;
+  }
+}

@@ -287,7 +287,9 @@ const state = {
   scrollNewMessages: 0,
   notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' },
   pendingAttachment: null,
+  pendingAttachments: [],
   attachmentUploading: false,
+  attachmentBatchSending: false,
   sendModeMenuOpen: false,
   sendMode: 'direct',
   audioRecorder: null,
@@ -375,6 +377,7 @@ function escapeHtml(value = '') {
 
 
 const R2_IMAGE_MAX_BYTES = 200 * 1024;
+const MAX_PENDING_IMAGE_ATTACHMENTS = 10;
 const R2_GENERIC_FILE_MAX_BYTES = 15 * 1024 * 1024;
 const MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -462,6 +465,26 @@ function attachmentFallbackText(attachment = null) {
   const normalized = normalizeAttachmentClient(attachment);
   if (!normalized) return '';
   return normalized.kind === 'image' ? 'Imagen adjunta' : `Archivo adjunto: ${normalized.fileName}`;
+}
+
+function pendingComposerAttachments() {
+  const normalized = [];
+  const seen = new Set();
+  const candidates = [
+    ...(Array.isArray(state.pendingAttachments) ? state.pendingAttachments : []),
+    state.pendingAttachment
+  ];
+  for (const candidate of candidates) {
+    const attachment = normalizeAttachmentClient(candidate);
+    if (!attachment || seen.has(attachment.attachmentId)) continue;
+    seen.add(attachment.attachmentId);
+    normalized.push(attachment);
+  }
+  return normalized;
+}
+
+function hasPendingComposerAttachment() {
+  return pendingComposerAttachments().length > 0;
 }
 
 function attachmentImageOrientationClass(attachment = null) {
@@ -573,26 +596,48 @@ function renderMessageTextBody(text = '', attachment = null) {
 
 function updateAttachmentPreview() {
   if (!els.attachmentPreview) return;
-  const attachment = normalizeAttachmentClient(state.pendingAttachment);
-  els.attachmentPreview.classList.toggle('hidden', !attachment && !state.attachmentUploading);
-  if (state.attachmentUploading) {
-    els.attachmentPreview.innerHTML = '<span class="ce-attachment-preview__spinner" aria-hidden="true"></span><strong>Preparando adjunto...</strong><em>Comprimiendo si es imagen y preparando subida segura.</em>';
+  const attachments = pendingComposerAttachments();
+  els.attachmentPreview.classList.toggle('hidden', !attachments.length && !state.attachmentUploading);
+  els.attachmentPreview.classList.toggle('ce-attachment-preview--gallery', attachments.length > 0 && attachments.every((attachment) => attachment.kind === 'image'));
+  if (!attachments.length && state.attachmentUploading) {
+    els.attachmentPreview.innerHTML = '<div class="ce-attachment-preview__loading"><span class="ce-attachment-preview__spinner" aria-hidden="true"></span><span><strong>Preparando imágenes...</strong><em>Comprimiendo y preparando la subida segura.</em></span></div>';
     return;
   }
-  if (!attachment) {
+  if (!attachments.length) {
     els.attachmentPreview.innerHTML = '';
     return;
   }
+  const imageAttachments = attachments.filter((attachment) => attachment.kind === 'image');
+  if (imageAttachments.length === attachments.length) {
+    const countLabel = imageAttachments.length === 1 ? '1 imagen lista para enviar' : `${imageAttachments.length} imágenes listas para enviar`;
+    const uploadLabel = state.attachmentUploading ? ' · preparando más imágenes' : '';
+    const gallery = imageAttachments.map((attachment, index) => {
+      const size = attachment.sizeBytes ? formatFileSize(attachment.sizeBytes) : '';
+      const viewLabel = `Ver ${attachment.fileName} en pantalla completa`;
+      return `<article class="ce-attachment-preview__item" data-attachment-id="${escapeHtml(attachment.attachmentId)}"><button class="ce-attachment-preview__thumb" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(attachment.url)}" data-image-alt="${escapeHtml(attachment.fileName)}" aria-label="${escapeHtml(viewLabel)}"><img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" /></button><button class="ce-attachment-preview__remove" type="button" data-clear-attachment="${escapeHtml(attachment.attachmentId)}" aria-label="Quitar ${escapeHtml(attachment.fileName)}" ${state.attachmentUploading ? 'disabled' : ''}>${uiIcon('close')}</button><span class="ce-attachment-preview__index" aria-hidden="true">${index + 1}</span><span class="ce-attachment-preview__caption"><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(size || 'Imagen WebP comprimida')}</em></span></article>`;
+    }).join('');
+    els.attachmentPreview.innerHTML = `<div class="ce-attachment-preview__gallery-head"><span><strong>${escapeHtml(countLabel)}</strong><em>Toca una imagen para verla a pantalla completa${escapeHtml(uploadLabel)}.</em></span>${imageAttachments.length > 1 ? `<button class="ce-attachment-preview__clear-all" type="button" data-clear-all-attachments="1" aria-label="Quitar todas las imágenes" ${state.attachmentUploading ? 'disabled' : ''}>Quitar todas</button>` : ''}</div><div class="ce-attachment-preview__gallery" role="list">${gallery}</div>`;
+    return;
+  }
+  const attachment = attachments[0];
   const preview = attachment.kind === 'image'
-    ? `<img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" />`
+    ? `<button class="ce-attachment-preview__single-image" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(attachment.url)}" data-image-alt="${escapeHtml(attachment.fileName)}" aria-label="Ver ${escapeHtml(attachment.fileName)} en pantalla completa"><img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" /></button>`
     : `<span class="ce-attachment-preview__file" aria-hidden="true">${uiIcon('attachment')}</span>`;
-  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo listo')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="1" aria-label="Quitar adjunto">${uiIcon('close')}</button>`;
+  els.attachmentPreview.innerHTML = `${preview}<span><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(attachment.kind === 'image' ? 'Imagen WebP comprimida' : 'Archivo listo')}${attachment.sizeBytes ? ` · ${escapeHtml(formatFileSize(attachment.sizeBytes))}` : ''}</em></span><button type="button" data-clear-attachment="${escapeHtml(attachment.attachmentId)}" aria-label="Quitar adjunto">${uiIcon('close')}</button>`;
 }
 
-function clearPendingAttachment() {
-  state.pendingAttachment = null;
-  state.attachmentUploading = false;
-  if (els.fileInput) els.fileInput.value = '';
+function clearPendingAttachment(attachmentId = '') {
+  const cleanId = String(attachmentId || '').trim();
+  if (cleanId) {
+    state.pendingAttachments = (Array.isArray(state.pendingAttachments) ? state.pendingAttachments : [])
+      .filter((attachment) => normalizeAttachmentClient(attachment)?.attachmentId !== cleanId);
+    if (normalizeAttachmentClient(state.pendingAttachment)?.attachmentId === cleanId) state.pendingAttachment = null;
+  } else {
+    state.pendingAttachment = null;
+    state.pendingAttachments = [];
+    state.attachmentUploading = false;
+  }
+  if (!pendingComposerAttachments().length && els.fileInput) els.fileInput.value = '';
   updateAttachmentPreview();
   updateComposerControls();
 }
@@ -964,34 +1009,70 @@ async function useInlineFallbackForPreparedAttachment(prepared = {}, statusReaso
   }
   showTemporaryDraftStatus(`${statusReason}; usando respaldo seguro ${fallback.provider}...`, 1800);
   const created = await createInlineMediaFallbackAttachment(prepared);
-  state.pendingAttachment = normalizeAttachmentClient(created.attachment);
+  const attachment = normalizeAttachmentClient(created.attachment);
+  if (!attachment) throw new Error('El respaldo seguro no devolvió un adjunto válido.');
   showTemporaryDraftStatus(`Adjunto listo para enviar con respaldo ${fallback.provider}.`, 2400);
+  return attachment;
 }
 
-async function uploadAttachmentForActiveChat(file) {
+async function createAttachmentForActiveChat(file) {
   if (!state.activeChatId) throw new Error('Selecciona un chat antes de adjuntar archivos.');
   if (isChatInteractionBlocked()) throw new Error(chatBlockNoticeText() || 'No puedes adjuntar archivos en este chat.');
   const uploadMode = resolveAttachmentUploadModeBeforeUpload();
+  const fallback = getInlineMediaFallbackConfig();
+  const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400), {
+    fileMaxBytes: uploadMode === 'media-firmada-inline' && fallback.maxBytes ? fallback.maxBytes : R2_GENERIC_FILE_MAX_BYTES
+  });
+  if (uploadMode === 'media-firmada-inline') {
+    return useInlineFallbackForPreparedAttachment(prepared, 'R2 no está configurado');
+  }
+  try {
+    showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
+    const attachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared));
+    if (!attachment) throw new Error('La subida segura no devolvió un adjunto válido.');
+    showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
+    return attachment;
+  } catch (error) {
+    if (!isR2NotConfiguredUploadError(error)) throw error;
+    return useInlineFallbackForPreparedAttachment(prepared, 'Cloudflare R2 no está configurado en este backend');
+  }
+}
+
+async function uploadAttachmentForActiveChat(file) {
   state.attachmentUploading = true;
   state.pendingAttachment = null;
+  state.pendingAttachments = [];
   updateAttachmentPreview();
   updateComposerControls();
   try {
-    const fallback = getInlineMediaFallbackConfig();
-    const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400), {
-      fileMaxBytes: uploadMode === 'media-firmada-inline' && fallback.maxBytes ? fallback.maxBytes : R2_GENERIC_FILE_MAX_BYTES
-    });
-    if (uploadMode === 'media-firmada-inline') {
-      await useInlineFallbackForPreparedAttachment(prepared, 'R2 no está configurado');
-      return;
-    }
-    try {
-      showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
-      state.pendingAttachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared));
-      showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
-    } catch (error) {
-      if (!isR2NotConfiguredUploadError(error)) throw error;
-      await useInlineFallbackForPreparedAttachment(prepared, 'Cloudflare R2 no está configurado en este backend');
+    state.pendingAttachment = await createAttachmentForActiveChat(file);
+  } finally {
+    state.attachmentUploading = false;
+    updateAttachmentPreview();
+    updateComposerControls();
+  }
+}
+
+async function uploadImageAttachmentsForActiveChat(files = []) {
+  const selectedFiles = Array.from(files || []).filter(Boolean);
+  if (!selectedFiles.length) return;
+  if (selectedFiles.length > MAX_PENDING_IMAGE_ATTACHMENTS) {
+    throw new Error(`Puedes preparar hasta ${MAX_PENDING_IMAGE_ATTACHMENTS} imágenes por envío.`);
+  }
+  if (selectedFiles.some((file) => !isImageAttachmentFile(file))) {
+    throw new Error('La selección múltiple está disponible solo para imágenes. Para otros archivos, adjunta uno a la vez.');
+  }
+  state.attachmentUploading = true;
+  state.pendingAttachment = null;
+  state.pendingAttachments = [];
+  updateAttachmentPreview();
+  updateComposerControls();
+  try {
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      showTemporaryDraftStatus(`Preparando imagen ${index + 1} de ${selectedFiles.length}...`, 1600);
+      const attachment = await createAttachmentForActiveChat(selectedFiles[index]);
+      state.pendingAttachments.push(attachment);
+      updateAttachmentPreview();
     }
   } finally {
     state.attachmentUploading = false;
@@ -3344,12 +3425,12 @@ function updateComposerControls() {
   const hasChat = Boolean(state.activeChatId);
   const blocked = isChatInteractionBlocked();
   els.messageInput.placeholder = blocked ? 'Contacto bloqueado' : (state.editingMessage?.messageId ? 'Edita tu mensaje' : 'Escribe un mensaje o /ayuda');
-  const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
+  const hasAttachment = hasPendingComposerAttachment();
   const textLength = String(els.messageInput?.value || '').trim().length;
   const hasAnyText = textLength > 0;
   const hasSendableText = textLength >= 1;
   const hasText = hasSendableText;
-  const canRecordAudio = hasChat && !blocked && !state.editingMessage?.messageId && !state.attachmentUploading && !state.audioSending && !hasAnyText && !hasAttachment;
+  const canRecordAudio = hasChat && !blocked && !state.editingMessage?.messageId && !state.attachmentUploading && !state.attachmentBatchSending && !state.audioSending && !hasAnyText && !hasAttachment;
   const sendIcon = state.audioSending
     ? 'loading'
     : (state.audioRecording
@@ -3373,8 +3454,8 @@ function updateComposerControls() {
   els.btnSend.classList.toggle('ce-send-circle--waiting-text', sendIcon === 'waitingText');
   els.btnSend.setAttribute('title', sendActionLabel);
   els.btnSend.setAttribute('aria-label', sendActionLabel);
-  els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || state.audioSending || (!state.editingMessage?.messageId && !hasText && !hasAttachment && !canRecordAudio && !state.audioRecording);
-  if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading || state.audioRecording || state.audioSending;
+  els.btnSend.disabled = !hasChat || blocked || state.attachmentUploading || state.attachmentBatchSending || state.audioSending || (!state.editingMessage?.messageId && !hasText && !hasAttachment && !canRecordAudio && !state.audioRecording);
+  if (els.btnAttachFile) els.btnAttachFile.disabled = !hasChat || blocked || Boolean(state.editingMessage?.messageId) || state.attachmentUploading || state.attachmentBatchSending || state.audioRecording || state.audioSending;
   if (els.btnQuickReplies) els.btnQuickReplies.disabled = !hasChat || blocked || state.audioRecording || state.audioSending;
   if (els.iconInsertPickerPanel && state.audioRecording) {
     state.iconInsertPanelOpen = false;
@@ -6225,17 +6306,46 @@ async function sendMessage(text, { silent = false, ephemeralSeconds = selectedEp
   }
 }
 
+async function sendComposerMessageWithPendingAttachments(text, { silent = false, ephemeralSeconds = selectedEphemeralSeconds() } = {}) {
+  const attachments = pendingComposerAttachments();
+  if (attachments.length <= 1) {
+    const attachment = attachments[0] || null;
+    await sendMessage(text, { silent, ephemeralSeconds, attachment });
+    if (attachment) clearPendingAttachment(attachment.attachmentId);
+    return;
+  }
+  let textConsumed = false;
+  state.attachmentBatchSending = true;
+  updateComposerControls();
+  try {
+    for (let index = 0; index < attachments.length; index += 1) {
+      const attachment = attachments[index];
+      try {
+        await sendMessage(index === 0 ? text : '', { silent, ephemeralSeconds, attachment });
+        if (index === 0 && String(text || '').trim()) textConsumed = true;
+        clearPendingAttachment(attachment.attachmentId);
+      } catch (error) {
+        if (textConsumed && error && typeof error === 'object') error.composerTextAlreadySent = true;
+        throw error;
+      }
+    }
+  } finally {
+    state.attachmentBatchSending = false;
+    updateComposerControls();
+  }
+}
+
 async function sendSilentCurrentMessage() {
   if (!state.activeChatId || state.editingMessage?.messageId) return;
   const text = String(els.messageInput?.value || '').trim();
   if (state.voiceDictating) stopVoiceDictation({ announce: false });
-  if (!text && !normalizeAttachmentClient(state.pendingAttachment)) {
+  if (!text && !hasPendingComposerAttachment()) {
     els.messageInput?.focus();
     return;
   }
   els.btnSilentSend && (els.btnSilentSend.disabled = true);
   try {
-    await sendMessage(text, { silent: true, ephemeralSeconds: selectedEphemeralSeconds() });
+    await sendComposerMessageWithPendingAttachments(text, { silent: true, ephemeralSeconds: selectedEphemeralSeconds() });
     if (els.messageInput) els.messageInput.value = '';
     clearPendingAttachment();
     await sendTyping(false);
@@ -9172,24 +9282,41 @@ function bindEvents() {
     closeSendModeMenu();
   });
   els.btnAttachFile?.addEventListener('click', () => {
-    if (state.attachmentUploading) return;
+    if (state.attachmentUploading || state.attachmentBatchSending) return;
     closeComposerTransientPanels();
     els.fileInput?.click();
   });
   els.fileInput?.addEventListener('change', () => {
-    const file = els.fileInput?.files?.[0] || null;
-    if (!file) return;
-    uploadAttachmentForActiveChat(file).catch((error) => {
+    const files = Array.from(els.fileInput?.files || []);
+    if (!files.length) return;
+    const uploadPromise = files.every((file) => isImageAttachmentFile(file))
+      ? uploadImageAttachmentsForActiveChat(files)
+      : (files.length === 1
+        ? uploadAttachmentForActiveChat(files[0])
+        : Promise.reject(new Error('La selección múltiple está disponible solo para imágenes. Para otros archivos, adjunta uno a la vez.')));
+    uploadPromise.catch((error) => {
       clearPendingAttachment();
       alert(error.message || 'No se pudo adjuntar el archivo.');
     });
   });
   els.attachmentPreview?.addEventListener('click', (event) => {
+    const imageButton = event.target.closest('[data-open-pending-image-viewer]');
+    if (imageButton && els.attachmentPreview.contains(imageButton)) {
+      event.preventDefault();
+      openImageViewer(imageButton.dataset.imageUrl || '', imageButton.dataset.imageAlt || 'Imagen adjunta');
+      return;
+    }
+    const clearAllButton = event.target.closest('[data-clear-all-attachments]');
+    if (clearAllButton && els.attachmentPreview.contains(clearAllButton)) {
+      event.preventDefault();
+      clearPendingAttachment();
+      els.messageInput?.focus();
+      return;
+    }
     const clearButton = event.target.closest('[data-clear-attachment]');
     if (!clearButton || !els.attachmentPreview.contains(clearButton)) return;
     event.preventDefault();
-    clearPendingAttachment();
-    updateComposerControls();
+    clearPendingAttachment(clearButton.dataset.clearAttachment || '');
     els.messageInput?.focus();
   });
   els.btnCreatePoll?.addEventListener('click', () => openPollModal());
@@ -9542,9 +9669,10 @@ function bindEvents() {
   els.tabContacts.addEventListener('click', showContactsTab);
   els.messageForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (state.attachmentBatchSending) return;
     const emojiKeyboardWasOpen = Boolean(state.iconInsertPanelOpen || els.messageForm?.classList.contains('ce-compose--emoji-keyboard') || document.body?.classList.contains('ce-emoji-keyboard-open'));
     const text = els.messageInput.value.trim();
-    const hasAttachment = Boolean(normalizeAttachmentClient(state.pendingAttachment));
+    const hasAttachment = hasPendingComposerAttachment();
     if (state.voiceDictating) stopVoiceDictation({ announce: false });
     if (!text && !hasAttachment && !state.editingMessage?.messageId) {
       closeComposerTransientPanels();
@@ -9580,13 +9708,13 @@ function bindEvents() {
         await scheduleCurrentMessage();
       } else {
         const silent = normalizeSendMode(state.sendMode) === 'silent';
-        await sendMessage(text, { silent });
+        await sendComposerMessageWithPendingAttachments(text, { silent });
         els.messageInput.value = '';
         clearPendingAttachment();
       }
       await sendTyping(false);
     } catch (error) {
-      els.messageInput.value = text;
+      els.messageInput.value = error?.composerTextAlreadySent ? '' : text;
       const fallback = state.editingMessage?.messageId
         ? 'No se pudo guardar la edición. Tu texto se conservó para reintentar.'
         : 'No se pudo enviar el mensaje. Tu texto se conservó para reintentar.';

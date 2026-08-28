@@ -131,6 +131,7 @@
           <svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v12.17l5.59-5.58L20 12l-8 8-8-8 1.41-1.41L11 16.17V4Z"/></svg>
         </button>
         <form class="ce-compose" id="messageForm">
+          <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite" aria-label="Vista previa de adjuntos"></div>
           <div class="ce-compose__top" aria-label="Opciones del mensaje">
             <div class="ce-compose__status-stack">
               <div class="ce-typing" id="typingStatus"></div>
@@ -139,10 +140,9 @@
               <div class="ce-quick-replies hidden" id="quickRepliesPanel" aria-live="polite"></div>
               <div class="ce-slash-panel hidden" id="slashCommandsPanel" aria-live="polite"></div>
               <div class="ce-icon-insert-panel hidden" id="iconInsertPickerPanel" aria-live="polite"></div>
-              <div class="ce-attachment-preview hidden" id="attachmentPreview" aria-live="polite"></div>
             </div>
             <div class="ce-compose__toolstrip">
-              <input id="fileInput" class="ce-file-input" type="file" hidden />
+              <input id="fileInput" class="ce-file-input" type="file" multiple hidden />
               <button class="ce-icon-btn ce-icon-btn--attach" id="btnAttachFile" type="button" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.7 6.3a4.25 4.25 0 0 0-6.01 0L5.4 12.59a3 3 0 1 0 4.24 4.24l7.07-7.07-1.41-1.41-7.07 7.07a1 1 0 1 1-1.41-1.41l6.29-6.3a2.25 2.25 0 0 1 3.18 3.18l-7.07 7.08A4.75 4.75 0 0 1 2.5 11.25l6.72-6.72 1.42 1.42-6.72 6.71a2.75 2.75 0 0 0 3.89 3.89l7.07-7.07 1.42 1.41-7.08 7.08a4.75 4.75 0 0 1-6.71-6.72l6.72-6.72a6.25 6.25 0 1 1 8.84 8.84l-6.37 6.36-1.41-1.41 6.36-6.36a4.25 4.25 0 0 0 0-6.01Z"/></svg></button>
               <button class="ce-icon-btn ce-icon-btn--quick" id="btnQuickReplies" type="button" title="Respuestas rápidas" aria-label="Abrir respuestas rápidas" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></button>
               <button class="ce-icon-btn ce-icon-btn--smart-reply" id="btnSmartReplySuggestions" type="button" title="Sugerir respuesta inteligente" aria-label="Sugerir respuesta inteligente" disabled><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z"/></svg></button>
