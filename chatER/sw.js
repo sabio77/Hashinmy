@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v93-attachment-progress-emoji-layout';
+const CACHE_NAME = 'chater-static-v94-navigation-history-selection';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',

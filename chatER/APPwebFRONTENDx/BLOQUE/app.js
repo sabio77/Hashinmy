@@ -227,6 +227,9 @@ const state = {
   quickRepliesLoading: false,
   quickReplies: [],
   highlightedMessageId: '',
+  selectedMessageIds: new Set(),
+  selectionDeleteModalOpen: false,
+  selectionDeleteBusy: false,
   unreadMarkerByChatId: new Map(),
   replyToMessage: null,
   editingMessage: null,
@@ -313,6 +316,16 @@ const state = {
 };
 
 let scrollBottomUpdateFrame = 0;
+let messageSelectionLongPressTimer = 0;
+let messageSelectionPointer = null;
+let messageSelectionIgnoreClickUntil = 0;
+let appNavigationHistoryInitialized = false;
+let appNavigationHistoryDepth = 0;
+let appNavigationHistoryPrimarySignature = '';
+let appNavigationHistorySyncFrame = 0;
+let appNavigationHistoryHandlingPop = false;
+let appNavigationHistoryReconcilingTo = null;
+let appNavigationHistoryObserver = null;
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -3375,13 +3388,13 @@ function renderMessageActions(message = {}, mine = false) {
   if (isDeletedMessage(message)) return '';
   const isPoll = message.type === 'poll' || Boolean(message.poll);
   const actionItems = [
+    { id: 'reply', html: renderReplyButton(message) },
+    { id: 'copy', html: renderCopyButton(message) },
+    { id: 'forward', html: renderForwardButton(message) },
     { id: 'star', html: renderStarButton(message) },
     { id: 'pin', html: renderPinMessageButton(message) },
-    { id: 'reply', html: renderReplyButton(message) },
-    { id: 'forward', html: renderForwardButton(message) },
     { id: 'reminder', html: renderReminderButton(message) },
     { id: 'link', html: renderMessageLinkButton(message) },
-    { id: 'copy', html: renderCopyButton(message) },
     ...(mine && !isPoll ? [{ id: 'edit', html: renderEditButton(message) }] : []),
     ...(mine ? [{ id: 'delete', html: renderDeleteButton(message) }] : [])
   ].filter((item) => item.html);
@@ -4071,9 +4084,9 @@ function ensureIconInsertPickerKeyboardPlacement() {
   if (!els.messageForm || !els.iconInsertPickerPanel) return;
   const topRow = els.messageForm.querySelector('.ce-compose__top');
   const bottomRow = els.messageForm.querySelector('.ce-compose__bottom');
-  const desktopLayout = Boolean(window.matchMedia?.('(min-width: 981px)')?.matches);
+  const mobileLayout = isMobileChatListPrimaryViewport();
 
-  if (desktopLayout && topRow) {
+  if (!mobileLayout && topRow) {
     if (els.iconInsertPickerPanel.nextElementSibling !== topRow) {
       els.messageForm.insertBefore(els.iconInsertPickerPanel, topRow);
     }
@@ -5268,6 +5281,9 @@ function clearActiveChatState() {
   state.scheduledLoading = false;
   state.schedulingMessage = false;
   state.highlightedMessageId = '';
+  state.selectedMessageIds = new Set();
+  state.selectionDeleteModalOpen = false;
+  state.selectionDeleteBusy = false;
   state.starredPanelOpen = false;
   state.starredMessages = [];
   state.chatSearchQuery = '';
@@ -6099,6 +6115,18 @@ function handleRealtimeEvent(payload = {}) {
     }
     shouldRender = true;
   }
+  if (payload.eventType === 'message.hidden' && Array.isArray(data.messageIds) && (data.chatId || payload.chatId)) {
+    const hiddenChatId = data.chatId || payload.chatId;
+    const hiddenIds = new Set(data.messageIds.filter(Boolean));
+    state.messagesByChat.set(hiddenChatId, (state.messagesByChat.get(hiddenChatId) || []).filter((message) => !hiddenIds.has(message.messageId)));
+    if (hiddenChatId === state.activeChatId) {
+      for (const messageId of hiddenIds) state.selectedMessageIds?.delete?.(messageId);
+      pruneMessageSelection();
+    }
+    state.starredMessages = state.starredMessages.filter((message) => !hiddenIds.has(message.messageId));
+    state.globalStarredMessages = state.globalStarredMessages.filter((item) => !(item.chat?.chatId === hiddenChatId && hiddenIds.has(item.message?.messageId)));
+    shouldRender = true;
+  }
   if ((['message.star.updated', 'message.deleted', 'message.expired'].includes(payload.eventType)) && messageForThisUser) {
     syncStarredPanelMessage(messageForThisUser);
     syncGlobalStarredMessage(messageForThisUser);
@@ -6265,6 +6293,7 @@ function renderAll() {
   renderPrivacyLockOverlay();
   updateNotificationPauseButton();
   updateResponsiveShellState();
+  scheduleAppNavigationHistorySync();
 }
 
 
@@ -6288,6 +6317,364 @@ function closeResponsiveChatPane() {
     const activeRow = els.chatList?.querySelector('[data-chat-id]');
     activeRow?.focus?.();
   });
+}
+
+function isAppNavigationElementOpen(element = null) {
+  return Boolean(element && !element.classList.contains('hidden'));
+}
+
+function currentAppNavigationLayers() {
+  if (!state.user || !els.chatScreen || els.chatScreen.classList.contains('hidden')) return [];
+  const layers = [];
+  const contactsVisible = isAppNavigationElementOpen(els.contactList) && els.chatList?.classList.contains('hidden');
+  const nonPrimaryList = contactsVisible
+    || state.chatListMode !== 'active'
+    || Boolean(state.archivedView)
+    || Boolean(normalizeChatLabelName(state.activeLabelFilter || ''));
+  if (nonPrimaryList) layers.push('list-mode');
+  if (state.activeChatId && activeChat()) layers.push('chat');
+  if (state.chatSearchOpen) layers.push('chat-search');
+  if (state.starredPanelOpen) layers.push('chat-starred');
+  if (isMessageSelectionActive()) layers.push('message-selection');
+  if (els.messages?.querySelector('.ce-msg.is-controls-open')) layers.push('message-controls');
+  if (state.quickRepliesOpen) layers.push('quick-replies');
+  if (state.slashCommandsOpen) layers.push('slash-commands');
+  if (state.iconInsertPanelOpen) layers.push('emoji-picker');
+  if (state.attachmentPickerOpen) layers.push('attachment-picker');
+  if (state.attachmentPickerOpen && state.attachmentPickerView === 'chater') layers.push('attachment-picker-chater');
+  if (state.sendModeMenuOpen) layers.push('send-mode');
+  if (state.selectionDeleteModalOpen) layers.push('selection-delete');
+  if (state.forwardingMessage?.messageId) layers.push('forward');
+  if (state.scheduleModalOpen) layers.push('schedule');
+  if (state.pollModalOpen) layers.push('poll');
+  if (state.privateNotesOpen) layers.push('private-notes');
+  if (state.remindersOpen) layers.push('reminders');
+  if (state.labelsModalOpen) layers.push('labels');
+  if (state.blockedContactsOpen) layers.push('blocked-contacts');
+  if (state.contactNicknameModalOpen) layers.push('contact-nickname');
+  if (state.globalSearchOpen) layers.push('global-search');
+  if (state.globalStarredOpen) layers.push('global-starred');
+  if (state.draftsOpen) layers.push('drafts');
+  if (state.linkLibraryOpen) layers.push('link-library');
+  if (state.chatBriefOpen) layers.push('chat-brief');
+  if (state.dateJumpOpen) layers.push('date-jump');
+  if (state.commandPaletteOpen) layers.push('command-palette');
+  if (state.privacyLock.mode !== 'closed' && !state.privacyLock.locked) layers.push('privacy-settings');
+  if (isAppNavigationElementOpen(els.qrModal)) layers.push('qr');
+  if (state.contactShareModalOpen) layers.push('contact-share');
+  const imageViewer = document.getElementById('ceImageViewer');
+  if (isAppNavigationElementOpen(imageViewer)) layers.push('image-viewer');
+  return layers;
+}
+
+function closeTopAppNavigationLayer(layer = '') {
+  switch (layer) {
+    case 'image-viewer':
+      closeImageViewer();
+      break;
+    case 'contact-share':
+      closeContactShareModal();
+      break;
+    case 'qr':
+      closeQrModal();
+      break;
+    case 'privacy-settings':
+      closePrivacyLockSettings();
+      break;
+    case 'command-palette':
+      closeCommandPalette();
+      break;
+    case 'date-jump':
+      closeDateJump();
+      break;
+    case 'chat-brief':
+      closeChatBrief();
+      break;
+    case 'link-library':
+      closeLinkLibrary();
+      break;
+    case 'drafts':
+      closeDraftsModal();
+      break;
+    case 'global-starred':
+      closeGlobalStarred();
+      break;
+    case 'global-search':
+      closeGlobalSearch();
+      break;
+    case 'contact-nickname':
+      closeContactNicknameModal();
+      break;
+    case 'blocked-contacts':
+      closeBlockedContactsModal();
+      break;
+    case 'labels':
+      closeLabelsModal();
+      break;
+    case 'reminders':
+      closeReminderModal();
+      break;
+    case 'private-notes':
+      closePrivateNotesModal();
+      break;
+    case 'poll':
+      closePollModal();
+      break;
+    case 'schedule':
+      closeScheduleModal();
+      break;
+    case 'forward':
+      closeForwardModal();
+      break;
+    case 'selection-delete':
+      closeSelectionDeleteModal();
+      break;
+    case 'send-mode':
+      closeSendModeMenu();
+      break;
+    case 'attachment-picker-chater':
+      state.attachmentPickerView = 'options';
+      renderAttachmentPicker();
+      break;
+    case 'attachment-picker':
+      closeAttachmentPicker();
+      break;
+    case 'emoji-picker':
+      closeIconInsertPicker();
+      break;
+    case 'slash-commands':
+      state.slashCommandsOpen = false;
+      renderSlashCommandsPanel();
+      break;
+    case 'quick-replies':
+      closeQuickRepliesPanel();
+      break;
+    case 'message-controls':
+      closeOpenMessageControls();
+      break;
+    case 'message-selection':
+      clearMessageSelection();
+      break;
+    case 'chat-starred':
+      state.starredPanelOpen = false;
+      state.starredMessages = [];
+      state.starredLoading = false;
+      renderSearchPanel();
+      break;
+    case 'chat-search':
+      setChatSearchOpen(false);
+      break;
+    case 'chat':
+      closeResponsiveChatPane();
+      break;
+    case 'list-mode':
+      state.activeLabelFilter = '';
+      showChatListMode('active');
+      renderAll();
+      loadChats({ includeArchived: false, unreadOnly: false, mode: 'active' }).catch(() => null);
+      break;
+    default:
+      break;
+  }
+}
+
+function captureAppNavigationPrimaryView() {
+  const contactsVisible = isAppNavigationElementOpen(els.contactList) && els.chatList?.classList.contains('hidden');
+  const listMode = contactsVisible ? 'contacts' : normalizeChatListMode(state.chatListMode);
+  return {
+    listMode,
+    activeLabelFilter: normalizeChatLabelName(state.activeLabelFilter || ''),
+    activeChatId: String(state.activeChatId || '').trim()
+  };
+}
+
+function appNavigationPrimarySignature(view = captureAppNavigationPrimaryView()) {
+  return JSON.stringify({
+    listMode: String(view?.listMode || 'active'),
+    activeLabelFilter: normalizeChatLabelName(view?.activeLabelFilter || ''),
+    activeChatId: String(view?.activeChatId || '').trim()
+  });
+}
+
+function buildAppNavigationHistoryState(depth = currentAppNavigationLayers().length, view = captureAppNavigationPrimaryView()) {
+  const currentState = history.state && typeof history.state === 'object' ? history.state : {};
+  return {
+    ...currentState,
+    __ceAppNavigation: true,
+    ceNavigationDepth: Math.max(0, Number(depth) || 0),
+    ceNavigationPrimaryView: view,
+    ceNavigationPrimarySignature: appNavigationPrimarySignature(view)
+  };
+}
+
+async function restoreAppNavigationPrimaryView(view = null) {
+  if (!view || typeof view !== 'object' || !state.user) return;
+  const currentView = captureAppNavigationPrimaryView();
+  const desiredChatId = String(view.activeChatId || '').trim();
+  const desiredFilter = normalizeChatLabelName(view.activeLabelFilter || '');
+  const desiredListMode = String(view.listMode || 'active') === 'contacts'
+    ? 'contacts'
+    : normalizeChatListMode(view.listMode || 'active');
+  const listModeChanged = String(currentView.listMode || 'active') !== desiredListMode;
+
+  state.activeLabelFilter = desiredFilter;
+  if (desiredListMode === 'contacts') {
+    showContactsTab();
+  } else {
+    showChatListMode(desiredListMode);
+    if (listModeChanged) {
+      await loadChats({
+        includeArchived: desiredListMode === 'archived',
+        unreadOnly: desiredListMode === 'unread',
+        mode: desiredListMode
+      }).catch(() => null);
+      showChatListMode(desiredListMode);
+    }
+  }
+
+  if (desiredChatId) {
+    if (state.activeChatId !== desiredChatId) {
+      if (!state.chats.some((chat) => chat.chatId === desiredChatId)) {
+        await loadChats({
+          includeArchived: desiredListMode === 'archived',
+          unreadOnly: desiredListMode === 'unread',
+          mode: desiredListMode === 'contacts' ? 'active' : desiredListMode
+        }).catch(() => null);
+        if (desiredListMode === 'contacts') showContactsTab();
+      }
+      if (state.chats.some((chat) => chat.chatId === desiredChatId)) {
+        await selectChat(desiredChatId).catch(() => null);
+      }
+    }
+  } else if (state.activeChatId) {
+    closeResponsiveChatPane();
+  }
+
+  if (!desiredChatId) {
+    renderAll();
+    if (desiredListMode === 'contacts') showContactsTab();
+    else showChatListMode(desiredListMode);
+  }
+}
+
+function scheduleAppNavigationHistorySync() {
+  if (!appNavigationHistoryInitialized || appNavigationHistoryHandlingPop || appNavigationHistoryReconcilingTo != null) return;
+  if (appNavigationHistorySyncFrame) return;
+  appNavigationHistorySyncFrame = 1;
+  const run = () => {
+    appNavigationHistorySyncFrame = 0;
+    syncAppNavigationHistory();
+  };
+  if (typeof window.queueMicrotask === 'function') window.queueMicrotask(run);
+  else Promise.resolve().then(run);
+}
+
+function syncAppNavigationHistory() {
+  if (!appNavigationHistoryInitialized || appNavigationHistoryHandlingPop || appNavigationHistoryReconcilingTo != null) return;
+  const targetDepth = currentAppNavigationLayers().length;
+  const targetView = captureAppNavigationPrimaryView();
+  const targetPrimarySignature = appNavigationPrimarySignature(targetView);
+
+  if (targetDepth === 0 && appNavigationHistoryDepth === 0) {
+    const currentManaged = Boolean(history.state?.__ceAppNavigation);
+    const currentDepth = Math.max(0, Number(history.state?.ceNavigationDepth) || 0);
+    const currentSignature = String(history.state?.ceNavigationPrimarySignature || '');
+    if (!currentManaged || currentDepth !== 0 || currentSignature !== targetPrimarySignature) {
+      history.replaceState(buildAppNavigationHistoryState(0, targetView), '', window.location.href);
+    }
+    appNavigationHistoryDepth = 0;
+    appNavigationHistoryPrimarySignature = targetPrimarySignature;
+    return;
+  }
+
+  if (targetDepth > appNavigationHistoryDepth) {
+    for (let depth = appNavigationHistoryDepth + 1; depth <= targetDepth; depth += 1) {
+      history.pushState(buildAppNavigationHistoryState(depth, targetView), '', window.location.href);
+    }
+    appNavigationHistoryDepth = targetDepth;
+    appNavigationHistoryPrimarySignature = targetPrimarySignature;
+    return;
+  }
+
+  if (targetDepth < appNavigationHistoryDepth) {
+    appNavigationHistoryReconcilingTo = targetDepth;
+    appNavigationHistoryDepth = targetDepth;
+    appNavigationHistoryPrimarySignature = targetPrimarySignature;
+    history.back();
+    return;
+  }
+
+  if (targetPrimarySignature !== appNavigationHistoryPrimarySignature) {
+    history.pushState(buildAppNavigationHistoryState(targetDepth, targetView), '', window.location.href);
+    appNavigationHistoryPrimarySignature = targetPrimarySignature;
+  }
+}
+
+async function handleAppNavigationPopState(event) {
+  if (!appNavigationHistoryInitialized) return;
+  const managed = Boolean(event.state?.__ceAppNavigation);
+  const targetDepth = managed ? Math.max(0, Number(event.state?.ceNavigationDepth) || 0) : 0;
+  const targetView = managed && event.state?.ceNavigationPrimaryView && typeof event.state.ceNavigationPrimaryView === 'object'
+    ? event.state.ceNavigationPrimaryView
+    : null;
+  const targetPrimarySignature = managed
+    ? String(event.state?.ceNavigationPrimarySignature || appNavigationPrimarySignature(targetView || captureAppNavigationPrimaryView()))
+    : '';
+
+  if (appNavigationHistoryReconcilingTo != null) {
+    const desiredDepth = appNavigationHistoryReconcilingTo;
+    if (managed && targetDepth > desiredDepth) {
+      history.back();
+      return;
+    }
+    appNavigationHistoryDepth = targetDepth;
+    appNavigationHistoryPrimarySignature = targetPrimarySignature || appNavigationPrimarySignature();
+    appNavigationHistoryReconcilingTo = null;
+    scheduleAppNavigationHistorySync();
+    return;
+  }
+
+  if (!managed) {
+    appNavigationHistoryDepth = 0;
+    appNavigationHistoryPrimarySignature = '';
+    return;
+  }
+
+  appNavigationHistoryHandlingPop = true;
+  appNavigationHistoryDepth = targetDepth;
+  appNavigationHistoryPrimarySignature = targetPrimarySignature;
+  try {
+    let layers = currentAppNavigationLayers();
+    let guard = 40;
+    while (layers.length > targetDepth && guard > 0) {
+      closeTopAppNavigationLayer(layers[layers.length - 1]);
+      const nextLayers = currentAppNavigationLayers();
+      if (nextLayers.length >= layers.length) break;
+      layers = nextLayers;
+      guard -= 1;
+    }
+    await restoreAppNavigationPrimaryView(targetView);
+  } finally {
+    appNavigationHistoryHandlingPop = false;
+  }
+  scheduleAppNavigationHistorySync();
+}
+
+function installAppNavigationHistory() {
+  if (appNavigationHistoryInitialized) return;
+  const view = captureAppNavigationPrimaryView();
+  appNavigationHistoryPrimarySignature = appNavigationPrimarySignature(view);
+  history.replaceState(buildAppNavigationHistoryState(0, view), '', window.location.href);
+  appNavigationHistoryDepth = 0;
+  appNavigationHistoryInitialized = true;
+  window.addEventListener('popstate', (event) => {
+    handleAppNavigationPopState(event).catch(() => null);
+  });
+  if ('MutationObserver' in window && document.body) {
+    appNavigationHistoryObserver = new MutationObserver(() => scheduleAppNavigationHistorySync());
+    appNavigationHistoryObserver.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+  }
+  scheduleAppNavigationHistorySync();
 }
 
 function getVisibleChats() {
@@ -6409,6 +6796,205 @@ function renderPinnedMessagesStrip(chat = {}, messages = []) {
   </div>`;
 }
 
+function activeSelectedMessageIds() {
+  if (!(state.selectedMessageIds instanceof Set)) state.selectedMessageIds = new Set();
+  return [...state.selectedMessageIds].filter(Boolean);
+}
+
+function selectedMessagesForActiveChat() {
+  const selected = new Set(activeSelectedMessageIds());
+  return (state.messagesByChat.get(state.activeChatId) || [])
+    .filter((message) => message?.messageId && selected.has(message.messageId) && !isDeletedMessage(message));
+}
+
+function isMessageSelectionActive() {
+  return activeSelectedMessageIds().length > 0;
+}
+
+function pruneMessageSelection() {
+  if (!(state.selectedMessageIds instanceof Set) || !state.selectedMessageIds.size) return 0;
+  const available = new Set((state.messagesByChat.get(state.activeChatId) || [])
+    .filter((message) => message?.messageId && !isDeletedMessage(message))
+    .map((message) => message.messageId));
+  for (const messageId of [...state.selectedMessageIds]) {
+    if (!available.has(messageId)) state.selectedMessageIds.delete(messageId);
+  }
+  if (!state.selectedMessageIds.size) {
+    state.selectionDeleteModalOpen = false;
+    state.selectionDeleteBusy = false;
+  }
+  return state.selectedMessageIds.size;
+}
+
+function clearMessageSelection({ render = true } = {}) {
+  state.selectedMessageIds = new Set();
+  state.selectionDeleteModalOpen = false;
+  state.selectionDeleteBusy = false;
+  renderSelectionDeleteModal();
+  if (render) renderAll();
+}
+
+function toggleMessageSelection(messageId = '', { forceSelected = false } = {}) {
+  const message = findActiveMessage(messageId);
+  if (!message || isDeletedMessage(message)) return;
+  if (!(state.selectedMessageIds instanceof Set)) state.selectedMessageIds = new Set();
+  if (forceSelected) state.selectedMessageIds.add(message.messageId);
+  else if (state.selectedMessageIds.has(message.messageId)) state.selectedMessageIds.delete(message.messageId);
+  else state.selectedMessageIds.add(message.messageId);
+  state.selectionDeleteModalOpen = false;
+  closeOpenMessageControls();
+  renderAll();
+}
+
+function copyTextForSelectedMessage(message = {}) {
+  const attachment = normalizeAttachmentClient(message.attachment || null);
+  if (attachment?.kind === 'image') return 'imagen';
+  if (attachment && String(attachment.mimeType || '').toLowerCase().startsWith('audio/')) return 'audio';
+  if (attachment && !String(message.text || '').trim()) return 'archivo';
+  return String(message.text || '').trim() || (attachment ? 'archivo' : '');
+}
+
+async function copySelectedMessages() {
+  const messages = selectedMessagesForActiveChat();
+  if (!messages.length) return clearMessageSelection();
+  const value = messages.map(copyTextForSelectedMessage).filter(Boolean).join('\n');
+  if (!value) return;
+  await copyTextToClipboard(value);
+  clearMessageSelection();
+  showTemporaryDraftStatus(messages.length === 1 ? 'Mensaje copiado al portapapeles.' : `${messages.length} mensajes copiados al portapapeles.`);
+}
+
+function canDeleteSelectionForEveryone() {
+  const messages = selectedMessagesForActiveChat();
+  return Boolean(messages.length && messages.every((message) => message.senderUserId === state.user?.userId));
+}
+
+function ensureSelectionDeleteModal() {
+  let modal = document.getElementById('ceSelectionDeleteModal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'ceSelectionDeleteModal';
+  modal.className = 'ce-modal ce-selection-delete-modal hidden';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Eliminar mensajes seleccionados');
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal || event.target.closest('[data-close-selection-delete]')) {
+      closeSelectionDeleteModal();
+      return;
+    }
+    const option = event.target.closest('[data-delete-selected-scope]');
+    if (!option || option.disabled) return;
+    deleteSelectedMessages(option.dataset.deleteSelectedScope || 'me').catch((error) => alert(error.message || 'No se pudieron eliminar los mensajes seleccionados.'));
+  });
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function renderSelectionDeleteModal() {
+  const modal = ensureSelectionDeleteModal();
+  const messages = selectedMessagesForActiveChat();
+  if (!state.selectionDeleteModalOpen || !messages.length) {
+    modal.classList.add('hidden');
+    modal.innerHTML = '';
+    return;
+  }
+  const canEveryone = canDeleteSelectionForEveryone();
+  const busy = Boolean(state.selectionDeleteBusy);
+  modal.classList.remove('hidden');
+  modal.innerHTML = `<div class="ce-modal__card ce-selection-delete-card">
+    <button class="ce-modal__close" type="button" data-close-selection-delete="1" aria-label="Cerrar">${uiIcon('close')}</button>
+    <div class="ce-selection-delete-card__head"><strong>Eliminar ${messages.length === 1 ? 'mensaje' : `${messages.length} mensajes`}</strong><span>Elige dónde quieres eliminar ${messages.length === 1 ? 'este mensaje' : 'estos mensajes'}.</span></div>
+    <div class="ce-selection-delete-options">
+      <button type="button" data-delete-selected-scope="me" ${busy ? 'disabled' : ''}><span class="ce-selection-delete-option__icon">${uiIcon('trash')}</span><strong>Para mí</strong><small>Se elimina solo de tu chat.</small></button>
+      <button type="button" data-delete-selected-scope="everyone" ${busy || !canEveryone ? 'disabled' : ''}><span class="ce-selection-delete-option__icon">${uiIcon('trash')}</span><strong>Para todos</strong><small>${canEveryone ? 'Se elimina para todos los participantes.' : 'Disponible solo si todos los seleccionados fueron enviados por ti.'}</small></button>
+    </div>
+  </div>`;
+}
+
+function openSelectionDeleteModal() {
+  if (!selectedMessagesForActiveChat().length) return;
+  state.selectionDeleteModalOpen = true;
+  state.selectionDeleteBusy = false;
+  renderSelectionDeleteModal();
+}
+
+function closeSelectionDeleteModal() {
+  state.selectionDeleteModalOpen = false;
+  state.selectionDeleteBusy = false;
+  renderSelectionDeleteModal();
+}
+
+async function deleteSelectedMessages(scope = 'me') {
+  const messages = selectedMessagesForActiveChat();
+  if (!messages.length || !state.activeChatId) return;
+  const normalizedScope = scope === 'everyone' ? 'everyone' : 'me';
+  if (normalizedScope === 'everyone' && !canDeleteSelectionForEveryone()) {
+    throw new Error('Para todos solo está disponible cuando todos los mensajes seleccionados fueron enviados por ti.');
+  }
+  state.selectionDeleteBusy = true;
+  renderSelectionDeleteModal();
+  try {
+    const messageIds = messages.map((message) => message.messageId);
+    const data = await post('/api/chats/delete', { chatId: state.activeChatId, messageIds, scope: normalizedScope });
+    if (data.chat?.chatId) upsertChat(data.chat);
+    if (normalizedScope === 'me') {
+      const hidden = new Set(Array.isArray(data.messageIds) ? data.messageIds : messageIds);
+      state.messagesByChat.set(state.activeChatId, (state.messagesByChat.get(state.activeChatId) || []).filter((message) => !hidden.has(message.messageId)));
+      state.starredMessages = state.starredMessages.filter((message) => !hidden.has(message.messageId));
+      state.globalStarredMessages = state.globalStarredMessages.filter((item) => !(item.chat?.chatId === state.activeChatId && hidden.has(item.message?.messageId)));
+    } else {
+      for (const message of Array.isArray(data.messages) ? data.messages : []) upsertMessage(message);
+    }
+    const count = messageIds.length;
+    clearMessageSelection({ render: false });
+    renderAll();
+    showTemporaryDraftStatus(normalizedScope === 'me'
+      ? `${count} ${count === 1 ? 'mensaje eliminado' : 'mensajes eliminados'} para ti.`
+      : `${count} ${count === 1 ? 'mensaje eliminado' : 'mensajes eliminados'} para todos.`);
+  } finally {
+    state.selectionDeleteBusy = false;
+    renderSelectionDeleteModal();
+  }
+}
+
+function cancelMessageSelectionLongPress() {
+  if (messageSelectionLongPressTimer) window.clearTimeout(messageSelectionLongPressTimer);
+  messageSelectionLongPressTimer = 0;
+  messageSelectionPointer = null;
+}
+
+function bindMessageLongPressSelection() {
+  if (!els.messages) return;
+  els.messages.addEventListener('pointerdown', (event) => {
+    if (event.button != null && event.button !== 0) return;
+    if (isMessageSelectionActive()) return;
+    if (event.target.closest('button, a, input, textarea, select, [role="button"]')) return;
+    const messageEl = event.target.closest('.ce-msg[data-message-id]');
+    if (!messageEl || !els.messages.contains(messageEl) || messageEl.classList.contains('is-deleted')) return;
+    cancelMessageSelectionLongPress();
+    messageSelectionPointer = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, messageId: messageEl.dataset.messageId || '' };
+    messageSelectionLongPressTimer = window.setTimeout(() => {
+      const pointer = messageSelectionPointer;
+      messageSelectionLongPressTimer = 0;
+      if (!pointer?.messageId) return;
+      messageSelectionIgnoreClickUntil = Date.now() + 650;
+      toggleMessageSelection(pointer.messageId, { forceSelected: true });
+      try { navigator.vibrate?.(18); } catch {}
+    }, 480);
+  }, { passive: true });
+  els.messages.addEventListener('pointermove', (event) => {
+    const pointer = messageSelectionPointer;
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 10) cancelMessageSelectionLongPress();
+  }, { passive: true });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => els.messages.addEventListener(eventName, cancelMessageSelectionLongPress, { passive: true }));
+  els.messages.addEventListener('contextmenu', (event) => {
+    const messageEl = event.target.closest('.ce-msg[data-message-id]');
+    if (messageEl && (isMessageSelectionActive() || Date.now() < messageSelectionIgnoreClickUntil)) event.preventDefault();
+  });
+}
+
 async function copyMessageText(messageId = '') {
   const message = findActiveMessage(messageId);
   if (!message || isDeletedMessage(message)) return;
@@ -6504,6 +7090,9 @@ async function exportActiveChat() {
 function renderActiveChat() {
   const chat = activeChat();
   if (!chat) {
+    state.selectedMessageIds = new Set();
+    state.selectionDeleteModalOpen = false;
+    renderSelectionDeleteModal();
     setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, '<div class="ce-empty-title">Selecciona un chat</div>');
     state.chatSearchOpen = false;
     renderChatSearchVisibility();
@@ -6557,8 +7146,18 @@ function renderActiveChat() {
   const nicknameLabel = chat.other?.nickname ? 'Editar apodo privado del contacto' : 'Agregar apodo privado al contacto';
   const nicknameButtonHtml = isSelfChat(chat) ? '' : `
       <button class="ce-icon-btn ce-icon-btn--nickname${chat.other?.nickname ? ' active' : ''}" type="button" data-edit-active-contact-nickname="1" title="${escapeHtml(nicknameLabel)}" aria-label="${escapeHtml(nicknameLabel)}">${uiIcon('nickname')}</button>`;
+  pruneMessageSelection();
+  const selectedCount = activeSelectedMessageIds().length;
   const searchOpen = Boolean(state.activeChatId && state.chatSearchOpen);
-  const activeChatHeaderHtml = `
+  const activeChatHeaderHtml = selectedCount ? `
+    <button class="ce-icon-btn ce-mobile-back" type="button" data-clear-message-selection="1" title="Cancelar selección" aria-label="Cancelar selección">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/></svg>
+    </button>
+    <div class="ce-chat__identity ce-chat__identity--selection"><div><strong>${selectedCount} ${selectedCount === 1 ? 'seleccionado' : 'seleccionados'}</strong><span>Toca otros mensajes para agregarlos o quitarlos</span></div></div>
+    <div class="ce-header-actions ce-chat-tools ce-selection-toolbar" aria-label="Acciones de selección">
+      <button class="ce-icon-btn ce-selection-copy" type="button" data-copy-selected-messages="1" title="Copiar selección" aria-label="Copiar mensajes seleccionados">${uiIcon('copy')}</button>
+      <button class="ce-icon-btn ce-selection-delete" type="button" data-delete-selected-messages="1" title="Eliminar selección" aria-label="Eliminar mensajes seleccionados">${uiIcon('trash')}</button>
+    </div>` : `
     <button class="ce-icon-btn ce-mobile-back" type="button" data-close-mobile-chat="1" title="Volver a conversaciones" aria-label="Volver a conversaciones">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/></svg>
     </button>
@@ -6601,6 +7200,9 @@ function renderActiveChat() {
   setCachedHtml('activeChatHeaderHtml', els.activeChatHeader, activeChatHeaderHtml);
   renderChatSearchVisibility();
   const messages = state.messagesByChat.get(chat.chatId) || [];
+  const selectedMessageIds = new Set(activeSelectedMessageIds());
+  els.messages?.classList.toggle('ce-message-selection-mode', selectedMessageIds.size > 0);
+  renderSelectionDeleteModal();
   const queuedMessages = getQueuedMessagesForChat(chat.chatId);
   const sameRenderedChat = state.renderedActiveChatId === chat.chatId;
   const wasNearBottom = !sameRenderedChat || isMessagesNearBottom();
@@ -6614,9 +7216,10 @@ function renderActiveChat() {
     const mine = msg.senderUserId === state.user?.userId;
     const highlighted = msg.messageId === state.highlightedMessageId ? ' is-highlighted' : '';
     const pinned = msg.isPinned && !isDeletedMessage(msg) ? ' is-pinned-message' : '';
+    const selected = selectedMessageIds.has(msg.messageId) ? ' is-selected' : '';
     const unreadSeparator = unreadMarker?.messageId && msg.messageId === unreadMarker.messageId ? renderUnreadSeparator(unreadMarker) : '';
     const clientMessageAttr = msg.clientMessageId ? ` data-client-message-id="${escapeHtml(msg.clientMessageId)}"` : '';
-    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}" data-message-id="${escapeHtml(msg.messageId || '')}"${clientMessageAttr}>${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
+    return `${unreadSeparator}<article class="ce-msg ${mine ? 'mine' : 'theirs'}${isDeletedMessage(msg) ? ' is-deleted' : ''}${highlighted}${pinned}${selected}" data-message-id="${escapeHtml(msg.messageId || '')}"${clientMessageAttr}>${renderMessageActions(msg, mine)}${renderReplyPreview(msg)}${renderMessageBody(msg, mine)}${renderMessageTime(msg, mine)}${isDeletedMessage(msg) ? '' : `${renderReactionSummary(msg)}${renderReactionPicker(msg)}`}</article>`;
   }).join('');
   const queuedMessageHtml = queuedMessages.map(renderQueuedMessage).join('');
   const emptyText = isChatInteractionBlocked(chat) ? 'La conversación se mantiene disponible para consulta.' : 'Envía el primer mensaje.';
@@ -6659,6 +7262,8 @@ async function selectChat(chatId) {
   if (changedChat) {
     state.replyToMessage = null;
     state.editingMessage = null;
+    state.selectedMessageIds = new Set();
+    state.selectionDeleteModalOpen = false;
     state.forwardingMessage = null;
     state.scheduleModalOpen = false;
     state.scheduledMessages = [];
@@ -7610,7 +8215,7 @@ async function consumeAddFromUrl() {
   try {
     await addContactByCode(code);
     url.searchParams.delete('add');
-    window.history.replaceState({}, '', url.toString());
+    window.history.replaceState(history.state && typeof history.state === 'object' ? history.state : {}, '', url.toString());
   } catch (error) {
     alert(error.message || 'No se pudo agregar el contacto del QR.');
   }
@@ -7624,7 +8229,7 @@ async function consumeChatFromUrl() {
   if (isMobileChatListPrimaryViewport()) {
     url.searchParams.delete('chat');
     url.searchParams.delete('message');
-    window.history.replaceState({}, '', url.toString());
+    window.history.replaceState(history.state && typeof history.state === 'object' ? history.state : {}, '', url.toString());
     renderAll();
     return;
   }
@@ -7633,7 +8238,7 @@ async function consumeChatFromUrl() {
     if (messageId) await openSearchResult(messageId).catch(() => null);
     url.searchParams.delete('chat');
     url.searchParams.delete('message');
-    window.history.replaceState({}, '', url.toString());
+    window.history.replaceState(history.state && typeof history.state === 'object' ? history.state : {}, '', url.toString());
   }
 }
 
@@ -9528,6 +10133,24 @@ function bindEvents() {
     renderAll();
   });
   els.activeChatHeader?.addEventListener('click', (event) => {
+    const clearSelectionButton = event.target.closest('[data-clear-message-selection]');
+    if (clearSelectionButton && els.activeChatHeader.contains(clearSelectionButton)) {
+      event.preventDefault();
+      clearMessageSelection();
+      return;
+    }
+    const copySelectionButton = event.target.closest('[data-copy-selected-messages]');
+    if (copySelectionButton && els.activeChatHeader.contains(copySelectionButton)) {
+      event.preventDefault();
+      copySelectedMessages().catch((error) => alert(error.message || 'No se pudieron copiar los mensajes seleccionados.'));
+      return;
+    }
+    const deleteSelectionButton = event.target.closest('[data-delete-selected-messages]');
+    if (deleteSelectionButton && els.activeChatHeader.contains(deleteSelectionButton)) {
+      event.preventDefault();
+      openSelectionDeleteModal();
+      return;
+    }
     const chatSearchButton = event.target.closest('[data-toggle-chat-search]');
     if (chatSearchButton && els.activeChatHeader.contains(chatSearchButton)) {
       event.preventDefault();
@@ -10062,7 +10685,19 @@ function bindEvents() {
     const jump = event.target.closest('[data-jump-message-id]');
     if (jump) jumpToMessage(jump.dataset.jumpMessageId || '').catch((error) => alert(error.message || 'No se pudo abrir el mensaje respondido.'));
   });
+  bindMessageLongPressSelection();
   els.messages.addEventListener('click', (event) => {
+    const selectionMessageEl = event.target.closest('.ce-msg[data-message-id]');
+    if (selectionMessageEl && els.messages.contains(selectionMessageEl) && (isMessageSelectionActive() || Date.now() < messageSelectionIgnoreClickUntil)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (Date.now() < messageSelectionIgnoreClickUntil) {
+        messageSelectionIgnoreClickUntil = 0;
+        return;
+      }
+      toggleMessageSelection(selectionMessageEl.dataset.messageId || '');
+      return;
+    }
     const sharedContactSaveButton = event.target.closest('[data-chater-contact-save-code]');
     if (sharedContactSaveButton && els.messages.contains(sharedContactSaveButton)) {
       event.preventDefault();
@@ -10417,6 +11052,7 @@ async function init() {
   setCompactMode(readCompactModePreference(), { announce: false });
   ensureIconInsertPickerKeyboardPlacement();
   bindEvents();
+  installAppNavigationHistory();
   await registerServiceWorker();
   try {
     await loadConfig();

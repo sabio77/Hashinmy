@@ -12487,3 +12487,286 @@ body.ce-dark-mode .ce-profile-share__toggle {
     min-height: 112px;
   }
 }
+
+/* Iteración selección/navegación · controles horizontales, selección múltiple y emoji flotante en tablet/PC. */
+.ce-msg-actions.ce-control-list,
+.ce-reaction-picker.ce-control-list {
+  flex-flow: row nowrap !important;
+  justify-content: flex-start !important;
+  width: max-content !important;
+  max-width: min(70vw, 70cqw) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ce-msg-actions.ce-control-list > *,
+.ce-reaction-picker.ce-control-list > * {
+  flex: 0 0 auto !important;
+}
+
+.ce-messages {
+  container-type: inline-size;
+}
+
+.ce-msg.is-selected {
+  position: relative;
+  outline: 2px solid var(--ce-accent) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ce-accent) 14%, transparent), var(--ce-shadow-soft) !important;
+}
+
+.ce-msg.is-selected::after {
+  content: '✓';
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 12;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ce-panel);
+  border-radius: 999px;
+  background: var(--ce-accent);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.ce-msg.theirs.is-selected::after {
+  right: auto;
+  left: -9px;
+}
+
+.ce-message-selection-mode .ce-msg-actions.ce-control-list,
+.ce-message-selection-mode .ce-reaction-picker.ce-control-list {
+  display: none !important;
+}
+
+.ce-chat__identity--selection {
+  min-width: 0;
+}
+
+.ce-chat__identity--selection > div {
+  min-width: 0;
+}
+
+.ce-selection-toolbar {
+  margin-left: auto !important;
+  flex: 0 0 auto;
+  display: inline-flex !important;
+  flex-flow: row nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.ce-selection-toolbar .ce-icon-btn {
+  flex: 0 0 auto;
+}
+
+.ce-selection-delete {
+  color: var(--ce-danger) !important;
+}
+
+.ce-selection-delete-card {
+  width: min(520px, calc(100vw - 28px)) !important;
+  max-width: 520px !important;
+}
+
+.ce-selection-delete-card__head {
+  display: grid;
+  gap: 5px;
+  padding: 4px 42px 16px 2px;
+}
+
+.ce-selection-delete-card__head strong {
+  font-size: 1.08rem;
+}
+
+.ce-selection-delete-card__head span {
+  color: var(--ce-muted-strong);
+  line-height: 1.45;
+}
+
+.ce-selection-delete-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ce-selection-delete-options > button {
+  min-width: 0;
+  min-height: 154px;
+  display: grid !important;
+  grid-template-rows: 58px auto auto;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  padding: 17px 14px !important;
+  border: 1px solid var(--ce-line) !important;
+  border-radius: 20px !important;
+  background: var(--ce-bg-soft) !important;
+  color: var(--ce-text) !important;
+  text-align: center;
+}
+
+.ce-selection-delete-options > button:not(:disabled):hover,
+.ce-selection-delete-options > button:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--ce-danger) 44%, var(--ce-line)) !important;
+  background: color-mix(in srgb, var(--ce-danger) 7%, var(--ce-bg-soft)) !important;
+}
+
+.ce-selection-delete-options > button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.ce-selection-delete-option__icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ce-danger) 12%, transparent);
+  color: var(--ce-danger);
+}
+
+.ce-selection-delete-option__icon .ce-ui-icon,
+.ce-selection-delete-option__icon svg {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.ce-selection-delete-options strong {
+  font-size: 1rem;
+}
+
+.ce-selection-delete-options small {
+  color: var(--ce-muted-strong);
+  line-height: 1.35;
+}
+
+/* Tablet y PC: el selector se superpone sobre messageForm sin aumentar el alto del compositor.
+   Móvil (<=620px) conserva el teclado de emojis ya existente. */
+@media (min-width: 621px) {
+  body.ce-emoji-keyboard-open .ce-chat {
+    grid-template-rows: var(--ce-header) minmax(0, 1fr) var(--ce-compose-compact-height) !important;
+  }
+
+  body.ce-emoji-keyboard-open .ce-scroll-bottom {
+    bottom: calc(var(--ce-compose-compact-height) + max(12px, var(--ce-compose-edge-margin))) !important;
+  }
+
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    position: relative !important;
+    width: min(100%, calc(100% - (var(--ce-compose-edge-margin) * 2))) !important;
+    min-height: var(--ce-compose-compact-height) !important;
+    height: var(--ce-compose-compact-height) !important;
+    max-height: var(--ce-compose-compact-height) !important;
+    margin: 0 auto !important;
+    padding: var(--ce-compose-pad-y) calc(var(--ce-compose-pad-x) + env(safe-area-inset-right)) calc(var(--ce-compose-pad-y) + env(safe-area-inset-bottom)) calc(var(--ce-compose-pad-x) + env(safe-area-inset-left)) !important;
+    border: 1px solid var(--ce-line) !important;
+    background: color-mix(in srgb, var(--ce-bg-soft) 92%, #ffffff 8%) !important;
+    overflow: visible !important;
+  }
+
+  #messageForm.ce-compose.ce-compose--emoji-keyboard .ce-icon-insert-panel--keyboard {
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(100% + 8px) !important;
+    z-index: 45 !important;
+    width: min(720px, calc(100vw - 28px)) !important;
+    max-width: min(720px, calc(100vw - 28px)) !important;
+    height: min(42dvh, 340px) !important;
+    min-height: 240px !important;
+    max-height: min(42dvh, 340px) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--ce-line) 76%, transparent) !important;
+    border-radius: 20px !important;
+    transform: translateX(-50%) !important;
+    box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28) !important;
+    overflow: hidden !important;
+  }
+
+  #messageForm.ce-compose.ce-compose--emoji-keyboard .ce-icon-insert-tabs {
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+@media (min-width: 981px) {
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    max-width: 1160px !important;
+    grid-template-columns: minmax(0, 0.74fr) minmax(280px, 1.26fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    grid-template-areas: "composerTools composerInput" !important;
+    gap: var(--ce-compose-gap) !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 980px) {
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    max-width: none !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 34px var(--ce-compose-input-height) !important;
+    grid-template-areas:
+      "composerTools"
+      "composerInput" !important;
+    gap: 6px !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .ce-msg-actions.ce-control-list,
+  .ce-reaction-picker.ce-control-list {
+    max-width: min(70vw, 70cqw) !important;
+  }
+
+  .ce-selection-delete-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ce-selection-delete-options > button {
+    min-height: 126px;
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .ce-selection-delete-option__icon {
+    grid-row: 1 / span 2;
+  }
+}
+
+@container ce-shell-pane (max-width: 1120px) {
+  @media (min-width: 621px) {
+    #messageForm.ce-compose.ce-compose--emoji-keyboard {
+      max-width: none !important;
+      grid-template-columns: minmax(0, 1fr) !important;
+      grid-template-rows: 34px var(--ce-compose-input-height) !important;
+      grid-template-areas:
+        "composerTools"
+        "composerInput" !important;
+      gap: 6px !important;
+      border-radius: 18px 18px 0 0 !important;
+    }
+  }
+}
+
+@media (max-width: 620px) {
+  .ce-selection-toolbar.ce-header-actions > .ce-icon-btn,
+  .ce-selection-toolbar.ce-chat-tools > .ce-icon-btn {
+    display: inline-flex !important;
+  }
+}
