@@ -1,21 +1,25 @@
-const CACHE_NAME = 'chater-static-v94-navigation-history-selection';
+const RELEASE_VERSION = 'dev';
+const CACHE_NAME = `chater-static-${RELEASE_VERSION}`;
+const versionedAsset = (asset = '') => `${asset}?v=${encodeURIComponent(RELEASE_VERSION)}`;
 const CORE_ASSETS = [
   './index.html',
-  './styles.css',
-  './theme-bootstrap.js',
-  './runtime-config.js',
-  './app.js',
-  './api.js',
-  './firebase.auth.js',
-  './APPwebFRONTENDx/conexion/index.js',
-  './APPwebFRONTENDx/BLOQUE/app.js',
-  './APPwebFRONTENDx/BLOQUE/api.js',
-  './APPwebFRONTENDx/BLOQUE/firebase.auth.js',
-  './LINKminiaturasx/conexion/index.js',
-  './LINKminiaturasx/BLOQUE/link-miniaturas.js',
-  './LINKcontactosCHATERx/conexion/index.js',
-  './LINKcontactosCHATERx/BLOQUE/link-contactos-chater.js',
-  './manifest.webmanifest'
+  ...[
+    './styles.css',
+    './theme-bootstrap.js',
+    './runtime-config.js',
+    './app.js',
+    './api.js',
+    './firebase.auth.js',
+    './APPwebFRONTENDx/conexion/index.js',
+    './APPwebFRONTENDx/BLOQUE/app.js',
+    './APPwebFRONTENDx/BLOQUE/api.js',
+    './APPwebFRONTENDx/BLOQUE/firebase.auth.js',
+    './LINKminiaturasx/conexion/index.js',
+    './LINKminiaturasx/BLOQUE/link-miniaturas.js',
+    './LINKcontactosCHATERx/conexion/index.js',
+    './LINKcontactosCHATERx/BLOQUE/link-contactos-chater.js',
+    './manifest.webmanifest'
+  ].map(versionedAsset)
 ];
 
 const OPTIONAL_ASSETS = [
@@ -25,9 +29,9 @@ const OPTIONAL_ASSETS = [
 
 const DELIVERY_ACK_DB_NAME = 'chater-delivery-acks-v1';
 const DELIVERY_ACK_STORE_NAME = 'pendingAcks';
-const DELIVERY_ACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const DELIVERY_ACK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const DELIVERY_ACK_MAX_BACKOFF_MS = 30 * 60 * 1000;
-const DELIVERY_ACK_MAX_ATTEMPTS = 96;
+const DELIVERY_ACK_MAX_ATTEMPTS = 12;
 const DELIVERY_ACK_SYNC_TAG = 'CHAT_ER_FLUSH_DELIVERY_ACKS';
 let deliveryAckDbPromise = null;
 
@@ -123,7 +127,9 @@ async function sendDeliveryAckRequest(token = '', ackUrl = '') {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token })
   });
-  if (!response || !response.ok) return false;
+  if (!response) return false;
+  if ([400, 401, 403, 404, 409, 410, 422].includes(response.status)) return true;
+  if (!response.ok) return false;
   const data = await response.clone().json().catch(() => null);
   if (!data || data.ok === false) return false;
   if (data.delivered === true || data.alreadyDelivered === true) return true;
@@ -132,12 +138,12 @@ async function sendDeliveryAckRequest(token = '', ackUrl = '') {
 }
 
 async function sendDeliveryAckWithRetries(token = '', ackUrl = '', retries = 3) {
-  const safeRetries = Math.max(1, Math.min(5, Number(retries || 3)));
+  const safeRetries = Math.max(1, Math.min(3, Number(retries || 3)));
   for (let attempt = 0; attempt < safeRetries; attempt += 1) {
     try {
       if (await sendDeliveryAckRequest(token, ackUrl)) return true;
     } catch {}
-    if (attempt < safeRetries - 1) await sleep(600 * (attempt + 1));
+    if (attempt < safeRetries - 1) await sleep(Math.round((500 * (2 ** attempt)) * (0.75 + Math.random() * 0.5)));
   }
   return false;
 }
@@ -219,7 +225,7 @@ async function flushQueuedDeliveryAcks(options = {}) {
   const now = Date.now();
   const due = items
     .filter((item) => options.force || Number(item.nextAttemptAt || 0) <= now || now - Number(item.queuedAt || now) > DELIVERY_ACK_MAX_AGE_MS)
-    .slice(0, Math.max(1, Math.min(80, Number(options.limit || 40))));
+    .slice(0, Math.max(1, Math.min(30, Number(options.limit || 20))));
   let confirmed = 0;
   for (const item of due) {
     if (await flushQueuedDeliveryAckItem(item, options)) confirmed += 1;
@@ -234,7 +240,7 @@ async function acknowledgePushDelivery(payload = {}, options = {}) {
   if (!queued || !hasIndexedDbSupport()) {
     return sendDeliveryAckWithRetries(normalized.token, normalized.ackUrl, options.retries || 3);
   }
-  const result = await flushQueuedDeliveryAcks({ force: Boolean(options.force), limit: 40 });
+  const result = await flushQueuedDeliveryAcks({ force: Boolean(options.force), limit: 20 });
   return Number(result.confirmed || 0) > 0;
 }
 
@@ -343,7 +349,7 @@ function fallbackIconResponse(pathname = '') {
 
 async function safeCacheRequest(cache, asset) {
   try {
-    const request = new Request(asset, { cache: 'reload' });
+    const request = new Request(asset);
     const response = await fetch(request);
     if (response && response.ok) await cache.put(request, response.clone());
     return true;
@@ -371,42 +377,35 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+async function cacheSuccessfulResponse(request, response) {
+  if (!response || !response.ok) return;
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  } catch {}
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || event.request.method !== 'GET') return;
-  event.waitUntil(flushQueuedDeliveryAcks().catch(() => null));
 
   const iconFallback = fallbackIconResponse(url.pathname);
   const isNavigation = event.request.mode === 'navigate' || event.request.destination === 'document';
 
   event.respondWith((async () => {
-    const isCoreAsset = CORE_ASSETS.some((asset) => new URL(asset, self.location.href).pathname === url.pathname);
-
-    if (isCoreAsset || isNavigation) {
-      try {
-        const response = await fetch(event.request, { cache: 'reload' });
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => null);
-          return response;
-        }
-      } catch {}
-    }
-
     const cached = await caches.match(event.request);
-    if (cached) return cached;
-
+    if (cached) return cached; // cache-first: una visita repetida no genera HTTP Responses para este recurso.
     try {
       const response = await fetch(event.request);
       if (iconFallback && (!response || response.status === 404)) return iconFallback;
-      if (response && response.ok) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => null);
-      }
+      if (response?.ok) await cacheSuccessfulResponse(event.request, response);
       return response;
     } catch (error) {
       if (iconFallback) return iconFallback;
-      if (isNavigation) return caches.match('./index.html');
+      if (isNavigation) {
+        const shell = await caches.match('./index.html');
+        if (shell) return shell;
+      }
       throw error;
     }
   })());
@@ -447,7 +446,7 @@ self.addEventListener('push', (event) => {
     }
   };
   event.waitUntil(Promise.allSettled([
-    acknowledgePushDelivery(payload, { retries: 5 }),
+    acknowledgePushDelivery(payload, { retries: 3 }),
     self.registration.showNotification(title, options)
   ]));
 });
@@ -462,7 +461,7 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('sync', (event) => {
   if (event.tag !== DELIVERY_ACK_SYNC_TAG) return;
-  event.waitUntil(flushQueuedDeliveryAcks({ force: true, limit: 80 }).catch(() => null));
+  event.waitUntil(flushQueuedDeliveryAcks({ force: true, limit: 20 }).catch(() => null));
 });
 
 self.addEventListener('notificationclick', (event) => {

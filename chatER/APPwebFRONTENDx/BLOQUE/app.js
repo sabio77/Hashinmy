@@ -14,6 +14,16 @@ import {
 } from '../../LINKcontactosCHATERx/conexion/index.js';
 
 const clientIdKey = 'chater_client_id';
+const realtimeLeaderStorageKey = 'chater_realtime_leader_v1';
+const realtimeBusStorageKey = 'chater_realtime_bus_v1';
+const realtimeLastEventPrefix = 'chater_realtime_last_event_v1';
+const realtimeChannelName = 'chater_realtime_channel_v1';
+const realtimeLeaderLeaseMs = 15000;
+const realtimeLeaderRenewMs = 5000;
+const realtimeElectionMs = 7000;
+const realtimeHiddenReleaseMs = 12000;
+const realtimeStableConnectionMs = 30000;
+const realtimeShortConnectionMs = 10000;
 const draftStoragePrefix = 'chater_draft_v1';
 const draftOriginStorageKey = 'chater_draft_origin_v1';
 const draftSaveDelayMs = 7 * 1000;
@@ -190,7 +200,19 @@ const state = {
   realtimeOpenSeq: 0,
   realtimeReconnectTimer: 0,
   realtimeRetryCount: 0,
+  realtimeShortDisconnects: 0,
+  realtimeOpenedAt: 0,
+  realtimeStableTimer: 0,
   realtimeManualClose: false,
+  realtimeLeader: false,
+  realtimeTabId: '',
+  realtimeChannel: null,
+  realtimeLeaseTimer: 0,
+  realtimeElectionTimer: 0,
+  realtimeHiddenTimer: 0,
+  realtimeCoordinatorReady: false,
+  realtimeSeenEventIds: new Set(),
+  realtimeResyncPromise: null,
   installPrompt: null,
   installDismissed: hasInstallDismissedPersisted(),
   installRelatedCheckDone: false,
@@ -421,10 +443,9 @@ function getInlineMediaFallbackConfig() {
   const attachments = getAttachmentRuntimeConfig();
   const fallback = attachments.mediaFallback || attachments.configuration?.mediaFallback || {};
   const hasAttachmentConfig = Boolean(state.config && state.config.attachments && typeof state.config.attachments === 'object');
-  const explicitDisabled = fallback.available === false || fallback.enabled === false || attachments.mediaFallbackAvailable === false;
   return {
-    available: fallback.available === true || fallback.enabled === true || (!hasAttachmentConfig && !explicitDisabled),
-    optimistic: !hasAttachmentConfig,
+    available: fallback.available === true || fallback.enabled === true,
+    optimistic: false,
     provider: String(fallback.provider || 'MEDIAfirmadaX-inline'),
     maxBytes: Math.max(0, Number(fallback.maxBytes || attachments.policy?.fallbackInlineMaxBytes || MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES) || MEDIA_FIRMADA_INLINE_FALLBACK_DEFAULT_MAX_BYTES)
   };
@@ -442,7 +463,7 @@ function buildR2MissingConfigurationMessage() {
     })
     .filter(Boolean)
     .join('; ');
-  return `Cloudflare R2 no está configurado para adjuntos de chatER. Faltan variables en el backend: ${missingLabels || 'endpoint/accountId, Access Key ID, Secret Access Key y bucket'}. En chatER_viejo las fotos podían funcionar por memoriaBACKEND/ImagenesCloudflareR2x y respaldo MEDIAfirmadaX; este backend actual firma con R2 cuando existen esas credenciales y usa respaldo MEDIAfirmadaX-inline solo para adjuntos pequeños cuando R2 falta.`;
+  return `Cloudflare R2 no está configurado para adjuntos de chatER. Faltan variables en el backend: ${missingLabels || 'endpoint/accountId, Access Key ID, Secret Access Key y bucket'}. En producción los adjuntos requieren R2 firmado para evitar transportar base64 o guardar multimedia en Render/Redis.`;
 }
 
 function resolveAttachmentUploadModeBeforeUpload() {
@@ -5049,7 +5070,7 @@ function showGuest() {
   state.privacyLock.locked = false;
   state.privacyLock.mode = 'closed';
   renderPrivacyLockOverlay();
-  closeRealtime();
+  closeRealtime({ releaseLeadership: true });
   stopPresenceRefresh();
   updatePushBanner();
 }
@@ -5184,20 +5205,211 @@ async function bootstrapExistingSession() {
   }
 }
 
-function closeRealtime() {
+function getRealtimeTabId() {
+  if (state.realtimeTabId) return state.realtimeTabId;
+  const key = 'chater_realtime_tab_id_v1';
+  try {
+    const stored = String(sessionStorage.getItem(key) || '').trim();
+    if (stored) return (state.realtimeTabId = stored);
+    const created = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    sessionStorage.setItem(key, created);
+    return (state.realtimeTabId = created);
+  } catch {
+    return (state.realtimeTabId = state.realtimeTabId || `${Date.now()}_${Math.random().toString(16).slice(2)}`);
+  }
+}
+
+function realtimeLastEventKey() {
+  const userId = String(state.user?.userId || '').trim();
+  return userId ? `${realtimeLastEventPrefix}:${userId}` : '';
+}
+
+function loadRealtimeLastEventId() {
+  const key = realtimeLastEventKey();
+  if (!key) return '';
+  try { return String(localStorage.getItem(key) || '').trim().slice(0, 180); } catch { return ''; }
+}
+
+function rememberRealtimeLastEventId(eventId = '') {
+  const clean = String(eventId || '').trim().slice(0, 180);
+  const key = realtimeLastEventKey();
+  if (!clean || !key) return;
+  try { localStorage.setItem(key, clean); } catch {}
+}
+
+function rememberRealtimeSeenEvent(eventId = '') {
+  const clean = String(eventId || '').trim();
+  if (!clean) return true;
+  if (state.realtimeSeenEventIds.has(clean)) return false;
+  state.realtimeSeenEventIds.add(clean);
+  if (state.realtimeSeenEventIds.size > 320) {
+    const first = state.realtimeSeenEventIds.values().next().value;
+    if (first) state.realtimeSeenEventIds.delete(first);
+  }
+  return true;
+}
+
+function readRealtimeLease() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(realtimeLeaderStorageKey) || 'null');
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch { return null; }
+}
+
+function writeRealtimeLease(expiresAt = Date.now() + realtimeLeaderLeaseMs) {
+  const lease = {
+    owner: getRealtimeTabId(),
+    clientId: getClientId(),
+    userId: String(state.user?.userId || ''),
+    expiresAt
+  };
+  try { localStorage.setItem(realtimeLeaderStorageKey, JSON.stringify(lease)); } catch { return false; }
+  return readRealtimeLease()?.owner === lease.owner;
+}
+
+function clearRealtimeLeaseIfOwned() {
+  const lease = readRealtimeLease();
+  if (lease?.owner !== getRealtimeTabId()) return;
+  try { localStorage.removeItem(realtimeLeaderStorageKey); } catch {}
+}
+
+function broadcastRealtime(message = {}, { persistSmall = true } = {}) {
+  const envelope = { ...message, userId: String(state.user?.userId || ''), sender: getRealtimeTabId(), at: Date.now() };
+  try { state.realtimeChannel?.postMessage(envelope); } catch {}
+  if (persistSmall && message.type !== 'bootstrap') {
+    try { localStorage.setItem(realtimeBusStorageKey, JSON.stringify(envelope)); } catch {}
+  }
+}
+
+function applyRealtimeBusEnvelope(envelope = {}) {
+  if (!envelope || envelope.sender === getRealtimeTabId()) return;
+  if (!state.user?.userId || String(envelope.userId || '') !== String(state.user.userId)) return;
+  if (envelope.type === 'event') {
+    const eventId = String(envelope.eventId || '').trim();
+    if (eventId) rememberRealtimeLastEventId(eventId);
+    if (!rememberRealtimeSeenEvent(eventId)) return;
+    handleRealtimeEvent(envelope.payload || {});
+    return;
+  }
+  if (envelope.type === 'bootstrap' && envelope.data) {
+    applyBootstrap(envelope.data);
+    return;
+  }
+  if (envelope.type === 'leader-release') scheduleRealtimeElection(40);
+}
+
+function ensureRealtimeCoordinator() {
+  if (state.realtimeCoordinatorReady) return;
+  state.realtimeCoordinatorReady = true;
+  getRealtimeTabId();
+  if ('BroadcastChannel' in window) {
+    try {
+      state.realtimeChannel = new BroadcastChannel(realtimeChannelName);
+      state.realtimeChannel.addEventListener('message', (event) => applyRealtimeBusEnvelope(event.data || {}));
+    } catch { state.realtimeChannel = null; }
+  }
+  window.addEventListener('storage', (event) => {
+    if (event.key === realtimeBusStorageKey && event.newValue) {
+      try { applyRealtimeBusEnvelope(JSON.parse(event.newValue)); } catch {}
+      return;
+    }
+    if (event.key === realtimeLeaderStorageKey && state.user && document.visibilityState === 'visible') {
+      const lease = readRealtimeLease();
+      if (!lease || Number(lease.expiresAt || 0) <= Date.now()) scheduleRealtimeElection(80);
+    }
+  });
+  state.realtimeElectionTimer = window.setInterval(() => {
+    if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    if (state.realtimeLeader) {
+      const lease = readRealtimeLease();
+      if (lease?.owner !== getRealtimeTabId()) releaseRealtimeLeadership({ closeTransport: true, announce: false });
+      return;
+    }
+    const lease = readRealtimeLease();
+    if (!lease || Number(lease.expiresAt || 0) <= Date.now() || String(lease.userId || '') !== String(state.user.userId)) {
+      openRealtime().catch(() => scheduleRealtimeReconnect());
+    }
+  }, realtimeElectionMs);
+}
+
+function renewRealtimeLeadership() {
+  if (!state.realtimeLeader) return;
+  if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) {
+    releaseRealtimeLeadership({ closeTransport: true });
+    return;
+  }
+  if (!writeRealtimeLease()) {
+    releaseRealtimeLeadership({ closeTransport: true, announce: false });
+    return;
+  }
+  broadcastRealtime({ type: 'leader-heartbeat' }, { persistSmall: false });
+}
+
+function claimRealtimeLeadership() {
+  ensureRealtimeCoordinator();
+  if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return false;
+  const now = Date.now();
+  const current = readRealtimeLease();
+  const owned = current?.owner === getRealtimeTabId();
+  const available = !current || Number(current.expiresAt || 0) <= now || String(current.userId || '') !== String(state.user.userId);
+  if (!owned && !available) return false;
+  if (!writeRealtimeLease(now + realtimeLeaderLeaseMs)) return false;
+  state.realtimeLeader = true;
+  if (state.realtimeLeaseTimer) window.clearInterval(state.realtimeLeaseTimer);
+  state.realtimeLeaseTimer = window.setInterval(renewRealtimeLeadership, realtimeLeaderRenewMs);
+  return true;
+}
+
+function releaseRealtimeLeadership({ closeTransport = true, announce = true } = {}) {
+  const wasLeader = state.realtimeLeader || readRealtimeLease()?.owner === getRealtimeTabId();
+  if (state.realtimeLeaseTimer) window.clearInterval(state.realtimeLeaseTimer);
+  state.realtimeLeaseTimer = 0;
+  state.realtimeLeader = false;
+  clearRealtimeLeaseIfOwned();
+  if (closeTransport) closeRealtime({ releaseLeadership: false });
+  if (wasLeader && announce) broadcastRealtime({ type: 'leader-release' });
+}
+
+function scheduleRealtimeElection(delay = 100) {
+  window.setTimeout(() => {
+    if (!state.user || !getSessionToken() || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    openRealtime().catch(() => scheduleRealtimeReconnect());
+  }, Math.max(20, Number(delay) || 100));
+}
+
+function closeRealtime({ releaseLeadership = false } = {}) {
   state.realtimeManualClose = true;
   state.realtimeOpenSeq += 1;
   if (state.realtimeReconnectTimer) window.clearTimeout(state.realtimeReconnectTimer);
+  if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
   state.realtimeReconnectTimer = 0;
+  state.realtimeStableTimer = 0;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
+  state.realtimeOpenedAt = 0;
+  if (releaseLeadership) releaseRealtimeLeadership({ closeTransport: false });
 }
 
 function isRealtimeStreamUsable() {
   return Boolean(state.eventSource && state.eventSource.readyState !== EventSource.CLOSED);
 }
 
+async function resyncRealtimeStateOnce() {
+  if (state.realtimeResyncPromise) return state.realtimeResyncPromise;
+  const promise = (async () => {
+    const data = await post('/api/bootstrap', {});
+    applyBootstrap(data);
+    broadcastRealtime({ type: 'bootstrap', data }, { persistSmall: false });
+    return data;
+  })();
+  state.realtimeResyncPromise = promise;
+  try { return await promise; }
+  finally { if (state.realtimeResyncPromise === promise) state.realtimeResyncPromise = null; }
+}
+
 async function openRealtime() {
+  ensureRealtimeCoordinator();
+  if (!claimRealtimeLeadership()) return null;
   if (state.realtimeOpeningPromise) return state.realtimeOpeningPromise;
   if (isRealtimeStreamUsable()) return state.eventSource;
   const openSeq = state.realtimeOpenSeq + 1;
@@ -5209,28 +5421,51 @@ async function openRealtime() {
     if (state.eventSource) state.eventSource.close();
     state.eventSource = null;
     const tokenData = await post('/api/realtime/token', { clientId: getClientId() });
-    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) return null;
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken() || !state.realtimeLeader) return null;
     const token = encodeURIComponent(tokenData.realtimeToken || '');
     if (!token) throw new Error('No se pudo preparar la sincronización en tiempo real.');
-    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}`);
+    const lastEventId = loadRealtimeLastEventId();
+    const resume = lastEventId ? `&lastEventId=${encodeURIComponent(lastEventId)}` : '';
+    const source = new EventSource(`${getBackendUrl()}/api/realtime/stream?realtimeToken=${token}${resume}`);
     source.addEventListener('chater_ready', () => {
       if (state.eventSource !== source) return;
-      state.realtimeRetryCount = 0;
+      state.realtimeOpenedAt = Date.now();
+      if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
+      state.realtimeStableTimer = window.setTimeout(() => {
+        if (state.eventSource !== source || source.readyState === EventSource.CLOSED) return;
+        state.realtimeRetryCount = 0;
+        state.realtimeShortDisconnects = 0;
+      }, realtimeStableConnectionMs);
     });
     source.addEventListener('chater_event', (event) => {
       if (state.eventSource !== source) return;
-      const payload = JSON.parse(event.data || '{}');
-      handleRealtimeEvent(payload);
+      try {
+        const payload = JSON.parse(event.data || '{}');
+        const eventId = String(event.lastEventId || payload.eventId || '').trim();
+        if (eventId) rememberRealtimeLastEventId(eventId);
+        if (!rememberRealtimeSeenEvent(eventId)) return;
+        handleRealtimeEvent(payload);
+        broadcastRealtime({ type: 'event', eventId, payload });
+      } catch {}
+    });
+    source.addEventListener('chater_control', (event) => {
+      if (state.eventSource !== source) return;
+      try {
+        const control = JSON.parse(event.data || '{}');
+        if (control.type === 'resync_required') resyncRealtimeStateOnce().catch(() => null);
+      } catch {}
     });
     source.onerror = () => {
       if (state.eventSource !== source) return;
-      if (state.realtimeManualClose || !getSessionToken()) {
+      const duration = state.realtimeOpenedAt ? Date.now() - state.realtimeOpenedAt : 0;
+      if (duration > 0 && duration < realtimeShortConnectionMs) state.realtimeShortDisconnects = Math.min(6, state.realtimeShortDisconnects + 1);
+      if (state.realtimeManualClose || !getSessionToken() || !state.realtimeLeader) {
         closeRealtime();
         return;
       }
       scheduleRealtimeReconnect();
     };
-    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken()) {
+    if (state.realtimeManualClose || openSeq !== state.realtimeOpenSeq || !getSessionToken() || !state.realtimeLeader) {
       source.close();
       return null;
     }
@@ -5246,14 +5481,20 @@ async function openRealtime() {
 }
 
 function scheduleRealtimeReconnect() {
-  if (state.realtimeReconnectTimer) return;
+  if (!state.realtimeLeader || state.realtimeReconnectTimer || !getSessionToken()) return;
   if (state.eventSource) state.eventSource.close();
   state.eventSource = null;
-  const delay = Math.min(30000, 1200 * (2 ** Math.min(state.realtimeRetryCount, 5)));
-  state.realtimeRetryCount += 1;
+  if (state.realtimeStableTimer) window.clearTimeout(state.realtimeStableTimer);
+  state.realtimeStableTimer = 0;
+  const penalty = Math.min(4, state.realtimeShortDisconnects);
+  const exponent = Math.min(6, state.realtimeRetryCount + penalty);
+  const base = Math.min(60000, 1800 * (2 ** exponent));
+  const jitter = 0.7 + (Math.random() * 0.6);
+  const delay = Math.round(base * jitter);
+  state.realtimeRetryCount = Math.min(8, state.realtimeRetryCount + 1);
   state.realtimeReconnectTimer = window.setTimeout(async () => {
     state.realtimeReconnectTimer = 0;
-    if (!getSessionToken() || !state.user) return;
+    if (!getSessionToken() || !state.user || !state.realtimeLeader || document.visibilityState !== 'visible' || navigator.onLine === false) return;
     try {
       await openRealtime();
     } catch {
@@ -5934,13 +6175,36 @@ async function setMessagePinned(messageId = '', pinned = true) {
   showTemporaryDraftStatus(data.pinned ? 'Mensaje fijado en este chat.' : 'Mensaje desfijado.');
 }
 
+async function loadMessageHistoryPages(chatId = '', { maxMessages = 500, pageSize = 120 } = {}) {
+  const cleanChatId = String(chatId || '').trim();
+  if (!cleanChatId) return [];
+  const safeMax = Math.min(500, Math.max(1, Number(maxMessages || 500)));
+  const safePageSize = Math.min(120, Math.max(20, Number(pageSize || 120)));
+  let cursor = 0;
+  let messages = [];
+  const maxPages = Math.ceil(safeMax / safePageSize) + 1;
+  for (let pageIndex = 0; pageIndex < maxPages && messages.length < safeMax; pageIndex += 1) {
+    const data = await post('/api/chats/messages', {
+      chatId: cleanChatId,
+      limit: Math.min(safePageSize, safeMax - messages.length),
+      cursor
+    });
+    const batch = Array.isArray(data.messages) ? data.messages : [];
+    if (batch.length) messages = [...batch, ...messages];
+    const nextCursor = Number(data.page?.nextCursor);
+    if (!data.page?.hasMore || !Number.isFinite(nextCursor) || nextCursor <= cursor) break;
+    cursor = nextCursor;
+  }
+  return messages.slice(-safeMax);
+}
+
 async function openSearchResult(messageId = '') {
   if (!state.activeChatId || !messageId) return;
   state.highlightedMessageId = messageId;
   const currentMessages = state.messagesByChat.get(state.activeChatId) || [];
   if (!currentMessages.some((msg) => msg.messageId === messageId)) {
-    const data = await post('/api/chats/messages', { chatId: state.activeChatId, limit: 500 });
-    state.messagesByChat.set(state.activeChatId, data.messages || []);
+    const messages = await loadMessageHistoryPages(state.activeChatId, { maxMessages: 500 });
+    state.messagesByChat.set(state.activeChatId, messages);
   }
   renderAll();
   window.setTimeout(focusHighlightedMessage, 30);
@@ -7076,8 +7340,7 @@ async function exportActiveChat() {
   const chat = activeChat();
   if (!chat?.chatId) return;
   showTemporaryDraftStatus('Preparando exportación del chat...', 1400);
-  const data = await post('/api/chats/messages', { chatId: chat.chatId, limit: 500 });
-  const messages = Array.isArray(data.messages) ? data.messages : [];
+  const messages = await loadMessageHistoryPages(chat.chatId, { maxMessages: 500 });
   state.messagesByChat.set(chat.chatId, messages);
   const contactName = chatDisplayName(chat);
   const stamp = new Date().toISOString().slice(0, 10);
@@ -7288,8 +7551,8 @@ async function selectChat(chatId) {
   let messages = Array.isArray(data.messages) ? data.messages : [];
   const pinnedIds = new Set((activeChat()?.pinnedMessageIds || []).filter(Boolean));
   if (pinnedIds.size && [...pinnedIds].some((messageId) => !messages.some((message) => message.messageId === messageId))) {
-    const fullData = await post('/api/chats/messages', { chatId, limit: 500 });
-    messages = Array.isArray(fullData.messages) ? fullData.messages : messages;
+    const fullMessages = await loadMessageHistoryPages(chatId, { maxMessages: 500 });
+    messages = fullMessages.length ? fullMessages : messages;
   }
   rememberUnreadMarkerForChat(chatBeforeRead, messages);
   state.messagesByChat.set(chatId, messages);
@@ -8583,9 +8846,8 @@ async function loadDateJumpTimeline() {
   state.dateJumpError = '';
   renderDateJumpModal();
   try {
-    const data = await post('/api/chats/messages', { chatId, limit: 500 });
+    const messages = await loadMessageHistoryPages(chatId, { maxMessages: 500 });
     if (state.activeChatId !== chatId || state.dateJumpChatId !== chatId) return;
-    const messages = Array.isArray(data.messages) ? data.messages : [];
     state.messagesByChat.set(chatId, messages);
     state.dateJumpDays = buildDateJumpTimeline(messages);
     if (!state.dateJumpSelected && state.dateJumpDays.length) state.dateJumpSelected = state.dateJumpDays[0].dateKey;
@@ -8693,8 +8955,7 @@ async function openChatBrief() {
   state.chatBriefError = '';
   renderChatBriefModal();
   try {
-    const data = await post('/api/chats/messages', { chatId: chat.chatId, limit: 500 });
-    const messages = Array.isArray(data.messages) ? data.messages : [];
+    const messages = await loadMessageHistoryPages(chat.chatId, { maxMessages: 500 });
     state.messagesByChat.set(chat.chatId, messages);
   } catch {
     state.chatBriefError = 'No se pudo actualizar desde el servidor. Se muestra el resumen con los mensajes ya cargados en este dispositivo.';
@@ -9674,20 +9935,36 @@ function bindEvents() {
   window.addEventListener('resize', handleMobileChatViewportChange, { passive: true });
   window.addEventListener('online', () => {
     if (state.user) {
-      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
+      scheduleRealtimeElection(80);
       resetRetryableContactLinkPreviews();
       retryQueuedOutboxMessages({ silent: true }).catch(() => null);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
     }
   });
+  window.addEventListener('offline', () => {
+    if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
+    else closeRealtime();
+  });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') saveActiveDraft({ announce: false });
+    if (document.visibilityState === 'hidden') {
+      saveActiveDraft({ announce: false });
+      if (state.realtimeHiddenTimer) window.clearTimeout(state.realtimeHiddenTimer);
+      state.realtimeHiddenTimer = window.setTimeout(() => {
+        state.realtimeHiddenTimer = 0;
+        if (document.visibilityState === 'hidden' && state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
+      }, realtimeHiddenReleaseMs);
+    }
     if (document.visibilityState === 'visible' && state.user) {
-      if (!state.eventSource) openRealtime().catch(() => scheduleRealtimeReconnect());
+      if (state.realtimeHiddenTimer) window.clearTimeout(state.realtimeHiddenTimer);
+      state.realtimeHiddenTimer = 0;
+      scheduleRealtimeElection(60);
       scheduleOutboxRetry(1400);
       flushDeliveryAckQueue({ force: true }).catch(() => null);
       requestServiceWorkerDeliveryAckFlush();
     }
+  });
+  window.addEventListener('pagehide', () => {
+    if (state.realtimeLeader) releaseRealtimeLeadership({ closeTransport: true });
   });
   els.messages?.addEventListener('scroll', () => scheduleScrollBottomButtonUpdate(), { passive: true });
   els.messages?.addEventListener('load', (event) => {
@@ -11040,7 +11317,16 @@ async function registerServiceWorker() {
     try {
       const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       state.serviceWorkerRegistration = registration;
-      await registration.update().catch(() => null);
+      try {
+        const updateKey = 'chater_sw_update_checked_at_v1';
+        const lastCheck = Number(localStorage.getItem(updateKey) || 0);
+        const now = Date.now();
+        if (!lastCheck) localStorage.setItem(updateKey, String(now));
+        else if (now - lastCheck >= 6 * 60 * 60 * 1000) {
+          localStorage.setItem(updateKey, String(now));
+          registration.update().catch(() => null);
+        }
+      } catch {}
       requestServiceWorkerDeliveryAckFlush();
     } catch {}
   }
