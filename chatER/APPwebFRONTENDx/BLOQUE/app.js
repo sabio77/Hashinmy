@@ -34,6 +34,8 @@ const recentMessageControlLimit = 3;
 const iconInsertStorageKey = 'chater_recent_emojis_v1';
 const iconInsertLegacyStorageKey = 'chater_recent_icon_inserts_v1';
 const iconInsertMaxRecent = 24;
+const permissionDenialStorageKey = 'chater_permission_denials_v1';
+const permissionAutoSettingsThreshold = 2;
 const allowedReactionEmojis = Object.freeze(['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '✅']);
 const reactionEmojiAliases = Object.freeze({
   like: '👍',
@@ -54,6 +56,11 @@ const iconInsertCategories = [
 ];
 
 const ceUiIconPaths = Object.freeze({
+  "gallery": "<path d=\"M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v12h16V6H4Zm3 2.5A2.5 2.5 0 1 1 7 13.5a2.5 2.5 0 0 1 0-5ZM4.8 17l4.1-4.1 2.4 2.4 2.7-2.7 5.2 4.4H4.8Z\"/>",
+  "camera": "<path d=\"M8.4 4 10 2h4l1.6 2H19a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h3.4ZM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm6-2h2v2h-2V7Z\"/>",
+  "location": "<path d=\"M12 2a7 7 0 0 1 7 7c0 5.2-7 13-7 13S5 14.2 5 9a7 7 0 0 1 7-7Zm0 2a5 5 0 0 0-5 5c0 2.9 3.1 7.7 5 10.3 1.9-2.6 5-7.4 5-10.3a5 5 0 0 0-5-5Zm0 2.5A2.5 2.5 0 1 1 12 11.5a2.5 2.5 0 0 1 0-5Z\"/>",
+  "contact": "<path d=\"M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM4 22v-2c0-4 3.6-6 8-6s8 2 8 6v2h-2v-2c0-2.5-2.7-4-6-4s-6 1.5-6 4v2H4Z\"/>",
+  "chater": "<path d=\"M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-6l-4.5 4v-4H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v11h7.5v1.55L13.25 16H20V5H4Zm4 3h8v2H8V8Zm0 4h5v2H8v-2Z\"/>",
   "attachment": "<path d=\"M17.7 6.3a4.25 4.25 0 0 0-6.01 0L5.4 12.59a3 3 0 1 0 4.24 4.24l7.07-7.07-1.41-1.41-7.07 7.07a1 1 0 1 1-1.41-1.41l6.29-6.3a2.25 2.25 0 0 1 3.18 3.18l-7.07 7.08A4.75 4.75 0 0 1 2.5 11.25l6.72-6.72 1.42 1.42-6.72 6.71a2.75 2.75 0 0 0 3.89 3.89l7.07-7.07 1.42 1.41-7.08 7.08a4.75 4.75 0 0 1-6.71-6.72l6.72-6.72a6.25 6.25 0 1 1 8.84 8.84l-6.37 6.36-1.41-1.41 6.36-6.36a4.25 4.25 0 0 0 0-6.01Z\"/>",
   "bolt": "<path d=\"M13 2 4 14h6l-1 8 9-12h-6l1-8Z\"/>",
   "spark": "<path d=\"M12 2 9.8 8.8 3 11l6.8 2.2L12 20l2.2-6.8L21 11l-6.8-2.2L12 2Zm7 14-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3ZM5 2 4.2 4.2 2 5l2.2.8L5 8l.8-2.2L8 5l-2.2-.8L5 2Z\"/>",
@@ -293,6 +300,8 @@ const state = {
   pendingImagePreviews: [],
   attachmentUploading: false,
   attachmentBatchSending: false,
+  attachmentPickerOpen: false,
+  attachmentPickerView: 'options',
   sendModeMenuOpen: false,
   sendMode: 'direct',
   audioRecorder: null,
@@ -313,7 +322,7 @@ const els = {
   addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnToggleHeaderActions: $('btnToggleHeaderActions'), headerActions: $('headerActions'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
-  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
+  messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), galleryInput: $('galleryInput'), cameraInput: $('cameraInput'), attachmentPickerPanel: $('attachmentPickerPanel'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
   qrModal: $('qrModal'), qrBox: $('qrBox'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   contactShareModal: $('contactShareModal'), contactShareSearch: $('contactShareSearch'), contactShareList: $('contactShareList'), contactSharePageInfo: $('contactSharePageInfo'), btnCloseContactShare: $('btnCloseContactShare'), btnContactSharePrev: $('btnContactSharePrev'), btnContactShareNext: $('btnContactShareNext'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
@@ -677,9 +686,15 @@ function updateAttachmentPreview() {
       const progress = Math.max(0, Math.min(100, Math.round(Number(preview.progress || 0))));
       const ready = preview.status === 'ready' || progress >= 100;
       const viewLabel = `Ver ${preview.fileName || 'imagen adjunta'} en pantalla completa`;
-      return `<article class="ce-attachment-preview__item${ready ? ' is-ready' : ' is-processing'}" data-image-preview-id="${escapeHtml(preview.previewId)}"><button class="ce-attachment-preview__thumb" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(preview.previewUrl)}" data-image-alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" aria-label="${escapeHtml(viewLabel)}"><img src="${escapeHtml(preview.previewUrl)}" alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" /></button><button class="ce-attachment-preview__remove" type="button" data-clear-image-preview="${escapeHtml(preview.previewId)}" aria-label="Quitar ${escapeHtml(preview.fileName || 'imagen adjunta')}" style="--ce-attachment-progress:${progress}%" ${state.attachmentUploading ? 'disabled' : ''}>${uiIcon('close')}</button></article>`;
+      const progressContent = ready
+        ? uiIcon('close')
+        : `<span class="ce-attachment-preview__progress-label" aria-hidden="true">${progress}%</span>`;
+      const removeLabel = ready
+        ? `Quitar ${preview.fileName || 'imagen adjunta'}`
+        : `${preview.fileName || 'Imagen adjunta'}: ${progress}% procesada`;
+      return `<article class="ce-attachment-preview__item${ready ? ' is-ready' : ' is-processing'}" data-image-preview-id="${escapeHtml(preview.previewId)}"><button class="ce-attachment-preview__thumb" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(preview.previewUrl)}" data-image-alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" aria-label="${escapeHtml(viewLabel)}"><img src="${escapeHtml(preview.previewUrl)}" alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" /></button><button class="ce-attachment-preview__remove${ready ? ' is-ready' : ' is-processing'}" type="button" data-clear-image-preview="${escapeHtml(preview.previewId)}" aria-label="${escapeHtml(removeLabel)}" style="--ce-attachment-progress:${progress}%" ${state.attachmentUploading ? 'disabled' : ''}>${progressContent}</button></article>`;
     }).join('');
-    els.attachmentPreview.innerHTML = `<div class="ce-attachment-preview__gallery-head"><span class="ce-attachment-preview__gallery-count" aria-label="${imagePreviews.length} ${imagePreviews.length === 1 ? 'imagen adjunta' : 'imágenes adjuntas'}">${uiIcon('attachment')}<strong>${imagePreviews.length}</strong></span></div><div class="ce-attachment-preview__gallery" role="list">${gallery}</div>`;
+    els.attachmentPreview.innerHTML = `<div class="ce-attachment-preview__gallery" role="list" aria-label="${imagePreviews.length} ${imagePreviews.length === 1 ? 'imagen adjunta' : 'imágenes adjuntas'}">${gallery}</div>`;
     return;
   }
   if (!attachments.length && state.attachmentUploading) {
@@ -866,6 +881,337 @@ function closeImageViewer() {
   resetImageViewerTransform();
 }
 
+function readPermissionDenials() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(permissionDenialStorageKey) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function permissionDenialCount(name = '') {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return 0;
+  return Math.max(0, Number(readPermissionDenials()[cleanName] || 0) || 0);
+}
+
+function setPermissionDenialCount(name = '', count = 0) {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return;
+  try {
+    const current = readPermissionDenials();
+    const safeCount = Math.max(0, Number(count || 0) || 0);
+    if (safeCount) current[cleanName] = safeCount;
+    else delete current[cleanName];
+    if (Object.keys(current).length) localStorage.setItem(permissionDenialStorageKey, JSON.stringify(current));
+    else localStorage.removeItem(permissionDenialStorageKey);
+  } catch {}
+}
+
+function markPermissionDenied(name = '') {
+  const next = permissionDenialCount(name) + 1;
+  setPermissionDenialCount(name, next);
+  return next;
+}
+
+async function queryPermissionState(name = '') {
+  const cleanName = String(name || '').trim();
+  if (!cleanName || !navigator.permissions?.query) return 'unknown';
+  try {
+    const status = await navigator.permissions.query({ name: cleanName });
+    return String(status?.state || 'unknown');
+  } catch {
+    return 'unknown';
+  }
+}
+
+function isPermissionDeniedError(error = null) {
+  const name = String(error?.name || '').trim();
+  const message = String(error?.message || '').toLowerCase();
+  return name === 'NotAllowedError' || name === 'SecurityError' || /permission|permiso|denied|deneg/.test(message);
+}
+
+function permissionLabel(name = '') {
+  return ({ microphone: 'micrófono', camera: 'cámara', geolocation: 'ubicación', contacts: 'contactos' })[String(name || '').trim()] || 'permiso';
+}
+
+function permissionSettingsHelp(name = '') {
+  const label = permissionLabel(name);
+  return `El permiso de ${label} está bloqueado. Ábrelo desde los permisos del sitio o de la app instalada y vuelve a intentarlo.`;
+}
+
+function ensurePermissionRecoveryDialog() {
+  let modal = document.getElementById('cePermissionRecoveryModal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'cePermissionRecoveryModal';
+  modal.className = 'ce-modal ce-permission-recovery hidden';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Permisos de chatER');
+  modal.innerHTML = `<div class="ce-modal__card ce-permission-recovery__card">
+    <button class="ce-modal__close" type="button" data-permission-dialog-close="1" aria-label="Cerrar">${uiIcon('close')}</button>
+    <span class="ce-permission-recovery__icon" aria-hidden="true">${uiIcon('lock')}</span>
+    <h2 data-permission-dialog-title>Permiso necesario</h2>
+    <p data-permission-dialog-message>Activa el permiso y vuelve a intentarlo.</p>
+    <div class="ce-permission-recovery__actions">
+      <button class="ce-btn ce-btn--primary" type="button" data-permission-open-settings="1">Abrir configuración</button>
+      <button class="ce-link" type="button" data-permission-dialog-close="1">Ahora no</button>
+    </div>
+  </div>`;
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal || event.target.closest('[data-permission-dialog-close]')) {
+      modal.classList.add('hidden');
+      return;
+    }
+    const settingsButton = event.target.closest('[data-permission-open-settings]');
+    if (!settingsButton) return;
+    openDevicePermissionSettingsBestEffort(modal.dataset.permissionName || '');
+  });
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function openDevicePermissionSettingsBestEffort(name = '') {
+  const userAgent = String(navigator.userAgent || '');
+  const anchor = document.createElement('a');
+  anchor.style.display = 'none';
+  anchor.rel = 'noopener noreferrer';
+  if (/Android/i.test(userAgent)) {
+    anchor.href = 'intent:#Intent;action=android.settings.APPLICATION_SETTINGS;end';
+  } else if (/iPhone|iPad|iPod/i.test(userAgent)) {
+    anchor.href = 'app-settings:';
+  } else {
+    showTemporaryDraftStatus(permissionSettingsHelp(name), 5200);
+    return false;
+  }
+  document.body.appendChild(anchor);
+  try {
+    anchor.click();
+    return true;
+  } catch {
+    showTemporaryDraftStatus(permissionSettingsHelp(name), 5200);
+    return false;
+  } finally {
+    window.setTimeout(() => anchor.remove(), 0);
+  }
+}
+
+function showPermissionRecovery(name = '', { autoOpenSettings = false } = {}) {
+  const modal = ensurePermissionRecoveryDialog();
+  modal.dataset.permissionName = String(name || '');
+  const label = permissionLabel(name);
+  const title = modal.querySelector('[data-permission-dialog-title]');
+  const message = modal.querySelector('[data-permission-dialog-message]');
+  if (title) title.textContent = `Activa el ${label}`;
+  if (message) message.textContent = permissionSettingsHelp(name);
+  modal.classList.remove('hidden');
+  if (autoOpenSettings) openDevicePermissionSettingsBestEffort(name);
+}
+
+async function acquireMediaStreamWithPermission(name = '', constraints = {}) {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error(`Este dispositivo no permite usar el ${permissionLabel(name)} desde chatER.`);
+  const currentState = await queryPermissionState(name);
+  if (currentState === 'denied') {
+    const count = Math.max(permissionAutoSettingsThreshold, markPermissionDenied(name));
+    showPermissionRecovery(name, { autoOpenSettings: count >= permissionAutoSettingsThreshold });
+    const error = new Error(permissionSettingsHelp(name));
+    error.permissionHandled = true;
+    throw error;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    setPermissionDenialCount(name, 0);
+    return stream;
+  } catch (error) {
+    if (isPermissionDeniedError(error)) {
+      const count = markPermissionDenied(name);
+      const deniedNow = (await queryPermissionState(name)) === 'denied';
+      showPermissionRecovery(name, { autoOpenSettings: deniedNow || count >= permissionAutoSettingsThreshold });
+      const handled = new Error(permissionSettingsHelp(name));
+      handled.permissionHandled = true;
+      throw handled;
+    }
+    throw error;
+  }
+}
+
+function setComposerSharedValue(value = '', status = '') {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!clean || !els.messageInput) return;
+  const existing = String(els.messageInput.value || '').trim();
+  els.messageInput.value = existing ? `${existing} ${clean}` : clean;
+  scheduleActiveDraftSave();
+  updateComposerControls();
+  if (status) showTemporaryDraftStatus(status, 3200);
+  els.messageInput.focus();
+}
+
+function closeAttachmentPicker({ restoreFocus = false } = {}) {
+  state.attachmentPickerOpen = false;
+  state.attachmentPickerView = 'options';
+  renderAttachmentPicker();
+  if (restoreFocus) els.messageInput?.focus();
+}
+
+function attachmentPickerContactRows() {
+  return state.contacts
+    .filter((contact) => contact?.userId && contact?.profileCode)
+    .slice()
+    .sort((a, b) => String(contactDisplayName(a)).localeCompare(String(contactDisplayName(b)), 'es'));
+}
+
+function renderAttachmentPicker() {
+  if (!els.attachmentPickerPanel) return;
+  const canOpen = Boolean(state.attachmentPickerOpen && state.activeChatId && !isChatInteractionBlocked() && !state.editingMessage?.messageId);
+  els.btnAttachFile?.setAttribute('aria-expanded', canOpen ? 'true' : 'false');
+  if (!canOpen) {
+    els.attachmentPickerPanel.classList.add('hidden');
+    els.attachmentPickerPanel.innerHTML = '';
+    return;
+  }
+  els.attachmentPickerPanel.classList.remove('hidden');
+  if (state.attachmentPickerView === 'chater') {
+    const contacts = attachmentPickerContactRows();
+    els.attachmentPickerPanel.innerHTML = `<div class="ce-attachment-picker__head"><button type="button" class="ce-attachment-picker__back" data-attachment-picker-back="1" aria-label="Volver">${uiIcon('arrowRight')}</button><span><strong>Contacto ChatER</strong><small>Elige un contacto agregado para compartirlo.</small></span></div><div class="ce-attachment-picker__contacts">${contacts.length ? contacts.map((contact) => `<button type="button" class="ce-attachment-picker__contact" data-attachment-chater-contact-id="${escapeHtml(contact.userId)}">${avatar(contact, 'small')}<span><strong>${escapeHtml(contactDisplayName(contact))}</strong><small>${escapeHtml(contactDisplaySubtitle(contact))}</small></span></button>`).join('') : '<div class="ce-attachment-picker__empty">No tienes contactos ChatER con perfil compartible.</div>'}</div>`;
+    return;
+  }
+  const options = [
+    ['gallery', 'gallery', 'Galería celular', 'Selecciona una o varias imágenes'],
+    ['camera', 'camera', 'Cámara', 'Toma una foto con permiso de cámara'],
+    ['file', 'file', 'Archivo', 'Elige un archivo del dispositivo'],
+    ['location', 'location', 'Ubicación', 'Comparte tu ubicación actual'],
+    ['device-contact', 'contact', 'Contacto del celular', 'Elige un contacto guardado'],
+    ['chater-contact', 'chater', 'Contacto ChatER', 'Comparte un contacto agregado']
+  ];
+  els.attachmentPickerPanel.innerHTML = `<div class="ce-attachment-picker__head"><span><strong>Adjuntar</strong><small>Elige qué quieres compartir.</small></span><button type="button" class="ce-attachment-picker__close" data-attachment-picker-close="1" aria-label="Cerrar">${uiIcon('close')}</button></div><div class="ce-attachment-picker__grid" role="menu">${options.map(([id, icon, title, subtitle]) => `<button type="button" role="menuitem" class="ce-attachment-picker__option" data-attachment-option="${id}"><span class="ce-attachment-picker__option-icon" aria-hidden="true">${uiIcon(icon)}</span><strong>${title}</strong><small>${subtitle}</small></button>`).join('')}</div>`;
+}
+
+function openAttachmentPicker() {
+  if (!state.activeChatId || isChatInteractionBlocked() || state.editingMessage?.messageId || state.attachmentUploading || state.attachmentBatchSending) return;
+  state.quickRepliesOpen = false;
+  state.slashCommandsOpen = false;
+  state.iconInsertPanelOpen = false;
+  state.sendModeMenuOpen = false;
+  state.attachmentPickerOpen = !state.attachmentPickerOpen;
+  state.attachmentPickerView = 'options';
+  renderQuickRepliesPanel();
+  renderSlashCommandsPanel();
+  renderIconInsertPickerPanel();
+  updateSendModeMenu();
+  renderAttachmentPicker();
+}
+
+async function openCameraAttachmentFlow() {
+  let stream = null;
+  try {
+    stream = await acquireMediaStreamWithPermission('camera', { video: { facingMode: { ideal: 'environment' } }, audio: false });
+  } finally {
+    for (const track of stream?.getTracks?.() || []) {
+      try { track.stop(); } catch {}
+    }
+  }
+  closeAttachmentPicker();
+  els.cameraInput?.click();
+}
+
+function geolocationPosition(options = {}) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('La ubicación no está disponible en este dispositivo.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+async function shareCurrentLocationFromAttachmentPicker() {
+  const stateBefore = await queryPermissionState('geolocation');
+  if (stateBefore === 'denied') {
+    const count = Math.max(permissionAutoSettingsThreshold, markPermissionDenied('geolocation'));
+    showPermissionRecovery('geolocation', { autoOpenSettings: count >= permissionAutoSettingsThreshold });
+    return;
+  }
+  try {
+    const position = await geolocationPosition({ enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 });
+    setPermissionDenialCount('geolocation', 0);
+    const latitude = Number(position.coords?.latitude || 0);
+    const longitude = Number(position.coords?.longitude || 0);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) throw new Error('No se pudo obtener una ubicación válida.');
+    const mapsUrl = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+    closeAttachmentPicker();
+    setComposerSharedValue(`📍 ${mapsUrl}`, 'Ubicación lista. Revisa el mensaje y pulsa enviar.');
+  } catch (error) {
+    if (isPermissionDeniedError(error) || Number(error?.code || 0) === 1) {
+      const count = markPermissionDenied('geolocation');
+      const deniedNow = (await queryPermissionState('geolocation')) === 'denied';
+      showPermissionRecovery('geolocation', { autoOpenSettings: deniedNow || count >= permissionAutoSettingsThreshold });
+      return;
+    }
+    throw error;
+  }
+}
+
+function firstContactField(contact = {}, field = '') {
+  const value = contact?.[field];
+  if (Array.isArray(value)) return String(value.find(Boolean) || '').trim();
+  return String(value || '').trim();
+}
+
+async function shareDeviceContactFromAttachmentPicker() {
+  if (!navigator.contacts?.select) {
+    closeAttachmentPicker();
+    showPermissionRecovery('contacts');
+    const message = ensurePermissionRecoveryDialog().querySelector('[data-permission-dialog-message]');
+    if (message) message.textContent = 'El selector de contactos del dispositivo no está disponible en este navegador. En Android funciona en navegadores compatibles con Contact Picker.';
+    return;
+  }
+  try {
+    const contacts = await navigator.contacts.select(['name', 'email', 'tel'], { multiple: false });
+    const contact = Array.isArray(contacts) ? contacts[0] : null;
+    if (!contact) return;
+    const name = firstContactField(contact, 'name') || 'Contacto';
+    const tel = firstContactField(contact, 'tel');
+    const email = firstContactField(contact, 'email');
+    const parts = [`👤 ${name}`];
+    if (tel) parts.push(`Tel: ${tel}`);
+    if (email) parts.push(`Email: ${email}`);
+    closeAttachmentPicker();
+    setComposerSharedValue(parts.join(' · '), 'Contacto del celular listo. Revisa el mensaje y pulsa enviar.');
+  } catch (error) {
+    if (/AbortError/i.test(String(error?.name || ''))) return;
+    if (isPermissionDeniedError(error)) {
+      const count = markPermissionDenied('contacts');
+      showPermissionRecovery('contacts', { autoOpenSettings: count >= permissionAutoSettingsThreshold });
+      return;
+    }
+    throw error;
+  }
+}
+
+function shareChatERContactFromAttachmentPicker(userId = '') {
+  const contact = state.contacts.find((item) => item?.userId === String(userId || '').trim());
+  if (!contact?.profileCode) throw new Error('Este contacto ChatER no tiene un perfil compartible disponible.');
+  const shareLink = buildProfileShareLink(contact);
+  if (!shareLink) throw new Error('No se pudo preparar el enlace del contacto ChatER.');
+  setContactLinkPreview(contact.profileCode, { code: contact.profileCode, status: 'ready', profile: contact, saved: true });
+  closeAttachmentPicker();
+  setComposerSharedValue(shareLink, 'Contacto ChatER listo. Revisa el mensaje y pulsa enviar.');
+}
+
+function handleAttachmentInputFiles(files = [], { imagesOnly = false } = {}) {
+  const selected = Array.from(files || []).filter(Boolean);
+  if (!selected.length) return Promise.resolve();
+  const onlyImages = selected.every((file) => isImageAttachmentFile(file));
+  if (imagesOnly && !onlyImages) return Promise.reject(new Error('Selecciona únicamente imágenes.'));
+  return onlyImages
+    ? uploadImageAttachmentsForActiveChat(selected)
+    : (selected.length === 1
+      ? uploadAttachmentForActiveChat(selected[0])
+      : Promise.reject(new Error('Para archivos que no sean imágenes, adjunta uno a la vez.')));
+}
+
 function isAudioRecordingSupported() {
   return Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
 }
@@ -924,32 +1270,41 @@ async function startAudioRecording() {
   if (state.editingMessage?.messageId) throw new Error('Termina la edición antes de grabar audio.');
   if (!isAudioRecordingSupported()) throw new Error('La grabación de audio no está disponible en este navegador.');
   if (state.voiceDictating) stopVoiceDictation({ announce: false });
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const mimeType = preferredAudioMimeType();
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-  state.audioStream = stream;
-  state.audioRecorder = recorder;
-  state.audioChunks = [];
-  state.audioStartedAt = Date.now();
-  state.audioRecording = true;
-  recorder.addEventListener('dataavailable', (event) => {
-    if (event.data?.size) state.audioChunks.push(event.data);
-  });
-  recorder.addEventListener('stop', () => {
-    finalizeAudioRecording().catch((error) => {
+  let stream = null;
+  try {
+    stream = await acquireMediaStreamWithPermission('microphone', { audio: true });
+    const mimeType = preferredAudioMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    state.audioStream = stream;
+    state.audioRecorder = recorder;
+    state.audioChunks = [];
+    state.audioStartedAt = Date.now();
+    state.audioRecording = true;
+    recorder.addEventListener('dataavailable', (event) => {
+      if (event.data?.size) state.audioChunks.push(event.data);
+    });
+    recorder.addEventListener('stop', () => {
+      finalizeAudioRecording().catch((error) => {
+        state.audioSending = false;
+        resetAudioRecorderState();
+        alert(error.message || 'No se pudo enviar el audio grabado.');
+      });
+    }, { once: true });
+    recorder.addEventListener('error', () => {
       state.audioSending = false;
       resetAudioRecorderState();
-      alert(error.message || 'No se pudo enviar el audio grabado.');
-    });
-  }, { once: true });
-  recorder.addEventListener('error', () => {
-    state.audioSending = false;
+      alert('No se pudo completar la grabación de audio.');
+    }, { once: true });
+    recorder.start();
+    showTemporaryDraftStatus('Grabando audio. Pulsa el botón cuadrado para enviar.', 2800);
+    updateComposerControls();
+  } catch (error) {
+    for (const track of stream?.getTracks?.() || []) {
+      try { track.stop(); } catch {}
+    }
     resetAudioRecorderState();
-    alert('No se pudo completar la grabación de audio.');
-  }, { once: true });
-  recorder.start();
-  showTemporaryDraftStatus('Grabando audio. Pulsa el botón cuadrado para enviar.', 2800);
-  updateComposerControls();
+    throw error;
+  }
 }
 
 function stopAudioRecording() {
@@ -1060,7 +1415,7 @@ async function createInlineMediaFallbackAttachment(prepared = {}) {
   });
 }
 
-async function createR2AttachmentForPreparedFile(prepared = {}) {
+async function createR2AttachmentForPreparedFile(prepared = {}, options = {}) {
   const intent = await post('/api/chats/attachments/intent', {
     chatId: state.activeChatId,
     kind: prepared.kind,
@@ -1074,7 +1429,17 @@ async function createR2AttachmentForPreparedFile(prepared = {}) {
     originalMimeType: prepared.originalMimeType
   });
   const upload = intent.upload || {};
-  await uploadToSignedUrl(upload.url, prepared.file, upload.headers || { 'Content-Type': prepared.mimeType });
+  await uploadToSignedUrl(
+    upload.url,
+    prepared.file,
+    upload.headers || { 'Content-Type': prepared.mimeType },
+    {
+      onProgress(progress) {
+        if (typeof options.onUploadProgress === 'function') options.onUploadProgress(progress);
+      }
+    }
+  );
+  if (typeof options.onConfirming === 'function') options.onConfirming();
   const confirmed = await post('/api/chats/attachments/confirm', { attachmentId: intent.attachment?.attachmentId || '' });
   return confirmed.attachment || intent.attachment;
 }
@@ -1114,8 +1479,16 @@ async function createAttachmentForActiveChat(file, options = {}) {
   }
   try {
     showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
-    reportImageProgress(90, 'uploading');
-    const attachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared));
+    reportImageProgress(86, 'intent');
+    const attachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared, {
+      onUploadProgress(progress) {
+        const networkProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+        reportImageProgress(88 + Math.round(networkProgress * 0.1), 'uploading');
+      },
+      onConfirming() {
+        reportImageProgress(99, 'confirming');
+      }
+    }));
     if (!attachment) throw new Error('La subida segura no devolvió un adjunto válido.');
     showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
     reportImageProgress(100, 'ready');
@@ -3511,12 +3884,15 @@ function closeComposerTransientPanels({ closeSchedule = true } = {}) {
   state.slashCommandsOpen = false;
   state.iconInsertPanelOpen = false;
   state.sendModeMenuOpen = false;
+  state.attachmentPickerOpen = false;
+  state.attachmentPickerView = 'options';
   if (closeSchedule && state.scheduleModalOpen) state.scheduleModalOpen = false;
   if (closeSchedule && state.pollModalOpen) state.pollModalOpen = false;
   renderQuickRepliesPanel();
   renderIconInsertPickerPanel();
   renderSlashCommandsPanel();
   updateSendModeMenu();
+  renderAttachmentPicker();
   if (closeSchedule) {
     renderScheduleModal();
     renderPollModal();
@@ -3693,10 +4069,19 @@ function syncIconInsertKeyboardClasses(isOpen = false) {
 
 function ensureIconInsertPickerKeyboardPlacement() {
   if (!els.messageForm || !els.iconInsertPickerPanel) return;
+  const topRow = els.messageForm.querySelector('.ce-compose__top');
   const bottomRow = els.messageForm.querySelector('.ce-compose__bottom');
-  if (bottomRow && els.iconInsertPickerPanel.previousElementSibling !== bottomRow) {
-    bottomRow.insertAdjacentElement('afterend', els.iconInsertPickerPanel);
-  } else if (!bottomRow && els.iconInsertPickerPanel.parentElement !== els.messageForm) {
+  const desktopLayout = Boolean(window.matchMedia?.('(min-width: 981px)')?.matches);
+
+  if (desktopLayout && topRow) {
+    if (els.iconInsertPickerPanel.nextElementSibling !== topRow) {
+      els.messageForm.insertBefore(els.iconInsertPickerPanel, topRow);
+    }
+  } else if (bottomRow) {
+    if (els.iconInsertPickerPanel.previousElementSibling !== bottomRow) {
+      bottomRow.insertAdjacentElement('afterend', els.iconInsertPickerPanel);
+    }
+  } else if (els.iconInsertPickerPanel.parentElement !== els.messageForm) {
     els.messageForm.appendChild(els.iconInsertPickerPanel);
   }
   els.iconInsertPickerPanel.classList.add('ce-icon-insert-panel--keyboard');
@@ -3748,6 +4133,9 @@ function toggleIconInsertPicker() {
     state.quickRepliesOpen = false;
     state.slashCommandsOpen = false;
     state.sendModeMenuOpen = false;
+    state.attachmentPickerOpen = false;
+    state.attachmentPickerView = 'options';
+    renderAttachmentPicker();
     if (state.scheduleModalOpen) closeScheduleModal();
     if (state.pollModalOpen) closePollModal();
     els.messageInput?.blur();
@@ -8673,6 +9061,7 @@ function bindEvents() {
   const mobileChatViewportQuery = window.matchMedia?.('(max-width: 620px)');
   const handleMobileChatViewportChange = () => {
     if (state.user) updateResponsiveShellState();
+    if (state.iconInsertPanelOpen) ensureIconInsertPickerKeyboardPlacement();
     scheduleScrollBottomButtonUpdate();
   };
   mobileChatViewportQuery?.addEventListener?.('change', handleMobileChatViewportChange);
@@ -9400,6 +9789,9 @@ function bindEvents() {
       state.quickRepliesOpen = false;
       state.slashCommandsOpen = false;
       state.iconInsertPanelOpen = false;
+      state.attachmentPickerOpen = false;
+      state.attachmentPickerView = 'options';
+      renderAttachmentPicker();
       if (state.scheduleModalOpen) closeScheduleModal();
       if (state.pollModalOpen) closePollModal();
       renderQuickRepliesPanel();
@@ -9425,25 +9817,60 @@ function bindEvents() {
     if (els.sendModeMenu?.contains(event.target) || els.btnSendModePrefix?.contains(event.target)) return;
     closeSendModeMenu();
   });
-  els.btnAttachFile?.addEventListener('click', () => {
+  els.btnAttachFile?.addEventListener('click', (event) => {
+    event.preventDefault();
     if (state.attachmentUploading || state.attachmentBatchSending) return;
-    closeComposerTransientPanels();
-    els.fileInput?.click();
+    openAttachmentPicker();
   });
-  els.fileInput?.addEventListener('change', () => {
-    const files = Array.from(els.fileInput?.files || []);
-    if (els.fileInput) els.fileInput.value = '';
-    if (!files.length) return;
-    const onlyImages = files.every((file) => isImageAttachmentFile(file));
-    const uploadPromise = onlyImages
-      ? uploadImageAttachmentsForActiveChat(files)
-      : (files.length === 1
-        ? uploadAttachmentForActiveChat(files[0])
-        : Promise.reject(new Error('La selección múltiple está disponible solo para imágenes. Para otros archivos, adjunta uno a la vez.')));
-    uploadPromise.catch((error) => {
-      if (!onlyImages) clearPendingAttachment();
-      alert(error.message || 'No se pudo adjuntar el archivo.');
+  els.attachmentPickerPanel?.addEventListener('click', (event) => {
+    const closeButton = event.target.closest('[data-attachment-picker-close]');
+    if (closeButton) {
+      event.preventDefault();
+      closeAttachmentPicker({ restoreFocus: true });
+      return;
+    }
+    const backButton = event.target.closest('[data-attachment-picker-back]');
+    if (backButton) {
+      event.preventDefault();
+      state.attachmentPickerView = 'options';
+      renderAttachmentPicker();
+      return;
+    }
+    const chaterContact = event.target.closest('[data-attachment-chater-contact-id]');
+    if (chaterContact) {
+      event.preventDefault();
+      try { shareChatERContactFromAttachmentPicker(chaterContact.dataset.attachmentChaterContactId || ''); }
+      catch (error) { alert(error.message || 'No se pudo compartir el contacto ChatER.'); }
+      return;
+    }
+    const option = event.target.closest('[data-attachment-option]');
+    if (!option) return;
+    event.preventDefault();
+    const action = option.dataset.attachmentOption || '';
+    if (action === 'gallery') { closeAttachmentPicker(); els.galleryInput?.click(); return; }
+    if (action === 'file') { closeAttachmentPicker(); els.fileInput?.click(); return; }
+    if (action === 'chater-contact') { state.attachmentPickerView = 'chater'; renderAttachmentPicker(); return; }
+    if (action === 'camera') { openCameraAttachmentFlow().catch((error) => { if (!error?.permissionHandled) alert(error.message || 'No se pudo abrir la cámara.'); }); return; }
+    if (action === 'location') { shareCurrentLocationFromAttachmentPicker().catch((error) => alert(error.message || 'No se pudo obtener la ubicación.')); return; }
+    if (action === 'device-contact') { shareDeviceContactFromAttachmentPicker().catch((error) => alert(error.message || 'No se pudo abrir el contacto del celular.')); }
+  });
+  const bindAttachmentInput = (input, options = {}) => {
+    input?.addEventListener('change', () => {
+      const files = Array.from(input.files || []);
+      input.value = '';
+      handleAttachmentInputFiles(files, options).catch((error) => {
+        if (!files.every((file) => isImageAttachmentFile(file))) clearPendingAttachment();
+        alert(error.message || 'No se pudo adjuntar el archivo.');
+      });
     });
+  };
+  bindAttachmentInput(els.galleryInput, { imagesOnly: true });
+  bindAttachmentInput(els.cameraInput, { imagesOnly: true });
+  bindAttachmentInput(els.fileInput, { imagesOnly: false });
+  document.addEventListener('click', (event) => {
+    if (!state.attachmentPickerOpen) return;
+    if (els.attachmentPickerPanel?.contains(event.target) || els.btnAttachFile?.contains(event.target)) return;
+    closeAttachmentPicker();
   });
   els.attachmentPreview?.addEventListener('click', (event) => {
     const imageButton = event.target.closest('[data-open-pending-image-viewer]');
@@ -9838,7 +10265,7 @@ function bindEvents() {
       } catch (error) {
         state.audioSending = false;
         resetAudioRecorderState();
-        alert(error.message || 'No se pudo iniciar la grabación de audio.');
+        if (!error?.permissionHandled) alert(error.message || 'No se pudo iniciar la grabación de audio.');
       } finally {
         updateComposerControls();
       }

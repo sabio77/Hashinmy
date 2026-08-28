@@ -12182,3 +12182,308 @@ body.ce-dark-mode .ce-profile-share__toggle {
     padding-inline: 8px !important;
   }
 }
+
+
+/* Iteración adjuntos/permisos · requisitos de chat móvil/PC, progreso de imágenes y selector profesional. */
+.ce-tabs {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+@media (max-width: 620px) {
+  .ce-tabs {
+    margin-top: 7px !important;
+    margin-bottom: 7px !important;
+  }
+}
+
+@media (min-width: 981px) {
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    grid-template-areas:
+      "emojiKeyboard"
+      "composerTools"
+      "composerInput" !important;
+  }
+
+  #messageForm.ce-compose.ce-compose--emoji-keyboard .ce-icon-insert-panel--keyboard {
+    margin: 0 0 8px !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+}
+
+@media (max-width: 980px) {
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    grid-template-areas:
+      "composerTools"
+      "composerInput"
+      "emojiKeyboard" !important;
+  }
+}
+
+#messageForm > #attachmentPreview.ce-attachment-preview--gallery {
+  width: min(760px, calc(100% - 12px)) !important;
+  max-height: min(34dvh, 210px) !important;
+  padding: 8px !important;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--ce-panel) 90%, transparent) !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head,
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-count {
+  display: none !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery {
+  margin: 0 !important;
+  padding: 0 2px 4px !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__item {
+  background: transparent !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove {
+  display: grid !important;
+  place-items: center !important;
+  font-size: 0.58rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.02em;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove.is-processing {
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.78)) padding-box,
+    conic-gradient(#22c55e 0 var(--ce-attachment-progress), rgba(255, 255, 255, 0.34) var(--ce-attachment-progress) 100%) border-box !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove.is-ready {
+  border-color: #53bdeb !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  box-shadow: 0 0 0 1px rgba(83, 189, 235, 0.34), 0 3px 10px rgba(0, 0, 0, 0.18) !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove.is-ready:hover,
+#messageForm > #attachmentPreview .ce-attachment-preview__remove.is-ready:focus-visible {
+  border-color: #53bdeb !important;
+  background: rgba(127, 29, 29, 0.92) !important;
+}
+
+.ce-attachment-preview__progress-label {
+  display: block;
+  min-width: 0;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ce-attachment-picker {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 48;
+  width: min(520px, calc(100vw - 24px));
+  max-height: min(66dvh, 520px);
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--ce-line) 86%, transparent);
+  border-radius: 24px;
+  padding: 14px;
+  overflow: auto;
+  background: color-mix(in srgb, var(--ce-panel) 96%, transparent);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(20px) saturate(1.12);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+}
+
+.ce-attachment-picker.hidden {
+  display: none !important;
+}
+
+.ce-attachment-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ce-attachment-picker__head > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ce-attachment-picker__head strong {
+  color: var(--ce-text);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+.ce-attachment-picker__head small,
+.ce-attachment-picker__option small,
+.ce-attachment-picker__contact small {
+  color: var(--ce-muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.ce-attachment-picker__close,
+.ce-attachment-picker__back {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ce-bg-soft);
+  color: var(--ce-muted-strong);
+  cursor: pointer;
+}
+
+.ce-attachment-picker__back .ce-ui-icon {
+  transform: rotate(180deg);
+}
+
+.ce-attachment-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ce-attachment-picker__option {
+  min-width: 0;
+  min-height: 126px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--ce-line) 82%, transparent);
+  border-radius: 19px;
+  padding: 14px 10px;
+  background: var(--ce-bg-soft);
+  color: var(--ce-text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.ce-attachment-picker__option:hover,
+.ce-attachment-picker__option:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--ce-accent) 55%, var(--ce-line));
+  background: color-mix(in srgb, var(--ce-accent-soft) 54%, var(--ce-panel));
+  outline: none;
+}
+
+.ce-attachment-picker__option-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ce-accent-soft) 72%, var(--ce-panel));
+  color: var(--ce-accent-dark);
+}
+
+.ce-attachment-picker__option-icon .ce-ui-icon {
+  width: 31px;
+  height: 31px;
+}
+
+.ce-attachment-picker__option strong {
+  font-size: .84rem;
+  font-weight: 900;
+}
+
+.ce-attachment-picker__contacts {
+  display: grid;
+  gap: 7px;
+  max-height: min(48dvh, 360px);
+  overflow: auto;
+}
+
+.ce-attachment-picker__contact {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--ce-line) 82%, transparent);
+  border-radius: 16px;
+  padding: 10px;
+  background: var(--ce-bg-soft);
+  color: var(--ce-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ce-attachment-picker__contact > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ce-attachment-picker__contact strong,
+.ce-attachment-picker__contact small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ce-attachment-picker__empty {
+  padding: 20px 12px;
+  border: 1px dashed var(--ce-line);
+  border-radius: 16px;
+  color: var(--ce-muted);
+  text-align: center;
+}
+
+.ce-permission-recovery__card {
+  width: min(92vw, 430px);
+  text-align: center;
+}
+
+.ce-permission-recovery__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: var(--ce-accent-soft);
+  color: var(--ce-accent-dark);
+}
+
+.ce-permission-recovery__icon .ce-ui-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.ce-permission-recovery__actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 620px) {
+  .ce-attachment-picker {
+    bottom: calc(100% + 6px);
+    width: calc(100vw - 14px);
+    max-height: min(70dvh, 520px);
+    border-radius: 22px 22px 10px 10px;
+    padding: 12px;
+  }
+
+  .ce-attachment-picker__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .ce-attachment-picker__option {
+    min-height: 112px;
+  }
+}

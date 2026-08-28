@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chater-static-v91-runtime-backend-config';
+const CACHE_NAME = 'chater-static-v93-attachment-progress-emoji-layout';
 const CORE_ASSETS = [
   './index.html',
   './styles.css',
@@ -20,9 +20,7 @@ const CORE_ASSETS = [
 
 const OPTIONAL_ASSETS = [
   './assets/icon-192.png',
-  './assets/icon-512.png',
-  './assets/icon-192.svg',
-  './assets/icon-512.svg'
+  './assets/icon-512.png'
 ];
 
 const DELIVERY_ACK_DB_NAME = 'chater-delivery-acks-v1';
@@ -240,23 +238,104 @@ async function acknowledgePushDelivery(payload = {}, options = {}) {
   return Number(result.confirmed || 0) > 0;
 }
 
-function buildFallbackIconSvg(size = 192) {
+function crc32(bytes = new Uint8Array()) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function adler32(bytes = new Uint8Array()) {
+  let a = 1;
+  let b = 0;
+  for (const byte of bytes) {
+    a = (a + byte) % 65521;
+    b = (b + a) % 65521;
+  }
+  return ((b << 16) | a) >>> 0;
+}
+
+function uint32be(value = 0) {
+  return new Uint8Array([(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
+}
+
+function concatBytes(parts = []) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
+function pngChunk(type = '', data = new Uint8Array()) {
+  const typeBytes = new TextEncoder().encode(type);
+  const body = concatBytes([typeBytes, data]);
+  return concatBytes([uint32be(data.length), body, uint32be(crc32(body))]);
+}
+
+function zlibStore(bytes = new Uint8Array()) {
+  const chunks = [new Uint8Array([0x78, 0x01])];
+  let offset = 0;
+  while (offset < bytes.length) {
+    const length = Math.min(65535, bytes.length - offset);
+    const finalBlock = offset + length >= bytes.length ? 1 : 0;
+    const nlen = (~length) & 0xffff;
+    chunks.push(new Uint8Array([finalBlock, length & 255, (length >>> 8) & 255, nlen & 255, (nlen >>> 8) & 255]));
+    chunks.push(bytes.slice(offset, offset + length));
+    offset += length;
+  }
+  chunks.push(uint32be(adler32(bytes)));
+  return concatBytes(chunks);
+}
+
+function buildFallbackIconPng(size = 192) {
   const safeSize = Math.max(64, Math.min(512, Number(size || 192)));
-  const radius = Math.round(safeSize * 0.23);
-  const bubbleX = Math.round(safeSize * 0.24);
-  const bubbleY = Math.round(safeSize * 0.18);
-  const bubbleW = Math.round(safeSize * 0.56);
-  const bubbleH = Math.round(safeSize * 0.46);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><rect width="${safeSize}" height="${safeSize}" rx="${radius}" fill="#0aa884"/><path d="M${bubbleX} ${bubbleY + bubbleH * 0.38}c0-${bubbleH * 0.42} ${bubbleW * 0.31}-${bubbleH * 0.76} ${bubbleW * 0.69}-${bubbleH * 0.76}h${bubbleW * 0.06}c${bubbleW * 0.38} 0 ${bubbleW * 0.69} ${bubbleH * 0.34} ${bubbleW * 0.69} ${bubbleH * 0.76}v${bubbleH * 0.16}c0 ${bubbleH * 0.42}-${bubbleW * 0.31} ${bubbleH * 0.76}-${bubbleW * 0.69} ${bubbleH * 0.76}h-${bubbleW * 0.2}l-${bubbleW * 0.22} ${bubbleH * 0.2}c-${bubbleW * 0.07} ${bubbleH * 0.06}-${bubbleW * 0.17}-.01-${bubbleW * 0.15}-${bubbleH * 0.1}l${bubbleW * 0.04}-${bubbleH * 0.19}a${bubbleW * 0.68} ${bubbleH * 0.68} 0 0 1-${bubbleW * 0.06}-${bubbleH * 0.27}v-${bubbleH * 0.16}Z" fill="#fff"/><circle cx="${safeSize * 0.42}" cy="${safeSize * 0.43}" r="${safeSize * 0.042}" fill="#0aa884"/><circle cx="${safeSize * 0.5}" cy="${safeSize * 0.43}" r="${safeSize * 0.042}" fill="#0aa884"/><circle cx="${safeSize * 0.58}" cy="${safeSize * 0.43}" r="${safeSize * 0.042}" fill="#0aa884"/></svg>`;
+  const stride = 1 + safeSize * 4;
+  const raw = new Uint8Array(stride * safeSize);
+  const margin = Math.round(safeSize * 0.2);
+  const bubbleTop = Math.round(safeSize * 0.25);
+  const bubbleBottom = Math.round(safeSize * 0.68);
+  const bubbleLeft = Math.round(safeSize * 0.2);
+  const bubbleRight = Math.round(safeSize * 0.8);
+  for (let y = 0; y < safeSize; y += 1) {
+    const row = y * stride;
+    raw[row] = 0;
+    for (let x = 0; x < safeSize; x += 1) {
+      const pixel = row + 1 + x * 4;
+      let r = 10, g = 168, b = 132;
+      const inBubble = x >= bubbleLeft && x <= bubbleRight && y >= bubbleTop && y <= bubbleBottom;
+      const inTail = y > bubbleBottom && y <= bubbleBottom + Math.round(safeSize * 0.12) && x >= margin && x <= Math.round(safeSize * 0.43) && (x + y) >= Math.round(safeSize * 0.93);
+      if (inBubble || inTail) r = g = b = 255;
+      const dotY = Math.round(safeSize * 0.46);
+      const dotRadius = Math.max(2, Math.round(safeSize * 0.035));
+      const dotCenters = [0.4, 0.5, 0.6].map((ratio) => Math.round(safeSize * ratio));
+      if ((inBubble || inTail) && dotCenters.some((cx) => ((x - cx) ** 2 + (y - dotY) ** 2) <= dotRadius ** 2)) {
+        r = 10; g = 168; b = 132;
+      }
+      raw[pixel] = r; raw[pixel + 1] = g; raw[pixel + 2] = b; raw[pixel + 3] = 255;
+    }
+  }
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = new Uint8Array(13);
+  ihdr.set(uint32be(safeSize), 0);
+  ihdr.set(uint32be(safeSize), 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return concatBytes([signature, pngChunk('IHDR', ihdr), pngChunk('IDAT', zlibStore(raw)), pngChunk('IEND', new Uint8Array())]);
 }
 
 function fallbackIconResponse(pathname = '') {
-  if (!/\/assets\/icon-(192|512)\.(png|svg)$/i.test(pathname)) return null;
+  if (!/\/assets\/icon-(192|512)\.png$/i.test(pathname)) return null;
   const size = pathname.includes('512') ? 512 : 192;
-  return new Response(buildFallbackIconSvg(size), {
+  return new Response(buildFallbackIconPng(size), {
     status: 200,
     headers: {
-      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=604800'
     }
   });
@@ -357,8 +436,8 @@ self.addEventListener('push', (event) => {
     body: payload.body || 'Tienes un mensaje nuevo.',
     tag: payload.tag || 'chatER',
     renotify: true,
-    badge: './assets/icon-192.svg',
-    icon: payload.sender?.photoUrl || './assets/icon-192.svg',
+    badge: './assets/icon-192.png',
+    icon: payload.sender?.photoUrl || './assets/icon-192.png',
     data: {
       url: payload.url || './index.html',
       chatId: payload.chatId || '',
