@@ -60,7 +60,7 @@ globalThis.fetch = async () => {
 };
 let exhausted = null;
 try {
-  await apiPost('/api/retry-exhausted', { operationId: 'op_test' });
+  await apiPost('/api/retry-exhausted', { operationId: 'op_test' }, { idempotent: true });
 } catch (error) {
   exhausted = error;
 }
@@ -78,6 +78,34 @@ assert.equal(terminalAudit.previousStatePreserved, true);
 assert.equal(terminalAudit.error.code, 'TEMPORARY_FAILURE');
 assert.equal(terminalAudit.error.status, 503);
 
+
+attempts = 0;
+globalThis.fetch = async () => {
+  attempts += 1;
+  return jsonResponse(503, { ok: false, code: 'TEMPORARY_FAILURE', message: 'Temporal' });
+};
+let unsafePost = null;
+try {
+  await apiPost('/api/auth/google-login', { idToken: 'firebase-token-test' }, { maxAttempts: 3 });
+} catch (error) {
+  unsafePost = error;
+}
+assert.ok(unsafePost, 'El POST no idempotente debe propagar el fallo de su único intento.');
+assert.equal(attempts, 1, 'Un POST no auditado como idempotente no debe duplicar mutaciones ni HTTP Responses.');
+assert.equal(unsafePost.requestAttempts, 1);
+assert.equal(unsafePost.requestMaxAttempts, 1);
+assert.equal(unsafePost.requestRetrySafetyLimited, true, 'Debe quedar trazable que el reintento fue bloqueado por seguridad/idempotencia.');
+
+attempts = 0;
+globalThis.fetch = async () => {
+  attempts += 1;
+  if (attempts < 3) return jsonResponse(503, { ok: false, code: 'TEMPORARY_FAILURE', message: 'Temporal' });
+  return jsonResponse(200, { ok: true, device: { deviceId: 'dev_test' } });
+};
+const safeBootstrap = await apiPost('/api/p2p/bootstrap', { device: { deviceId: 'dev_test' } });
+assert.equal(safeBootstrap.device.deviceId, 'dev_test');
+assert.equal(attempts, 3, 'El bootstrap P2P auditado como idempotente debe conservar su recuperación acotada.');
+
 attempts = 0;
 globalThis.fetch = async () => {
   attempts += 1;
@@ -93,6 +121,23 @@ assert.ok(invalid);
 assert.equal(attempts, 1, 'Un 4xx no recuperable no debe repetirse.');
 assert.equal(invalid.requestRetryExhausted, false);
 
+attempts = 0;
+globalThis.fetch = async () => {
+  attempts += 1;
+  return jsonResponse(501, { ok: false, code: 'NOT_IMPLEMENTED', message: 'Operación no implementada' });
+};
+let definitiveServerError = null;
+try {
+  await apiGet('/api/not-implemented');
+} catch (error) {
+  definitiveServerError = error;
+}
+assert.ok(definitiveServerError, 'Un 5xx definitivo debe propagarse sin ocultar el fallo.');
+assert.equal(attempts, 1, 'Un 501 definitivo no debe consumir respuestas HTTP adicionales mediante reintentos.');
+assert.equal(definitiveServerError.requestRetryExhausted, false);
+assert.equal(definitiveServerError.requestAttempts, 1);
+assert.equal(definitiveServerError.status, 501);
+
 const auditCountBeforeSingleAttempt = auditEvents.length;
 attempts = 0;
 globalThis.fetch = async () => {
@@ -107,4 +152,4 @@ assert.equal(auditEvents.length, auditCountBeforeSingleAttempt, 'La auditoría e
 
 console.warn = originalWarn;
 console.error = originalError;
-console.log('OK: solicitudes backend con máximo de 3 intentos, rollback lógico de la capa de request y auditoría estructurada validados.');
+console.log('OK: GET/POST idempotentes conservan reintentos solo ante fallos transitorios; POST no idempotentes y 5xx definitivos quedan en un intento, con auditoría estructurada.');

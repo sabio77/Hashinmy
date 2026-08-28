@@ -39,11 +39,12 @@ Los archivos que controlan actualización deben salir siempre frescos:
 /index.html        no-store
 /version.json      no-store
 /manifest.webmanifest no-cache
-/src/*             no-cache si no usas nombres con hash
-/assets/*          no-cache si no usas nombres con hash
+/src/*             public, max-age=86400, stale-while-revalidate=604800
+/assets/*          public, max-age=604800, stale-while-revalidate=2592000
+/textX/*           public, max-age=86400, stale-while-revalidate=604800
 ```
 
-Si tu bundler genera archivos con hash, puedes usar cache largo e `immutable` solo para esos assets hasheados.
+El Service Worker mantiene cachés separados por identidad de release. Por eso estos TTL evitan respuestas HTTP repetidas sin congelar un despliegue nuevo: `sw.js` y `version.json` continúan frescos y el nuevo worker precarga el shell del release. Si además tu bundler genera nombres con hash, puedes usar `immutable` para esos assets.
 
 ## Render Static Site conectado a memoriaBACKEND
 

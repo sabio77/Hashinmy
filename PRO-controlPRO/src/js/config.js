@@ -15,9 +15,14 @@ window.APP_SEED_CONFIG = Object.freeze({
   updateCheckOnFocus: true,
   updateCheckOnOnline: true,
   updateCheckOnPageShow: true,
+  // Las señales de ciclo de vida se agrupan para que focus/visible/pageshow no
+  // conviertan la comprobación de releases en tráfico HTTP repetitivo.
+  passiveUpdateCheckMinIntervalMs: 300000,
+  startupUpdateCheckDedupMs: 15000,
 
   // Evita que varias pestañas instaladas hagan la misma consulta al servidor.
-  // No usa heartbeat por intervalo; el bloqueo es transitorio y se libera al terminar cada revisión.
+  // El sello de última revisión complementa el lock transitorio para impedir que
+  // pestañas que arrancan una detrás de otra repitan version.json tras liberarse el lock.
   multiTabCoordinationEnabled: true,
   leaderLockTtlMs: 45000,
   broadcastChannelName: String(window.APP_SEED_METADATA?.cacheNamespace || 'semilla-appweb-pwa') + ':updates',
@@ -32,10 +37,10 @@ window.APP_SEED_CONFIG = Object.freeze({
   // todos los archivos críticos en cada revisión.
   releaseManifestAssetsEnabled: true,
 
-  // Cuando version.json declara una lista nueva de criticalAssets, el cliente pide al
-  // Service Worker que los precargue por evento real. Esto cubre idiomas nuevos, logo
-  // nuevo e íconos nuevos sin polling y sin backend.
-  prefetchReleaseAssetsOnCheck: true,
+  // El Service Worker del release nuevo reutiliza por SHA-256 el shell anterior y
+  // descarga solo diferencias. La precarga desde la página queda desactivada para no
+  // duplicar esas mismas respuestas; puede habilitarse explícitamente si otro host lo requiere.
+  prefetchReleaseAssetsOnCheck: false,
   prefetchReleaseAssetsMax: 120,
 
   // Diagnóstico opcional contra mutaciones fuera del pipeline de deploy. Aunque se

@@ -291,7 +291,7 @@ export class P2PTabCoordinator {
     ]);
   }
 
-  async suspendForPageCache() {
+  async suspend() {
     if (!this.started || this.suspended) return false;
     this.suspended = true;
     this.clearTimers();
@@ -313,7 +313,7 @@ export class P2PTabCoordinator {
     return true;
   }
 
-  async resumeFromPageCache() {
+  async resume() {
     if (!this.started) return false;
     if (!this.suspended) return this.isLeader();
     const pendingWebLock = this.webLockTask;
@@ -327,6 +327,16 @@ export class P2PTabCoordinator {
     this.scheduleElection();
     if (!acquired) this.broadcast('state-request', {});
     return this.isLeader();
+  }
+
+  // Alias explícitos para BFCache: comparten la misma suspensión de liderazgo,
+  // pero conservan la API previa y evitan regresiones en pagehide/pageshow.
+  async suspendForPageCache() {
+    return this.suspend();
+  }
+
+  async resumeFromPageCache() {
+    return this.resume();
   }
 
   async requestLeadership() {

@@ -15,7 +15,7 @@ La versión anterior era robusta para actualizar, pero podía escalar mal si muc
 
 - Hospeda la app en CDN o hosting estático con HTTPS.
 - Mantén `index.html`, `sw.js` y `version.json` con `Cache-Control: no-store`.
-- Mantén `src/*`, `assets/*` y `textX/*` con `no-cache` si no usas nombres de archivo con hash.
+- Mantén `src/*` y `textX/*` con `max-age=86400` + `stale-while-revalidate`, y `assets/*` con TTL más largo; el Service Worker los aísla por identidad de release y evita pedirlos de nuevo en cada apertura.
 - En apps grandes, usa nombres de archivo con hash y cambia esos assets a `immutable`.
 - Ejecuta `python tools/generate-release.py` en cada despliegue.
 - Usa blue/green, rolling deploy o despliegue atómico del hosting para que todos los archivos de una versión aparezcan juntos.

@@ -20,10 +20,10 @@ El Service Worker:
 
 - Precarga el shell mínimo.
 - No rompe la instalación si un archivo opcional falla.
-- Usa `network-first` para navegación, HTML, CSS, JS y JSON.
-- Usa `stale-while-revalidate` para assets estáticos generales.
-- Usa `network-first` con fallback geométrico únicamente para el logo interno de UI (`assets/ui/ui_logo_principal_96x96.png`). Además, valida el `Content-Type` para evitar que un rewrite SPA de Render u otro hosting guarde `index.html` como si fuera una imagen real. Los íconos declarados por `manifest.webmanifest` no reciben fallbacks generados: la instalación se ofrece solo cuando existen PNG reales. Durante el build, `tools/generate-release.py` conserva estable la ruta del manifest y cambia el parámetro `icon_rev` de cada ícono cuando cambia su contenido, de modo que Chrome para Android pueda detectar el cambio en su ciclo de actualización del WebAPK.
-- Fuerza frescura para `sw.js`, `version.json` y `app-metadata.js`.
+- Usa `cache-first` sobre el caché estático versionado del release para navegación, HTML, CSS, JS y JSON; solo consulta red cuando el recurso no está en el release actual.
+- Usa el mismo caché versionado para assets estáticos generales, evitando la revalidación de red en cada lectura.
+- Para el logo interno de UI (`assets/ui/ui_logo_principal_96x96.png`), consulta primero el caché canónico; solo si falta intenta red y, si sigue ausente, genera el fallback geométrico. Además, valida el `Content-Type` para evitar que un rewrite SPA de Render u otro hosting guarde `index.html` como si fuera una imagen real. Los íconos declarados por `manifest.webmanifest` no reciben fallbacks generados: la instalación se ofrece solo cuando existen PNG reales. Durante el build, `tools/generate-release.py` conserva estable la ruta del manifest y cambia el parámetro `icon_rev` de cada ícono cuando cambia su contenido, de modo que Chrome para Android pueda detectar el cambio en su ciclo de actualización del WebAPK.
+- Fuerza frescura únicamente para `sw.js` y `version.json`; `app-metadata.js` viaja dentro del caché versionado del release.
 - Ejecuta `skipWaiting()` para activar versiones nuevas.
 - Ejecuta `clients.claim()` para tomar control de las ventanas abiertas.
 - Limpia únicamente cachés `static` y `runtime` del namespace exacto de la aplicación; no usa el prefijo general que podría incluir carpetas hermanas.
@@ -38,14 +38,15 @@ Estos archivos deben usar `no-store`:
 /version.json
 ```
 
-Estos archivos deberían usar `no-cache` o una política equivalente de revalidación:
+Los archivos estáticos del release pueden usar caché pública acotada porque el Service Worker los separa por versión y el deploy cambia la identidad del release:
 
 ```text
-/src/*
-/assets/*
-/textX/*
-/manifest.webmanifest
+/src/*     public, max-age=86400, stale-while-revalidate=604800
+/textX/*   public, max-age=86400, stale-while-revalidate=604800
+/assets/*  public, max-age=604800, stale-while-revalidate=2592000
 ```
+
+`manifest.webmanifest` conserva `no-cache` para que el navegador pueda revisar metadatos de instalación.
 
 Si un CDN congela `sw.js`, `index.html` o `version.json`, ninguna PWA puede garantizar actualización inmediata.
 

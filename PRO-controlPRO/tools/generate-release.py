@@ -475,9 +475,13 @@ def replace_js_array_property(text: str, property_name: str, values: Iterable[st
 
 
 def metadata_precache_urls(language_manifest: Dict[str, Any]) -> List[str]:
+    # sw.js ya es descargado y validado por el algoritmo nativo de actualización del
+    # navegador (`updateViaCache: none`). Guardarlo además en el app-shell solo duplica
+    # una respuesta y nunca participa en la carga controlada de la interfaz.
+    shell_assets = [asset for asset in DEFAULT_CRITICAL_ASSETS if asset != "./sw.js"]
     return ordered_unique([
         "./",
-        *DEFAULT_CRITICAL_ASSETS,
+        *shell_assets,
         *public_language_assets(language_manifest),
         *OPTIONAL_PRECACHE_ASSETS,
     ])

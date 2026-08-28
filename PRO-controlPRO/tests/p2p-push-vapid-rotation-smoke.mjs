@@ -39,7 +39,9 @@ export {
   resetState,
   comparePushApplicationServerKeys,
   readStoredPushVapidBinding,
-  writeStoredPushVapidBinding
+  writeStoredPushVapidBinding,
+  markStoredPushBackendRegistration,
+  storedPushBackendRegistrationIsFresh
 };
 `;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(isolatedModule).toString('base64')}`;
@@ -49,7 +51,9 @@ const {
   resetState,
   comparePushApplicationServerKeys,
   readStoredPushVapidBinding,
-  writeStoredPushVapidBinding
+  writeStoredPushVapidBinding,
+  markStoredPushBackendRegistration,
+  storedPushBackendRegistrationIsFresh
 } = await import(moduleUrl);
 
 function base64Url(bytes) {
@@ -79,6 +83,32 @@ const keyB = Uint8Array.from([4, 10, 20, 30, 40, 50, 61]);
 assert.equal(comparePushApplicationServerKeys(keyA, keyA.slice().buffer), true);
 assert.equal(comparePushApplicationServerKeys(keyA, keyB), false);
 assert.equal(comparePushApplicationServerKeys(null, keyB), null);
+
+resetState();
+const durableSubscription = hiddenKeySubscription('https://push.example/durable-binding');
+const durableContext = Object.freeze({ generation: 1, userId: 'user_a', deviceId: 'dev_rotation_0001', sessionToken: 'session' });
+writeStoredPushVapidBinding(durableSubscription, base64Url(keyA));
+assert.equal(
+  storedPushBackendRegistrationIsFresh(durableSubscription, { publicKey: base64Url(keyA), subscriptionTtlSeconds: 86400 }, durableContext),
+  false,
+  'Una vinculación VAPID local todavía no debe fingir que Redis ya fue registrado.'
+);
+assert.equal(markStoredPushBackendRegistration(durableSubscription, base64Url(keyA), durableContext), true);
+assert.equal(
+  storedPushBackendRegistrationIsFresh(durableSubscription, { publicKey: base64Url(keyA), subscriptionTtlSeconds: 86400 }, durableContext),
+  true,
+  'Una suscripción recién confirmada en backend debería evitar otro POST en el siguiente arranque.'
+);
+assert.equal(
+  storedPushBackendRegistrationIsFresh(durableSubscription, { publicKey: base64Url(keyA), subscriptionTtlSeconds: 86400 }, { ...durableContext, userId: 'user_b' }),
+  false,
+  'La marca durable Push no puede reutilizarse entre cuentas.'
+);
+assert.equal(
+  storedPushBackendRegistrationIsFresh(durableSubscription, { publicKey: base64Url(keyA), subscriptionTtlSeconds: 86400 }, { ...durableContext, deviceId: 'dev_other' }),
+  false,
+  'La marca durable Push no puede reutilizarse entre dispositivos.'
+);
 
 const client = new TestClient();
 const context = client.captureSessionContext();
@@ -234,6 +264,19 @@ try {
 assert.equal(stuckError?.code, 'P2P_PUSH_VAPID_ROTATION_FAILED');
 assert.equal(apiCalls.length, 1);
 
+const resolveBegin = source.indexOf('  async resolvePushConfiguration(');
+const resolveEnd = source.indexOf('  async ensurePushSubscriptionForCurrentVapidKey', resolveBegin);
+const resolveBlock = source.slice(resolveBegin, resolveEnd);
+assert.ok(resolveBlock.includes('if (this.pushConfigurationLoaded)'), 'El cliente no reutiliza la configuración Push ya incluida en bootstrap.');
+assert.ok(resolveBlock.indexOf('if (this.pushConfigurationLoaded)') < resolveBlock.indexOf("await apiGet('/api/push/public-key')"), 'El GET de clave Push se ejecuta antes de intentar reutilizar bootstrap.');
+
+const restoreBegin = source.indexOf('  async registerExistingPushSubscription()');
+const restoreEnd = source.indexOf('  async detachPushSubscription(', restoreBegin);
+const restoreBlock = source.slice(restoreBegin, restoreEnd);
+assert.ok(restoreBlock.includes('const backendRegistrationFresh = storedPushBackendRegistrationIsFresh(subscription, keyData, sessionContext);'), 'El arranque no comprueba si la suscripción ya sigue vigente en backend.');
+assert.ok(restoreBlock.includes('if (!backendRegistrationFresh) {'), 'El POST Push de arranque continúa siendo incondicional.');
+assert.ok(restoreBlock.includes('markStoredPushBackendRegistration(subscription, keyData.publicKey, sessionContext);'), 'Un POST Push exitoso no deja una marca durable para evitar la siguiente respuesta HTTP.');
+
 for (const required of [
   "await apiPost('/api/push/unsubscribe', { endpoint: staleEndpoint });",
   'comparePushApplicationServerKeys(',
@@ -246,4 +289,4 @@ for (const required of [
   assert.ok(source.includes(required), `Falta la barrera de rotación Push: ${required}`);
 }
 
-console.log('OK: una rotación VAPID también se recupera cuando el navegador oculta applicationServerKey, sin renovar de más una vinculación local vigente.');
+console.log('OK: rotación VAPID segura y registro Push durable evitan GET/POST redundantes sin perder renovación por TTL.');

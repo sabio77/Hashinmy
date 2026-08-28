@@ -9,15 +9,27 @@
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-lRCdaGVhvfFFcJSwJg4kkkgh4L2jLFOwnrADoTSirvY='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 </IfModule>
 
-<FilesMatch "^(index\.html|sw\.js|version\.json|health\.json)$">
+<FilesMatch "\.(css|js|json|webmanifest|txt|xml|woff2?|ttf|otf)$">
   <IfModule mod_headers.c>
-    Header set Cache-Control "no-store, max-age=0, must-revalidate"
+    Header set Cache-Control "public, max-age=86400, stale-while-revalidate=604800"
   </IfModule>
 </FilesMatch>
 
-<FilesMatch "\.(css|js|webmanifest|png|svg|ico|json|txt)$">
+<FilesMatch "\.(png|jpg|jpeg|webp|svg|gif|ico)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=604800, stale-while-revalidate=2592000"
+  </IfModule>
+</FilesMatch>
+
+<Files "manifest.webmanifest">
   <IfModule mod_headers.c>
     Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </IfModule>
+</Files>
+
+<FilesMatch "^(index\.html|sw\.js|version\.json|health\.json)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-store, max-age=0, must-revalidate"
   </IfModule>
 </FilesMatch>
 
@@ -32,4 +44,8 @@
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/plain text/css application/json application/javascript application/manifest+json image/svg+xml
 </IfModule>

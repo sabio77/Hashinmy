@@ -26,15 +26,18 @@ services:
       - path: /manifest.webmanifest
         name: Cache-Control
         value: no-cache, max-age=0, must-revalidate
+      - path: /src/*
+        name: Cache-Control
+        value: public, max-age=86400, stale-while-revalidate=604800
       - path: /textX/*
         name: Cache-Control
-        value: no-store, no-cache, must-revalidate, max-age=0
-      - path: /src/js/app-metadata.js
-        name: Cache-Control
-        value: no-store, no-cache, must-revalidate, max-age=0
+        value: public, max-age=86400, stale-while-revalidate=604800
       - path: /assets/*
         name: Cache-Control
-        value: no-cache, max-age=0, must-revalidate
+        value: public, max-age=604800, stale-while-revalidate=2592000
+      - path: /P2P_sin_RED_LOCALx/*
+        name: Cache-Control
+        value: public, max-age=86400, stale-while-revalidate=604800
       - path: /*
         name: X-Content-Type-Options
         value: nosniff

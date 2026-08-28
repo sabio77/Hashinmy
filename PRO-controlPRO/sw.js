@@ -88,12 +88,10 @@ const ROOT_OWNED_EXACT_PATHS = normalizeRootExactPaths([
 
 const ALWAYS_FRESH_PATHS = [
   /\/sw\.js$/,
-  /\/version\.json$/,
-  /\/textX\/languages\.json$/,
-  /\/src\/js\/app-metadata\.js$/
+  /\/version\.json$/
 ];
 
-const NETWORK_FIRST_FILE_TYPES = /\.(?:html|css|js|json|webmanifest|txt|xml)$/i;
+const RELEASE_CACHE_FIRST_FILE_TYPES = /\.(?:html|css|js|json|webmanifest|txt|xml)$/i;
 const STATIC_FILE_TYPES = /\.(?:png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|otf|mp3|mp4|webm|wasm)$/i;
 
 // Parámetros internos usados solo para romper caché del navegador/CDN durante
@@ -124,7 +122,7 @@ self.addEventListener('install', function installServiceWorker(event) {
 
 self.addEventListener('activate', function activateServiceWorker(event) {
   event.waitUntil((async function activateNewWorker() {
-    await enableNavigationPreload();
+    await disableNavigationPreload();
     await deleteOldAppCaches();
     await self.clients.claim();
     await broadcast({
@@ -212,12 +210,8 @@ self.addEventListener('fetch', function routeFetch(event) {
     return;
   }
 
-  if (NETWORK_FIRST_FILE_TYPES.test(url.pathname)) {
-    event.respondWith(networkFirst(request, {
-      cacheName: RUNTIME_CACHE,
-      forceReload: false,
-      allowFallback: true
-    }));
+  if (RELEASE_CACHE_FIRST_FILE_TYPES.test(url.pathname)) {
+    event.respondWith(cacheFirstReleaseAsset(request));
     return;
   }
 
@@ -228,7 +222,7 @@ self.addEventListener('fetch', function routeFetch(event) {
   }
 
   if (STATIC_FILE_TYPES.test(url.pathname)) {
-    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+    event.respondWith(cacheFirstReleaseAsset(request));
     return;
   }
 
@@ -239,10 +233,10 @@ self.addEventListener('fetch', function routeFetch(event) {
   }));
 });
 
-async function enableNavigationPreload() {
+async function disableNavigationPreload() {
   if (self.registration && self.registration.navigationPreload) {
     try {
-      await self.registration.navigationPreload.enable();
+      await self.registration.navigationPreload.disable();
     } catch (error) {
       // No todos los navegadores lo soportan. No es crítico.
     }
@@ -251,36 +245,51 @@ async function enableNavigationPreload() {
 
 async function precacheAppShell() {
   const cache = await caches.open(STATIC_CACHE);
+  const releaseAssetHashes = await loadReleaseAssetHashes();
+  const previousCacheNames = (await caches.keys()).filter(function keepPreviousReleaseCache(name) {
+    return isOwnedAppCacheName(name) && name !== STATIC_CACHE && name !== RUNTIME_CACHE;
+  });
+  const shellGroups = groupPrecacheAliases(APP_SHELL);
 
-  const results = await Promise.allSettled(APP_SHELL.map(async function cacheOneAsset(assetUrl) {
-    const request = new Request(assetUrl, {
-      cache: 'reload',
-      credentials: 'same-origin'
-    });
-    const fallbackSpec = getGeneratedImageFallbackSpec(new URL(assetUrl, self.location.href));
+  const results = await Promise.allSettled(shellGroups.map(async function cacheOneAssetGroup(group) {
+    const sourceAssetUrl = group.source;
+    const sourceUrl = new URL(sourceAssetUrl, APP_BASE_URL);
+    const fallbackSpec = getGeneratedImageFallbackSpec(sourceUrl);
+    const expectedSha256 = releaseAssetHashes.get(releaseAssetKey(sourceUrl)) || '';
 
     try {
-      const response = await fetch(request);
+      const reusable = await findReusablePrecacheResponse(
+        sourceAssetUrl,
+        expectedSha256,
+        fallbackSpec,
+        previousCacheNames
+      );
+      const response = reusable || await fetchPrecacheAsset(sourceAssetUrl, expectedSha256);
+      let responseToCache = response;
 
-      if (fallbackSpec) {
-        if (isUsableImageResponse(response)) {
-          await cache.put(assetUrl, response.clone());
-        } else {
-          await cache.put(assetUrl, createGeneratedImageFallbackResponse(fallbackSpec));
-        }
-        return assetUrl;
+      if (fallbackSpec && !isUsableImageResponse(responseToCache)) {
+        responseToCache = createGeneratedImageFallbackResponse(fallbackSpec);
+      } else if (!fallbackSpec && !isCacheableResponse(responseToCache)) {
+        throw new Error(`No cacheable: ${sourceAssetUrl}`);
       }
 
-      if (isCacheableResponse(response)) {
-        await cache.put(assetUrl, response.clone());
-        return assetUrl;
+      if (expectedSha256
+        && canVerifyResponseSha256()
+        && !await responseMatchesSha256(responseToCache, expectedSha256)) {
+        throw new Error(`Huella SHA-256 inesperada: ${sourceAssetUrl}`);
       }
 
-      throw new Error(`No cacheable: ${assetUrl}`);
+      await Promise.all(group.aliases.map(function cacheAlias(alias) {
+        return cache.put(alias, responseToCache.clone());
+      }));
+      return sourceAssetUrl;
     } catch (error) {
       if (fallbackSpec) {
-        await cache.put(assetUrl, createGeneratedImageFallbackResponse(fallbackSpec));
-        return assetUrl;
+        const generated = createGeneratedImageFallbackResponse(fallbackSpec);
+        await Promise.all(group.aliases.map(function cacheFallbackAlias(alias) {
+          return cache.put(alias, generated.clone());
+        }));
+        return sourceAssetUrl;
       }
       throw error;
     }
@@ -295,36 +304,185 @@ async function precacheAppShell() {
   }
 }
 
-async function handleNavigation(event) {
-  const request = event.request;
+function groupPrecacheAliases(assetUrls) {
+  const groups = new Map();
+
+  assetUrls.forEach(function collectAlias(assetUrl) {
+    const normalized = String(assetUrl || '').trim();
+    if (!normalized) return;
+
+    // La raíz y /index.html representan exactamente el mismo shell. Descargar ambos
+    // generaba una respuesta HTTP duplicada por cada instalación del Service Worker.
+    const resolved = new URL(normalized, APP_BASE_URL);
+    const source = resolved.pathname === APP_BASE_PATH ? './index.html' : normalized;
+    const key = new URL(source, APP_BASE_URL).toString();
+    const group = groups.get(key) || { source: source, aliases: [] };
+    if (!group.aliases.includes(normalized)) group.aliases.push(normalized);
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values());
+}
+
+async function loadReleaseAssetHashes() {
+  const hashes = new Map();
 
   try {
-    const preloadResponse = await event.preloadResponse;
-    if (isCacheableResponse(preloadResponse)) {
-      const cache = await caches.open(RUNTIME_CACHE);
-      await cache.put('./index.html', preloadResponse.clone());
-      return preloadResponse;
+    const response = await fetchFresh(new Request(new URL('./version.json', APP_BASE_URL), {
+      credentials: 'same-origin'
+    }), { timeoutMs: RESOURCE_TIMEOUT_MS });
+    if (!isCacheableResponse(response)) return hashes;
+
+    const payload = await response.json();
+    const expectedVersion = String(APP_META.version || '');
+    const expectedBuild = String(APP_META.build || '');
+    if (String(payload && payload.version || '') !== expectedVersion
+      || String(payload && payload.build || '') !== expectedBuild) {
+      return hashes;
     }
+
+    const assets = Array.isArray(payload.criticalAssets) ? payload.criticalAssets : [];
+    assets.forEach(function collectReleaseHash(asset) {
+      const sha256 = String(asset && asset.sha256 || '').trim().toLowerCase();
+      if (!/^[a-f0-9]{64}$/.test(sha256)) return;
+      try {
+        const url = new URL(String(asset.url || asset.path || ''), APP_BASE_URL);
+        if (url.origin === APP_ORIGIN) hashes.set(releaseAssetKey(url), sha256);
+      } catch (error) {
+        // Una entrada inválida del manifiesto no invalida las demás huellas.
+      }
+    });
   } catch (error) {
-    // Se intenta red normal abajo.
+    // Sin manifiesto verificable no se reutilizan respuestas antiguas no verificadas.
   }
+
+  return hashes;
+}
+
+function releaseAssetKey(input) {
+  try {
+    const url = input instanceof URL ? input : new URL(input, APP_BASE_URL);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return '';
+  }
+}
+
+async function findReusablePrecacheResponse(assetUrl, expectedSha256, fallbackSpec, cacheNames) {
+  if (!expectedSha256 && !fallbackSpec) return null;
+  const request = new Request(new URL(assetUrl, APP_BASE_URL).toString(), {
+    credentials: 'same-origin'
+  });
+
+  for (let index = cacheNames.length - 1; index >= 0; index -= 1) {
+    const cache = await caches.open(cacheNames[index]);
+    const cached = await cache.match(request);
+    if (!cached) continue;
+
+    if (expectedSha256) {
+      if (await responseMatchesSha256(cached, expectedSha256)) return cached;
+      continue;
+    }
+
+    if (fallbackSpec && isUsableImageResponse(cached)) return cached;
+  }
+
+  return null;
+}
+
+async function fetchPrecacheAsset(assetUrl, expectedSha256) {
+  const verifiable = Boolean(expectedSha256) && canVerifyResponseSha256();
+  const request = new Request(new URL(assetUrl, APP_BASE_URL).toString(), {
+    cache: verifiable ? 'default' : 'reload',
+    credentials: 'same-origin'
+  });
+  let response = await fetch(request);
+
+  // `default` puede resolver desde la caché HTTP del navegador sin generar una
+  // respuesta de red. Si esa copia es antigua, la huella obliga una única recarga.
+  if (verifiable && !await responseMatchesSha256(response, expectedSha256)) {
+    response = await fetch(new Request(request, { cache: 'reload' }));
+  }
+
+  return response;
+}
+
+function canVerifyResponseSha256() {
+  return Boolean(self.crypto && self.crypto.subtle && typeof self.crypto.subtle.digest === 'function');
+}
+
+async function responseMatchesSha256(response, expectedSha256) {
+  const expected = String(expectedSha256 || '').trim().toLowerCase();
+  if (!expected || !isCacheableResponse(response) || !canVerifyResponseSha256()) return false;
+
+  try {
+    const body = await response.clone().arrayBuffer();
+    const digest = await self.crypto.subtle.digest('SHA-256', body);
+    const actual = Array.from(new Uint8Array(digest)).map(function toHex(byte) {
+      return byte.toString(16).padStart(2, '0');
+    }).join('');
+    return actual === expected;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function handleNavigation(event) {
+  const request = event.request;
+  const staticCache = await caches.open(STATIC_CACHE);
+  const runtimeCache = await caches.open(RUNTIME_CACHE);
+  const cachedIndex = await staticCache.match('./index.html')
+    || await staticCache.match('./')
+    || await runtimeCache.match('./index.html')
+    || await runtimeCache.match('./');
+
+  // El release se actualiza por version.json + actualización del Service Worker.
+  // Mientras este worker siga activo, devolver su shell versionado evita una
+  // respuesta HTTP completa por cada navegación ya instalada.
+  if (cachedIndex) return cachedIndex;
 
   try {
     const response = await fetchFresh(request, { timeoutMs: NAVIGATION_TIMEOUT_MS });
     if (isCacheableResponse(response)) {
-      const cache = await caches.open(RUNTIME_CACHE);
-      await cache.put('./index.html', response.clone());
+      await runtimeCache.put('./index.html', response.clone());
       await trimCache(RUNTIME_CACHE, RUNTIME_CACHE_MAX_ENTRIES);
     }
     return response;
   } catch (error) {
-    const cachedIndex = await caches.match('./index.html') || await caches.match('./');
-    if (cachedIndex) return cachedIndex;
     return caches.match(OFFLINE_URL) || new Response('Sin conexión', {
       status: 503,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     });
   }
+}
+
+
+async function cacheFirstReleaseAsset(request) {
+  // Los parámetros internos existen solo para verificaciones explícitas por evento.
+  // En ese caso sí se permite red; las cargas normales permanecen 100% cache-first.
+  if (hasOnlyInternalCacheBustParams(request)) {
+    return networkFirst(request, {
+      cacheName: RUNTIME_CACHE,
+      forceReload: true,
+      allowFallback: true
+    });
+  }
+
+  const cacheRequest = createRuntimeCacheRequest(request);
+  const staticCache = await caches.open(STATIC_CACHE);
+  const runtimeCache = await caches.open(RUNTIME_CACHE);
+  const cached = await staticCache.match(cacheRequest)
+    || await staticCache.match(request)
+    || await runtimeCache.match(cacheRequest)
+    || await runtimeCache.match(request);
+  if (cached) return cached;
+
+  const response = await fetchFresh(request, { timeoutMs: RESOURCE_TIMEOUT_MS });
+  if (isCacheableResponse(response)) {
+    await runtimeCache.put(cacheRequest, response.clone());
+    await trimCache(RUNTIME_CACHE, RUNTIME_CACHE_MAX_ENTRIES);
+  }
+  return response;
 }
 
 async function networkFirst(request, options) {
@@ -385,6 +543,13 @@ async function staleWhileRevalidate(request, cacheName) {
 async function networkFirstWithGeneratedImageFallback(request, cacheName, fallbackSpec) {
   const cache = await caches.open(cacheName);
   const canonicalRequest = createCanonicalOptionalAssetRequest(request);
+  const staticCache = await caches.open(STATIC_CACHE);
+  const cachedFirst = await staticCache.match(canonicalRequest)
+    || await staticCache.match(request, { ignoreSearch: true })
+    || await cache.match(canonicalRequest)
+    || await cache.match(request, { ignoreSearch: true });
+
+  if (isUsableImageResponse(cachedFirst)) return cachedFirst;
 
   try {
     const response = await fetchFresh(request, {
@@ -807,7 +972,7 @@ function createGeneratedImageFallbackResponse(spec) {
     status: 200,
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
-      'Cache-Control': 'no-cache, max-age=0, must-revalidate',
+      'Cache-Control': 'public, max-age=86400',
       'X-Generated-Asset-Fallback': 'true'
     }
   });

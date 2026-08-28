@@ -613,7 +613,7 @@ export const purgeSpaceCrypto=async()=>true;
         (js_root / "p2p-storage.js").write_text(
             """
 export const getMeta=async()=>0;
-export const setMeta=async(key,value)=>{globalThis.__savedMeta={key,value};};
+export const setMeta=async(key,value)=>{globalThis.__savedMeta={key,value}; globalThis.__savedMetaByKey ??= new Map(); globalThis.__savedMetaByKey.set(key,value);};
 export const setP2PStorageUser=async()=>{};
 export const configureP2PStorageLimits=()=>({});
 export const saveSpaces=async()=>{};
@@ -985,7 +985,8 @@ await client.handleEvent({
   resetToSequence: 3
 });
 if (acknowledged !== 3
-  || globalThis.__savedMeta?.value !== 3
+  || globalThis.__savedMetaByKey?.get('deliveryCursor:dev_source_000001') !== 3
+  || globalThis.__savedMetaByKey?.get('deliveryAckCursor:dev_source_000001') !== 0
   || client.lastProcessedSequence !== 3
   || client.lastAcceptedStreamSequence !== 3
   || client.highestPendingAck !== 0
@@ -1592,9 +1593,11 @@ def main() -> None:
     for required in ["navigatorRef?.locks", "ifAvailable", "leaseTtlMs", "BroadcastChannelRef", "state-request", "leader-active"]:
         if required not in p2p_tabs:
             fail(f"src/js/p2p-tab-coordinator.js perdió coordinación multiventana: {required}")
-    for required in ["P2PTabCoordinator", "realtimeLeader", "bindTabRelays", "outbox-ready", "sharedTab", "removeSpaceFromBootstrapState", "addRelay('p2p:space-deleted'", "addRelay('p2p:access-revoked'", "type === 'space-deleted'", "type === 'access-revoked'", "this.realtimeLeader ? 'new-device' : false", "if (!this.realtimeLeader) return;"]:
+    for required in ["P2PTabCoordinator", "realtimeLeader", "bindTabRelays", "outbox-ready", "sharedTab", "removeSpaceFromBootstrapState", "addRelay('p2p:space-deleted'", "addRelay('p2p:access-revoked'", "type === 'space-deleted'", "type === 'access-revoked'", "const requiresBootstrap = this.needsInitialBackendBootstrap();", "if (!this.realtimeLeader) return;"]:
         if required not in p2p_client:
             fail(f"src/js/p2p-client.js perdió la integración multiventana: {required}")
+    if "this.fetchBootstrap(this.realtimeLeader ? 'new-device' : false)" in p2p_client:
+        fail("Una pestaña seguidora volvió a consumir su propio bootstrap HTTP durante el arranque.")
     for required in ["sessionToken: getSessionToken()", "String(context.sessionToken || '') === getSessionToken()", "isSessionChangedError(error)"]:
         if required not in p2p_client:
             fail(f"src/js/p2p-client.js perdió el aislamiento de sesión: {required}")
@@ -1651,10 +1654,10 @@ def main() -> None:
     if "installingWorker.state === 'installed' && navigator.serviceWorker.controller" in manager:
         fail("Un controller de otra app/scope no puede convertir la primera instalación en una actualización.")
     for required in [
-        "checkNow('controllerchange', { force: true })",
-        "checkNow('service-worker-waiting', { force: true })",
-        "checkNow('service-worker-installed', { force: true })",
-        "checkNow('broadcast-update-found', { force: true })",
+        "checkNow('controllerchange', { bypassCooldown: true, bypassCoordination: true })",
+        "checkNow('service-worker-waiting', { bypassCooldown: true, bypassCoordination: true })",
+        "checkNow('service-worker-installed', { bypassCooldown: true, bypassCoordination: true })",
+        "checkNow('broadcast-update-found', { bypassCooldown: true, bypassCoordination: true })",
         "isCurrentPageControlledByRegistration",
         "confirmedDeploymentKey === state.currentVersionKey",
         "scheduleReload('deploy-confirmed', deployment.serverVersionKey)",
@@ -1746,6 +1749,26 @@ def main() -> None:
     for needle in ["isUsableImageResponse", "contentType === 'text/html'", "buildOptionalImageFallbackReason"]:
         if needle not in sw:
             fail(f"sw.js debe rechazar rewrites SPA HTML como si fueran imágenes opcionales reales: {needle}")
+
+    for needle in ["disableNavigationPreload", "cacheFirstReleaseAsset", "RELEASE_CACHE_FIRST_FILE_TYPES"]:
+        if needle not in sw:
+            fail(f"sw.js debe evitar respuestas HTTP repetidas para recursos ya presentes en el release: {needle}")
+    if "await enableNavigationPreload();" in sw:
+        fail("sw.js no debe habilitar navigation preload: provoca una respuesta HTTP incluso cuando la navegación se resuelve desde el caché del release.")
+    navigation_start = sw.find("async function handleNavigation")
+    navigation_end = sw.find("async function cacheFirstReleaseAsset", navigation_start)
+    navigation_block = sw[navigation_start:navigation_end]
+    if navigation_start < 0 or "staticCache.match('./index.html')" not in navigation_block:
+        fail("La navegación debe consultar primero index.html en el caché versionado del release.")
+    if "fetchFresh(request" in navigation_block and navigation_block.find("fetchFresh(request") < navigation_block.find("staticCache.match('./index.html')"):
+        fail("La navegación no debe consumir red antes de consultar el shell cacheado.")
+
+    i18n_text = (ROOT / "src/js/i18n.js").read_text(encoding="utf-8")
+    if "__i18n" in i18n_text or "cache: 'no-store'" in i18n_text or 'cache: "no-store"' in i18n_text:
+        fail("i18n no debe forzar una respuesta HTTP nueva en cada apertura mediante cache-busting/no-store.")
+    asset_loader_text = (ROOT / "src/js/asset-loader.js").read_text(encoding="utf-8")
+    if "__asset" in asset_loader_text or "Date.now()" in asset_loader_text:
+        fail("asset-loader no debe cambiar la URL del logo en cada hidratación y saltarse el caché del release.")
 
     headers = (ROOT / "_headers").read_text(encoding="utf-8")
     for route in ["/sw.js", "/version.json", "/index.html", "/textX/*"]:

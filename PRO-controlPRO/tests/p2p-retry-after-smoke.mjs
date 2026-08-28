@@ -37,14 +37,18 @@ assert.equal(
 assert.equal(api.parseRetryAfterSeconds('no-valido', now), 0, 'Un Retry-After inválido produjo una espera falsa.');
 
 api.setSessionToken('token_prueba');
-globalThis.fetch = async () => new Response(JSON.stringify({
+let capacityFetches = 0;
+globalThis.fetch = async () => {
+  capacityFetches += 1;
+  return new Response(JSON.stringify({
   ok: false,
   code: 'P2P_BOOTSTRAP_RATE_LIMITED',
   message: 'Capacidad temporal agotada.'
 }), {
   status: 429,
   headers: { 'Content-Type': 'application/json', 'Retry-After': '7' }
-});
+  });
+};
 
 let limitedError = null;
 try {
@@ -52,6 +56,7 @@ try {
 } catch (error) {
   limitedError = error;
 }
+assert.equal(capacityFetches, 1, 'Un 429 con Retry-After consumió reintentos HTTP inmediatos innecesarios.');
 assert.equal(limitedError?.status, 429, 'La API perdió el estado HTTP 429.');
 assert.equal(limitedError?.retryAfterSeconds, 7, 'La API no adjuntó Retry-After al error P2P.');
 assert.ok(Number(limitedError?.retryAt) > Date.now(), 'La API no calculó el instante seguro de reintento.');
@@ -60,16 +65,21 @@ assert.equal(dispatched[0]?.type, 'p2p:rate-limited');
 assert.equal(dispatched[0]?.detail?.path, '/api/p2p/bootstrap');
 assert.equal(dispatched[0]?.detail?.retryAfterSeconds, 7);
 
-globalThis.fetch = async () => new Response(JSON.stringify({
-  ok: false,
-  message: 'Se alcanzó el máximo histórico de invitaciones.'
-}), {
-  status: 429,
-  headers: { 'Content-Type': 'application/json' }
-});
+let functionalLimitFetches = 0;
+globalThis.fetch = async () => {
+  functionalLimitFetches += 1;
+  return new Response(JSON.stringify({
+    ok: false,
+    message: 'Se alcanzó el máximo histórico de invitaciones.'
+  }), {
+    status: 429,
+    headers: { 'Content-Type': 'application/json' }
+  });
+};
 try {
   await api.apiPost('/api/p2p/invitations/create', { email: 'persona@example.test' });
 } catch {}
+assert.equal(functionalLimitFetches, 1, 'Un límite funcional definitivo consumió reintentos HTTP redundantes.');
 assert.equal(dispatched.length, 1, 'Un límite funcional sin Retry-After activó una reconexión P2P improcedente.');
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -97,16 +107,22 @@ assert.equal(
 for (const expected of [
   'this.serverRetryTimer = 0;',
   'this.serverRetryAttempt = 0;',
+  'const SERVER_RECOVERY_MAX_ATTEMPTS = 6;',
   'serverRecoveryDelayMilliseconds(error = null',
   'scheduleServerRecovery(error = null',
   'this.isRetryableTransportError(error)',
   'this.serverRetryDueAt <= dueAt',
+  'attempt >= SERVER_RECOVERY_MAX_ATTEMPTS',
+  'if (!hadScheduledRetry) this.serverRetryAttempt = attempt + 1;',
+  'automaticNetworkRecoveryDeferred()',
   "reason: rateLimited ? 'rate-limit' : 'transport-retry'",
   "state: !rateLimited && attempt >= 3 ? 'disconnected' : 'connecting'",
   "window.addEventListener('p2p:rate-limited', this.boundRateLimited);",
   "window.removeEventListener('p2p:rate-limited', this.boundRateLimited);",
   "this.scheduleServerRecovery(error, 'bootstrap-start');",
-  "this.scheduleServerRecovery(error, 'recover-online')",
+  "this.scheduleServerRecovery(error, recoveryReason || 'recover-online')",
+  'this.recoverOnline({ reason: recoveryStage })',
+  'this.scheduleServerRecovery(recoveryError, recoveryStage)',
   'P2P_BOOTSTRAP_RATE_LIMITED',
   'P2P_PUBLISH_RATE_LIMITED',
   'P2P_CONTROL_RATE_LIMITED',
@@ -120,6 +136,10 @@ assert.ok(
   stopStart >= 0 && stopEnd > stopStart && clientSource.slice(stopStart, stopEnd).includes('this.clearServerRecoveryTimer();'),
   'Detener o cambiar de sesión no cancela la recuperación pendiente.'
 );
+const retryableStart = clientSource.indexOf('  isRetryableTransportError(error = null) {');
+const retryableEnd = clientSource.indexOf('  isPermanentOutboxRejection(', retryableStart);
+assert.ok(retryableStart >= 0 && retryableEnd > retryableStart, 'No se encontró la clasificación de errores de transporte.');
+assert.ok(!clientSource.slice(retryableStart, retryableEnd).includes('401'), 'Un 401 definitivo todavía puede consumir un ciclo exterior de recuperación.');
 assert.ok(!clientSource.includes('setInterval('), 'La recuperación agregó polling periódico.');
 
-console.log('OK: Retry-After y fallos transitorios 5xx/red agendan recuperación P2P acotada, priorizan el intento más temprano y evitan quedar desconectados sin polling.');
+console.log('OK: Retry-After y fallos transitorios 5xx/red usan un presupuesto exterior finito, suspenden actividad oculta y evitan reintentar sesiones 401 definitivas sin polling.');

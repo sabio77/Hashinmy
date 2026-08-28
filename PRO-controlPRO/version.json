@@ -1,9 +1,9 @@
 {
   "schemaVersion": 3,
-  "releaseId": "semilla-appweb-pwa@1.9.101+2026-08-17-168",
-  "version": "1.9.101",
-  "build": "2026-08-17-168",
-  "releasedAt": "2026-08-17T20:01:00-05:00",
+  "releaseId": "semilla-appweb-pwa@1.9.110+2026-08-28-181",
+  "version": "1.9.110",
+  "build": "2026-08-28-181",
+  "releasedAt": "2026-08-28T18:10:00-05:00",
   "channel": "stable",
   "minimumSupportedBuild": "2026-07-02-002",
   "forceReload": true,
@@ -43,8 +43,8 @@
     },
     {
       "url": "./sw.js",
-      "sha256": "b3210553d9da0860b84e07882ac44d4d897d2d6dc7ab9046045d87f3e43aaf0d",
-      "bytes": 33036
+      "sha256": "2a331c7d1b200ed1df4acafba866da1406bb0062c47288f9c8aa88cf917478a7",
+      "bytes": 39747
     },
     {
       "url": "./src/css/app.css",
@@ -53,8 +53,8 @@
     },
     {
       "url": "./src/js/app-metadata.js",
-      "sha256": "aa00395126f6200fad6b5c49481de29f09500816e22f5029f57a492d47962a80",
-      "bytes": 4495
+      "sha256": "2bc88d2bea04447e4220ecda1275445e40af9a2db08bdb697dd541014d40e3a1",
+      "bytes": 4478
     },
     {
       "url": "./src/js/runtime-config.js",
@@ -63,8 +63,8 @@
     },
     {
       "url": "./src/js/config.js",
-      "sha256": "42387a078abe7caca970c7c555f15ee3936b0ba90c0e78689603b6cb037db23e",
-      "bytes": 8431
+      "sha256": "ff7c9dbf37049a2ddc5c755753823d62d5c52369a295120d11d31791edc0e667",
+      "bytes": 8779
     },
     {
       "url": "./src/js/application-scope.js",
@@ -73,8 +73,8 @@
     },
     {
       "url": "./src/js/api.js",
-      "sha256": "096022c6b599516ac25ee33c83a98e6c8d59d33954920c240d6d8add21495201",
-      "bytes": 10368
+      "sha256": "cf2f07c7ccf214df56290b5aea88a26974b14f29fb880dd131d04cd9adcc8f37",
+      "bytes": 12579
     },
     {
       "url": "./src/js/firebase-auth.js",
@@ -98,13 +98,13 @@
     },
     {
       "url": "./src/js/p2p-tab-coordinator.js",
-      "sha256": "7ae3717bed7568e88588f4e863de2e4889a99f37bb4ff7dfbbed9c69cbb49782",
-      "bytes": 28115
+      "sha256": "9dbd5b889f5fe54ff39fe8ee4f02b0cb493f7e26b4eb28297cef47e51895d47f",
+      "bytes": 28376
     },
     {
       "url": "./src/js/p2p-client.js",
-      "sha256": "d270ddf85158863e8b20009f0d4fe64a4c1ce2e95bd36c6ce45efabe6156d613",
-      "bytes": 521001
+      "sha256": "0ad6a189b16727b93c23ae7b4f0de0b9c22719517c74f6cc2df9846e1d39530c",
+      "bytes": 549939
     },
     {
       "url": "./src/js/p2p-permissions.js",
@@ -143,18 +143,18 @@
     },
     {
       "url": "./src/js/i18n.js",
-      "sha256": "25d778f3d1cf7385d5f3bcc11d4c32c0f5ea2d2d28629395e2b9092af4ae98ea",
-      "bytes": 11830
+      "sha256": "7f8fe772da2f153b04eef7bcc0f539158e8c87951f09e7d9fd4c68fc7c726c17",
+      "bytes": 11581
     },
     {
       "url": "./src/js/asset-loader.js",
-      "sha256": "e00071c4fffcfc25b2bac768c6bd8d20bd6f1b39b7aab06a0051555cc53a5ce8",
-      "bytes": 2767
+      "sha256": "223e357029e4298d87cd01be1376d22ad3562fa12cf83ecfed3ec000d6078970",
+      "bytes": 2701
     },
     {
       "url": "./src/js/pwa-update-manager.js",
-      "sha256": "92c356587ab2454a209fff7959447270d50f04d12cdb18851932581049832947",
-      "bytes": 27651
+      "sha256": "97a5bcb9b29c62e572a5542a708be687a75830f81b435c8fb5c6170e439eaa1b",
+      "bytes": 30537
     },
     {
       "url": "./src/js/app.js",
@@ -163,7 +163,7 @@
     },
     {
       "url": "./textX/languages.json",
-      "sha256": "fe205598848224977789aac34dd8a2bb866a512c63a4f724fd4c431e6b24de3d",
+      "sha256": "377ec0eb0b01074740bf1615dce5d522e7c9772a54a00369519e1ea5b9a3f87d",
       "bytes": 981
     },
     {

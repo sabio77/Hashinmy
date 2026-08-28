@@ -31,8 +31,26 @@ const applyMethod = clientSource.slice(applyStart, applyEnd);
 
 const applyHarness = `
 const CURSOR_META_PREFIX = 'deliveryCursor:';
+const BOOTSTRAP_INCREMENTAL_SECTION_NAMES = Object.freeze(['devices', 'spaces', 'revokedSpaceIds', 'invitations', 'lifecycleTransactions', 'limits']);
 let replaceFailure = null;
 let recoveryFailure = null;
+function normalizeBootstrapSectionFingerprints(input = null) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const normalized = {};
+  for (const sectionName of BOOTSTRAP_INCREMENTAL_SECTION_NAMES) {
+    const fingerprint = String(input[sectionName] || '').trim().toLowerCase();
+    if (/^[a-f0-9]{32}$/.test(fingerprint)) normalized[sectionName] = fingerprint;
+  }
+  return normalized;
+}
+function bootstrapSectionIsUnchanged(data = {}, sectionName = '', knownFingerprints = {}) {
+  if (!BOOTSTRAP_INCREMENTAL_SECTION_NAMES.includes(sectionName)) return false;
+  if (Object.prototype.hasOwnProperty.call(data || {}, sectionName)) return false;
+  if (!Array.isArray(data?.unchangedSections) || !data.unchangedSections.includes(sectionName)) return false;
+  const knownFingerprint = String(knownFingerprints?.[sectionName] || '').trim().toLowerCase();
+  const responseFingerprint = String(data?.bootstrapSectionFingerprints?.[sectionName] || '').trim().toLowerCase();
+  return /^[a-f0-9]{32}$/.test(knownFingerprint) && responseFingerprint === knownFingerprint;
+}
 function normalizeInvitationCollection(value = {}) {
   return {
     received: Array.isArray(value.received) ? value.received : [],
@@ -48,10 +66,12 @@ async function replaceBootstrapControlState(spaces, invitations) {
   return { spaces: spaces.map((space) => ({ ...space, durable: true })), removedSpaceIds: [], preservedSpaceIds: [], invitations };
 }
 async function purgeSpaceCrypto() { return true; }
+function configureP2PStorageLimits() {}
 function dispatch() {}
 class TestClient {
   constructor() {
     this.bootstrapState = { marker: 'old', spaces: [{ spaceId: 'old' }] };
+    this.bootstrapSectionFingerprints = {};
     this.eventMaxBytes = 20000;
     this.entityMaxBytes = 10000;
     this.snapshotGrantTtlSeconds = 30;
@@ -68,6 +88,7 @@ class TestClient {
   snapshotRecoveryDelay() { return 0; }
   scheduleSnapshotRecovery() {}
   clearSnapshotRecovery() {}
+  scheduleLifecycleFinalizationObserver() {}
 ${applyMethod}
 }
 function setReplaceFailure(error) { replaceFailure = error; }
@@ -100,6 +121,39 @@ const applyModule = await import(`data:text/javascript;base64,${Buffer.from(appl
   assert.equal(client.bootstrapState.spaces[0].spaceId, 'new');
   assert.equal(client.bootstrapState.spaces[0].durable, true);
   assert.equal(client.eventMaxBytes, 65536);
+}
+
+{
+  const client = new applyModule.TestClient();
+  applyModule.setRecoveryFailure(null);
+  const fingerprint = 'a'.repeat(32);
+  client.bootstrapState = {
+    spaces: [{ spaceId: 'cached', encryptionVersion: 0 }],
+    revokedSpaceIds: ['revoked_cached'],
+    invitations: { received: [{ invitationId: 'inv_cached' }], sent: [] },
+    devices: [
+      { deviceId: 'device_atomic_1', name: 'Anterior', lastSeenAt: 'old' },
+      { deviceId: 'device_other', name: 'Otro', lastSeenAt: 'stable' }
+    ],
+    lifecycleTransactions: [],
+    replicaHealth: {}
+  };
+  client.bootstrapSectionFingerprints = Object.fromEntries(
+    ['devices', 'spaces', 'revokedSpaceIds', 'invitations', 'lifecycleTransactions', 'limits'].map((name) => [name, fingerprint])
+  );
+  const state = await client.applyBootstrapData({
+    device: { deviceId: 'device_atomic_1', name: 'Actual', lastSeenAt: 'fresh' },
+    unchangedSections: ['devices', 'spaces', 'revokedSpaceIds', 'invitations', 'lifecycleTransactions', 'limits'],
+    bootstrapSectionFingerprints: { ...client.bootstrapSectionFingerprints },
+    stateRevisions: {},
+    deliveryState: { sequence: 0 },
+    snapshotRequests: [],
+    replicaHealth: {}
+  });
+  assert.equal(state.spaces[0].spaceId, 'cached', 'Una sección omitida con huella válida perdió el estado de espacios ya aplicado.');
+  assert.equal(state.invitations.received[0].invitationId, 'inv_cached', 'Una sección omitida con huella válida perdió las invitaciones ya aplicadas.');
+  assert.equal(state.devices.find((device) => device.deviceId === 'device_atomic_1')?.lastSeenAt, 'fresh', 'El dispositivo actual no conservó sus timestamps frescos al omitir la lista completa.');
+  assert.equal(state.devices.find((device) => device.deviceId === 'device_other')?.lastSeenAt, 'stable', 'La omisión incremental alteró otro dispositivo sin cambios.');
 }
 
 const fetchStart = clientSource.indexOf('  async fetchBootstrap(requestSnapshots = false');

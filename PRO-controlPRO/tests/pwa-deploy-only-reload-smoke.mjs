@@ -57,7 +57,11 @@ const registration = new FakeEventTarget();
 registration.active = activeWorker;
 registration.waiting = null;
 registration.installing = null;
-registration.update = async () => registration;
+let registrationUpdateCalls = 0;
+registration.update = async () => {
+  registrationUpdateCalls += 1;
+  return registration;
+};
 serviceWorker.register = async () => registration;
 
 let serverRelease = {
@@ -70,6 +74,7 @@ let serverRelease = {
 };
 
 const replacements = [];
+let versionFetchCalls = 0;
 const windowTarget = new FakeEventTarget();
 const documentTarget = new FakeEventTarget();
 const localStorage = new MemoryStorage();
@@ -153,11 +158,14 @@ const context = vm.createContext({
   BroadcastChannel: FakeBroadcastChannel,
   setTimeout,
   clearTimeout,
-  fetch: async () => ({
+  fetch: async () => {
+    versionFetchCalls += 1;
+    return {
     ok: true,
     status: 200,
     json: async () => JSON.parse(JSON.stringify(serverRelease))
-  })
+    };
+  }
 });
 
 vm.runInContext(managerSource, context, { filename: 'pwa-update-manager.js' });
@@ -165,6 +173,31 @@ await wait(10);
 
 if (replacements.length !== 0) {
   throw new Error('La carga inicial no puede recargar la interfaz sin un deploy nuevo.');
+}
+if (versionFetchCalls !== 1) {
+  throw new Error(`El arranque debe consultar version.json una sola vez; recibidas: ${versionFetchCalls}.`);
+}
+if (registrationUpdateCalls !== 0) {
+  throw new Error(`El arranque no debe duplicar la comprobación con registration.update(); recibidas: ${registrationUpdateCalls}.`);
+}
+
+for (let index = 0; index < 40; index += 1) {
+  windowTarget.dispatch('focus');
+  documentTarget.dispatch('visibilitychange');
+  windowTarget.dispatch('pageshow', { persisted: false });
+}
+await wait(10);
+if (versionFetchCalls !== 1) {
+  throw new Error(`focus/visibility/pageshow repetidos deben quedar agrupados por cooldown; consultas: ${versionFetchCalls}.`);
+}
+if (registrationUpdateCalls !== 0) {
+  throw new Error('Las señales pasivas no deben ejecutar registration.update().');
+}
+
+await windowObject.PWAUpdateManager.checkNow();
+await wait(5);
+if (versionFetchCalls !== 2 || registrationUpdateCalls !== 1) {
+  throw new Error(`La comprobación manual debe forzar exactamente version.json + registration.update(); fetch=${versionFetchCalls}, update=${registrationUpdateCalls}.`);
 }
 
 serviceWorker.dispatch('controllerchange');
@@ -183,6 +216,7 @@ await wait(10);
 if (replacements.length !== 0) {
   throw new Error('updatefound/installed recargó la interfaz sin deploy confirmado.');
 }
+registration.installing = null;
 
 const updateChannel = FakeBroadcastChannel.instances[0];
 if (!updateChannel) {
@@ -223,5 +257,8 @@ if (replacements.length !== 1) {
 if (!new URL(replacements[0]).searchParams.has('app_updated')) {
   throw new Error('La recarga confirmada por deploy perdió el cache-buster app_updated.');
 }
+if (registrationUpdateCalls !== 2) {
+  throw new Error(`Un deploy confirmado sin worker nuevo debe actualizar sw.js exactamente una vez antes de recargar; update=${registrationUpdateCalls}.`);
+}
 
-console.log('OK: Service Worker y BroadcastChannel no recargan por sí solos; solo un release nuevo confirmado por version.json recarga la interfaz.');
+console.log('OK: señales PWA repetidas se agrupan sin HTTP redundante; revisión manual y deploy conservan frescura del Service Worker sin duplicar comprobaciones pasivas.');

@@ -19,6 +19,9 @@ jobs:
       - name: Generate release manifest, metadata and runtime fingerprints
         run: python tools/generate-release.py
 
+      - name: Validate HTTP response cache efficiency
+        run: node tests/pwa-http-cache-efficiency-smoke.mjs
+
       - name: Run static smoke check
         run: python tests/pwa-smoke-check.py
 
@@ -33,3 +36,18 @@ jobs:
 
       - name: Validate poisoned encrypted payload recovery
         run: node tests/p2p-poisoned-payload-recovery-smoke.mjs
+
+      - name: Validate SSE reconnect backoff and jitter
+        run: node tests/p2p-realtime-backoff-smoke.mjs
+
+      - name: Validate HTTP response efficiency across bootstrap, visibility and recovery
+        run: node tests/p2p-http-response-efficiency-smoke.mjs
+
+      - name: Validate single realtime leader across tabs and PWA windows
+        run: node tests/p2p-multitab-smoke.mjs
+
+      - name: Validate bounded and idempotent API retries
+        run: node tests/api-retry-smoke.mjs
+
+      - name: Validate deploy-only reload and deduplicated update checks
+        run: node tests/pwa-deploy-only-reload-smoke.mjs

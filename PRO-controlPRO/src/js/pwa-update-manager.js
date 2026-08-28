@@ -13,6 +13,8 @@
     updateCheckOnFocus: true,
     updateCheckOnOnline: true,
     updateCheckOnPageShow: true,
+    passiveUpdateCheckMinIntervalMs: 300000,
+    startupUpdateCheckDedupMs: 15000,
     autoReloadWhenVersionChanges: true,
     autoReloadDelayMs: 700,
     minimumSecondsBetweenAutoReloads: 10,
@@ -21,7 +23,7 @@
     leaderLockTtlMs: 45000,
     broadcastChannelName: 'semilla-appweb-pwa-updates',
     releaseManifestAssetsEnabled: true,
-    prefetchReleaseAssetsOnCheck: true,
+    prefetchReleaseAssetsOnCheck: false,
     prefetchReleaseAssetsMax: 120,
     directFingerprintFallbackEnabled: false,
     directFingerprintFallbackIntervalMs: 300000,
@@ -41,7 +43,8 @@
     lastReloadAt: storagePrefix + ':last-reload-at',
     lastReloadKey: storagePrefix + ':last-reload-key',
     leaderLock: storagePrefix + ':update-leader-lock',
-    installDismissed: storagePrefix + ':install-dismissed'
+    installDismissed: storagePrefix + ':install-dismissed',
+    lastUpdateCheckAt: storagePrefix + ':last-update-check-at'
   };
 
   var channel = createBroadcastChannel();
@@ -338,7 +341,9 @@
       }
     }
 
-    if (serverAssetsKey && (firstAssetSnapshot || deploymentChanged || assetsChanged || releasePrefetchPending)) {
+    if (config.prefetchReleaseAssetsOnCheck
+      && serverAssetsKey
+      && (firstAssetSnapshot || deploymentChanged || assetsChanged || releasePrefetchPending)) {
       prefetchReleaseAssets(payload, serverAssetsKey).catch(function prefetchFailed(error) {
         if (navigator.onLine) {
           console.warn('[PWAUpdateManager] No se pudieron precargar assets del release:', error);
@@ -422,7 +427,7 @@
     // autorización suficiente para recargar. Se activa y version.json decide.
     if (registration.waiting && isCurrentPageControlledByRegistration(registration)) {
       askWaitingWorkerToActivate(registration);
-      checkNow('service-worker-waiting', { force: true }).catch(function waitingWorkerCheckFailed(error) {
+      checkNow('service-worker-waiting', { bypassCooldown: true, bypassCoordination: true }).catch(function waitingWorkerCheckFailed(error) {
         if (navigator.onLine) {
           console.warn('[PWAUpdateManager] No se pudo confirmar el deploy del worker en espera:', error);
         }
@@ -438,7 +443,7 @@
       installingWorker.addEventListener('statechange', function handleStateChange() {
         if (installingWorker.state === 'installed' && isCurrentPageControlledByRegistration(registration)) {
           askWaitingWorkerToActivate(registration);
-          checkNow('service-worker-installed', { force: true }).catch(function installedWorkerCheckFailed(error) {
+          checkNow('service-worker-installed', { bypassCooldown: true, bypassCoordination: true }).catch(function installedWorkerCheckFailed(error) {
             if (navigator.onLine) {
               console.warn('[PWAUpdateManager] No se pudo confirmar el deploy del worker instalado:', error);
             }
@@ -448,17 +453,65 @@
     });
   }
 
+  function nonNegativeNumber(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  }
+
+  function updateCheckCooldownMs(reason, settings) {
+    if (settings && settings.bypassCooldown === true) return 0;
+    var passiveMs = nonNegativeNumber(config.passiveUpdateCheckMinIntervalMs, 300000);
+    if (reason === 'startup' || reason === 'online' || reason === 'pageshow-bfcache') {
+      return Math.min(passiveMs, nonNegativeNumber(config.startupUpdateCheckDedupMs, 15000));
+    }
+    return passiveMs;
+  }
+
+  function lastUpdateCheckAt() {
+    try {
+      var value = Number(localStorage.getItem(storageKeys.lastUpdateCheckAt) || 0);
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function markUpdateCheckAttempt() {
+    try {
+      localStorage.setItem(storageKeys.lastUpdateCheckAt, String(Date.now()));
+    } catch (error) {}
+  }
+
+  function canRunUpdateCheck(reason, settings) {
+    if (settings && settings.bypassCoordination === true) return true;
+    if (document.visibilityState === 'hidden') return false;
+
+    var cooldownMs = updateCheckCooldownMs(reason, settings);
+    var checkedAt = lastUpdateCheckAt();
+    var now = Date.now();
+    if (cooldownMs > 0 && checkedAt > 0 && checkedAt <= now && now - checkedAt < cooldownMs) return false;
+
+    if (!config.multiTabCoordinationEnabled) return true;
+    return acquireLeaderLock();
+  }
+
   async function checkNow(reason, options) {
     var settings = options || {};
 
     if (state.checking) return false;
-    if (!settings.force && !canThisTabCheck()) return false;
+    if (!canRunUpdateCheck(reason, settings)) return false;
 
     state.checking = true;
+    markUpdateCheckAttempt();
 
     try {
-      if (state.registration) {
+      // La identidad fresca de release vive en version.json. En una revisión normal
+      // no se solicita sw.js además de version.json: el Service Worker se actualiza
+      // solo cuando hay un deploy confirmado. La revisión manual sí fuerza ambas.
+      var serviceWorkerRefreshed = false;
+      if (state.registration && settings.refreshServiceWorker === true) {
         await state.registration.update();
+        serviceWorkerRefreshed = true;
       }
 
       var deployment = await checkVersionEndpoint().catch(function versionCheckFailed(error) {
@@ -482,6 +535,23 @@
       }
 
       if (deployment.deploymentChanged) {
+        // Si version.json confirma un deploy y todavía no hay un worker nuevo en
+        // instalación/espera, actualizamos sw.js una sola vez antes de recargar.
+        // Así la reducción de respuestas no deja la página nueva bajo un worker viejo.
+        if (state.registration && !serviceWorkerRefreshed && !state.registration.waiting && !state.registration.installing) {
+          try {
+            await state.registration.update();
+          } catch (error) {
+            if (navigator.onLine) {
+              console.warn('[PWAUpdateManager] El deploy existe pero no se pudo actualizar el Service Worker:', error);
+            }
+            return false;
+          }
+        }
+
+        if (state.registration && state.registration.waiting) {
+          await askWaitingWorkerToActivate(state.registration);
+        }
         scheduleReload('deploy-confirmed', deployment.serverVersionKey);
         return true;
       }
@@ -502,12 +572,6 @@
         releaseLeaderLock();
       }
     }
-  }
-
-  function canThisTabCheck() {
-    if (!config.multiTabCoordinationEnabled) return true;
-    if (document.visibilityState === 'hidden') return false;
-    return acquireLeaderLock();
   }
 
   function createTabId() {
@@ -576,7 +640,7 @@
       // es una autoridad de release: otra pestaña (o cualquier script del mismo
       // origen) no puede ordenar una recarga pasando un deploymentKey arbitrario.
       // Cada pestaña debe confirmar por sí misma version.json antes de recargar.
-      checkNow('broadcast-update-found', { force: true }).catch(function broadcastDeployCheckFailed(error) {
+      checkNow('broadcast-update-found', { bypassCooldown: true, bypassCoordination: true }).catch(function broadcastDeployCheckFailed(error) {
         if (navigator.onLine) {
           console.warn('[PWAUpdateManager] No se pudo confirmar el deploy anunciado por otra pestaña:', error);
         }
@@ -600,13 +664,13 @@
 
     if (config.updateCheckOnOnline) {
       window.addEventListener('online', function checkOnOnline() {
-        checkNow('online', { force: true });
+        checkNow('online');
       });
     }
 
     if (config.updateCheckOnPageShow) {
       window.addEventListener('pageshow', function checkOnPageShow(event) {
-        checkNow(event.persisted ? 'pageshow-bfcache' : 'pageshow', { force: true });
+        checkNow(event.persisted ? 'pageshow-bfcache' : 'pageshow');
       });
     }
 
@@ -744,7 +808,7 @@
         // clients.claim() también dispara controllerchange durante la primera
         // instalación. Ese evento por sí solo no autoriza una recarga: primero
         // debe existir evidencia de un release nuevo en version.json/huellas.
-        checkNow('controllerchange', { force: true }).catch(function controllerChangeCheckFailed(error) {
+        checkNow('controllerchange', { bypassCooldown: true, bypassCoordination: true }).catch(function controllerChangeCheckFailed(error) {
           if (navigator.onLine) {
             console.warn('[PWAUpdateManager] No se pudo verificar el release tras controllerchange:', error);
           }
@@ -758,7 +822,7 @@
         }
       });
 
-      await checkNow('startup', { force: true });
+      await checkNow('startup');
     } catch (error) {
       console.error('[PWAUpdateManager] Error registrando Service Worker:', error);
       showStatus(translate('pwa.swRegisterError', 'No se pudo activar instalación/offline.'), 'error');
@@ -773,7 +837,7 @@
 
   window.PWAUpdateManager = Object.freeze({
     checkNow: function manualCheck() {
-      return checkNow('manual', { force: true });
+      return checkNow('manual', { bypassCooldown: true, bypassCoordination: true, refreshServiceWorker: true });
     },
     clearCaches: clearCaches,
     requestInstall: requestInstall,

@@ -1,10 +1,8 @@
 (function createRuntimeAssetLoader(root) {
   'use strict';
 
-  function noStoreUrl(path) {
-    var url = new URL(path, window.location.href);
-    url.searchParams.set('__asset', String(Date.now()));
-    return url.toString();
+  function releaseAssetUrl(path) {
+    return new URL(path, window.location.href).toString();
   }
 
   function beginSkeletonFor(target) {
@@ -66,7 +64,7 @@
       slot.dataset.assetState = 'fallback';
     }, { once: true });
 
-    image.src = noStoreUrl(src);
+    image.src = releaseAssetUrl(src);
   }
 
   function hydrate(rootNode) {

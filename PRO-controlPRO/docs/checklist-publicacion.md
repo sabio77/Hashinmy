@@ -21,7 +21,7 @@ Antes de publicar una app real basada en esta semilla:
 ## Autoactualización
 
 - [ ] Confirmar que `/sw.js`, `/index.html` y `/version.json` usan `no-store`.
-- [ ] Confirmar que `/src/*` revalida con `no-cache`.
+- [ ] Confirmar que `/src/*` usa caché pública acotada (`max-age=86400`) y que el Service Worker sirve primero el caché versionado del release.
 - [ ] Actualizar `version.json` en cada deploy.
 - [ ] Actualizar `src/js/app-metadata.js` en cada deploy importante.
 - [ ] Revisar `fingerprintCheckFiles`.
@@ -59,4 +59,4 @@ Antes de publicar una app real basada en esta semilla:
 - Validar que cada idioma tenga `textX/app/<codigo>.json` y `textX/seo/<codigo>.json`.
 - Ejecutar `python tools/generate-release.py` antes de publicar para regenerar `textX/languages.json`, `src/js/app-metadata.js` y `version.json`; en Render Static Site puede hacerlo automáticamente `render.yaml`.
 - Ejecutar `python tests/pwa-smoke-check.py`.
-- Confirmar que `/textX/*` se sirve con `Cache-Control: no-cache`.
+- Confirmar que `/textX/*` usa caché pública acotada (`max-age=86400, stale-while-revalidate=604800`); `version.json` sigue siendo la señal fresca de cambio de release.

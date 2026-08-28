@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.105 - 2026-08-28
+
+- Cerrado el punto débil de recuperación exterior sin presupuesto total: el backoff de red/`Retry-After` ya no puede convertir un `5xx` o `429` persistente en respuestas HTTP indefinidas. El ciclo automático queda limitado a seis intentos y una señal real posterior puede iniciar una recuperación nueva sin polling.
+- Un `401` de sesión deja de clasificarse como fallo de transporte reintentable; el outbox local se conserva, pero no se siguen consumiendo respuestas contra una sesión autoritativamente inválida.
+- Las reconexiones SSE y los temporizadores de recuperación no abren `realtime/token`, streams o bootstrap mientras la pestaña líder está oculta; `visibilitychange`/`pageshow` conservan la recuperación dirigida al volver a primer plano. Se ampliaron las regresiones de eficiencia HTTP y `Retry-After`.
+
+## 1.9.102 - 2026-08-28
+
+- Reducido el consumo de respuestas HTTP de la PWA instalada: navegación y archivos del release usan primero el caché versionado del Service Worker; se desactiva `navigation preload` para no abrir una petición paralela cuando el shell ya está disponible localmente.
+- `i18n` y el cargador del logo dejan de añadir marcas `Date.now()` y `no-store` en cada apertura, evitando saltarse el caché sin alterar la actualización por `version.json` ni los chequeos explícitos por evento.
+- Sincronizadas las políticas de caché de Render, Netlify/Cloudflare, Vercel, Nginx y Apache; `sw.js`, `version.json` e `index.html` conservan frescura estricta y los assets del release reciben TTL acotado con `stale-while-revalidate`. La regresión queda cubierta por el smoke test PWA.
+
 ## 1.9.91 - 2026-08-12
 
 - Corregido el punto débil de creación parcial de invitaciones de panel: si el envío se interrumpe después de crear solo algunos proyectos, una recarga o cambio a otro dispositivo de la misma cuenta ya no genera automáticamente un grupo incompatible.

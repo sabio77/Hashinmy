@@ -169,10 +169,10 @@ Al extender una app raíz con rutas SPA adicionales o nuevas carpetas de assets,
 
 | Tipo de recurso | Estrategia |
 |---|---|
-| Navegación | network-first con fallback a `index.html` y `offline.html` |
-| HTML/CSS/JS/JSON | network-first |
-| `sw.js`, `version.json`, `textX/languages.json`, `app-metadata.js` | siempre fresco |
-| Imágenes/fuentes/media | stale-while-revalidate |
+| Navegación | cache-first del shell del release; red solo si el shell actual no está cacheado |
+| HTML/CSS/JS/JSON | cache-first en caché versionado por release |
+| `sw.js`, `version.json` | siempre frescos |
+| Imágenes/fuentes/media | cache-first en caché versionado; fallback geométrico del logo solo tras miss |
 | APIs privadas | network-only |
 
 ## Por qué esta arquitectura es reutilizable

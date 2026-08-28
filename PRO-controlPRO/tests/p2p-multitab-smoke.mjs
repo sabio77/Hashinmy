@@ -526,6 +526,12 @@ if (!bfcacheWindow.listeners.get('pagehide')?.has(bfcacheCoordinator.boundPageHi
   || !bfcacheWindow.listeners.get('pageshow')?.has(bfcacheCoordinator.boundPageShow)) {
   throw new Error('La coordinación no registró el ciclo de suspensión y restauración de BFCache.');
 }
+if (!await bfcacheCoordinator.suspend() || !bfcacheCoordinator.suspended || bfcacheCoordinator.isLeader()) {
+  throw new Error('La suspensión reutilizable no cedió el liderazgo realtime de forma atómica.');
+}
+if (!await bfcacheCoordinator.resume() || bfcacheCoordinator.suspended || !bfcacheCoordinator.isLeader()) {
+  throw new Error('La reanudación reutilizable no restauró el arbitraje realtime después de una suspensión ordinaria.');
+}
 bfcacheCoordinator.boundPageHide({ persisted: true });
 await new Promise((resolve) => setTimeout(resolve, 0));
 await bfcacheCoordinator.leadershipQueue;

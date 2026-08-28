@@ -62,20 +62,12 @@
     };
   }
 
-  function noStoreUrl(path) {
-    var url = new URL(path, window.location.href);
-    url.searchParams.set('__i18n', String(Date.now()));
-    return url.toString();
-  }
-
   async function fetchJson(path) {
-    var response = await fetch(noStoreUrl(path), {
-      cache: 'no-store',
+    var response = await fetch(path, {
+      cache: 'default',
       credentials: 'same-origin',
       headers: {
-        'Accept': 'application/json,text/plain,*/*',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Accept': 'application/json,text/plain,*/*'
       }
     });
 

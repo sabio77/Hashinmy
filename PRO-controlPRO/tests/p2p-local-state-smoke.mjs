@@ -809,6 +809,7 @@ const lifecycleRequestRetryDelay = (attempt = 0) => {
   );
 };
 const CURSOR_META_PREFIX = 'cursor:';
+const ACKNOWLEDGED_CURSOR_META_PREFIX = 'deliveryAckCursor:';
 const pendingApiCalls = [];
 const createdEventSources = [];
 let outboxItems = [];

@@ -103,13 +103,41 @@ function assertRequestSession(requestSessionToken = '') {
 const REQUEST_MAX_ATTEMPTS = 3;
 const REQUEST_RETRY_BASE_MS = 400;
 const REQUEST_RETRY_MAX_MS = 5000;
+const REQUEST_RETRYABLE_HTTP_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
+
+// Solo estos POST tienen semántica de reintento verificada dentro del contrato actual.
+// /api/bootstrap es una lectura de sesión; /api/p2p/bootstrap puede repetirse con el
+// mismo dispositivo porque su registro, reconciliación y despachos usan claves
+// deterministas/idempotentes en el backend. Cualquier otro POST requiere optar
+// explícitamente con { idempotent: true } después de auditar su operación.
+const REQUEST_RETRY_SAFE_POST_PATHS = new Set([
+  '/api/bootstrap',
+  '/api/p2p/bootstrap'
+]);
+
+function requestRetrySafe(path = '', method = 'GET', retryOptions = {}) {
+  const normalizedMethod = String(method || 'GET').trim().toUpperCase();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) return true;
+  if (normalizedMethod !== 'POST') return retryOptions.idempotent === true;
+  if (retryOptions.idempotent === true) return true;
+  if (retryOptions.idempotent === false) return false;
+  const normalizedPath = String(path || '').trim().split('?', 1)[0];
+  return REQUEST_RETRY_SAFE_POST_PATHS.has(normalizedPath);
+}
 
 function requestRetryable(error = null) {
   if (isSessionChangedError(error)) return false;
   if (error?.retryable === false) return false;
   if (error?.retryable === true) return true;
   const status = Math.max(0, Number(error?.status || 0));
-  if ([408, 425, 429].includes(status) || status >= 500) return true;
+  // Un 429 ya consumió una HTTP Response y expresa una ventana/cuota autoritativa.
+  // No se reintenta dentro de la misma llamada: el flujo P2P usa Retry-After para
+  // agendar una recuperación única y los límites funcionales quedan terminales.
+  if (status === 429) return false;
+  // Solo se repiten estados que suelen representar fallos transitorios de transporte/gateway.
+  // 501/505/506/507/508/510/511 requieren implementación, configuración, capacidad o acción
+  // externa; repetirlos inmediatamente solo consume HTTP Responses sin aumentar la recuperación.
+  if (REQUEST_RETRYABLE_HTTP_STATUSES.has(status)) return true;
   return status === 0 && (
     error?.name === 'TypeError'
     || error?.name === 'AbortError'
@@ -208,9 +236,15 @@ async function requestAttempt(path, options = {}, requestSessionToken = '') {
 
 async function request(path, options = {}, retryOptions = {}) {
   const requestSessionToken = getSessionToken();
-  const maxAttempts = Math.min(3, Math.max(1, Math.floor(Number(retryOptions.maxAttempts || REQUEST_MAX_ATTEMPTS))));
-  const audit = retryOptions.audit !== false;
   const method = String(options.method || 'GET').trim().toUpperCase();
+  const retrySafe = requestRetrySafe(path, method, retryOptions);
+  const requestedMaxAttempts = Math.min(3, Math.max(1, Math.floor(Number(retryOptions.maxAttempts || REQUEST_MAX_ATTEMPTS))));
+  // Un POST no auditado como idempotente ejecuta una sola vez la operación. Así una
+  // respuesta perdida no dispara una segunda mutación ni consume respuestas HTTP
+  // adicionales. Los flujos especializados (outbox/watchdogs) conservan sus propios
+  // reintentos con identificadores idempotentes.
+  const maxAttempts = retrySafe ? requestedMaxAttempts : 1;
+  const audit = retryOptions.audit !== false;
   const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
   let lastError = null;
 
@@ -240,6 +274,7 @@ async function request(path, options = {}, retryOptions = {}) {
           error.requestAttempts = attempt;
           error.requestMaxAttempts = maxAttempts;
           error.requestRetryExhausted = retryable && attempt >= maxAttempts;
+          error.requestRetrySafetyLimited = retryable && !retrySafe;
           error.previousStatePreserved = true;
         }
         if (isP2PCapacityRetry(error) && String(path || '').startsWith('/api/p2p/')) {
