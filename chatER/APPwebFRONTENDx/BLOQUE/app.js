@@ -77,6 +77,7 @@ const ceUiIconPaths = Object.freeze({
   "reminder": "<path d=\"M12 2a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm1 8.59 3.2 3.2-1.4 1.42L11 11.41V5h2v5.59ZM4 20h16v2H4v-2Z\"/>",
   "edit": "<path d=\"M4 17.25V21h3.75L18.8 9.95l-3.75-3.75L4 17.25ZM20.7 8.05a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z\"/>",
   "copy": "<path d=\"M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z\"/>",
+  "more": "<circle cx=\"5\" cy=\"12\" r=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><circle cx=\"19\" cy=\"12\" r=\"2\"/>",
   "reply": "<path d=\"M10 8V4l-7 7 7 7v-4h5.5c2.5 0 4.5 2 4.5 4.5V20h2v-1.5A6.5 6.5 0 0 0 15.5 12H10V8Z\"/>",
   "forward": "<path d=\"M14 8V4l7 7-7 7v-4H8.5C6 14 4 16 4 18.5V20H2v-1.5A6.5 6.5 0 0 1 8.5 12H14V8Z\"/>",
   "nickname": "<path d=\"M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V5a2 2 0 0 1 2-2h8l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z\"/>",
@@ -307,11 +308,11 @@ const els = {
   appRoot: $('appRoot'), authScreen: $('authScreen'), chatScreen: $('chatScreen'), btnGoogleLogin: $('btnGoogleLogin'), authStatus: $('authStatus'),
   userSummary: $('userSummary'), btnOpenSelfNotes: $('btnOpenSelfNotes'), btnOpenGlobalSearch: $('btnOpenGlobalSearch'), btnOpenGlobalStarred: $('btnOpenGlobalStarred'), btnOpenDrafts: $('btnOpenDrafts'), btnNotificationPause: $('btnNotificationPause'), btnOpenBlockedContacts: $('btnOpenBlockedContacts'), btnPrivacyMode: $('btnPrivacyMode'), btnPrivacyLock: $('btnPrivacyLock'), btnCompactMode: $('btnCompactMode'), btnCommandPalette: $('btnCommandPalette'), btnLogout: $('btnLogout'), installBanner: $('installBanner'), btnInstall: $('btnInstall'), btnInstallLater: $('btnInstallLater'),
   pushBanner: $('pushBanner'), btnEnablePush: $('btnEnablePush'), btnPushLater: $('btnPushLater'),
-  addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
+  addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnToggleAddContact: $('btnToggleAddContact'), btnToggleHeaderActions: $('btnToggleHeaderActions'), headerActions: $('headerActions'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
   messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
-  qrModal: $('qrModal'), qrBox: $('qrBox'), qrHelp: $('qrHelp'), qrModalTitle: $('qrModalTitle'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
+  qrModal: $('qrModal'), qrBox: $('qrBox'), btnCloseQr: $('btnCloseQr'), scanBox: $('scanBox'), qrVideo: $('qrVideo'), scanStatus: $('scanStatus'), manualCodeForm: $('manualCodeForm'), manualCodeInput: $('manualCodeInput'),
   contactShareModal: $('contactShareModal'), contactShareSearch: $('contactShareSearch'), contactShareList: $('contactShareList'), contactSharePageInfo: $('contactSharePageInfo'), btnCloseContactShare: $('btnCloseContactShare'), btnContactSharePrev: $('btnContactSharePrev'), btnContactShareNext: $('btnContactShareNext'),
   forwardModal: $('forwardModal'), forwardPreview: $('forwardPreview'), forwardList: $('forwardList'), btnCloseForward: $('btnCloseForward'),
   scheduleModal: $('scheduleModal'), schedulePreview: $('schedulePreview'), scheduleDateTime: $('scheduleDateTime'), scheduleSilent: $('scheduleSilent'), scheduledList: $('scheduledList'), btnConfirmSchedule: $('btnConfirmSchedule'),
@@ -1172,7 +1173,7 @@ function profileDisplayEmail(profile = {}) {
 function renderProfilePhotoForModal(profile = {}) {
   const label = profileDisplayName(profile);
   if (profile.photoUrl) {
-    return `<span class="ce-profile-photo"><img src="${escapeHtml(profile.photoUrl)}" alt="Foto de perfil de ${escapeHtml(label)}" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false"></span>`;
+    return `<button class="ce-profile-photo ce-profile-photo--interactive" type="button" data-open-profile-image-viewer="1" data-image-url="${escapeHtml(profile.photoUrl)}" data-image-alt="Foto de perfil de ${escapeHtml(label)}" aria-label="Ver foto de perfil de ${escapeHtml(label)} en pantalla completa"><img src="${escapeHtml(profile.photoUrl)}" alt="Foto de perfil de ${escapeHtml(label)}" referrerpolicy="no-referrer" loading="eager" decoding="async" draggable="false"></button>`;
   }
   return `<span class="ce-profile-photo ce-profile-photo--fallback" aria-label="Foto de perfil de ${escapeHtml(label)}">${escapeHtml(initials(profile))}</span>`;
 }
@@ -1222,7 +1223,7 @@ function renderProfileShareControls(profile = {}) {
   const qrSrc = buildProfileQrImageUrl(profile);
   if (!shareLink || !qrSrc) return '';
   return `<div class="ce-profile-share" data-profile-share-root="1">
-    <button class="ce-profile-share__toggle" type="button" data-profile-share-toggle="1" aria-expanded="false" aria-label="Compartir este perfil">${uiIcon('forward')}<span>Compartir</span></button>
+    <button class="ce-profile-share__toggle" type="button" data-profile-share-toggle="1" aria-expanded="false" aria-label="Compartir perfil" title="Compartir perfil">${uiIcon('more')}</button>
     <div class="ce-profile-share__menu hidden" data-profile-share-menu="1" aria-label="Opciones para compartir perfil">
       <button type="button" data-profile-share-image="${escapeHtml(qrSrc)}">Imagen QR</button>
       <button type="button" data-profile-share-copy="${escapeHtml(shareLink)}">Copiar link</button>
@@ -1239,7 +1240,7 @@ function renderProfileQrForModal(profile = {}) {
   const label = profileDisplayName(profile);
   const shareLink = buildProfileShareLink(profile);
   const qrSrc = buildProfileQrImageUrl(profile);
-  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${escapeHtml(qrSrc)}" alt="QR de ${escapeHtml(label)}"><code>${escapeHtml(code)}</code><div class="ce-profile-qr__actions"><a class="ce-link" href="${escapeHtml(shareLink)}" target="_blank" rel="noopener">Abrir enlace de perfil</a><button class="ce-link" type="button" data-copy-profile-link="${escapeHtml(shareLink)}">Copiar enlace</button></div>${renderProfileShareControls(profile)}</div>`;
+  return `<div class="ce-profile-qr"><img class="ce-profile-qr__image" src="${escapeHtml(qrSrc)}" alt="QR de ${escapeHtml(label)}"><div class="ce-profile-qr__actions"><button class="ce-profile-qr__icon-btn" type="button" data-copy-profile-link="${escapeHtml(shareLink)}" aria-label="Copiar enlace del perfil" title="Copiar enlace">${uiIcon('copy')}</button>${renderProfileShareControls(profile)}</div></div>`;
 }
 
 function resolveProfileFromChat(chat = {}) {
@@ -1255,8 +1256,7 @@ function openProfileCard(profile = {}) {
   state.contactSharePage = 0;
   const title = profileDisplayName(cleanProfile);
   const email = profileDisplayEmail(cleanProfile);
-  els.qrModalTitle.textContent = title;
-  els.qrHelp.textContent = email ? `Correo de la cuenta: ${email}` : 'Correo no disponible para esta cuenta.';
+  els.qrModal.setAttribute('aria-label', `Perfil de ${title}`);
   els.scanBox.classList.add('hidden');
   els.manualCodeForm?.classList.add('hidden');
   stopScan();
@@ -7037,8 +7037,7 @@ function openOwnQr() {
 }
 
 async function openScanQr() {
-  els.qrModalTitle.textContent = 'Escanear QR';
-  els.qrHelp.textContent = 'Escanea el QR de un contacto. Si la cámara no está disponible, pega el código o enlace.';
+  els.qrModal.setAttribute('aria-label', 'Escanear QR de contacto');
   els.qrBox.innerHTML = '';
   els.scanStatus.textContent = 'Apunta la cámara al código QR.';
   els.scanBox.classList.remove('hidden');
@@ -8327,9 +8326,36 @@ function isTypingInEditableField(event) {
   return target.isContentEditable || ['input', 'textarea', 'select'].includes(tagName);
 }
 
+function setMobileFoldState(container, toggle, expanded) {
+  if (!container || !toggle) return;
+  const open = Boolean(expanded);
+  container.classList.toggle('is-mobile-expanded', open);
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const action = open ? 'Ocultar' : 'Mostrar';
+  const target = container === els.addContactForm ? 'opciones para agregar contacto' : 'acciones de cuenta';
+  toggle.setAttribute('aria-label', `${action} ${target}`);
+  toggle.setAttribute('title', `${action} ${target}`);
+}
+
+function toggleMobileFold(container, toggle) {
+  if (!container || !toggle) return;
+  setMobileFoldState(container, toggle, !container.classList.contains('is-mobile-expanded'));
+}
+
 function bindEvents() {
   window.addEventListener('beforeunload', () => saveActiveDraft({ announce: false }));
   window.addEventListener('resize', () => updateResponsiveShellState(), { passive: true });
+  els.btnToggleHeaderActions?.addEventListener('click', (event) => {
+    event.preventDefault();
+    toggleMobileFold(els.headerActions, els.btnToggleHeaderActions);
+  });
+  els.btnToggleAddContact?.addEventListener('click', (event) => {
+    event.preventDefault();
+    toggleMobileFold(els.addContactForm, els.btnToggleAddContact);
+    if (els.addContactForm?.classList.contains('is-mobile-expanded')) {
+      window.requestAnimationFrame?.(() => els.contactEmailInput?.focus?.());
+    }
+  });
   ['pointerdown', 'touchstart', 'focusin'].forEach((eventName) => {
     document.addEventListener(eventName, () => resetPrivacyLockActivity(), { passive: true });
   });
@@ -9346,7 +9372,13 @@ function bindEvents() {
   els.addContactForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const email = els.contactEmailInput.value.trim();
-    if (!email) return;
+    if (!email) {
+      if (isMobileChatListPrimaryViewport() && !els.addContactForm.classList.contains('is-mobile-expanded')) {
+        setMobileFoldState(els.addContactForm, els.btnToggleAddContact, true);
+        window.requestAnimationFrame?.(() => els.contactEmailInput?.focus?.());
+      }
+      return;
+    }
     await addContactByEmail(email).catch((error) => alert(error.message));
     els.contactEmailInput.value = '';
   });
@@ -9767,6 +9799,12 @@ function bindEvents() {
   els.qrModal.addEventListener('click', (event) => {
     if (event.target === els.qrModal) {
       closeQrModal();
+      return;
+    }
+    const profileImageButton = event.target.closest('[data-open-profile-image-viewer]');
+    if (profileImageButton && els.qrModal.contains(profileImageButton)) {
+      event.preventDefault();
+      openImageViewer(profileImageButton.dataset.imageUrl || '', profileImageButton.dataset.imageAlt || 'Foto de perfil');
       return;
     }
     const shareToggle = event.target.closest('[data-profile-share-toggle]');

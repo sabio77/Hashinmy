@@ -11726,3 +11726,269 @@ body.ce-dark-mode .ce-contact-share-pager span {
     max-width: 58vw;
   }
 }
+
+
+/* Solicitud QR/perfil + compactación móvil: ajustes acotados y de mayor especificidad para preservar el resto del tema. */
+.ce-mobile-fold-toggle {
+  display: none;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ce-muted);
+  cursor: pointer;
+}
+
+.ce-mobile-fold-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  transition: transform 0.18s ease;
+}
+
+.is-mobile-expanded > .ce-mobile-fold-toggle svg,
+.ce-add.is-mobile-expanded > .ce-mobile-fold-toggle svg {
+  transform: rotate(180deg);
+}
+
+#contactEmailInput {
+  background: #f6f7f8;
+  background: color-mix(in srgb, var(--ce-bg-soft) 72%, #ffffff 28%);
+}
+
+#contactEmailInput:focus {
+  background: #ffffff;
+}
+
+:root[data-theme='dark'] #contactEmailInput,
+body.ce-dark-mode #contactEmailInput {
+  background: #2a373e;
+  background: color-mix(in srgb, var(--ce-bg-soft) 90%, #ffffff 10%);
+}
+
+.ce-profile-photo--interactive {
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ce-profile-photo--interactive:hover,
+.ce-profile-photo--interactive:focus-visible {
+  transform: scale(1.025);
+  outline: 3px solid color-mix(in srgb, var(--ce-accent) 35%, transparent);
+  outline-offset: 3px;
+}
+
+.ce-profile-qr__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.ce-profile-qr__icon-btn,
+.ce-profile-share__toggle {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ce-line) 78%, transparent);
+  border-radius: 14px;
+  padding: 0;
+  background: color-mix(in srgb, var(--ce-bg-soft) 86%, transparent);
+  color: var(--ce-accent-dark);
+  box-shadow: 0 8px 18px rgba(17, 27, 33, 0.08);
+  cursor: pointer;
+}
+
+.ce-profile-qr__icon-btn:hover,
+.ce-profile-qr__icon-btn:focus-visible,
+.ce-profile-share__toggle:hover,
+.ce-profile-share__toggle:focus-visible {
+  background: color-mix(in srgb, var(--ce-accent-soft) 72%, var(--ce-panel));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.ce-profile-qr__icon-btn .ce-ui-icon,
+.ce-profile-share__toggle .ce-ui-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ce-profile-share {
+  position: relative;
+  display: block;
+  margin: 0;
+}
+
+.ce-profile-share__menu {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 8px);
+  left: 50%;
+  width: min(280px, 82vw);
+  transform: translateX(-50%);
+  box-shadow: 0 14px 34px rgba(17, 27, 33, 0.16);
+}
+
+:root[data-theme='dark'] .ce-profile-qr__icon-btn,
+:root[data-theme='dark'] .ce-profile-share__toggle,
+body.ce-dark-mode .ce-profile-qr__icon-btn,
+body.ce-dark-mode .ce-profile-share__toggle {
+  background: color-mix(in srgb, var(--ce-bg-soft) 92%, #ffffff 8%);
+  color: var(--ce-accent);
+  border-color: var(--ce-line);
+}
+
+@media (max-width: 620px) {
+  .ce-mobile-fold-toggle {
+    display: grid;
+  }
+
+  .ce-sidebar__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ce-sidebar__header .ce-user {
+    grid-column: 1;
+    width: auto;
+  }
+
+  .ce-sidebar__header .ce-header-actions {
+    grid-column: 2;
+    width: auto;
+    max-width: none;
+    padding: 0;
+    overflow: visible;
+    justify-content: flex-end;
+  }
+
+  .ce-header-actions:not(.is-mobile-expanded) > .ce-icon-btn {
+    display: none;
+  }
+
+  .ce-header-actions.is-mobile-expanded {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding-top: 2px;
+  }
+
+  .ce-header-actions.is-mobile-expanded > .ce-mobile-fold-toggle {
+    margin-right: auto;
+  }
+
+  .ce-add {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .ce-add:not(.is-mobile-expanded) > #contactEmailInput,
+  .ce-add:not(.is-mobile-expanded) > #btnScanQr {
+    display: none;
+  }
+
+  .ce-add:not(.is-mobile-expanded) > .ce-mobile-fold-toggle {
+    grid-column: 1;
+  }
+
+  .ce-add:not(.is-mobile-expanded) > .ce-icon-btn--accent {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .ce-add.is-mobile-expanded {
+    grid-template-columns: 42px minmax(0, 1fr) 42px 42px;
+  }
+
+  .ce-add.is-mobile-expanded > .ce-mobile-fold-toggle {
+    grid-column: 1;
+  }
+
+  .ce-add.is-mobile-expanded > #contactEmailInput {
+    grid-column: 2;
+  }
+
+  .ce-add.is-mobile-expanded > .ce-icon-btn--accent {
+    grid-column: 3;
+  }
+
+  .ce-add.is-mobile-expanded > #btnScanQr {
+    grid-column: 4;
+  }
+
+  .ce-add > .ce-icon-btn,
+  .ce-add > .ce-mobile-fold-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* 70% de las dimensiones internas previas para reducir la huella visual de las pestañas en móvil. */
+  .ce-tabs {
+    margin: 0 10px 7px;
+    padding: 3.5px;
+    gap: 3.5px;
+    border-radius: 11px;
+  }
+
+  .ce-tabs button {
+    min-height: 0;
+    padding: 7px 4px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    line-height: 1.1;
+  }
+}
+
+@media (max-width: 360px) {
+  .ce-add,
+  .ce-add.is-mobile-expanded {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .ce-add.is-mobile-expanded {
+    grid-template-columns: 38px minmax(0, 1fr) 38px 38px;
+  }
+
+  .ce-add > .ce-icon-btn,
+  .ce-add > .ce-mobile-fold-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+}
+
+/* Mantiene la intención visual del botón de alta tras la capa temática final. */
+.ce-add > .ce-icon-btn--accent {
+  background: var(--ce-accent);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 168, 132, 0.2);
+}
+
+.ce-add > .ce-icon-btn--accent:hover,
+.ce-add > .ce-icon-btn--accent:focus-visible {
+  background: var(--ce-accent-dark);
+  color: #ffffff;
+}
+
+#qrModal .ce-scan:not(.hidden) {
+  padding-top: 32px;
+}

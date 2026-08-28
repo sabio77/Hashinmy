@@ -34,7 +34,10 @@
       <aside class="ce-sidebar">
         <header class="ce-sidebar__header">
           <div class="ce-user" id="userSummary"></div>
-          <div class="ce-header-actions">
+          <div class="ce-header-actions" id="headerActions">
+            <button class="ce-mobile-fold-toggle" id="btnToggleHeaderActions" type="button" aria-expanded="false" aria-label="Mostrar acciones de cuenta" title="Mostrar acciones de cuenta">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 8.6 12 15.2l6.6-6.6L20 10l-8 8-8-8 1.4-1.4Z"/></svg>
+            </button>
             <button class="ce-icon-btn" id="btnShowQr" type="button" title="Mi QR" aria-label="Mi QR">
               <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3V3Zm2 2v4h4V5H5Zm8-2h8v8h-8V3Zm2 2v4h4V5h-4ZM3 13h8v8H3v-8Zm2 2v4h4v-4H5Zm10-2h2v2h-2v-2Zm4 0h2v4h-4v-2h2v-2Zm-4 4h2v4h-2v-4Zm4 2h2v2h-2v-2Z"/></svg>
             </button>
@@ -93,9 +96,12 @@
         </div>
 
         <form class="ce-add" id="addContactForm">
+          <button class="ce-mobile-fold-toggle" id="btnToggleAddContact" type="button" aria-expanded="false" aria-label="Mostrar opciones para agregar contacto" title="Mostrar opciones para agregar contacto">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 8.6 12 15.2l6.6-6.6L20 10l-8 8-8-8 1.4-1.4Z"/></svg>
+          </button>
           <input id="contactEmailInput" type="email" autocomplete="email" placeholder="Agregar contacto por correo" />
-          <button class="ce-icon-btn ce-icon-btn--accent" type="submit" title="Agregar" aria-label="Agregar contacto">
-            <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-8 0c1.66 0 3-1.34 3-3S8.66 6 7 6 4 7.34 4 9s1.34 3 3 3Zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm-8 .5c-.31 0-.65.02-1 .05-1.67.15-5 .98-5 2.45v3h4v-2c0-1.48.81-2.61 2.05-3.5H7Z"/></svg>
+          <button class="ce-icon-btn ce-icon-btn--accent" type="submit" title="Agregar contacto" aria-label="Agregar contacto">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g transform="translate(1.5 2.5) scale(.78)"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-8 0c1.66 0 3-1.34 3-3S8.66 6 7 6 4 7.34 4 9s1.34 3 3 3Zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm-8 .5c-.31 0-.65.02-1 .05-1.67.15-5 .98-5 2.45v3h4v-2c0-1.48.81-2.61 2.05-3.5H7Z"/></g><path d="M17 2h2v3h3v2h-3v3h-2V7h-3V5h3V2Z"/></svg>
           </button>
           <button class="ce-icon-btn" id="btnScanQr" type="button" title="Escanear QR" aria-label="Escanear QR">
             <svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4ZM8 8h2v2H8V8Zm6 0h2v2h-2V8Zm-6 6h2v2H8v-2Zm6 0h2v2h-2v-2Z"/></svg>
@@ -181,9 +187,7 @@
   <div class="ce-modal hidden" id="qrModal" role="dialog" aria-modal="true" aria-label="Código QR chatER">
     <div class="ce-modal__card">
       <button class="ce-modal__close" id="btnCloseQr" type="button" aria-label="Cerrar"><svg class="ce-ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 16.9 4.3 12 9.17 7.1 4.3 5.7 5.7 10.59 10.59 5.7 15.48 7.1 16.9 12 12 16.9 16.9 18.3 15.48 13.41 10.59 18.3 5.7Z"/></svg></button>
-      <h2 id="qrModalTitle">Mi código QR</h2>
       <div class="ce-qr-box" id="qrBox"></div>
-      <p id="qrHelp">Comparte este QR para que otros te agreguen y abran un chat contigo.</p>
       <div class="ce-scan hidden" id="scanBox">
         <video id="qrVideo" playsinline muted></video>
         <p id="scanStatus">Apunta la cámara al código QR.</p>
