@@ -78,6 +78,7 @@ const ceUiIconPaths = Object.freeze({
   "edit": "<path d=\"M4 17.25V21h3.75L18.8 9.95l-3.75-3.75L4 17.25ZM20.7 8.05a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z\"/>",
   "copy": "<path d=\"M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z\"/>",
   "more": "<circle cx=\"5\" cy=\"12\" r=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><circle cx=\"19\" cy=\"12\" r=\"2\"/>",
+  "share": "<path d=\"M18 16a3 3 0 0 0-2.38 1.18l-6.82-3.41a3.2 3.2 0 0 0 0-3.54l6.82-3.41A3 3 0 1 0 15 5c0 .16.01.31.04.46L8.1 8.93a3 3 0 1 0 0 6.14l6.94 3.47A3 3 0 1 0 18 16Z\"/>",
   "reply": "<path d=\"M10 8V4l-7 7 7 7v-4h5.5c2.5 0 4.5 2 4.5 4.5V20h2v-1.5A6.5 6.5 0 0 0 15.5 12H10V8Z\"/>",
   "forward": "<path d=\"M14 8V4l7 7-7 7v-4H8.5C6 14 4 16 4 18.5V20H2v-1.5A6.5 6.5 0 0 1 8.5 12H14V8Z\"/>",
   "nickname": "<path d=\"M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V5a2 2 0 0 1 2-2h8l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z\"/>",
@@ -289,6 +290,7 @@ const state = {
   notificationPreferences: { notificationsPaused: false, notificationsPausedUntil: '', updatedAt: '' },
   pendingAttachment: null,
   pendingAttachments: [],
+  pendingImagePreviews: [],
   attachmentUploading: false,
   attachmentBatchSending: false,
   sendModeMenuOpen: false,
@@ -308,7 +310,7 @@ const els = {
   appRoot: $('appRoot'), authScreen: $('authScreen'), chatScreen: $('chatScreen'), btnGoogleLogin: $('btnGoogleLogin'), authStatus: $('authStatus'),
   userSummary: $('userSummary'), btnOpenSelfNotes: $('btnOpenSelfNotes'), btnOpenGlobalSearch: $('btnOpenGlobalSearch'), btnOpenGlobalStarred: $('btnOpenGlobalStarred'), btnOpenDrafts: $('btnOpenDrafts'), btnNotificationPause: $('btnNotificationPause'), btnOpenBlockedContacts: $('btnOpenBlockedContacts'), btnPrivacyMode: $('btnPrivacyMode'), btnPrivacyLock: $('btnPrivacyLock'), btnCompactMode: $('btnCompactMode'), btnCommandPalette: $('btnCommandPalette'), btnLogout: $('btnLogout'), installBanner: $('installBanner'), btnInstall: $('btnInstall'), btnInstallLater: $('btnInstallLater'),
   pushBanner: $('pushBanner'), btnEnablePush: $('btnEnablePush'), btnPushLater: $('btnPushLater'),
-  addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnToggleAddContact: $('btnToggleAddContact'), btnToggleHeaderActions: $('btnToggleHeaderActions'), headerActions: $('headerActions'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
+  addContactForm: $('addContactForm'), contactEmailInput: $('contactEmailInput'), btnToggleHeaderActions: $('btnToggleHeaderActions'), headerActions: $('headerActions'), btnScanQr: $('btnScanQr'), btnShowQr: $('btnShowQr'),
   chatList: $('chatList'), contactList: $('contactList'), chatLabelFilters: $('chatLabelFilters'), tabChats: $('tabChats'), tabUnread: $('tabUnread'), tabArchived: $('tabArchived'), tabContacts: $('tabContacts'),
   activeChatHeader: $('activeChatHeader'), chatSearchArea: $('chatSearchArea'), chatSearchForm: $('chatSearchForm'), chatSearchInput: $('chatSearchInput'), btnClearSearch: $('btnClearSearch'), btnShowStarred: $('btnShowStarred'), chatSearchPanel: $('chatSearchPanel'),
   messages: $('messages'), btnScrollBottom: $('btnScrollBottom'), typingStatus: $('typingStatus'), replyDraft: $('replyDraft'), draftStatus: $('draftStatus'), quickRepliesPanel: $('quickRepliesPanel'), slashCommandsPanel: $('slashCommandsPanel'), iconInsertPickerPanel: $('iconInsertPickerPanel'), btnQuickReplies: $('btnQuickReplies'), btnSmartReplySuggestions: $('btnSmartReplySuggestions'), btnIconInsertPicker: $('btnIconInsertPicker'), btnScheduleMessage: $('btnScheduleMessage'), btnCreatePoll: $('btnCreatePoll'), btnVoiceDictation: $('btnVoiceDictation'), btnSilentSend: $('btnSilentSend'), messageTtlSelect: $('messageTtlSelect'), btnAttachFile: $('btnAttachFile'), fileInput: $('fileInput'), attachmentPreview: $('attachmentPreview'), messageForm: $('messageForm'), messageInput: $('messageInput'), btnSend: $('btnSend'), btnSendModePrefix: $('btnSendModePrefix'), sendModeMenu: $('sendModeMenu'), btnCycleTtl: $('btnCycleTtl'),
@@ -595,29 +597,97 @@ function renderMessageTextBody(text = '', attachment = null) {
   });
 }
 
+function pendingImagePreviewItems() {
+  return (Array.isArray(state.pendingImagePreviews) ? state.pendingImagePreviews : [])
+    .filter((preview) => preview && typeof preview === 'object' && preview.previewId && preview.previewUrl);
+}
+
+function revokePendingImagePreview(preview = null) {
+  const previewUrl = String(preview?.previewUrl || '');
+  if (!previewUrl.startsWith('blob:')) return;
+  try { URL.revokeObjectURL(previewUrl); } catch {}
+}
+
+function removePendingImagePreviewRecord(previewId = '', attachmentId = '') {
+  const cleanPreviewId = String(previewId || '').trim();
+  const cleanAttachmentId = String(attachmentId || '').trim();
+  state.pendingImagePreviews = (Array.isArray(state.pendingImagePreviews) ? state.pendingImagePreviews : []).filter((preview) => {
+    const matches = (cleanPreviewId && preview.previewId === cleanPreviewId)
+      || (cleanAttachmentId && preview.attachmentId === cleanAttachmentId);
+    if (matches) revokePendingImagePreview(preview);
+    return !matches;
+  });
+}
+
+function clearPendingImagePreviews() {
+  for (const preview of pendingImagePreviewItems()) revokePendingImagePreview(preview);
+  state.pendingImagePreviews = [];
+}
+
+function createPendingImagePreview(file = null) {
+  if (!file || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return null;
+  const previewId = `image-preview-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return {
+    previewId,
+    previewUrl: URL.createObjectURL(file),
+    fileName: String(file.name || 'imagen').trim() || 'imagen',
+    progress: 0,
+    status: 'processing',
+    attachmentId: ''
+  };
+}
+
+function clearPendingImagePreview(previewId = '') {
+  const cleanPreviewId = String(previewId || '').trim();
+  if (!cleanPreviewId) return;
+  const preview = pendingImagePreviewItems().find((item) => item.previewId === cleanPreviewId);
+  if (!preview) return;
+  if (preview.attachmentId) {
+    state.pendingAttachments = (Array.isArray(state.pendingAttachments) ? state.pendingAttachments : [])
+      .filter((attachment) => normalizeAttachmentClient(attachment)?.attachmentId !== preview.attachmentId);
+    if (normalizeAttachmentClient(state.pendingAttachment)?.attachmentId === preview.attachmentId) state.pendingAttachment = null;
+  }
+  removePendingImagePreviewRecord(cleanPreviewId, '');
+  if (!pendingComposerAttachments().length && !pendingImagePreviewItems().length && els.fileInput) els.fileInput.value = '';
+  updateAttachmentPreview();
+  updateComposerControls();
+}
+
 function updateAttachmentPreview() {
   if (!els.attachmentPreview) return;
   const attachments = pendingComposerAttachments();
-  els.attachmentPreview.classList.toggle('hidden', !attachments.length && !state.attachmentUploading);
-  els.attachmentPreview.classList.toggle('ce-attachment-preview--gallery', attachments.length > 0 && attachments.every((attachment) => attachment.kind === 'image'));
+  const trackedPreviews = pendingImagePreviewItems();
+  const trackedAttachmentIds = new Set(trackedPreviews.map((preview) => String(preview.attachmentId || '')).filter(Boolean));
+  const fallbackImagePreviews = attachments
+    .filter((attachment) => attachment.kind === 'image' && !trackedAttachmentIds.has(attachment.attachmentId))
+    .map((attachment) => ({
+      previewId: attachment.attachmentId,
+      previewUrl: attachment.url,
+      fileName: attachment.fileName,
+      progress: 100,
+      status: 'ready',
+      attachmentId: attachment.attachmentId
+    }));
+  const imagePreviews = [...trackedPreviews, ...fallbackImagePreviews];
+  const hasImageGallery = imagePreviews.length > 0;
+  els.attachmentPreview.classList.toggle('hidden', !attachments.length && !hasImageGallery && !state.attachmentUploading);
+  els.attachmentPreview.classList.toggle('ce-attachment-preview--gallery', hasImageGallery);
+  if (hasImageGallery) {
+    const gallery = imagePreviews.map((preview) => {
+      const progress = Math.max(0, Math.min(100, Math.round(Number(preview.progress || 0))));
+      const ready = preview.status === 'ready' || progress >= 100;
+      const viewLabel = `Ver ${preview.fileName || 'imagen adjunta'} en pantalla completa`;
+      return `<article class="ce-attachment-preview__item${ready ? ' is-ready' : ' is-processing'}" data-image-preview-id="${escapeHtml(preview.previewId)}"><button class="ce-attachment-preview__thumb" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(preview.previewUrl)}" data-image-alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" aria-label="${escapeHtml(viewLabel)}"><img src="${escapeHtml(preview.previewUrl)}" alt="${escapeHtml(preview.fileName || 'Imagen adjunta')}" /></button><button class="ce-attachment-preview__remove" type="button" data-clear-image-preview="${escapeHtml(preview.previewId)}" aria-label="Quitar ${escapeHtml(preview.fileName || 'imagen adjunta')}" style="--ce-attachment-progress:${progress}%" ${state.attachmentUploading ? 'disabled' : ''}>${uiIcon('close')}</button></article>`;
+    }).join('');
+    els.attachmentPreview.innerHTML = `<div class="ce-attachment-preview__gallery-head"><span class="ce-attachment-preview__gallery-count" aria-label="${imagePreviews.length} ${imagePreviews.length === 1 ? 'imagen adjunta' : 'imágenes adjuntas'}">${uiIcon('attachment')}<strong>${imagePreviews.length}</strong></span></div><div class="ce-attachment-preview__gallery" role="list">${gallery}</div>`;
+    return;
+  }
   if (!attachments.length && state.attachmentUploading) {
-    els.attachmentPreview.innerHTML = '<div class="ce-attachment-preview__loading"><span class="ce-attachment-preview__spinner" aria-hidden="true"></span><span><strong>Preparando imágenes...</strong><em>Comprimiendo y preparando la subida segura.</em></span></div>';
+    els.attachmentPreview.innerHTML = '<div class="ce-attachment-preview__loading"><span class="ce-attachment-preview__spinner" aria-hidden="true"></span><span><strong>Preparando adjunto...</strong><em>Procesando y preparando la subida segura.</em></span></div>';
     return;
   }
   if (!attachments.length) {
     els.attachmentPreview.innerHTML = '';
-    return;
-  }
-  const imageAttachments = attachments.filter((attachment) => attachment.kind === 'image');
-  if (imageAttachments.length === attachments.length) {
-    const countLabel = imageAttachments.length === 1 ? '1 imagen lista para enviar' : `${imageAttachments.length} imágenes listas para enviar`;
-    const uploadLabel = state.attachmentUploading ? ' · preparando más imágenes' : '';
-    const gallery = imageAttachments.map((attachment, index) => {
-      const size = attachment.sizeBytes ? formatFileSize(attachment.sizeBytes) : '';
-      const viewLabel = `Ver ${attachment.fileName} en pantalla completa`;
-      return `<article class="ce-attachment-preview__item" data-attachment-id="${escapeHtml(attachment.attachmentId)}"><button class="ce-attachment-preview__thumb" type="button" data-open-pending-image-viewer="1" data-image-url="${escapeHtml(attachment.url)}" data-image-alt="${escapeHtml(attachment.fileName)}" aria-label="${escapeHtml(viewLabel)}"><img src="${escapeHtml(attachment.url)}" alt="${escapeHtml(attachment.fileName)}" /></button><button class="ce-attachment-preview__remove" type="button" data-clear-attachment="${escapeHtml(attachment.attachmentId)}" aria-label="Quitar ${escapeHtml(attachment.fileName)}" ${state.attachmentUploading ? 'disabled' : ''}>${uiIcon('close')}</button><span class="ce-attachment-preview__index" aria-hidden="true">${index + 1}</span><span class="ce-attachment-preview__caption"><strong>${escapeHtml(attachment.fileName)}</strong><em>${escapeHtml(size || 'Imagen WebP comprimida')}</em></span></article>`;
-    }).join('');
-    els.attachmentPreview.innerHTML = `<div class="ce-attachment-preview__gallery-head"><span><strong>${escapeHtml(countLabel)}</strong><em>Toca una imagen para verla a pantalla completa${escapeHtml(uploadLabel)}.</em></span>${imageAttachments.length > 1 ? `<button class="ce-attachment-preview__clear-all" type="button" data-clear-all-attachments="1" aria-label="Quitar todas las imágenes" ${state.attachmentUploading ? 'disabled' : ''}>Quitar todas</button>` : ''}</div><div class="ce-attachment-preview__gallery" role="list">${gallery}</div>`;
     return;
   }
   const attachment = attachments[0];
@@ -633,12 +703,14 @@ function clearPendingAttachment(attachmentId = '') {
     state.pendingAttachments = (Array.isArray(state.pendingAttachments) ? state.pendingAttachments : [])
       .filter((attachment) => normalizeAttachmentClient(attachment)?.attachmentId !== cleanId);
     if (normalizeAttachmentClient(state.pendingAttachment)?.attachmentId === cleanId) state.pendingAttachment = null;
+    removePendingImagePreviewRecord('', cleanId);
   } else {
     state.pendingAttachment = null;
     state.pendingAttachments = [];
+    clearPendingImagePreviews();
     state.attachmentUploading = false;
   }
-  if (!pendingComposerAttachments().length && els.fileInput) els.fileInput.value = '';
+  if (!pendingComposerAttachments().length && !pendingImagePreviewItems().length && els.fileInput) els.fileInput.value = '';
   updateAttachmentPreview();
   updateComposerControls();
 }
@@ -910,7 +982,11 @@ async function prepareFileForR2(file, onProgress = () => {}, options = {}) {
       maxBytes: R2_IMAGE_MAX_BYTES,
       maxDimension: 1600,
       onProgress(progress, stage) {
-        onProgress(`Comprimiendo imagen WebP ${Math.max(1, Math.min(100, Number(progress || 0)))}%`);
+        const normalizedProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+        onProgress(`Comprimiendo imagen WebP ${Math.max(1, Math.round(normalizedProgress))}%`);
+        if (typeof options.onImageProgress === 'function') {
+          options.onImageProgress(Math.min(82, Math.round(normalizedProgress * 0.82)), stage || 'compressing');
+        }
       }
     });
     const compressedFile = result?.file;
@@ -1016,26 +1092,40 @@ async function useInlineFallbackForPreparedAttachment(prepared = {}, statusReaso
   return attachment;
 }
 
-async function createAttachmentForActiveChat(file) {
+async function createAttachmentForActiveChat(file, options = {}) {
   if (!state.activeChatId) throw new Error('Selecciona un chat antes de adjuntar archivos.');
   if (isChatInteractionBlocked()) throw new Error(chatBlockNoticeText() || 'No puedes adjuntar archivos en este chat.');
+  const reportImageProgress = (progress, stage = '') => {
+    if (typeof options.onImageProgress !== 'function') return;
+    options.onImageProgress(Math.max(0, Math.min(100, Math.round(Number(progress || 0)))), stage);
+  };
   const uploadMode = resolveAttachmentUploadModeBeforeUpload();
   const fallback = getInlineMediaFallbackConfig();
   const prepared = await prepareFileForR2(file, (status) => showTemporaryDraftStatus(status, 1400), {
-    fileMaxBytes: uploadMode === 'media-firmada-inline' && fallback.maxBytes ? fallback.maxBytes : R2_GENERIC_FILE_MAX_BYTES
+    fileMaxBytes: uploadMode === 'media-firmada-inline' && fallback.maxBytes ? fallback.maxBytes : R2_GENERIC_FILE_MAX_BYTES,
+    onImageProgress: reportImageProgress
   });
+  if (prepared.kind === 'image') reportImageProgress(84, 'prepared');
   if (uploadMode === 'media-firmada-inline') {
-    return useInlineFallbackForPreparedAttachment(prepared, 'R2 no está configurado');
+    reportImageProgress(90, 'uploading');
+    const attachment = await useInlineFallbackForPreparedAttachment(prepared, 'R2 no está configurado');
+    reportImageProgress(100, 'ready');
+    return attachment;
   }
   try {
     showTemporaryDraftStatus('Solicitando subida segura a Cloudflare R2...', 1800);
+    reportImageProgress(90, 'uploading');
     const attachment = normalizeAttachmentClient(await createR2AttachmentForPreparedFile(prepared));
     if (!attachment) throw new Error('La subida segura no devolvió un adjunto válido.');
     showTemporaryDraftStatus('Adjunto listo para enviar.', 2200);
+    reportImageProgress(100, 'ready');
     return attachment;
   } catch (error) {
     if (!isR2NotConfiguredUploadError(error)) throw error;
-    return useInlineFallbackForPreparedAttachment(prepared, 'Cloudflare R2 no está configurado en este backend');
+    reportImageProgress(92, 'fallback');
+    const attachment = await useInlineFallbackForPreparedAttachment(prepared, 'Cloudflare R2 no está configurado en este backend');
+    reportImageProgress(100, 'ready');
+    return attachment;
   }
 }
 
@@ -1043,6 +1133,7 @@ async function uploadAttachmentForActiveChat(file) {
   state.attachmentUploading = true;
   state.pendingAttachment = null;
   state.pendingAttachments = [];
+  clearPendingImagePreviews();
   updateAttachmentPreview();
   updateComposerControls();
   try {
@@ -1057,28 +1148,62 @@ async function uploadAttachmentForActiveChat(file) {
 async function uploadImageAttachmentsForActiveChat(files = []) {
   const selectedFiles = Array.from(files || []).filter(Boolean);
   if (!selectedFiles.length) return;
-  if (selectedFiles.length > MAX_PENDING_IMAGE_ATTACHMENTS) {
-    throw new Error(`Puedes preparar hasta ${MAX_PENDING_IMAGE_ATTACHMENTS} imágenes por envío.`);
-  }
   if (selectedFiles.some((file) => !isImageAttachmentFile(file))) {
     throw new Error('La selección múltiple está disponible solo para imágenes. Para otros archivos, adjunta uno a la vez.');
   }
+  if (pendingComposerAttachments().some((attachment) => attachment.kind !== 'image')) clearPendingAttachment();
+  const readyImageAttachments = pendingComposerAttachments().filter((attachment) => attachment.kind === 'image');
+  const processingPreviewCount = pendingImagePreviewItems().filter((preview) => !preview.attachmentId).length;
+  const existingImageCount = readyImageAttachments.length + processingPreviewCount;
+  if (existingImageCount + selectedFiles.length > MAX_PENDING_IMAGE_ATTACHMENTS) {
+    throw new Error(`Puedes preparar hasta ${MAX_PENDING_IMAGE_ATTACHMENTS} imágenes por envío.`);
+  }
+  const queue = selectedFiles.map((file) => ({ file, preview: createPendingImagePreview(file) }));
+  if (queue.some((item) => !item.preview)) {
+    for (const item of queue) if (item.preview) revokePendingImagePreview(item.preview);
+    throw new Error('Este navegador no permite crear la vista previa local de la imagen.');
+  }
+  state.pendingImagePreviews.push(...queue.map((item) => item.preview));
   state.attachmentUploading = true;
-  state.pendingAttachment = null;
-  state.pendingAttachments = [];
   updateAttachmentPreview();
   updateComposerControls();
+  const failures = [];
   try {
-    for (let index = 0; index < selectedFiles.length; index += 1) {
-      showTemporaryDraftStatus(`Preparando imagen ${index + 1} de ${selectedFiles.length}...`, 1600);
-      const attachment = await createAttachmentForActiveChat(selectedFiles[index]);
-      state.pendingAttachments.push(attachment);
-      updateAttachmentPreview();
+    for (let index = 0; index < queue.length; index += 1) {
+      const item = queue[index];
+      showTemporaryDraftStatus(`Preparando imagen ${index + 1} de ${queue.length}...`, 1600);
+      try {
+        const attachment = await createAttachmentForActiveChat(item.file, {
+          onImageProgress(progress) {
+            const current = pendingImagePreviewItems().find((preview) => preview.previewId === item.preview.previewId);
+            if (!current) return;
+            current.progress = Math.max(Number(current.progress || 0), Math.max(0, Math.min(100, Number(progress || 0))));
+            current.status = current.progress >= 100 ? 'ready' : 'processing';
+            updateAttachmentPreview();
+          }
+        });
+        const current = pendingImagePreviewItems().find((preview) => preview.previewId === item.preview.previewId);
+        if (current) {
+          current.attachmentId = attachment.attachmentId;
+          current.progress = 100;
+          current.status = 'ready';
+        }
+        state.pendingAttachments.push(attachment);
+        updateAttachmentPreview();
+      } catch (error) {
+        failures.push(error);
+        removePendingImagePreviewRecord(item.preview.previewId, '');
+        updateAttachmentPreview();
+      }
     }
   } finally {
     state.attachmentUploading = false;
     updateAttachmentPreview();
     updateComposerControls();
+  }
+  if (failures.length) {
+    const firstMessage = failures[0]?.message || 'No se pudo preparar una de las imágenes.';
+    throw new Error(failures.length === 1 ? firstMessage : `${failures.length} imágenes no se pudieron preparar. ${firstMessage}`);
   }
 }
 
@@ -1223,7 +1348,7 @@ function renderProfileShareControls(profile = {}) {
   const qrSrc = buildProfileQrImageUrl(profile);
   if (!shareLink || !qrSrc) return '';
   return `<div class="ce-profile-share" data-profile-share-root="1">
-    <button class="ce-profile-share__toggle" type="button" data-profile-share-toggle="1" aria-expanded="false" aria-label="Compartir perfil" title="Compartir perfil">${uiIcon('more')}</button>
+    <button class="ce-profile-share__toggle" type="button" data-profile-share-toggle="1" aria-expanded="false" aria-label="Compartir perfil" title="Compartir perfil">${uiIcon('share')}</button>
     <div class="ce-profile-share__menu hidden" data-profile-share-menu="1" aria-label="Opciones para compartir perfil">
       <button type="button" data-profile-share-image="${escapeHtml(qrSrc)}">Imagen QR</button>
       <button type="button" data-profile-share-copy="${escapeHtml(shareLink)}">Copiar link</button>
@@ -8332,7 +8457,7 @@ function setMobileFoldState(container, toggle, expanded) {
   container.classList.toggle('is-mobile-expanded', open);
   toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   const action = open ? 'Ocultar' : 'Mostrar';
-  const target = container === els.addContactForm ? 'opciones para agregar contacto' : 'acciones de cuenta';
+  const target = 'acciones de cuenta';
   toggle.setAttribute('aria-label', `${action} ${target}`);
   toggle.setAttribute('title', `${action} ${target}`);
 }
@@ -8348,13 +8473,6 @@ function bindEvents() {
   els.btnToggleHeaderActions?.addEventListener('click', (event) => {
     event.preventDefault();
     toggleMobileFold(els.headerActions, els.btnToggleHeaderActions);
-  });
-  els.btnToggleAddContact?.addEventListener('click', (event) => {
-    event.preventDefault();
-    toggleMobileFold(els.addContactForm, els.btnToggleAddContact);
-    if (els.addContactForm?.classList.contains('is-mobile-expanded')) {
-      window.requestAnimationFrame?.(() => els.contactEmailInput?.focus?.());
-    }
   });
   ['pointerdown', 'touchstart', 'focusin'].forEach((eventName) => {
     document.addEventListener(eventName, () => resetPrivacyLockActivity(), { passive: true });
@@ -9314,14 +9432,16 @@ function bindEvents() {
   });
   els.fileInput?.addEventListener('change', () => {
     const files = Array.from(els.fileInput?.files || []);
+    if (els.fileInput) els.fileInput.value = '';
     if (!files.length) return;
-    const uploadPromise = files.every((file) => isImageAttachmentFile(file))
+    const onlyImages = files.every((file) => isImageAttachmentFile(file));
+    const uploadPromise = onlyImages
       ? uploadImageAttachmentsForActiveChat(files)
       : (files.length === 1
         ? uploadAttachmentForActiveChat(files[0])
         : Promise.reject(new Error('La selección múltiple está disponible solo para imágenes. Para otros archivos, adjunta uno a la vez.')));
     uploadPromise.catch((error) => {
-      clearPendingAttachment();
+      if (!onlyImages) clearPendingAttachment();
       alert(error.message || 'No se pudo adjuntar el archivo.');
     });
   });
@@ -9330,6 +9450,13 @@ function bindEvents() {
     if (imageButton && els.attachmentPreview.contains(imageButton)) {
       event.preventDefault();
       openImageViewer(imageButton.dataset.imageUrl || '', imageButton.dataset.imageAlt || 'Imagen adjunta');
+      return;
+    }
+    const imagePreviewClear = event.target.closest('[data-clear-image-preview]');
+    if (imagePreviewClear && els.attachmentPreview.contains(imagePreviewClear)) {
+      event.preventDefault();
+      clearPendingImagePreview(imagePreviewClear.dataset.clearImagePreview || '');
+      els.messageInput?.focus();
       return;
     }
     const clearAllButton = event.target.closest('[data-clear-all-attachments]');
@@ -9373,10 +9500,7 @@ function bindEvents() {
     event.preventDefault();
     const email = els.contactEmailInput.value.trim();
     if (!email) {
-      if (isMobileChatListPrimaryViewport() && !els.addContactForm.classList.contains('is-mobile-expanded')) {
-        setMobileFoldState(els.addContactForm, els.btnToggleAddContact, true);
-        window.requestAnimationFrame?.(() => els.contactEmailInput?.focus?.());
-      }
+      els.contactEmailInput?.focus?.();
       return;
     }
     await addContactByEmail(email).catch((error) => alert(error.message));

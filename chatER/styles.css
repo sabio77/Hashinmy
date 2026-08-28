@@ -11992,3 +11992,193 @@ body.ce-dark-mode .ce-profile-share__toggle {
 #qrModal .ce-scan:not(.hidden) {
   padding-top: 32px;
 }
+
+/* Iteración solicitada · compartir, contactos móviles, controles sutiles, emojis responsive y vista previa acumulativa de imágenes. */
+.ce-chat-pin,
+.ce-chat-archive {
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--ce-muted) 72%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.ce-chat-pin:hover,
+.ce-chat-pin.active,
+.ce-chat-archive:hover,
+.ce-chat-archive.active {
+  border: 0 !important;
+  background: color-mix(in srgb, var(--ce-text) 5%, transparent) !important;
+  color: color-mix(in srgb, var(--ce-muted-strong) 78%, transparent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+@media (min-width: 981px) {
+  #messageForm.ce-compose.ce-compose--emoji-keyboard {
+    grid-template-areas:
+      "emojiKeyboard"
+      "composerTools"
+      "composerInput" !important;
+  }
+
+  #messageForm.ce-compose.ce-compose--emoji-keyboard .ce-icon-insert-panel--keyboard {
+    margin: 0 0 8px !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+}
+
+#messageForm > #attachmentPreview.ce-attachment-preview--gallery {
+  display: block !important;
+  max-height: min(30dvh, 190px) !important;
+  padding: 8px !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-height: 18px !important;
+  margin: 0 0 5px !important;
+  padding: 0 2px !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  color: var(--ce-muted-strong) !important;
+  line-height: 1 !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-count .ce-ui-icon {
+  width: 13px !important;
+  height: 13px !important;
+  flex: 0 0 auto;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery-count strong {
+  display: inline !important;
+  color: inherit !important;
+  font-size: 0.7rem !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__gallery {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 1px 2px 5px !important;
+  scroll-snap-type: inline proximity;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__item {
+  flex: 0 0 clamp(104px, 16vw, 132px) !important;
+  width: clamp(104px, 16vw, 132px) !important;
+  height: 104px !important;
+  min-width: 104px !important;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: color-mix(in srgb, var(--ce-bg-soft) 78%, var(--ce-panel)) !important;
+  box-shadow: none !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+  border-radius: 13px !important;
+  background: transparent !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  background: transparent !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove {
+  --ce-attachment-progress: 100%;
+  top: 5px !important;
+  right: 5px !important;
+  width: 28px !important;
+  height: 28px !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.76)) padding-box,
+    conic-gradient(#22c55e 0 var(--ce-attachment-progress), rgba(255, 255, 255, 0.34) var(--ce-attachment-progress) 100%) border-box !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18) !important;
+  opacity: 1 !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove:hover,
+#messageForm > #attachmentPreview .ce-attachment-preview__remove:focus-visible {
+  background:
+    linear-gradient(rgba(127, 29, 29, 0.9), rgba(127, 29, 29, 0.9)) padding-box,
+    conic-gradient(#22c55e 0 var(--ce-attachment-progress), rgba(255, 255, 255, 0.34) var(--ce-attachment-progress) 100%) border-box !important;
+}
+
+#messageForm > #attachmentPreview .ce-attachment-preview__remove:disabled {
+  cursor: default !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 620px) {
+  #addContactForm.ce-add,
+  #addContactForm.ce-add.is-mobile-expanded {
+    grid-template-columns: minmax(0, 1fr) 42px 42px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+
+  #addContactForm.ce-add > #contactEmailInput,
+  #addContactForm.ce-add:not(.is-mobile-expanded) > #contactEmailInput {
+    display: block !important;
+    grid-column: 1 !important;
+    min-width: 0 !important;
+  }
+
+  #addContactForm.ce-add > .ce-icon-btn--accent,
+  #addContactForm.ce-add:not(.is-mobile-expanded) > .ce-icon-btn--accent,
+  #addContactForm.ce-add.is-mobile-expanded > .ce-icon-btn--accent {
+    grid-column: 2 !important;
+    justify-self: end !important;
+  }
+
+  #addContactForm.ce-add > #btnScanQr,
+  #addContactForm.ce-add:not(.is-mobile-expanded) > #btnScanQr,
+  #addContactForm.ce-add.is-mobile-expanded > #btnScanQr {
+    display: grid !important;
+    grid-column: 3 !important;
+  }
+
+  #messageForm > #attachmentPreview.ce-attachment-preview--gallery {
+    max-height: min(28dvh, 166px) !important;
+  }
+
+  #messageForm > #attachmentPreview .ce-attachment-preview__item {
+    flex-basis: 96px !important;
+    width: 96px !important;
+    min-width: 96px !important;
+    height: 96px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  #addContactForm.ce-add,
+  #addContactForm.ce-add.is-mobile-expanded {
+    grid-template-columns: minmax(0, 1fr) 38px 38px !important;
+    gap: 6px !important;
+    padding-inline: 8px !important;
+  }
+}
