@@ -1,0 +1,10 @@
+{
+  "nombre_recurso": "chater-icon-fallback.png",
+  "tipo_imagen": "pwa_icon_fallback_png_optional",
+  "ubicacion": "assets/chater-icon-fallback.png",
+  "uso": "Icono PNG opcional de respaldo para favicon, apple-touch-icon y notificaciones cuando los PNG finales todavía no existan en assets.",
+  "descripcion_visual": "Figura geométrica simple con fondo verde ChatER, burbuja de chat centrada y marca CE legible. Debe funcionar en modo claro y oscuro, pantalla de instalación, notificaciones y favicon provisional.",
+  "restricciones": "PNG cuadrado, sin formatos alternos a PNG, sin transparencias que afecten la legibilidad, sin copiar marcas registradas ni el icono exacto de WhatsApp.",
+  "fallback_funcional": "Si este PNG no existe físicamente en assets, el service worker genera una respuesta image/png geométrica cacheable para iconos PWA y la interfaz conserva placeholders CSS donde aplique.",
+  "relacion_con_png_final": "No reemplaza chater-icon-192.png ni chater-icon-512.png; solo evita que la appWEB dependa de recursos ausentes mientras se agregan los PNG finales."
+}

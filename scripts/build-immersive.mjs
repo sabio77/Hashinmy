@@ -2246,6 +2246,12 @@ ${structuredData}
 ${staticSection}
     <div class="hm-seo-static-page__labels" hidden>${requiredVisibleLabelText}</div>
   </main>
+  <a class="hm-whatsapp-float" href="https://wa.me/573136804558?text=Hola%2C%20estoy%20necesitando%20un%20software%20y%20me%20gustaria%20cotizarlo%20para%20pagar%20en%20comodas%20cuotas." target="_blank" rel="noopener noreferrer" aria-label="Cotizar software por WhatsApp" title="Cotizar software por WhatsApp">
+    <span class="hm-whatsapp-float__media" aria-hidden="true">
+      <img class="hm-whatsapp-float__image" src="/assets/whatsapp-logo.png" alt="" decoding="async" loading="lazy" onload="this.parentElement.classList.add('has-whatsapp-image')" onerror="this.hidden=true;this.parentElement.classList.remove('has-whatsapp-image')" />
+      <span class="hm-whatsapp-float__fallback"><span>☎</span></span>
+    </span>
+  </a>
 </body>
 </html>`;
 }

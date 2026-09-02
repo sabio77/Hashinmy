@@ -1,0 +1,36 @@
+{
+  "asset": "whatsapp-logo.png",
+  "purpose": "Icono flotante de contacto comercial por WhatsApp para Hashinmy",
+  "format": "PNG con fondo transparente",
+  "dimensions": {
+    "width": 512,
+    "height": 512,
+    "aspectRatio": "1:1"
+  },
+  "composition": {
+    "subject": "Símbolo oficial visualmente reconocible de WhatsApp: burbuja circular verde con auricular telefónico blanco centrado y cola de chat integrada.",
+    "framing": "Símbolo centrado, ocupando aproximadamente 86% del lienzo, con margen transparente uniforme alrededor.",
+    "background": "Completamente transparente, sin placa rectangular, sin fotografía, sin escena adicional.",
+    "readability": "Debe seguir siendo legible al reducirse a 52x52 px y 62x62 px. Contornos limpios, masas simples y contraste alto.",
+    "lighting": "Plano, sin iluminación 3D, sin reflejos complejos, sin sombras externas duras.",
+    "palette": {
+      "primaryGreen": "#25D366",
+      "white": "#FFFFFF"
+    }
+  },
+  "style": {
+    "type": "icono de interfaz de producción, limpio y nítido",
+    "edges": "antialiasing suave, formas geométricas precisas",
+    "effects": "sin texto, sin mockups, sin marcas adicionales, sin fondos decorativos"
+  },
+  "constraints": [
+    "Mantener fondo alfa transparente.",
+    "No agregar palabras, números, etiquetas ni logotipos de Hashinmy.",
+    "No cambiar el verde principal ni el auricular blanco.",
+    "No recortar la cola de la burbuja.",
+    "Exportar exactamente como whatsapp-logo.png.",
+    "Optimizar para interfaz web sobre fondos claros y oscuros.",
+    "La imagen debe reconocer automáticamente el espacio circular ya reservado por CSS; no incluir margen opaco."
+  ],
+  "fallback": "Si whatsapp-logo.png no existe, la web debe conservar el círculo verde geométrico con burbuja/auricular construido por CSS ocupando exactamente el mismo espacio visual."
+}

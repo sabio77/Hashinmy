@@ -1,0 +1,14 @@
+{
+  "nombre_recurso": "chater-icon-512.png",
+  "tipo_imagen": "pwa_icon",
+  "proyecto": "ChatER",
+  "tamano_requerido": "512x512",
+  "uso": "Icono de alta resolución para instalación PWA, launcher y pantallas de sistema.",
+  "descripcion_visual": "Icono grande con fondo verde profundo, burbuja de conversación blanca con borde suave, detalle interior con las letras CE en verde oscuro, apariencia profesional de app de chat empresarial, legible en Android, iOS y escritorio.",
+  "estilo": "app icon profesional, limpio, alto contraste, bordes seguros, exportación PNG",
+  "restricciones": [
+    "Debe funcionar recortado en círculos o cuadrados redondeados.",
+    "No depender de sombras muy finas que se pierdan a tamaño pequeño.",
+    "No usar logotipos de terceros."
+  ]
+}

@@ -21,7 +21,7 @@
   const COMMERCIAL_FLOW_IDEMPOTENCY_PREFIX = 'hashinmy-web-cotizacion';
   const COMMERCIAL_LOADING_MESSAGE = 'Enviando tu solicitud a Hashinmy...';
   const COMMERCIAL_SUCCESS_MESSAGE = '¡Solicitud recibida! Revisaremos tu información y te enviaremos la cotización al correo indicado. Si tenemos alguna duda, nos pondremos en contacto contigo por WhatsApp.';
-  const COMMERCIAL_ERROR_MESSAGE = 'No pudimos confirmar la recepción automática de la solicitud. Para no perder tu ruta, puedes comunicarte directamente por WhatsApp con el resumen ya preparado.';
+  const COMMERCIAL_WHATSAPP_CONTINUATION_MESSAGE = 'Tu ruta ya quedó preparada. Solo falta enviarla por WhatsApp para que podamos recibir el resumen completo y continuar con tu cotización.';
   const COMMERCIAL_WHATSAPP_LABEL = 'Enviar por WhatsApp';
   const COMMERCIAL_WHATSAPP_ALIAS = 'principal';
   const MEMORIA_BACKEND_SUBMISSION_FIELD_LABELS = Object.freeze([
@@ -5646,14 +5646,15 @@
 
     elements.contact.dataset.submitResult = mode;
     result.hidden = false;
-    const safeTitle = escapeHtml(title || (mode === 'success' ? 'Solicitud enviada con éxito' : 'No se pudo enviar la solicitud'));
+    const isWhatsappContinuation = mode === 'whatsapp';
+    const safeTitle = escapeHtml(title || (isWhatsappContinuation ? 'Tu ruta está lista para enviar por WhatsApp' : 'Solicitud enviada con éxito'));
     const safeMessage = escapeHtml(message || '');
-    const button = mode === 'error' && whatsappUrl
+    const button = isWhatsappContinuation && whatsappUrl
       ? `<a class="hm-button hm-button--primary hm-contact-result__whatsapp" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(whatsappLabel)}</a>`
       : '';
 
     result.innerHTML = `
-      <div class="hm-contact-result__icon" aria-hidden="true">${mode === 'success' ? '✓' : '!'}</div>
+      <div class="hm-contact-result__icon" aria-hidden="true">✓</div>
       <strong>${safeTitle}</strong>
       <p>${safeMessage}</p>
       ${button}
@@ -5705,13 +5706,13 @@
       closeCommercialStatusDialog();
       const whatsappMessage = buildWhatsappFallbackMessage();
       const whatsappUrl = await resolveWhatsappFallbackUrl(whatsappMessage, createCommercialIdempotencyKey(email, phone));
-      setContactResultState('error', {
-        title: 'No se pudo confirmar el envío automático',
-        message: COMMERCIAL_ERROR_MESSAGE,
+      setContactResultState('whatsapp', {
+        title: 'Tu ruta está lista para enviar por WhatsApp',
+        message: COMMERCIAL_WHATSAPP_CONTINUATION_MESSAGE,
         whatsappUrl
       });
-      if (elements.formNote) elements.formNote.textContent = COMMERCIAL_ERROR_MESSAGE;
-      publishRouteUpdate('submit-memoriabackend-error-whatsapp-fallback');
+      if (elements.formNote) elements.formNote.textContent = COMMERCIAL_WHATSAPP_CONTINUATION_MESSAGE;
+      publishRouteUpdate('submit-memoriabackend-whatsapp-continuation');
     } finally {
       setContactSubmitPending(false);
     }

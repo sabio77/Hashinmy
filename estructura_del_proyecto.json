@@ -1,0 +1,2181 @@
+{
+  "type": "nova_project_structure_manifest",
+  "version": 1,
+  "fileName": "estructura_del_proyecto.json",
+  "generatedAt": "2026-09-02T21:37:52.880Z",
+  "sourceRootName": "284.0",
+  "scope": "full_project_attachment",
+  "partialZip": false,
+  "instructionsForChatGPT": [
+    "Este archivo es un índice actualizado de la estructura del proyecto, no un módulo funcional para modificar.",
+    "Si el ZIP adjunto es parcial, usa attachedInZip para distinguir qué rutas sí vienen como contenido y cuáles solo existen en la estructura real del proyecto.",
+    "Si necesitas un archivo o una carpeta que aparece aquí pero no está adjunta como contenido, pídela por ruta exacta antes de modificar o reconstruir lógica.",
+    "No inventes archivos a partir de esta estructura; úsala para pedir a Nova los módulos necesarios."
+  ],
+  "counts": {
+    "directories": 22,
+    "files": 198,
+    "attachedFilesInZip": 169,
+    "referencedOnlyFiles": 29,
+    "omittedDirectoriesSample": 0,
+    "omittedFilesSample": 2,
+    "complete": true
+  },
+  "directories": [
+    {
+      "path": ".well-known",
+      "name": ".well-known",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.202Z"
+    },
+    {
+      "path": "assets",
+      "name": "assets",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.220Z"
+    },
+    {
+      "path": "assets/clientes",
+      "name": "clientes",
+      "parent": "assets",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.202Z"
+    },
+    {
+      "path": "chatER",
+      "name": "chatER",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.261Z"
+    },
+    {
+      "path": "chatER/assets",
+      "name": "assets",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.236Z"
+    },
+    {
+      "path": "chatER/css",
+      "name": "css",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.236Z"
+    },
+    {
+      "path": "chatER/docs",
+      "name": "docs",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.254Z"
+    },
+    {
+      "path": "chatER/IMAGENwebpCOMPRESIONx",
+      "name": "IMAGENwebpCOMPRESIONx",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.255Z"
+    },
+    {
+      "path": "chatER/IMAGENwebpCOMPRESIONx/BLOQUE",
+      "name": "BLOQUE",
+      "parent": "chatER/IMAGENwebpCOMPRESIONx",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.255Z"
+    },
+    {
+      "path": "chatER/IMAGENwebpCOMPRESIONx/conexion",
+      "name": "conexion",
+      "parent": "chatER/IMAGENwebpCOMPRESIONx",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.255Z"
+    },
+    {
+      "path": "chatER/js",
+      "name": "js",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.258Z"
+    },
+    {
+      "path": "chatER/PERMISOSx",
+      "name": "PERMISOSx",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.260Z"
+    },
+    {
+      "path": "chatER/PERMISOSx/BLOQUE",
+      "name": "BLOQUE",
+      "parent": "chatER/PERMISOSx",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.259Z"
+    },
+    {
+      "path": "chatER/PERMISOSx/conexion",
+      "name": "conexion",
+      "parent": "chatER/PERMISOSx",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.260Z"
+    },
+    {
+      "path": "chatER/QRcodigosX",
+      "name": "QRcodigosX",
+      "parent": "chatER",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.261Z"
+    },
+    {
+      "path": "chatER/QRcodigosX/BLOQUE",
+      "name": "BLOQUE",
+      "parent": "chatER/QRcodigosX",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.261Z"
+    },
+    {
+      "path": "chatER/QRcodigosX/conexion",
+      "name": "conexion",
+      "parent": "chatER/QRcodigosX",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.261Z"
+    },
+    {
+      "path": "css",
+      "name": "css",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.262Z"
+    },
+    {
+      "path": "js",
+      "name": "js",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.264Z"
+    },
+    {
+      "path": "scripts",
+      "name": "scripts",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.268Z"
+    },
+    {
+      "path": "textX",
+      "name": "textX",
+      "parent": "",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.318Z"
+    },
+    {
+      "path": "textX/seo",
+      "name": "seo",
+      "parent": "textX",
+      "attachedInZip": true,
+      "updatedAt": "2026-07-07T00:52:24.303Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".well-known/memoriabackend-domain-verification.txt",
+      "name": "memoriabackend-domain-verification.txt",
+      "directory": ".well-known",
+      "ext": ".txt",
+      "sizeBytes": 88,
+      "updatedAt": "2026-07-03T23:57:57.006Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/clientes/clientes-manifest.json",
+      "name": "clientes-manifest.json",
+      "directory": "assets/clientes",
+      "ext": ".json",
+      "sizeBytes": 799,
+      "updatedAt": "2026-06-26T07:51:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/clientes/logo_clean_MAX.jpg",
+      "name": "logo_clean_MAX.jpg",
+      "directory": "assets/clientes",
+      "ext": ".jpg",
+      "sizeBytes": 32932,
+      "updatedAt": "2026-03-28T21:43:38.993Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_cliente_placeholder.webp.txt",
+      "name": "logo_cliente_placeholder.webp.txt",
+      "directory": "assets/clientes",
+      "ext": ".txt",
+      "sizeBytes": 457,
+      "updatedAt": "2026-06-26T02:38:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/clientes/logo_design_&_3D_international.png",
+      "name": "logo_design_&_3D_international.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 538857,
+      "updatedAt": "2026-03-29T03:46:29.036Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_griferias_VX.png",
+      "name": "logo_griferias_VX.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 37812,
+      "updatedAt": "2023-12-05T02:53:43.546Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_IA-Colombia.jpg",
+      "name": "logo_IA-Colombia.jpg",
+      "directory": "assets/clientes",
+      "ext": ".jpg",
+      "sizeBytes": 141352,
+      "updatedAt": "2025-11-04T13:40:06.909Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_MapsX_Marketplace.png",
+      "name": "logo_MapsX_Marketplace.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 66489,
+      "updatedAt": "2026-02-28T19:34:11.232Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_maxpunz.png",
+      "name": "logo_maxpunz.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 23405,
+      "updatedAt": "2026-03-28T21:41:58.605Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_robots-colombia.png",
+      "name": "logo_robots-colombia.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 52696,
+      "updatedAt": "2026-03-28T22:05:54.281Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/clientes/logo_xzone_industries.png",
+      "name": "logo_xzone_industries.png",
+      "directory": "assets/clientes",
+      "ext": ".png",
+      "sizeBytes": 1019760,
+      "updatedAt": "2025-05-14T21:31:41.193Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hashinmy-logo-emblem.png",
+      "name": "hashinmy-logo-emblem.png",
+      "directory": "assets",
+      "ext": ".png",
+      "sizeBytes": 20442,
+      "updatedAt": "2026-06-25T04:52:28.318Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hashinmy-logo-emblem.png.txt",
+      "name": "hashinmy-logo-emblem.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 1836,
+      "updatedAt": "2026-06-25T04:04:14.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-01-financing-command.webp",
+      "name": "hm-scene-01-financing-command.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1382984,
+      "updatedAt": "2026-06-25T02:48:09.998Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-01-financing-command.webp.txt",
+      "name": "hm-scene-01-financing-command.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2363,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-02-service-atlas.webp",
+      "name": "hm-scene-02-service-atlas.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1291910,
+      "updatedAt": "2026-06-25T02:48:56.404Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-02-service-atlas.webp.txt",
+      "name": "hm-scene-02-service-atlas.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2343,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-03-build-lab.webp",
+      "name": "hm-scene-03-build-lab.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1427346,
+      "updatedAt": "2026-06-25T02:49:26.075Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-03-build-lab.webp.txt",
+      "name": "hm-scene-03-build-lab.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2302,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-04-intelligence-core.webp",
+      "name": "hm-scene-04-intelligence-core.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1333664,
+      "updatedAt": "2026-06-25T02:49:49.306Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-04-intelligence-core.webp.txt",
+      "name": "hm-scene-04-intelligence-core.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2344,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-05-operation-cloud.webp",
+      "name": "hm-scene-05-operation-cloud.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1419718,
+      "updatedAt": "2026-06-25T02:50:57.813Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-05-operation-cloud.webp.txt",
+      "name": "hm-scene-05-operation-cloud.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2317,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-06-finance-route.webp",
+      "name": "hm-scene-06-finance-route.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1372130,
+      "updatedAt": "2026-06-25T02:51:45.118Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-06-finance-route.webp.txt",
+      "name": "hm-scene-06-finance-route.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2283,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-07-roadmap-brief.webp",
+      "name": "hm-scene-07-roadmap-brief.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1269676,
+      "updatedAt": "2026-06-25T02:53:13.030Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-07-roadmap-brief.webp.txt",
+      "name": "hm-scene-07-roadmap-brief.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2300,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/hm-scene-08-security-gate.webp",
+      "name": "hm-scene-08-security-gate.webp",
+      "directory": "assets",
+      "ext": ".webp",
+      "sizeBytes": 1247882,
+      "updatedAt": "2026-06-25T02:55:48.207Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/hm-scene-08-security-gate.webp.txt",
+      "name": "hm-scene-08-security-gate.webp.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 2541,
+      "updatedAt": "2026-06-25T08:06:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_clean_MAX.jpg.txt",
+      "name": "logo_clean_MAX.jpg.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 376,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_design_&_3D_international.png.txt",
+      "name": "logo_design_&_3D_international.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 344,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_griferias_VX.png.txt",
+      "name": "logo_griferias_VX.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 298,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_IA-Colombia.jpg.txt",
+      "name": "logo_IA-Colombia.jpg.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 317,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_MapsX_Marketplace.png.txt",
+      "name": "logo_MapsX_Marketplace.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 306,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_maxpunz.png.txt",
+      "name": "logo_maxpunz.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 279,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_robots-colombia.png.txt",
+      "name": "logo_robots-colombia.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 298,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/logo_xzone_industries.png.txt",
+      "name": "logo_xzone_industries.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 297,
+      "updatedAt": "2026-06-26T02:25:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/miniVISTA.png",
+      "name": "miniVISTA.png",
+      "directory": "assets",
+      "ext": ".png",
+      "sizeBytes": 164451,
+      "updatedAt": "2026-07-02T16:06:20.251Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "assets/miniVISTA.png.txt",
+      "name": "miniVISTA.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 3646,
+      "updatedAt": "2026-07-07T05:31:16.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "assets/whatsapp-logo.png.txt",
+      "name": "whatsapp-logo.png.txt",
+      "directory": "assets",
+      "ext": ".txt",
+      "sizeBytes": 1878,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/app-version.json",
+      "name": "app-version.json",
+      "directory": "chatER",
+      "ext": ".json",
+      "sizeBytes": 1113,
+      "updatedAt": "2026-07-07T00:52:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/avatar-carlos.png",
+      "name": "avatar-carlos.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 465834,
+      "updatedAt": "2026-07-04T03:48:02.206Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/avatar-carlos.txt",
+      "name": "avatar-carlos.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 579,
+      "updatedAt": "2026-07-03T01:16:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/avatar-equipo-trabajo.png",
+      "name": "avatar-equipo-trabajo.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 327177,
+      "updatedAt": "2026-07-04T03:48:29.296Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/avatar-equipo-trabajo.txt",
+      "name": "avatar-equipo-trabajo.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 595,
+      "updatedAt": "2026-07-03T01:16:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/avatar-familia.png",
+      "name": "avatar-familia.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 419481,
+      "updatedAt": "2026-07-04T03:50:02.788Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/avatar-familia.txt",
+      "name": "avatar-familia.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 581,
+      "updatedAt": "2026-07-03T01:16:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/avatar-soporte.png",
+      "name": "avatar-soporte.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 268993,
+      "updatedAt": "2026-07-04T03:50:57.120Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/avatar-soporte.txt",
+      "name": "avatar-soporte.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 581,
+      "updatedAt": "2026-07-03T01:16:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/avatar.png",
+      "name": "avatar.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 576939,
+      "updatedAt": "2026-07-04T03:51:51.220Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/avatar.txt",
+      "name": "avatar.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 1160,
+      "updatedAt": "2026-07-03T10:53:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-icon-192.png",
+      "name": "chater-icon-192.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 371704,
+      "updatedAt": "2026-07-04T03:53:18.457Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-icon-192.txt",
+      "name": "chater-icon-192.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 847,
+      "updatedAt": "2026-07-03T03:29:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-icon-512.png",
+      "name": "chater-icon-512.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 310851,
+      "updatedAt": "2026-07-04T03:54:23.587Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-icon-512.txt",
+      "name": "chater-icon-512.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 784,
+      "updatedAt": "2026-07-03T03:29:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-icon-fallback.png",
+      "name": "chater-icon-fallback.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 277755,
+      "updatedAt": "2026-07-04T03:56:28.892Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-icon-fallback.txt",
+      "name": "chater-icon-fallback.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 1090,
+      "updatedAt": "2026-07-03T09:14:04.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-logo.png",
+      "name": "chater-logo.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 312809,
+      "updatedAt": "2026-07-04T03:58:12.581Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-logo.txt",
+      "name": "chater-logo.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 1471,
+      "updatedAt": "2026-07-03T09:26:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-maskable-512.png",
+      "name": "chater-maskable-512.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 254707,
+      "updatedAt": "2026-07-04T03:59:53.355Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-maskable-512.txt",
+      "name": "chater-maskable-512.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 789,
+      "updatedAt": "2026-07-03T03:29:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/assets/chater-maskable-fallback.png",
+      "name": "chater-maskable-fallback.png",
+      "directory": "chatER/assets",
+      "ext": ".png",
+      "sizeBytes": 438907,
+      "updatedAt": "2026-07-04T04:03:06.362Z",
+      "attachedInZip": false,
+      "contentOmittedFromZip": true
+    },
+    {
+      "path": "chatER/assets/chater-maskable-fallback.txt",
+      "name": "chater-maskable-fallback.txt",
+      "directory": "chatER/assets",
+      "ext": ".txt",
+      "sizeBytes": 982,
+      "updatedAt": "2026-07-03T09:14:04.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/auth-gate.js",
+      "name": "auth-gate.js",
+      "directory": "chatER",
+      "ext": ".js",
+      "sizeBytes": 43889,
+      "updatedAt": "2026-07-07T00:11:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/css/styles.css",
+      "name": "styles.css",
+      "directory": "chatER/css",
+      "ext": ".css",
+      "sizeBytes": 55329,
+      "updatedAt": "2026-07-06T08:08:18.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/docs/BLOQUES_LEGO.md",
+      "name": "BLOQUES_LEGO.md",
+      "directory": "chatER/docs",
+      "ext": ".md",
+      "sizeBytes": 32468,
+      "updatedAt": "2026-07-05T00:28:16.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/docs/memoriaBACKEND_APIS.md",
+      "name": "memoriaBACKEND_APIS.md",
+      "directory": "chatER/docs",
+      "ext": ".md",
+      "sizeBytes": 372667,
+      "updatedAt": "2026-07-07T00:52:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/IMAGENwebpCOMPRESIONx/BLOQUE/compresor-webp-core.js",
+      "name": "compresor-webp-core.js",
+      "directory": "chatER/IMAGENwebpCOMPRESIONx/BLOQUE",
+      "ext": ".js",
+      "sizeBytes": 50925,
+      "updatedAt": "2026-07-05T00:28:16.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/IMAGENwebpCOMPRESIONx/conexion/imagen-webp-compresionx.js",
+      "name": "imagen-webp-compresionx.js",
+      "directory": "chatER/IMAGENwebpCOMPRESIONx/conexion",
+      "ext": ".js",
+      "sizeBytes": 1973,
+      "updatedAt": "2026-07-05T00:28:16.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/index.html",
+      "name": "index.html",
+      "directory": "chatER",
+      "ext": ".html",
+      "sizeBytes": 10826,
+      "updatedAt": "2026-07-07T05:45:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/app.js",
+      "name": "app.js",
+      "directory": "chatER/js",
+      "ext": ".js",
+      "sizeBytes": 801084,
+      "updatedAt": "2026-07-07T00:51:58.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/config.js",
+      "name": "config.js",
+      "directory": "chatER/js",
+      "ext": ".js",
+      "sizeBytes": 6331,
+      "updatedAt": "2026-07-07T00:12:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/CONFIGmemoriaBACKEND.json",
+      "name": "CONFIGmemoriaBACKEND.json",
+      "directory": "chatER/js",
+      "ext": ".json",
+      "sizeBytes": 131,
+      "updatedAt": "2026-07-04T06:35:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/memoria-backend-config.js",
+      "name": "memoria-backend-config.js",
+      "directory": "chatER/js",
+      "ext": ".js",
+      "sizeBytes": 6331,
+      "updatedAt": "2026-07-07T00:12:56.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/pwa.js",
+      "name": "pwa.js",
+      "directory": "chatER/js",
+      "ext": ".js",
+      "sizeBytes": 17587,
+      "updatedAt": "2026-07-05T03:56:48.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/js/theme-bootstrap.js",
+      "name": "theme-bootstrap.js",
+      "directory": "chatER/js",
+      "ext": ".js",
+      "sizeBytes": 414,
+      "updatedAt": "2026-07-06T06:47:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/manifest.json",
+      "name": "manifest.json",
+      "directory": "chatER",
+      "ext": ".json",
+      "sizeBytes": 2406,
+      "updatedAt": "2026-07-03T23:03:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/PERMISOSx/BLOQUE/permisos-core.js",
+      "name": "permisos-core.js",
+      "directory": "chatER/PERMISOSx/BLOQUE",
+      "ext": ".js",
+      "sizeBytes": 11671,
+      "updatedAt": "2026-07-05T00:08:44.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/PERMISOSx/conexion/permisosx.js",
+      "name": "permisosx.js",
+      "directory": "chatER/PERMISOSx/conexion",
+      "ext": ".js",
+      "sizeBytes": 840,
+      "updatedAt": "2026-07-04T20:31:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/QRcodigosX/BLOQUE/qr-core.js",
+      "name": "qr-core.js",
+      "directory": "chatER/QRcodigosX/BLOQUE",
+      "ext": ".js",
+      "sizeBytes": 14529,
+      "updatedAt": "2026-07-06T17:16:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/QRcodigosX/conexion/qr-codigosx.js",
+      "name": "qr-codigosx.js",
+      "directory": "chatER/QRcodigosX/conexion",
+      "ext": ".js",
+      "sizeBytes": 1388,
+      "updatedAt": "2026-07-04T21:37:38.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "chatER/service-worker.js",
+      "name": "service-worker.js",
+      "directory": "chatER",
+      "ext": ".js",
+      "sizeBytes": 18860,
+      "updatedAt": "2026-07-07T00:52:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "css/hashinmy-classic.css",
+      "name": "hashinmy-classic.css",
+      "directory": "css",
+      "ext": ".css",
+      "sizeBytes": 24241,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "css/hashinmy-immersive.css",
+      "name": "hashinmy-immersive.css",
+      "directory": "css",
+      "ext": ".css",
+      "sizeBytes": 174867,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "ejecutar SC.bat",
+      "name": "ejecutar SC.bat",
+      "directory": "",
+      "ext": ".bat",
+      "sizeBytes": 2985,
+      "updatedAt": "2026-06-30T12:01:42.407Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "index.html",
+      "name": "index.html",
+      "directory": "",
+      "ext": ".html",
+      "sizeBytes": 87546,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "js/CONFIGmemoriaBACKEND.json",
+      "name": "CONFIGmemoriaBACKEND.json",
+      "directory": "js",
+      "ext": ".json",
+      "sizeBytes": 131,
+      "updatedAt": "2026-07-04T06:35:32.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "js/hashinmy-immersive.js",
+      "name": "hashinmy-immersive.js",
+      "directory": "js",
+      "ext": ".js",
+      "sizeBytes": 261986,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "llms.txt",
+      "name": "llms.txt",
+      "directory": "",
+      "ext": ".txt",
+      "sizeBytes": 1407845,
+      "updatedAt": "2026-06-30T19:24:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "package.json",
+      "name": "package.json",
+      "directory": "",
+      "ext": ".json",
+      "sizeBytes": 783,
+      "updatedAt": "2026-06-25T07:28:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "render.yaml",
+      "name": "render.yaml",
+      "directory": "",
+      "ext": ".yaml",
+      "sizeBytes": 316255,
+      "updatedAt": "2026-07-01T06:03:44.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "robots.txt",
+      "name": "robots.txt",
+      "directory": "",
+      "ext": ".txt",
+      "sizeBytes": 172,
+      "updatedAt": "2026-06-25T19:22:44.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "scripts/build-immersive.mjs",
+      "name": "build-immersive.mjs",
+      "directory": "scripts",
+      "ext": ".mjs",
+      "sizeBytes": 114468,
+      "updatedAt": "2026-09-02T21:37:52.880Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "scripts/llms-i18n-labels.mjs",
+      "name": "llms-i18n-labels.mjs",
+      "directory": "scripts",
+      "ext": ".mjs",
+      "sizeBytes": 1592,
+      "updatedAt": "2026-06-26T09:40:58.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "scripts/memoria-backend-config.mjs",
+      "name": "memoria-backend-config.mjs",
+      "directory": "scripts",
+      "ext": ".mjs",
+      "sizeBytes": 1544,
+      "updatedAt": "2026-07-04T06:50:54.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "scripts/validate-dist-immersive.mjs",
+      "name": "validate-dist-immersive.mjs",
+      "directory": "scripts",
+      "ext": ".mjs",
+      "sizeBytes": 158650,
+      "updatedAt": "2026-07-07T05:37:46.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "scripts/validate-immersive.mjs",
+      "name": "validate-immersive.mjs",
+      "directory": "scripts",
+      "ext": ".mjs",
+      "sizeBytes": 151570,
+      "updatedAt": "2026-07-07T05:45:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/am.json",
+      "name": "am.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 40842,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ar.json",
+      "name": "ar.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 37748,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/as.json",
+      "name": "as.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 58950,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/bn.json",
+      "name": "bn.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 58718,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ca.json",
+      "name": "ca.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31359,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/cs.json",
+      "name": "cs.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 29946,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/da.json",
+      "name": "da.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 28796,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/de.json",
+      "name": "de.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 35949,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/el.json",
+      "name": "el.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 54748,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/en.json",
+      "name": "en.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31520,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/es.json",
+      "name": "es.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 32309,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/fa.json",
+      "name": "fa.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 43376,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/fi.json",
+      "name": "fi.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 34023,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/fil.json",
+      "name": "fil.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 33376,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/fr.json",
+      "name": "fr.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 33079,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/gu.json",
+      "name": "gu.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 58257,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ha.json",
+      "name": "ha.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 29526,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/he.json",
+      "name": "he.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 35555,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/hi.json",
+      "name": "hi.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 49851,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/hu.json",
+      "name": "hu.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 33741,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/id.json",
+      "name": "id.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30541,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/it.json",
+      "name": "it.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31952,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ja.json",
+      "name": "ja.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 33365,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/jv.json",
+      "name": "jv.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30449,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/kn.json",
+      "name": "kn.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 56425,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ko.json",
+      "name": "ko.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31651,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/languages.json",
+      "name": "languages.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 702,
+      "updatedAt": "2026-06-30T02:46:36.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ml.json",
+      "name": "ml.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 61933,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/mr.json",
+      "name": "mr.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 50225,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ms.json",
+      "name": "ms.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30424,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/my.json",
+      "name": "my.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 66725,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ne.json",
+      "name": "ne.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 53886,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/nl.json",
+      "name": "nl.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30557,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/no.json",
+      "name": "no.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 29862,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/or.json",
+      "name": "or.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 54127,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/pa.json",
+      "name": "pa.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 50371,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/pl.json",
+      "name": "pl.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31316,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/pt.json",
+      "name": "pt.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 31740,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ro.json",
+      "name": "ro.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30995,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ru.json",
+      "name": "ru.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 43657,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/am.json",
+      "name": "am.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 938449,
+      "updatedAt": "2026-06-30T11:55:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ar.json",
+      "name": "ar.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 761718,
+      "updatedAt": "2026-06-30T11:55:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/as.json",
+      "name": "as.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 1277957,
+      "updatedAt": "2026-06-30T11:55:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/bn.json",
+      "name": "bn.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 1245119,
+      "updatedAt": "2026-06-30T11:55:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ca.json",
+      "name": "ca.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 289955,
+      "updatedAt": "2026-06-30T18:42:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/cs.json",
+      "name": "cs.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 279255,
+      "updatedAt": "2026-06-30T08:46:00.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/da.json",
+      "name": "da.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 280577,
+      "updatedAt": "2026-06-30T08:46:00.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/de.json",
+      "name": "de.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 365245,
+      "updatedAt": "2026-06-30T07:55:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/el.json",
+      "name": "el.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 573250,
+      "updatedAt": "2026-06-30T07:55:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/en.json",
+      "name": "en.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 274749,
+      "updatedAt": "2026-06-30T04:10:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/es.json",
+      "name": "es.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 268139,
+      "updatedAt": "2026-06-30T07:13:58.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/fa.json",
+      "name": "fa.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 473563,
+      "updatedAt": "2026-06-30T19:24:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/fi.json",
+      "name": "fi.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 427800,
+      "updatedAt": "2026-06-30T09:14:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/fil.json",
+      "name": "fil.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 271564,
+      "updatedAt": "2026-06-30T18:42:54.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/fr.json",
+      "name": "fr.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 420809,
+      "updatedAt": "2026-06-30T08:14:54.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/gu.json",
+      "name": "gu.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 800751,
+      "updatedAt": "2026-06-30T09:14:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ha.json",
+      "name": "ha.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 271801,
+      "updatedAt": "2026-06-30T08:46:00.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/he.json",
+      "name": "he.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 483813,
+      "updatedAt": "2026-06-30T11:05:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/hi.json",
+      "name": "hi.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 770098,
+      "updatedAt": "2026-06-30T09:23:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/hu.json",
+      "name": "hu.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 335855,
+      "updatedAt": "2026-06-30T18:55:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/id.json",
+      "name": "id.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 301231,
+      "updatedAt": "2026-06-30T18:55:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/it.json",
+      "name": "it.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 286372,
+      "updatedAt": "2026-06-30T18:42:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ja.json",
+      "name": "ja.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 583637,
+      "updatedAt": "2026-06-30T11:05:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/jv.json",
+      "name": "jv.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 347812,
+      "updatedAt": "2026-06-30T18:19:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/kn.json",
+      "name": "kn.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 874426,
+      "updatedAt": "2026-06-30T09:29:06.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ko.json",
+      "name": "ko.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 506274,
+      "updatedAt": "2026-06-30T11:05:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ml.json",
+      "name": "ml.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 954273,
+      "updatedAt": "2026-06-30T09:47:26.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/mr.json",
+      "name": "mr.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 780509,
+      "updatedAt": "2026-06-30T09:47:26.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ms.json",
+      "name": "ms.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 304458,
+      "updatedAt": "2026-06-30T18:55:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/my.json",
+      "name": "my.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 933777,
+      "updatedAt": "2026-06-30T09:47:40.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ne.json",
+      "name": "ne.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 846936,
+      "updatedAt": "2026-06-30T09:58:18.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/nl.json",
+      "name": "nl.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 363059,
+      "updatedAt": "2026-06-30T18:20:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/no.json",
+      "name": "no.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 344841,
+      "updatedAt": "2026-06-30T19:09:42.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/or.json",
+      "name": "or.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 858001,
+      "updatedAt": "2026-06-30T09:58:18.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/pa.json",
+      "name": "pa.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 786782,
+      "updatedAt": "2026-06-30T09:58:18.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/pl.json",
+      "name": "pl.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 444575,
+      "updatedAt": "2026-06-30T09:40:00.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/pt.json",
+      "name": "pt.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 290852,
+      "updatedAt": "2026-06-30T18:42:02.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ro.json",
+      "name": "ro.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 282491,
+      "updatedAt": "2026-06-30T08:46:00.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ru.json",
+      "name": "ru.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 698566,
+      "updatedAt": "2026-06-30T10:08:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/si.json",
+      "name": "si.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 873535,
+      "updatedAt": "2026-06-30T10:08:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/sv.json",
+      "name": "sv.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 359191,
+      "updatedAt": "2026-06-30T18:19:50.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/sw.json",
+      "name": "sw.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 333746,
+      "updatedAt": "2026-06-30T19:24:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ta.json",
+      "name": "ta.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 891357,
+      "updatedAt": "2026-06-30T10:08:52.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/te.json",
+      "name": "te.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 822690,
+      "updatedAt": "2026-06-30T10:20:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/th.json",
+      "name": "th.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 704455,
+      "updatedAt": "2026-06-30T19:24:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/tr.json",
+      "name": "tr.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 411187,
+      "updatedAt": "2026-06-30T10:20:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/uk.json",
+      "name": "uk.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 669958,
+      "updatedAt": "2026-06-30T10:20:24.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/ur.json",
+      "name": "ur.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 549573,
+      "updatedAt": "2026-06-30T10:29:58.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/vi.json",
+      "name": "vi.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 422856,
+      "updatedAt": "2026-06-30T19:24:12.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/seo/zh.json",
+      "name": "zh.json",
+      "directory": "textX/seo",
+      "ext": ".json",
+      "sizeBytes": 567870,
+      "updatedAt": "2026-06-30T11:05:20.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/si.json",
+      "name": "si.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 53320,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/sv.json",
+      "name": "sv.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30661,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/sw.json",
+      "name": "sw.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 30312,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ta.json",
+      "name": "ta.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 55025,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/te.json",
+      "name": "te.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 60886,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/th.json",
+      "name": "th.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 59607,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/tr.json",
+      "name": "tr.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 32066,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/uk.json",
+      "name": "uk.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 47227,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/ur.json",
+      "name": "ur.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 38428,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/vi.json",
+      "name": "vi.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 34788,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    },
+    {
+      "path": "textX/zh.json",
+      "name": "zh.json",
+      "directory": "textX",
+      "ext": ".json",
+      "sizeBytes": 27767,
+      "updatedAt": "2026-07-07T01:21:22.000Z",
+      "attachedInZip": true,
+      "contentOmittedFromZip": false
+    }
+  ],
+  "omitted": {
+    "directories": [],
+    "files": [
+      {
+        "path": "hashinmy_miniVISTA_social_preview_chater_fix.zip",
+        "reason": "zip_generado_o_no_funcional"
+      },
+      {
+        "path": "proyecto_programacion_automatica_iteracion_4_mypdp01.zip",
+        "reason": "zip_generado_o_no_funcional"
+      }
+    ],
+    "overflow": false,
+    "maxEntries": 20000,
+    "notes": [
+      "node_modules, carpetas internas de Nova, temporales, artefactos de sistema y ZIPs generados se omiten porque no son módulos funcionales del proyecto.",
+      "Los archivos de imagen pueden aparecer en este índice aunque Nova no adjunte su contenido binario en el ZIP."
+    ]
+  }
+}
