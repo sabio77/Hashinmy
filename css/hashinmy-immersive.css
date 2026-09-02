@@ -6207,7 +6207,7 @@ body.hm-viewport-cramped:not([data-scene="intro"]) .hm-option {
 /* Acceso comercial persistente: visible en todas las escenas y páginas estáticas generadas. */
 .hm-whatsapp-float {
   position: fixed;
-  z-index: 90;
+  z-index: 130;
   left: max(16px, var(--hm-safe-left));
   bottom: max(16px, var(--hm-safe-bottom));
   display: grid;

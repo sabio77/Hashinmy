@@ -4499,7 +4499,7 @@
   async function requestImmersiveMode() {
     if (state.seoClassicView) return;
     if (state.fullscreenRequested && getImmersiveFullscreenElement()) return;
-    const fullscreenTarget = elements.stage || document.documentElement;
+    const fullscreenTarget = document.documentElement;
     state.fullscreenRequested = true;
 
     try {

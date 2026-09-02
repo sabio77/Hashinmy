@@ -877,7 +877,7 @@ body.hm-seo-classic-view .hm-seo-static-page--detail .hm-seo-static-page__hero h
 /* Acceso comercial persistente para páginas SEO clásicas generadas. */
 .hm-whatsapp-float {
   position: fixed;
-  z-index: 90;
+  z-index: 130;
   left: max(16px, env(safe-area-inset-left, 0px));
   bottom: max(16px, env(safe-area-inset-bottom, 0px));
   display: grid;
