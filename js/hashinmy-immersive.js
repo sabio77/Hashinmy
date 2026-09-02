@@ -7,6 +7,7 @@
   const CONTACT_EMAIL = 'sales@hashinmy.com';
   const MAILTO_MAX_SAFE_LENGTH = 1800;
   let memoriaBackendRuntimeConfigPromise = null;
+  let seoEntryImmediateAccessBound = false;
   let memoriaBackendRuntimeConfig = null;
   let MEMORIA_BACKEND_SITE_ID = '';
   let MEMORIA_BACKEND_BASE_URL = '';
@@ -694,13 +695,23 @@
     if (previousSignature !== nextSignature) {
       state.seoContent = null;
       state.seoContentPromise = null;
+      state.seoContentComplete = false;
+      state.seoLanguagePromises.clear();
       if (syncDom) {
         syncLanguageSelector();
         syncLocalizedSeoLinks();
         if (state.seoHubOpen) {
-          loadSeoContent().then(() => renderSeoHub()).catch((error) => {
-            console.warn('Hashinmy: no se pudo refrescar SEO tras detectar idiomas nuevos.', error);
-          });
+          loadSeoLanguageContent(state.language)
+            .then(() => {
+              renderSeoHub();
+              return loadSeoContent();
+            })
+            .then(() => {
+              if (state.seoHubOpen) renderSeoHub();
+            })
+            .catch((error) => {
+              console.warn('Hashinmy: no se pudo refrescar SEO tras detectar idiomas nuevos.', error);
+            });
         }
       }
     }
@@ -856,7 +867,10 @@
     textCache: new Map(),
     seoContent: null,
     seoContentPromise: null,
+    seoContentComplete: false,
+    seoLanguagePromises: new Map(),
     seoHubOpen: false,
+    seoOpenRequestToken: 0,
     seoClassicView: false,
     seoActiveId: '',
     seoActiveCategory: '',
@@ -1555,8 +1569,53 @@
     return `${SEO_BASE_PATH}${encodeURIComponent(getSeoLanguage(code))}.json`;
   }
 
+  function mergeSeoContentLanguages(languages = {}) {
+    const currentLanguages = state.seoContent?.languages || {};
+    state.seoContent = {
+      schemaVersion: 1,
+      siteUrl: PUBLIC_SITE_URL,
+      languages: { ...currentLanguages, ...languages }
+    };
+    return state.seoContent;
+  }
+
+  async function loadSeoLanguageContent(language = state.language) {
+    const code = getSeoLanguage(language);
+    const existingBundle = state.seoContent?.languages?.[code];
+    if (existingBundle) return existingBundle;
+    if (state.seoLanguagePromises.has(code)) return state.seoLanguagePromises.get(code);
+
+    const languagePromise = (async () => {
+      let spanishBundle = state.seoContent?.languages?.es || null;
+      if (!spanishBundle) spanishBundle = await fetchJson(buildSeoBundlePath('es'));
+      if (!isValidSeoBundle(spanishBundle)) {
+        throw new Error('textX/seo/es.json debe existir y funcionar como catálogo SEO canónico de producción.');
+      }
+
+      const requestedBundle = code === 'es' ? spanishBundle : await fetchJson(buildSeoBundlePath(code));
+      assertCompleteSeoBundle(code, requestedBundle, spanishBundle);
+
+      const languages = {
+        es: { ...spanishBundle, code: spanishBundle.code || 'es' }
+      };
+      languages[code] = { ...requestedBundle, code: requestedBundle.code || code };
+      mergeSeoContentLanguages(languages);
+      return state.seoContent?.languages?.[code] || null;
+    })()
+      .catch((error) => {
+        console.warn(`Hashinmy: no se pudo cargar de forma prioritaria textX/seo/${code}.json.`, error);
+        return null;
+      })
+      .finally(() => {
+        state.seoLanguagePromises.delete(code);
+      });
+
+    state.seoLanguagePromises.set(code, languagePromise);
+    return languagePromise;
+  }
+
   async function loadSeoContent() {
-    if (state.seoContent) return state.seoContent;
+    if (state.seoContentComplete && state.seoContent) return state.seoContent;
     if (state.seoContentPromise) return state.seoContentPromise;
 
     const catalog = state.languageCatalog.length ? state.languageCatalog : buildLanguageCatalogFromCodes(['es']);
@@ -1573,7 +1632,7 @@
     }))
       .then((entries) => {
         const loadedLanguages = Object.fromEntries(entries.filter(([, bundle]) => bundle && typeof bundle === 'object'));
-        const spanishBundle = loadedLanguages.es;
+        const spanishBundle = loadedLanguages.es || state.seoContent?.languages?.es;
         if (!isValidSeoBundle(spanishBundle)) {
           throw new Error('textX/seo/es.json debe existir y funcionar como catálogo SEO canónico de producción.');
         }
@@ -1581,7 +1640,7 @@
         const languages = {};
         const validCodes = [];
         for (const code of requestedSeoLanguages) {
-          const bundle = loadedLanguages[code];
+          const bundle = loadedLanguages[code] || state.seoContent?.languages?.[code];
           if (!bundle) continue;
 
           try {
@@ -1600,17 +1659,14 @@
         const filteredCatalog = state.languageCatalog.filter((language) => validCodes.includes(language.code));
         if (filteredCatalog.length && filteredCatalog.length !== state.languageCatalog.length) setLanguageCatalog(filteredCatalog);
 
-        state.seoContent = {
-          schemaVersion: 1,
-          siteUrl: PUBLIC_SITE_URL,
-          languages
-        };
+        mergeSeoContentLanguages(languages);
+        state.seoContentComplete = true;
         return state.seoContent;
       })
       .catch((error) => {
-        console.warn('Hashinmy: no se pudo cargar el contenido SEO de productos desde textX/seo.', error);
-        state.seoContent = null;
-        return null;
+        console.warn('Hashinmy: no se pudo completar la precarga SEO de productos desde textX/seo.', error);
+        state.seoContentComplete = false;
+        return state.seoContent;
       })
       .finally(() => {
         state.seoContentPromise = null;
@@ -2613,9 +2669,13 @@
     if (!elements.seoHubButton) return;
     const bundle = getSeoBundle();
     if (!bundle) {
-      elements.seoHubButton.hidden = true;
-      elements.seoHubButton.setAttribute('aria-hidden', 'true');
-      try { elements.seoHubButton.inert = true; } catch {}
+      const fallbackLabel = String(elements.seoHubButton.textContent || '').trim() || (state.language === 'en' ? 'Products' : 'Productos');
+      elements.seoHubButton.hidden = false;
+      elements.seoHubButton.removeAttribute('aria-hidden');
+      try { elements.seoHubButton.inert = false; } catch {}
+      elements.seoHubButton.textContent = fallbackLabel;
+      elements.seoHubButton.setAttribute('aria-label', fallbackLabel);
+      elements.seoHubButton.setAttribute('aria-expanded', 'false');
       syncSeoClassicLink();
       return;
     }
@@ -3116,11 +3176,59 @@
     } catch {}
   }
 
+  function renderSeoHubLoadingShell({ classicView = false } = {}) {
+    if (!elements.seoHub) return;
+
+    const entryLabel = String(elements.seoHubButton?.textContent || '').trim() || (state.language === 'en' ? 'Products' : 'Productos');
+    state.seoHubOpen = true;
+    state.seoClassicView = Boolean(classicView);
+    document.body.classList.add('hm-seo-is-open');
+    document.body.dataset.seoHub = 'loading';
+    syncSeoClassicViewChrome();
+    syncSeoFullscreenMode(state.seoClassicView);
+
+    elements.seoHub.hidden = false;
+    elements.seoHub.setAttribute('aria-busy', 'true');
+    if (elements.seoHubTitle) elements.seoHubTitle.textContent = entryLabel;
+    if (elements.seoHubLead) elements.seoHubLead.textContent = '';
+    if (elements.seoHubCategories) {
+      elements.seoHubCategories.innerHTML = '';
+      elements.seoHubCategories.hidden = true;
+      elements.seoHubCategories.setAttribute('aria-hidden', 'true');
+      try { elements.seoHubCategories.inert = true; } catch {}
+    }
+    if (elements.seoHubCards) {
+      elements.seoHubCards.innerHTML = '';
+      elements.seoHubCards.hidden = false;
+      elements.seoHubCards.removeAttribute('aria-hidden');
+      try { elements.seoHubCards.inert = false; } catch {}
+    }
+    if (elements.seoHubDetail) {
+      elements.seoHubDetail.innerHTML = '';
+      elements.seoHubDetail.hidden = true;
+    }
+    syncSeoClassicLink();
+
+    window.setTimeout(() => {
+      if (state.seoHubOpen && state.seoOpenRequestToken) elements.seoHubClose?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   async function openSeoHub({ itemId = '', categoryId = '', pushHistory = true, replaceHistory = false, classicView = false, preferClassicCategory = false } = {}) {
     if (state.proofWindowOpen) closeProofWindow({ focusReturn: false });
-    await loadSeoContent();
+    const openRequestToken = ++state.seoOpenRequestToken;
+
+    if (!getSeoBundle()) {
+      renderSeoHubLoadingShell({ classicView });
+      await loadSeoLanguageContent(state.language);
+      if (openRequestToken !== state.seoOpenRequestToken || !state.seoHubOpen) return true;
+    }
+
     const bundle = getSeoBundle();
-    if (!bundle) return false;
+    if (!bundle) {
+      if (openRequestToken === state.seoOpenRequestToken && state.seoHubOpen) closeSeoHub({ pushHistory: false });
+      return false;
+    }
 
     const requestedItem = itemId ? getSeoItemById(itemId) : null;
     state.seoHubOpen = true;
@@ -3129,6 +3237,7 @@
     state.seoActiveCategory = requestedItem?.category || categoryId || state.seoActiveCategory || bundle.categories?.[0]?.id || '';
     document.body.classList.add('hm-seo-is-open');
     document.body.dataset.seoHub = state.seoClassicView ? 'classic' : state.seoActiveId ? 'detail' : 'index';
+    elements.seoHub?.removeAttribute('aria-busy');
     syncSeoClassicViewChrome();
     syncSeoFullscreenMode(state.seoClassicView);
     renderSeoHub();
@@ -3141,11 +3250,21 @@
         : (state.seoActiveId ? elements.seoHubDetail?.querySelector('[data-action="seo-back"]') : elements.seoHubClose);
       focusTarget?.focus({ preventScroll: true });
     }, 0);
+    if (!state.seoContentComplete) {
+      loadSeoContent()
+        .then(() => {
+          syncLocalizedSeoLinks();
+          syncSeoStructuredData();
+          if (state.seoHubOpen) renderSeoHub();
+        })
+        .catch((error) => console.warn('Hashinmy: no se pudo completar la precarga SEO después de abrir Productos.', error));
+    }
     return true;
   }
 
   function closeSeoHub({ pushHistory = true } = {}) {
     if (!state.seoHubOpen) return;
+    state.seoOpenRequestToken += 1;
     state.seoHubOpen = false;
     state.seoClassicView = false;
     state.seoActiveId = '';
@@ -3153,6 +3272,7 @@
     delete document.body.dataset.seoHub;
     if (elements.seoHub) {
       elements.seoHub.hidden = true;
+      elements.seoHub.removeAttribute('aria-busy');
       elements.seoHub.classList.remove('hm-seo-hub--classic');
       elements.seoHub.dataset.seoView = 'modern';
     }
@@ -5231,6 +5351,7 @@
       if (!applied) return;
       render();
       if (state.seoHubOpen) {
+        if (!getSeoBundle()) await loadSeoLanguageContent(state.language);
         if (state.seoActiveId && !getSeoItemById(state.seoActiveId)) state.seoActiveId = '';
         renderSeoHub();
         syncSeoRouteUrl({ replace: true });
@@ -5718,6 +5839,40 @@
     }
   }
 
+  function openSeoHubFromEntry(actionElement) {
+    const fallbackHref = actionElement?.href || '';
+    openSeoHub({ pushHistory: true })
+      .then((opened) => {
+        if (!opened && fallbackHref) window.location.href = fallbackHref;
+      })
+      .catch((error) => {
+        console.warn('Hashinmy: Productos no pudo abrir el hub inmediato; se usa la ruta navegable de respaldo.', error);
+        if (fallbackHref) window.location.href = fallbackHref;
+      });
+  }
+
+  function handleSeoHubEntryPointerDown(event) {
+    event.stopPropagation();
+  }
+
+  function handleSeoHubEntryKeyDown(event) {
+    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+  }
+
+  function handleSeoHubEntryClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openSeoHubFromEntry(event.currentTarget);
+  }
+
+  function bindImmediateSeoEntryAccess() {
+    if (seoEntryImmediateAccessBound || !elements.seoHubButton) return;
+    elements.seoHubButton.addEventListener('pointerdown', handleSeoHubEntryPointerDown, { passive: true });
+    elements.seoHubButton.addEventListener('keydown', handleSeoHubEntryKeyDown);
+    elements.seoHubButton.addEventListener('click', handleSeoHubEntryClick);
+    seoEntryImmediateAccessBound = true;
+  }
+
   function handleActionClick(event) {
     const seoCard = event.target.closest('[data-seo-card-id]');
     if (seoCard) {
@@ -5769,9 +5924,7 @@
     if (action === 'proof-open') openProofWindow();
     if (action === 'proof-close') closeProofWindow({ focusReturn: true });
     if (action === 'seo-hub') {
-      openSeoHub({ pushHistory: true }).then((opened) => {
-        if (!opened && actionElement.href) window.location.href = actionElement.href;
-      });
+      openSeoHubFromEntry(actionElement);
       return;
     }
     if (action === 'seo-close') closeSeoHub({ pushHistory: true });
@@ -6174,7 +6327,13 @@
 
   function warmSeoContentAfterFirstRender() {
     window.setTimeout(() => {
-      loadSeoContent()
+      loadSeoLanguageContent(state.language)
+        .then(() => {
+          syncSeoEntryButton();
+          syncLocalizedSeoLinks();
+          if (state.seoHubOpen) renderSeoHub();
+          return loadSeoContent();
+        })
         .then(() => {
           syncLocalizedSeoLinks();
           syncSeoStructuredData();
@@ -6397,8 +6556,9 @@
   }
 
   async function init() {
-    await loadMemoriaBackendRuntimeConfig();
     bindElements();
+    bindImmediateSeoEntryAccess();
+    const memoriaBackendRuntimeConfigReady = loadMemoriaBackendRuntimeConfig();
     renderProofLogos();
     validateSceneMap();
     setViewportHeightVariable();
@@ -6407,7 +6567,15 @@
     hydrateInitialSceneImageState();
     syncProofWindowButton();
     seedFastLanguageCatalog();
+    await memoriaBackendRuntimeConfigReady;
     await readLanguage();
+
+    loadSeoLanguageContent(state.language)
+      .then(() => {
+        syncSeoEntryButton();
+        syncLocalizedSeoLinks();
+      })
+      .catch((error) => console.warn('Hashinmy: no se pudo preparar Productos de forma anticipada.', error));
 
     const initialLanguageRequestToken = ++state.languageRequestToken;
     const initialTextSeed = seedInitialCriticalText(state.language);
