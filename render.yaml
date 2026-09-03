@@ -7477,3 +7477,15 @@ services:
       - type: redirect
         source: /transformacion-digital-empresas-colombia.html
         destination: /es/productos/transformacion-digital/
+
+      # Fallback de índice de directorio para acceso directo en Render.
+      # Mantiene la URL canónica con slash y sirve el index.html estático ya generado.
+      - type: rewrite
+        source: /:lang/
+        destination: /:lang/index.html
+      - type: rewrite
+        source: /:lang/:section/
+        destination: /:lang/:section/index.html
+      - type: rewrite
+        source: /:lang/:section/:slug/
+        destination: /:lang/:section/:slug/index.html

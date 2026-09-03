@@ -498,6 +498,32 @@ function collectCanonicalDirectRoutePairs(seoContent = {}, languageManifest = {}
   return pairs;
 }
 
+function buildRenderDirectoryIndexRewriteRule(depth = 1) {
+  const safeDepth = Math.max(1, Number(depth) || 1);
+  const segmentNames = ['lang', 'section', 'slug'];
+  const segments = Array.from({ length: safeDepth }, (_, index) => `:${segmentNames[index] || `level${index + 1}`}`);
+  const source = `/${segments.join('/')}/`;
+  const destination = `/${segments.join('/')}/index.html`;
+  return { source, destination };
+}
+
+function assertRenderDirectoryIndexRewrites(renderConfig = '', routePairs = [], sourceLabel = 'render.yaml') {
+  const requiredDepths = [...new Set(routePairs.map(({ destination }) => (
+    normalizeSeoPath(destination).split('/').filter(Boolean).length
+  )).filter((depth) => depth > 0))].sort((a, b) => a - b);
+
+  const missing = requiredDepths
+    .map(buildRenderDirectoryIndexRewriteRule)
+    .filter(({ source, destination }) => (
+      !renderConfig.includes(`type: rewrite\n        source: ${source}\n        destination: ${destination}`)
+    ));
+
+  assert(
+    !missing.length,
+    `${sourceLabel} debe reescribir las URLs canónicas con slash hacia su index.html estático para que Render abra enlaces directos sin 404. Faltan: ${missing.map(({ source, destination }) => `${source} -> ${destination}`).join(', ')}.`
+  );
+}
+
 function assertRenderAccessibleDirectRoutes(renderConfig = '', seoContent = {}, languageManifest = {}, sourceLabel = 'render.yaml') {
   const routePairs = collectCanonicalDirectRoutePairs(seoContent, languageManifest);
   const missing = routePairs.filter(({ source, destination }) => (
@@ -508,6 +534,7 @@ function assertRenderAccessibleDirectRoutes(renderConfig = '', seoContent = {}, 
     !missing.length,
     `${sourceLabel} debe redirigir todas las rutas públicas sin barra final a su URL canónica con slash para evitar Not Found al pegar URLs visibles directamente. Faltan: ${missing.slice(0, 12).map(({ source, destination }) => `${source} -> ${destination}`).join(', ')}.`
   );
+  assertRenderDirectoryIndexRewrites(renderConfig, routePairs, sourceLabel);
 }
 
 function extractLlmsLanguageSection(llmsText = '', code = '') {
