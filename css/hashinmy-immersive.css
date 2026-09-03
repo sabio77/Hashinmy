@@ -6244,6 +6244,7 @@ body.hm-viewport-cramped:not([data-scene="intro"]) .hm-option {
 
 .hm-whatsapp-float__image {
   position: absolute;
+  z-index: 1;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -6256,8 +6257,19 @@ body.hm-viewport-cramped:not([data-scene="intro"]) .hm-option {
   opacity: 1;
 }
 
+.hm-whatsapp-float__outline {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .hm-whatsapp-float__fallback {
   position: absolute;
+  z-index: 2;
   inset: 0;
   display: block;
   width: 100%;
